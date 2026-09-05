@@ -1,0 +1,11 @@
+# El contexto de construcción no debe llevar nada que no acabe en la imagen.
+# Esto es también una medida de seguridad: un .env en el contexto puede acabar
+# copiado por un COPY . . descuidado.
+.env
+*.env
+!.env.example
+*_test.go
+testdata/
+bin/
+coverage.out
+.git

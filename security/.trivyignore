@@ -1,0 +1,14 @@
+# CVE aceptados temporalmente.
+#
+# REGLA: ninguna entrada sin las tres cosas —justificación, responsable y fecha
+# de expiración—. Un .trivyignore sin fechas deja de ser una decisión de riesgo
+# y pasa a ser un cajón donde se esconden los problemas.
+#
+# Formato:
+#   # <CVE> — <por qué se acepta>
+#   # Responsable: <rol>  ·  Expira: AAAA-MM-DD  ·  Ficha: security/findings/VULN-NNN-*.md
+#   <CVE>
+#
+# Hoy está vacío a propósito: la línea base vulnerable existe para que los
+# hallazgos SE VEAN, no para silenciarlos. Las excepciones que aparezcan durante
+# la remediación se documentarán aquí una a una.

@@ -1,0 +1,54 @@
+# Configuración de golangci-lint.
+#
+# gosec va aquí y no como herramienta aparte para que un solo comando cubra
+# estilo y seguridad: cuantos menos pasos tenga que recordar alguien, más
+# probable es que los ejecute antes de abrir el PR.
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  enable:
+    - gosec         # análisis de seguridad (G101 credenciales, G201 SQL, G401 hash débil…)
+    - errcheck      # errores ignorados
+    - govet
+    - staticcheck
+    - ineffassign
+    - unused
+    - misspell
+    - bodyclose     # cuerpos de respuesta HTTP sin cerrar
+    - noctx         # peticiones HTTP sin contexto
+    - rowserrcheck  # errores de sql.Rows sin comprobar
+    - sqlclosecheck
+    - errorlint     # comparación de errores sin errors.Is/As
+    - copyloopvar
+    - nolintlint    # obliga a justificar cada //nolint
+
+linters-settings:
+  gosec:
+    excludes: []
+    severity: low
+    confidence: low
+
+  errcheck:
+    check-type-assertions: true
+
+  misspell:
+    locale: US
+
+  nolintlint:
+    require-explanation: true
+    require-specific: true
+    allow-unused: false
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+  exclude-rules:
+    # Los archivos de la línea base vulnerable llevan sus propios //nolint con
+    # explicación y referencia a la ficha VULN-NNN correspondiente. No se
+    # excluyen aquí: se quiere que gosec los siga marcando en el informe.
+    - path: _test\.go
+      linters: [gosec, errcheck, bodyclose, noctx]

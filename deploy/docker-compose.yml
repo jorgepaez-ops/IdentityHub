@@ -1,0 +1,200 @@
+# ╔══════════════════════════════════════════════════════════════════════════╗
+# ║  Entorno de DESARROLLO — construye desde el código local.                 ║
+# ║                                                                          ║
+# ║  ⚠️ Contiene defectos sembrados a propósito (ver adr/0007):               ║
+# ║      VULN-003  credenciales incrustadas en el compose  → Gitleaks         ║
+# ║      VULN-019  imágenes base antiguas                  → Trivy image      ║
+# ║      VULN-020  sin endurecimiento de contenedores      → Trivy config     ║
+# ║                                                                          ║
+# ║  El compose de producción (docker-compose.prod.yml) llega en la semana 3: ║
+# ║  imágenes firmadas desde GHCR, secretos por entorno y endurecimiento.     ║
+# ╚══════════════════════════════════════════════════════════════════════════╝
+
+name: identity-hub
+
+services:
+  # ── Datos ───────────────────────────────────────────────────────────────
+  db:
+    # VULN-019 — PostgreSQL 14 sobre bullseye: rama antigua, muchos CVE de SO.
+    image: postgres:14-bullseye
+    environment:
+      # VULN-003 — Credenciales incrustadas. Lo correcto es leerlas de .env,
+      # que está fuera de git, y fallar el arranque si no están.
+      POSTGRES_USER: identity
+      POSTGRES_PASSWORD: postgres_admin_2024
+      POSTGRES_DB: identity
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U identity -d identity"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  broker:
+    # VULN-019 — RabbitMQ 3.11 está fuera de soporte.
+    image: rabbitmq:3.11-management
+    environment:
+      RABBITMQ_DEFAULT_USER: identity
+      RABBITMQ_DEFAULT_PASS: rabbit_admin_2024
+    ports:
+      - "5672:5672"    # AMQP
+      - "15672:15672"  # interfaz de administración
+    volumes:
+      - rabbitdata:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  mailpit:
+    # Servidor SMTP de captura: recoge todo el correo saliente y lo muestra en
+    # una interfaz web. No es un broker — esa función la cumple RabbitMQ.
+    image: axllent/mailpit:v1.20
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # interfaz web y API HTTP que consultan las pruebas E2E
+    environment:
+      MP_MAX_MESSAGES: 500
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Migraciones ─────────────────────────────────────────────────────────
+  migrate:
+    image: migrate/migrate:v4.17.0
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ../db/migrations:/migrations:ro
+    command:
+      - "-path=/migrations"
+      - "-database=postgres://identity:postgres_admin_2024@db:5432/identity?sslmode=disable"
+      - "up"
+    restart: on-failure
+
+  # ── Aplicación ──────────────────────────────────────────────────────────
+  api:
+    build:
+      context: ../backend
+      target: api
+    depends_on:
+      db:
+        condition: service_healthy
+      broker:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      API_PORT: 8081
+      LOG_LEVEL: debug
+      APP_VERSION: 0.1.0-baseline
+      DATABASE_URL: postgres://identity:postgres_admin_2024@db:5432/identity?sslmode=disable
+      RABBITMQ_URL: amqp://identity:rabbit_admin_2024@broker:5672/
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      SMTP_FROM: no-reply@identity.local
+      JWT_ISSUER: http://localhost:8080
+    ports:
+      - "8081:8081"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8081/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+    # VULN-020 — Aquí faltan read_only, cap_drop, no-new-privileges y user.
+    # Se añaden en el compose de producción durante la remediación (RNF-008).
+
+  worker:
+    build:
+      context: ../backend
+      target: worker
+    depends_on:
+      broker:
+        condition: service_healthy
+      mailpit:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      LOG_LEVEL: debug
+      APP_VERSION: 0.1.0-baseline
+      DATABASE_URL: postgres://identity:postgres_admin_2024@db:5432/identity?sslmode=disable
+      RABBITMQ_URL: amqp://identity:rabbit_admin_2024@broker:5672/
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      SMTP_FROM: no-reply@identity.local
+    ports:
+      - "9091:9091"  # /metrics del worker
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ../frontend
+      target: web
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+
+  # ── Observabilidad (perfil aparte) ──────────────────────────────────────
+  # Se arranca con:  docker compose --profile observability up -d
+  # Fuera del perfil por defecto para no cargar cuatro contenedores más en cada
+  # ciclo de desarrollo.
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    profiles: ["observability"]
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+
+  loki:
+    image: grafana/loki:2.9.4
+    profiles: ["observability"]
+    command: ["-config.file=/etc/loki/local-config.yaml"]
+    ports:
+      - "3100:3100"
+
+  alloy:
+    # Grafana Alloy sustituye a Promtail, que está descontinuado.
+    image: grafana/alloy:v1.0.0
+    profiles: ["observability"]
+    depends_on: [loki]
+    volumes:
+      - ./observability/alloy.river:/etc/alloy/config.river:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command:
+      - "run"
+      - "--server.http.listen-addr=0.0.0.0:12345"
+      - "/etc/alloy/config.river"
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    profiles: ["observability"]
+    depends_on: [prometheus, loki]
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./observability/grafana:/etc/grafana/provisioning:ro
+      - grafanadata:/var/lib/grafana
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:
+  rabbitdata:
+  grafanadata:

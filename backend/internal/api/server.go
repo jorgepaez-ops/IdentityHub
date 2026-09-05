@@ -1,0 +1,60 @@
+// Package api expone el servidor HTTP.
+//
+// A partir de la semana 2 los handlers implementan la interfaz generada por
+// oapi-codegen desde specs/03-api/openapi.yaml, de modo que divergir del
+// contrato pasa a ser un error de compilación y no un fallo en producción.
+package api
+
+import (
+	"log/slog"
+	"net/http"
+	"time"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+)
+
+type Server struct {
+	logger  *slog.Logger
+	version string
+	deps    map[string]Checker
+}
+
+func NewServer(logger *slog.Logger, version string, deps map[string]Checker) *Server {
+	return &Server{logger: logger, version: version, deps: deps}
+}
+
+func (s *Server) Routes() http.Handler {
+	r := chi.NewRouter()
+
+	r.Use(middleware.RealIP)
+	r.Use(TraceID)
+	r.Use(middleware.Recoverer)
+	r.Use(middleware.Timeout(30 * time.Second))
+	// Un cuerpo de petición acotado (AM-018). Ninguna operación del contrato
+	// necesita más de 1 MiB.
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			req.Body = http.MaxBytesReader(w, req.Body, 1<<20)
+			next.ServeHTTP(w, req)
+		})
+	})
+	r.Use(Metrics)
+
+	r.Get("/healthz", s.Health)
+	r.Get("/readyz", s.Readiness)
+
+	// /metrics no se expone al exterior: Nginx no lo proxea y en producción el
+	// puerto de la API no se publica al host. Solo Prometheus, dentro de la red
+	// de Docker, puede alcanzarlo.
+	r.Handle("/metrics", promhttp.Handler())
+
+	r.Route("/api/v1", func(r chi.Router) {
+		// ⚠️ Endpoint de la línea base vulnerable. No está en el contrato
+		// OpenAPI y se elimina en la fase de remediación (ver adr/0007).
+		r.Get("/auth/legacy-login", s.LegacyLogin)
+	})
+
+	return r
+}

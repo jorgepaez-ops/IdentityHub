@@ -1,0 +1,57 @@
+# Configuración de Gitleaks.
+#
+# HALLAZGO QUE MOTIVA ESTE ARCHIVO (ver security/findings/VULN-023):
+# el conjunto de reglas por defecto detecta secretos con formato reconocible
+# —claves de AWS, tokens de Slack, claves privadas PEM— porque puede
+# identificarlos por su forma. Pero NO detecta una contraseña genérica como
+#
+#     POSTGRES_PASSWORD: postgres_admin_2024
+#
+# porque es indistinguible de cualquier otra cadena. En la línea base, Gitleaks
+# con reglas por defecto encontró 2 de los 6 secretos sembrados.
+#
+# Confiar solo en las reglas por defecto deja pasar exactamente la clase de
+# secreto más común en un proyecto real: la contraseña de la base de datos.
+
+[extend]
+useDefault = true
+
+# Los grupos son NO capturantes a propósito: con grupos capturantes, Gitleaks
+# informa del grupo y no de la coincidencia completa, y la lista de excepciones
+# —que se compara contra el secreto informado— deja de funcionar como uno espera.
+[[rules]]
+id = "contrasena-en-variable-de-entorno"
+description = "Contraseña o secreto asignado en una variable de entorno o en YAML"
+# El prefijo (?:[a-z0-9]+[_-])* es esencial: `\bpassword` NO coincide dentro de
+# `POSTGRES_PASSWORD`, porque el guion bajo es carácter de palabra y no hay
+# frontera antes de "PASSWORD". Sin esto, la regla pasaba por alto justo la
+# variable más común. Se detectó comparando lo encontrado con lo sembrado.
+regex = '''(?im)(?:^|[\s"',{[])(?:[a-z0-9]+[_-])*(?:password|passwd|pass|secret|api[_-]?key|signing[_-]?key)["']?\s*[:=]\s*["']?[^\s"'{$#][^\s"']{7,}["']?'''
+tags = ["secreto", "generico"]
+
+[[rules]]
+id = "url-de-conexion-con-credenciales"
+description = "URL de conexión con usuario y contraseña incrustados"
+regex = '''(?i)\b(?:postgres|postgresql|mysql|mongodb|amqp|redis|rediss)://[^:\s/]+:[^@\s/]+@'''
+tags = ["secreto", "dsn"]
+
+[allowlist]
+description = "Rutas y valores que no son secretos reales"
+paths = [
+  '''\.gitleaks\.toml$''',
+  '''security/findings/.*\.md$''',   # las fichas citan los secretos como evidencia
+  '''security/evidence/.*''',
+  '''\.env\.example$''',             # plantilla sin valores
+  '''package-lock\.json$''',
+]
+regexes = [
+  '''\$\{[A-Z_]+\}''',   # interpolación, no un valor
+  '''password:\s*$''',   # clave sin valor
+
+  # Fixtures de prueba, enumerados uno a uno con su valor literal en lugar de
+  # excluir *_test.go en bloque. Los secretos reales también acaban en los
+  # tests, y una exclusión amplia sería justo el agujero que este archivo
+  # existe para cerrar.
+  '''contraseña-real''',
+  '''aGVsbG8td29ybGQt''',
+]

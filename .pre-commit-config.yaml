@@ -1,0 +1,53 @@
+# Ganchos locales. Los mismos controles que en CI, pero antes de commitear.
+#
+# El objetivo no es duplicar el pipeline: es acortar el ciclo. Descubrir un
+# secreto commiteado en CI ya es tarde, porque el secreto ya está en el
+# historial y hay que rotarlo.
+#
+# Instalar con:  pre-commit install
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=512]
+      - id: detect-private-key
+
+  # RNF-003 — La última línea de defensa antes de que un secreto entre en el
+  # historial de git.
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.18.4
+    hooks:
+      - id: gitleaks
+
+  - repo: local
+    hooks:
+      - id: gofmt
+        name: gofmt
+        entry: bash -c 'cd backend && gofmt -l -w .'
+        language: system
+        types: [go]
+        pass_filenames: false
+
+      - id: go-build
+        name: go build
+        entry: bash -c 'cd backend && go build ./...'
+        language: system
+        types: [go]
+        pass_filenames: false
+
+      # RNF-011 — La matriz de trazabilidad se regenera sola; commitearla
+      # desactualizada rompe el job spec-drift.
+      - id: traceability
+        name: matriz de trazabilidad
+        entry: python3 scripts/traceability.py
+        language: system
+        files: ^(specs/|backend/.*_test\.go|e2e/)
+        pass_filenames: false

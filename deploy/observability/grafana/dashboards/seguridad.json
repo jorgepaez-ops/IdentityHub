@@ -1,0 +1,62 @@
+{
+  "title": "Identity Hub — Seguridad",
+  "uid": "identity-security",
+  "tags": ["identity", "seguridad"],
+  "timezone": "browser",
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Intentos de inicio de sesión por resultado",
+      "description": "Un pico de 'failed' concentrado en pocas IP es el patrón de fuerza bruta (AM-001).",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum by (result) (rate(identity_login_attempts_total[5m]))",
+          "legendFormat": "{{result}}"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Reusos de refresh token detectados",
+      "description": "Cada uno revoca una familia de sesiones (RF-006). Un valor distinto de cero merece investigación.",
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 0 },
+      "targets": [
+        { "expr": "increase(identity_refresh_reuse_detected_total[24h])" }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Profundidad de la DLQ",
+      "description": "Notificaciones que fallaron tres entregas. Alerta por encima de 10 (AM-019).",
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 0 },
+      "targets": [
+        { "expr": "rabbitmq_queue_messages{queue=\"notifications.dlq\"}" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Latencia p95 por ruta",
+      "description": "RNF-010: por debajo de 300 ms, excluido el coste deliberado de Argon2id.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, route) (rate(identity_http_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "{{route}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Eventos publicados y consumidos",
+      "description": "Una divergencia sostenida entre ambas series significa que el worker no da abasto.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        { "expr": "sum(rate(identity_events_published_total[5m]))", "legendFormat": "publicados" },
+        { "expr": "sum(rate(identity_events_consumed_total[5m]))", "legendFormat": "consumidos" }
+      ]
+    }
+  ]
+}

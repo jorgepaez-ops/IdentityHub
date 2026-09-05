@@ -1,0 +1,774 @@
+openapi: 3.0.3
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  FUENTE DE VERDAD del contrato HTTP.
+#  De este archivo se genera:
+#    · backend/internal/api/gen.go        (tipos + interfaz del servidor)  oapi-codegen
+#    · frontend/src/api/schema.d.ts       (tipos del cliente)              openapi-typescript
+#  El job `spec-drift` de CI regenera y falla si el resultado difiere.
+#  Se usa 3.0.3 y no 3.1 por compatibilidad con kin-openapi (ver adr/0003).
+# ─────────────────────────────────────────────────────────────────────────────
+
+info:
+  title: Identity Hub API
+  version: 0.1.0
+  description: |
+    Proveedor de identidad: registro, autenticación, emisión y rotación de tokens,
+    segundo factor, control de acceso por roles y auditoría.
+
+    Cada operación declara `x-requirement` con el identificador del requisito que
+    implementa (ver specs/01-requirements.md).
+  license:
+    name: Apache-2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+
+servers:
+  - url: http://localhost:8080
+    description: Desarrollo local (a través de Nginx)
+
+tags:
+  - name: system
+    description: Sondas de salud y metadatos criptográficos
+  - name: auth
+    description: Operaciones no autenticadas del ciclo de sesión
+  - name: me
+    description: Operaciones del titular sobre su propia cuenta
+  - name: admin
+    description: Operaciones restringidas al rol admin
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ── Sistema ───────────────────────────────────────────────────────────────
+  /healthz:
+    get:
+      operationId: getHealth
+      tags: [system]
+      summary: Sonda de vitalidad
+      security: []
+      responses:
+        '200':
+          description: El proceso está vivo
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HealthStatus' }
+
+  /readyz:
+    get:
+      operationId: getReadiness
+      tags: [system]
+      summary: Sonda de disponibilidad (comprueba base de datos y broker)
+      security: []
+      responses:
+        '200':
+          description: Todas las dependencias responden
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReadinessStatus' }
+        '503':
+          description: Alguna dependencia no responde
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReadinessStatus' }
+
+  /.well-known/jwks.json:
+    get:
+      operationId: getJwks
+      tags: [system]
+      summary: Clave pública para validar los tokens emitidos
+      x-requirement: RF-004
+      security: []
+      responses:
+        '200':
+          description: Conjunto de claves públicas
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Jwks' }
+
+  # ── Autenticación ─────────────────────────────────────────────────────────
+  /api/v1/auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Crear una cuenta
+      x-requirement: RF-001
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterRequest' }
+      responses:
+        '201':
+          description: Cuenta creada en estado pending_verification
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RegisterResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409':
+          description: El correo ya está registrado
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /api/v1/auth/verify-email:
+    post:
+      operationId: verifyEmail
+      tags: [auth]
+      summary: Activar la cuenta con el token recibido por correo
+      x-requirement: RF-002
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TokenRequest' }
+      responses:
+        '204': { description: Cuenta activada }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '410':
+          description: El token expiró o ya fue usado
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /api/v1/auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Iniciar sesión con correo y contraseña
+      description: |
+        Devuelve `200` con el par de tokens si la cuenta no tiene segundo factor.
+        Si lo tiene, devuelve `202` con un `mfa_token` de corta vida que debe
+        canjearse en `/api/v1/auth/mfa/verify`.
+      x-requirement: RF-003
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: Sesión iniciada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenPair' }
+        '202':
+          description: Se requiere segundo factor
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MfaChallenge' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '423':
+          description: Cuenta bloqueada por intentos fallidos
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /api/v1/auth/mfa/verify:
+    post:
+      operationId: verifyMfa
+      tags: [auth]
+      summary: Canjear el desafío de segundo factor por una sesión
+      x-requirement: RF-014
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MfaVerifyRequest' }
+      responses:
+        '200':
+          description: Sesión iniciada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenPair' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/v1/auth/refresh:
+    post:
+      operationId: refreshSession
+      tags: [auth]
+      summary: Rotar el refresh token y obtener un par nuevo
+      description: |
+        La rotación es obligatoria: el token presentado queda invalidado.
+        Presentar un token ya rotado se interpreta como robo de credencial y
+        revoca la familia de sesiones completa (RF-006).
+      x-requirement: RF-005
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefreshRequest' }
+      responses:
+        '200':
+          description: Par de tokens renovado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenPair' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/v1/auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Revocar el refresh token de la sesión actual
+      x-requirement: RF-007
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefreshRequest' }
+      responses:
+        '204': { description: Sesión cerrada }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/v1/auth/password-reset/request:
+    post:
+      operationId: requestPasswordReset
+      tags: [auth]
+      summary: Solicitar un enlace de restablecimiento
+      description: Responde `202` exista o no la cuenta, para no revelar qué correos están registrados.
+      x-requirement: RF-015
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EmailRequest' }
+      responses:
+        '202': { description: Si la cuenta existe, se envió el correo }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /api/v1/auth/password-reset/confirm:
+    post:
+      operationId: confirmPasswordReset
+      tags: [auth]
+      summary: Fijar una contraseña nueva con el token recibido
+      x-requirement: RF-015
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PasswordResetConfirmRequest' }
+      responses:
+        '204': { description: Contraseña actualizada y sesiones revocadas }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '410':
+          description: El token expiró o ya fue usado
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  # ── Titular ───────────────────────────────────────────────────────────────
+  /api/v1/me:
+    get:
+      operationId: getCurrentUser
+      tags: [me]
+      summary: Perfil del usuario autenticado
+      x-requirement: RF-008
+      responses:
+        '200':
+          description: Perfil
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    patch:
+      operationId: updateCurrentUser
+      tags: [me]
+      summary: Actualizar el perfil propio
+      x-requirement: RF-008
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateProfileRequest' }
+      responses:
+        '200':
+          description: Perfil actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/v1/me/sessions:
+    get:
+      operationId: listSessions
+      tags: [me]
+      summary: Sesiones activas del titular
+      x-requirement: RF-016
+      responses:
+        '200':
+          description: Listado de sesiones
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Session' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/v1/me/sessions/{sessionId}:
+    delete:
+      operationId: revokeSession
+      tags: [me]
+      summary: Revocar una sesión concreta
+      x-requirement: RF-016
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '204': { description: Sesión revocada }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/me/mfa/enroll:
+    post:
+      operationId: enrollMfa
+      tags: [me]
+      summary: Iniciar el alta de TOTP
+      description: Devuelve el secreto una única vez. No se puede volver a consultar.
+      x-requirement: RF-013
+      responses:
+        '200':
+          description: Secreto y códigos de recuperación
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MfaEnrollment' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409':
+          description: El segundo factor ya está activo
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /api/v1/me/mfa/activate:
+    post:
+      operationId: activateMfa
+      tags: [me]
+      summary: Confirmar el alta con un código TOTP válido
+      x-requirement: RF-013
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MfaCodeRequest' }
+      responses:
+        '204': { description: Segundo factor activado }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/v1/me/mfa:
+    delete:
+      operationId: disableMfa
+      tags: [me]
+      summary: Desactivar el segundo factor
+      x-requirement: RF-013
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PasswordConfirmRequest' }
+      responses:
+        '204': { description: Segundo factor desactivado }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  # ── Administración ────────────────────────────────────────────────────────
+  /api/v1/admin/users:
+    get:
+      operationId: listUsers
+      tags: [admin]
+      summary: Listar y buscar cuentas
+      x-requirement: RF-010
+      parameters:
+        - $ref: '#/components/parameters/Query'
+        - $ref: '#/components/parameters/Status'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Página de cuentas
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserPage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/v1/admin/users/{userId}:
+    get:
+      operationId: getUser
+      tags: [admin]
+      summary: Consultar una cuenta
+      x-requirement: RF-010
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: Cuenta
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      operationId: updateUser
+      tags: [admin]
+      summary: Cambiar el estado o los roles de una cuenta
+      description: Un administrador no puede deshabilitarse a sí mismo (invariante 6).
+      x-requirement: RF-010
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminUpdateUserRequest' }
+      responses:
+        '200':
+          description: Cuenta actualizada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/admin/audit-log:
+    get:
+      operationId: listAuditLog
+      tags: [admin]
+      summary: Consultar el registro de auditoría
+      x-requirement: RF-011
+      parameters:
+        - $ref: '#/components/parameters/Action'
+        - $ref: '#/components/parameters/ActorId'
+        - $ref: '#/components/parameters/Since'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Página de eventos
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuditLogPage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token Ed25519. Validar contra el JWKS; se rechaza cualquier `alg` distinto de `EdDSA`.
+
+  parameters:
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    SessionId:
+      name: sessionId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Query:
+      name: q
+      in: query
+      description: Búsqueda parcial por correo o nombre
+      schema: { type: string, maxLength: 200 }
+    Status:
+      name: status
+      in: query
+      schema: { $ref: '#/components/schemas/UserStatus' }
+    Action:
+      name: action
+      in: query
+      schema: { type: string, maxLength: 100 }
+    ActorId:
+      name: actorId
+      in: query
+      schema: { type: string, format: uuid }
+    Since:
+      name: since
+      in: query
+      schema: { type: string, format: date-time }
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+    Cursor:
+      name: cursor
+      in: query
+      schema: { type: string, maxLength: 500 }
+
+  responses:
+    BadRequest:
+      description: Petición mal formada o que no supera la validación
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Unauthorized:
+      description: Credenciales ausentes, inválidas o expiradas
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Forbidden:
+      description: Autenticado pero sin permiso para este recurso
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    NotFound:
+      description: El recurso no existe
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    TooManyRequests:
+      description: Límite de peticiones excedido
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+
+  schemas:
+    Problem:
+      type: object
+      description: Error en formato RFC 7807. Nunca revela si un correo está registrado.
+      required: [type, title, status]
+      properties:
+        type:     { type: string, format: uri, example: 'https://identity.local/problems/invalid-credentials' }
+        title:    { type: string, example: 'Credenciales inválidas' }
+        status:   { type: integer, example: 401 }
+        detail:   { type: string }
+        instance: { type: string }
+        errors:
+          type: array
+          description: Detalle por campo en errores de validación
+          items:
+            type: object
+            required: [field, message]
+            properties:
+              field:   { type: string }
+              message: { type: string }
+
+    HealthStatus:
+      type: object
+      required: [status, version]
+      properties:
+        status:  { type: string, enum: [ok] }
+        version: { type: string }
+
+    ReadinessStatus:
+      type: object
+      required: [status, checks]
+      properties:
+        status: { type: string, enum: [ready, degraded] }
+        checks:
+          type: object
+          additionalProperties:
+            type: object
+            required: [status]
+            properties:
+              status: { type: string, enum: [up, down] }
+              error:  { type: string }
+
+    Jwks:
+      type: object
+      required: [keys]
+      properties:
+        keys:
+          type: array
+          items:
+            type: object
+            required: [kty, crv, x, kid, use, alg]
+            properties:
+              kty: { type: string, example: OKP }
+              crv: { type: string, example: Ed25519 }
+              x:   { type: string, description: Clave pública en base64url }
+              kid: { type: string }
+              use: { type: string, example: sig }
+              alg: { type: string, example: EdDSA }
+
+    UserStatus:
+      type: string
+      enum: [pending_verification, active, locked, disabled]
+
+    Role:
+      type: string
+      enum: [admin, user]
+
+    User:
+      type: object
+      required: [id, email, displayName, status, roles, mfaEnabled, createdAt]
+      properties:
+        id:          { type: string, format: uuid }
+        email:       { type: string, format: email }
+        displayName: { type: string }
+        status:      { $ref: '#/components/schemas/UserStatus' }
+        roles:
+          type: array
+          items: { $ref: '#/components/schemas/Role' }
+        mfaEnabled:  { type: boolean }
+        createdAt:   { type: string, format: date-time }
+        lastLoginAt: { type: string, format: date-time, nullable: true }
+
+    UserPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/User' }
+        nextCursor: { type: string, nullable: true }
+
+    RegisterRequest:
+      type: object
+      required: [email, password, displayName]
+      properties:
+        email:       { type: string, format: email, maxLength: 254 }
+        password:    { type: string, minLength: 12, maxLength: 128, format: password }
+        displayName: { type: string, minLength: 1, maxLength: 100 }
+
+    RegisterResponse:
+      type: object
+      required: [id, email, status]
+      properties:
+        id:     { type: string, format: uuid }
+        email:  { type: string, format: email }
+        status: { $ref: '#/components/schemas/UserStatus' }
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:    { type: string, format: email }
+        password: { type: string, format: password }
+
+    TokenPair:
+      type: object
+      required: [accessToken, refreshToken, tokenType, expiresIn]
+      properties:
+        accessToken:  { type: string, description: JWT Ed25519 }
+        refreshToken: { type: string, description: Token opaco de 32 bytes en base64url }
+        tokenType:    { type: string, enum: [Bearer] }
+        expiresIn:    { type: integer, description: Segundos de vigencia del access token, example: 900 }
+
+    MfaChallenge:
+      type: object
+      required: [mfaToken, expiresIn]
+      properties:
+        mfaToken:  { type: string, description: Token de un solo uso, vigente 5 minutos }
+        expiresIn: { type: integer, example: 300 }
+
+    MfaVerifyRequest:
+      type: object
+      required: [mfaToken, code]
+      properties:
+        mfaToken: { type: string }
+        code:     { type: string, description: Código TOTP de 6 dígitos o código de recuperación }
+
+    MfaEnrollment:
+      type: object
+      required: [secret, otpauthUri, recoveryCodes]
+      properties:
+        secret:     { type: string, description: Secreto TOTP en base32. Se muestra una sola vez. }
+        otpauthUri: { type: string, description: 'URI otpauth:// para el código QR' }
+        recoveryCodes:
+          type: array
+          description: Diez códigos de un solo uso. Se muestran una sola vez.
+          items: { type: string }
+
+    MfaCodeRequest:
+      type: object
+      required: [code]
+      properties:
+        code: { type: string, minLength: 6, maxLength: 6 }
+
+    PasswordConfirmRequest:
+      type: object
+      required: [password]
+      properties:
+        password: { type: string, format: password }
+
+    RefreshRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken: { type: string }
+
+    TokenRequest:
+      type: object
+      required: [token]
+      properties:
+        token: { type: string }
+
+    EmailRequest:
+      type: object
+      required: [email]
+      properties:
+        email: { type: string, format: email }
+
+    PasswordResetConfirmRequest:
+      type: object
+      required: [token, password]
+      properties:
+        token:    { type: string }
+        password: { type: string, minLength: 12, maxLength: 128, format: password }
+
+    UpdateProfileRequest:
+      type: object
+      properties:
+        displayName: { type: string, minLength: 1, maxLength: 100 }
+
+    AdminUpdateUserRequest:
+      type: object
+      properties:
+        status: { $ref: '#/components/schemas/UserStatus' }
+        roles:
+          type: array
+          items: { $ref: '#/components/schemas/Role' }
+
+    Session:
+      type: object
+      required: [id, ip, userAgent, createdAt, lastUsedAt, current]
+      properties:
+        id:         { type: string, format: uuid }
+        ip:         { type: string }
+        userAgent:  { type: string }
+        createdAt:  { type: string, format: date-time }
+        lastUsedAt: { type: string, format: date-time }
+        current:    { type: boolean, description: Indica si es la sesión desde la que se consulta }
+
+    AuditEvent:
+      type: object
+      required: [id, action, createdAt]
+      properties:
+        id:           { type: integer, format: int64 }
+        actorUserId:  { type: string, format: uuid, nullable: true }
+        action:       { type: string, example: login_failed }
+        resourceType: { type: string, nullable: true }
+        resourceId:   { type: string, nullable: true }
+        ip:           { type: string, nullable: true }
+        userAgent:    { type: string, nullable: true }
+        metadata:     { type: object, additionalProperties: true }
+        createdAt:    { type: string, format: date-time }
+
+    AuditLogPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/AuditEvent' }
+        nextCursor: { type: string, nullable: true }

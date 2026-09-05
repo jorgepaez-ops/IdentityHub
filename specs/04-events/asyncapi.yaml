@@ -1,0 +1,173 @@
+asyncapi: '2.6.0'
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  FUENTE DE VERDAD del contrato de mensajería entre la API (productor) y el
+#  worker (consumidor).
+#
+#  Nota honesta sobre generación: la generación de código Go desde AsyncAPI no
+#  está madura, así que los structs se escriben a mano en
+#  backend/internal/events/. Lo que sí es automático es la VERIFICACIÓN: la
+#  prueba TestEventContract_MatchesAsyncAPISchema serializa cada evento y lo
+#  valida contra los JSON Schema de este archivo. Si divergen, falla el build.
+# ─────────────────────────────────────────────────────────────────────────────
+
+info:
+  title: Identity Hub — Eventos
+  version: 0.1.0
+  description: |
+    Eventos de dominio y de seguridad publicados por la API y consumidos por el
+    worker de notificaciones.
+  license:
+    name: Apache-2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+
+servers:
+  local:
+    url: broker:5672
+    protocol: amqp
+    description: RabbitMQ en la red de Docker Compose
+
+defaultContentType: application/json
+
+channels:
+  user.registered:
+    description: Se creó una cuenta; hay que enviar el correo de verificación.
+    publish:
+      operationId: publishUserRegistered
+      message: { $ref: '#/components/messages/UserRegistered' }
+
+  user.email_verified:
+    description: La cuenta quedó activa; correo de bienvenida.
+    publish:
+      operationId: publishEmailVerified
+      message: { $ref: '#/components/messages/EmailVerified' }
+
+  user.password_reset_requested:
+    description: Alguien pidió restablecer la contraseña.
+    publish:
+      operationId: publishPasswordResetRequested
+      message: { $ref: '#/components/messages/PasswordResetRequested' }
+
+  security.refresh_reuse_detected:
+    description: |
+      Se presentó un refresh token ya rotado (RF-006). Se revocó la familia de
+      sesiones y hay que avisar al titular de una posible credencial robada.
+    publish:
+      operationId: publishRefreshReuseDetected
+      message: { $ref: '#/components/messages/RefreshReuseDetected' }
+
+  security.account_locked:
+    description: Cuenta bloqueada por intentos fallidos (RF-017).
+    publish:
+      operationId: publishAccountLocked
+      message: { $ref: '#/components/messages/AccountLocked' }
+
+components:
+  messages:
+    UserRegistered:
+      name: UserRegistered
+      title: Cuenta creada
+      contentType: application/json
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/Envelope'
+          - type: object
+            required: [data]
+            properties:
+              data:
+                type: object
+                required: [userId, email, displayName, verificationToken, expiresAt]
+                properties:
+                  userId:            { type: string, format: uuid }
+                  email:             { type: string, format: email }
+                  displayName:       { type: string }
+                  verificationToken: { type: string, description: 'Token en claro: solo viaja por el broker, nunca se registra en logs' }
+                  expiresAt:         { type: string, format: date-time }
+
+    EmailVerified:
+      name: EmailVerified
+      contentType: application/json
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/Envelope'
+          - type: object
+            required: [data]
+            properties:
+              data:
+                type: object
+                required: [userId, email, displayName]
+                properties:
+                  userId:      { type: string, format: uuid }
+                  email:       { type: string, format: email }
+                  displayName: { type: string }
+
+    PasswordResetRequested:
+      name: PasswordResetRequested
+      contentType: application/json
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/Envelope'
+          - type: object
+            required: [data]
+            properties:
+              data:
+                type: object
+                required: [userId, email, resetToken, expiresAt]
+                properties:
+                  userId:     { type: string, format: uuid }
+                  email:      { type: string, format: email }
+                  resetToken: { type: string }
+                  expiresAt:  { type: string, format: date-time }
+
+    RefreshReuseDetected:
+      name: RefreshReuseDetected
+      contentType: application/json
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/Envelope'
+          - type: object
+            required: [data]
+            properties:
+              data:
+                type: object
+                required: [userId, email, familyId, revokedCount, ip]
+                properties:
+                  userId:       { type: string, format: uuid }
+                  email:        { type: string, format: email }
+                  familyId:     { type: string, format: uuid }
+                  revokedCount: { type: integer }
+                  ip:           { type: string }
+                  userAgent:    { type: string }
+
+    AccountLocked:
+      name: AccountLocked
+      contentType: application/json
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/Envelope'
+          - type: object
+            required: [data]
+            properties:
+              data:
+                type: object
+                required: [userId, email, lockedUntil, failedAttempts]
+                properties:
+                  userId:         { type: string, format: uuid }
+                  email:          { type: string, format: email }
+                  lockedUntil:    { type: string, format: date-time }
+                  failedAttempts: { type: integer }
+                  ip:             { type: string }
+
+  schemas:
+    Envelope:
+      type: object
+      description: |
+        Sobre común a todos los eventos. `eventId` permite al consumidor ser
+        idempotente: un reintento del broker no debe enviar el correo dos veces.
+      required: [eventId, eventType, occurredAt, version]
+      properties:
+        eventId:    { type: string, format: uuid }
+        eventType:  { type: string, example: user.registered }
+        occurredAt: { type: string, format: date-time }
+        version:    { type: integer, example: 1 }
+        traceId:    { type: string, description: Correlación con los logs de la API }

@@ -1,0 +1,34 @@
+# Secretos y entorno local
+.env
+.env.local
+*.pem
+*.key
+!specs/**/*.key.example
+
+# Go
+backend/bin/
+*.test
+coverage.out
+coverage.html
+
+# Node / frontend
+node_modules/
+frontend/dist/
+frontend/.vite/
+*.tsbuildinfo
+
+# Playwright
+e2e/node_modules/
+e2e/test-results/
+e2e/playwright-report/
+e2e/.auth/
+
+# Salidas de escaneo generadas localmente (las de CI se versionan en security/evidence/)
+*.sarif
+trivy-report.json
+gitleaks-report.json
+
+# SO / editores
+.DS_Store
+.idea/
+.vscode/

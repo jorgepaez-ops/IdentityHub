@@ -1,0 +1,346 @@
+# ═══════════════════════════════════════════════════════════════════════════
+#  Pipeline principal — los gates ROMPEN la build.
+#
+#  Estado esperado hoy: EN ROJO. El repositorio está en la línea base
+#  deliberadamente vulnerable (specs/adr/0007) y varios gates encuentran lo que
+#  se sembró para ellos. Pasará a verde durante la fase de remediación.
+#  Para ver los hallazgos sin bloquear, está baseline-scan.yml.
+#
+#  Jobs 1–10 de la tabla del plan. Los de release (SBOM, firma, publicación),
+#  E2E y DAST se incorporan en la semana 3.
+# ═══════════════════════════════════════════════════════════════════════════
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# AM-022 — El token por defecto solo lee. Cada job amplía lo mínimo que necesite.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GO_VERSION: "1.22"
+  NODE_VERSION: "18"
+
+jobs:
+  # ── 1. Los specs son la fuente de verdad ────────────────────────────────
+  spec-drift:
+    name: 1 · Deriva entre specs y código
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validar el contrato OpenAPI
+        run: |
+          python3 -m pip install --quiet 'openapi-spec-validator==0.7.1'
+          python3 -m openapi_spec_validator specs/03-api/openapi.yaml
+
+      - name: Regenerar la matriz de trazabilidad
+        run: python3 scripts/traceability.py --check
+
+      # A partir de la semana 2, aquí se regeneran también
+      # backend/internal/api/gen.go y frontend/src/api/schema.d.ts y se
+      # comprueba que no difieren de lo commiteado (RNF-011).
+      - name: El árbol de trabajo debe quedar limpio
+        run: git diff --exit-code
+
+  # ── 2. Estilo y tipos ───────────────────────────────────────────────────
+  lint:
+    name: 2 · Lint y tipos
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: backend/go.sum
+
+      - name: golangci-lint (incluye gosec)
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.59
+          working-directory: backend
+          args: --timeout=5m
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependencias del frontend
+        working-directory: frontend
+        run: npm ci || npm install
+
+      - name: ESLint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Comprobación de tipos
+        working-directory: frontend
+        run: npm run typecheck
+
+      - name: Hadolint sobre los Dockerfiles
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: backend/Dockerfile
+          failure-threshold: warning
+
+      - name: Hadolint sobre el Dockerfile del frontend
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: frontend/Dockerfile
+          failure-threshold: warning
+
+  # ── 3. Secretos ─────────────────────────────────────────────────────────
+  secrets:
+    name: 3 · Secretos en el historial
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # RNF-003 — El historial completo. Un secreto borrado en el último
+          # commit sigue estando en el repositorio y sigue siendo válido.
+          fetch-depth: 0
+
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── 4. Análisis estático ────────────────────────────────────────────────
+  sast:
+    name: 4 · SAST
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write   # necesario para publicar los SARIF
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [go, javascript-typescript]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        if: matrix.language == 'go'
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: backend/go.sum
+
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended
+
+      - uses: github/codeql-action/autobuild@v3
+
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: /language:${{ matrix.language }}
+
+  semgrep:
+    name: 4b · Semgrep (OWASP)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    container:
+      image: semgrep/semgrep:1.86.0
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Analizar
+        run: semgrep scan --config=p/owasp-top-ten --config=p/golang --config=p/react --sarif --output=semgrep.sarif
+        env:
+          SEMGREP_RULES: p/owasp-top-ten
+
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
+
+      - name: Romper la build si hay hallazgos de severidad alta
+        run: semgrep scan --config=p/owasp-top-ten --config=p/golang --severity=ERROR --error
+
+  # ── 5. Dependencias ─────────────────────────────────────────────────────
+  sca:
+    name: 5 · Dependencias vulnerables
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: backend/go.sum
+
+      # govulncheck analiza ALCANZABILIDAD: solo informa de vulnerabilidades
+      # cuyo código es realmente invocable desde el nuestro. Eso elimina casi
+      # todo el ruido frente a un escáner que solo lee go.mod.
+      - name: govulncheck
+        working-directory: backend
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: npm audit
+        working-directory: frontend
+        run: |
+          npm install --package-lock-only
+          npm audit --audit-level=high
+
+      - name: osv-scanner
+        uses: google/osv-scanner-action/osv-scanner-action@v1.9.0
+        with:
+          scan-args: |-
+            --recursive
+            --skip-git
+            ./
+
+  # ── 6. Pruebas unitarias ────────────────────────────────────────────────
+  test-unit:
+    name: 6 · Pruebas unitarias
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: backend/go.sum
+
+      - name: go test
+        working-directory: backend
+        run: go test -race -short -coverprofile=coverage.out -covermode=atomic ./...
+
+      # RNF-005 — Umbral de cobertura. Se activa como gate a partir de la
+      # semana 2, cuando exista lógica de dominio que medir; sobre un esqueleto
+      # el porcentaje no significa nada.
+      - name: Informe de cobertura
+        working-directory: backend
+        run: |
+          go tool cover -func=coverage.out | tail -1
+          COVERAGE=$(go tool cover -func=coverage.out | tail -1 | awk '{print substr($3, 1, length($3)-1)}')
+          echo "Cobertura actual: ${COVERAGE}% (umbral objetivo: 70%)"
+          echo "coverage=${COVERAGE}" >> "$GITHUB_OUTPUT"
+        id: coverage
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Pruebas del frontend
+        working-directory: frontend
+        run: |
+          npm install
+          npm run test
+
+  # ── 8. Configuración e infraestructura ──────────────────────────────────
+  iac-scan:
+    name: 8 · Configuración de contenedores
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Trivy config
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: config
+          scan-ref: .
+          format: sarif
+          output: trivy-config.sarif
+          severity: HIGH,CRITICAL
+          exit-code: "0"   # el SARIF se sube siempre; el gate va en el paso siguiente
+
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-config.sarif
+          category: trivy-config
+
+      - name: Romper la build si hay misconfiguración HIGH o CRITICAL
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: config
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+
+  # ── 9 y 10. Construcción y escaneo de imágenes ──────────────────────────
+  image:
+    name: 9-10 · Construir y escanear imágenes
+    runs-on: ubuntu-latest
+    needs: [lint]
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: api
+            context: backend
+            target: api
+          - name: worker
+            context: backend
+            target: worker
+          - name: web
+            context: frontend
+            target: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Construir ${{ matrix.name }}
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          target: ${{ matrix.target }}
+          load: true
+          tags: identity-hub/${{ matrix.name }}:${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,scope=${{ matrix.name }},mode=max
+
+      - name: Trivy sobre la imagen (informe)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: identity-hub/${{ matrix.name }}:${{ github.sha }}
+          format: sarif
+          output: trivy-${{ matrix.name }}.sarif
+          severity: HIGH,CRITICAL
+          exit-code: "0"
+
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-${{ matrix.name }}.sarif
+          category: trivy-image-${{ matrix.name }}
+
+      # RNF-004 — --ignore-unfixed: solo rompe la build lo que tiene parche
+      # disponible. Bloquear por un CVE sin arreglo no protege de nada y
+      # entrena al equipo a ignorar el rojo.
+      - name: Romper la build si hay CVE corregibles
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: identity-hub/${{ matrix.name }}:${{ github.sha }}
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          trivyignores: security/.trivyignore
+          exit-code: "1"

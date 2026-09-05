@@ -1,0 +1,43 @@
+{
+  "name": "identity-hub-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "license": "Apache-2.0",
+  "//": "⚠️ LÍNEA BASE VULNERABLE — ver specs/adr/0007. axios y lodash están fijados en versiones con CVE publicado a propósito, para que osv-scanner y npm audit tengan algo real que informar. No actualizar sin registrar la remediación en security/findings/.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "gen:api": "openapi-typescript ../specs/03-api/openapi.yaml -o src/api/schema.d.ts"
+  },
+  "dependencies": {
+    "axios": "0.21.1",
+    "lodash": "4.17.15",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.21.0"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.2.0",
+    "@testing-library/react": "^14.1.2",
+    "@types/lodash": "^4.14.202",
+    "@types/react": "^18.2.48",
+    "@types/react-dom": "^18.2.18",
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/parser": "^6.19.0",
+    "@vitejs/plugin-react": "^4.2.1",
+    "@vitest/coverage-v8": "^1.2.0",
+    "eslint": "^8.56.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "jsdom": "^23.2.0",
+    "openapi-typescript": "^6.7.4",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.12",
+    "vitest": "^1.2.0"
+  }
+}
