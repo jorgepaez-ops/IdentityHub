@@ -1,0 +1,1022 @@
+<title>Línea base vulnerable</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+
+<style>
+/* ─────────────────────────────────────────────────────────────
+   Identity Hub — Informe de seguridad de la línea base
+   Tipografía: familia IBM Plex, diseñada para documentación técnica.
+   Serif para títulos, Sans para prosa, Mono para identificadores y cifras.
+   ───────────────────────────────────────────────────────────── */
+
+:root {
+  /* Neutros con sesgo frío, como una hoja de datos de instrumentación */
+  --ground:      #f2f4f6;
+  --surface:     #ffffff;
+  --surface-alt: #eceff3;
+  --ink:         #14171c;
+  --ink-soft:    #3d4550;
+  --muted:       #5f6a78;
+  --line:        #dce1e8;
+  --line-strong: #c3ccd7;
+
+  /* Un solo acento, gastado con cuidado */
+  --accent:      #1b5e6b;
+  --accent-soft: #e2eef0;
+
+  /* Severidad: rampa SECUENCIAL de un tono. El orden es magnitud,
+     no identidad, así que no son dos hues categóricos. */
+  --sev-critical: #8f1f1f;
+  --sev-high:     #c4574e;
+  --sev-track:    #e6eaef;
+
+  --ok:      #1f6f45;
+  --ok-soft: #e3f1e9;
+
+  --measure: 68ch;
+  --radius: 3px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:      #101318;
+    --surface:     #171b22;
+    --surface-alt: #1d222b;
+    --ink:         #e4e8ee;
+    --ink-soft:    #c2cad6;
+    --muted:       #8f99a8;
+    --line:        #252c36;
+    --line-strong: #37414e;
+
+    --accent:      #5cb6c6;
+    --accent-soft: #16323a;
+
+    --sev-critical: #f2756b;
+    --sev-high:     #b95a51;
+    --sev-track:    #232a34;
+
+    --ok:      #4ec08a;
+    --ok-soft: #143026;
+  }
+}
+
+:root[data-theme="dark"] {
+  --ground:      #101318;
+  --surface:     #171b22;
+  --surface-alt: #1d222b;
+  --ink:         #e4e8ee;
+  --ink-soft:    #c2cad6;
+  --muted:       #8f99a8;
+  --line:        #252c36;
+  --line-strong: #37414e;
+
+  --accent:      #5cb6c6;
+  --accent-soft: #16323a;
+
+  --sev-critical: #f2756b;
+  --sev-high:     #b95a51;
+  --sev-track:    #232a34;
+
+  --ok:      #4ec08a;
+  --ok-soft: #143026;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Rejilla: columna de lectura + banda ancha para datos ────── */
+.doc {
+  display: grid;
+  grid-template-columns:
+    1fr
+    min(var(--measure), 100% - 3rem)
+    1fr;
+  row-gap: 0;
+}
+.doc > * { grid-column: 2; }
+
+/* Ensanchado para tablas y gráficos. Se apoya en `100%` del contenedor —la
+   columna de lectura— así que funciona a cualquier profundidad, no solo en
+   los hijos directos de .doc. */
+.wide {
+  width: min(58rem, calc(100vw - 3rem));
+  margin-inline: calc((100% - min(58rem, 100vw - 3rem)) / 2);
+}
+
+/* ── Portada ─────────────────────────────────────────────────── */
+.masthead {
+  padding: 4.5rem 0 2.5rem;
+  border-bottom: 2px solid var(--ink);
+}
+
+.eyebrow {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.eyebrow::before {
+  content: "";
+  width: 1.75rem;
+  height: 2px;
+  background: var(--accent);
+  flex: none;
+}
+
+h1 {
+  font-family: "IBM Plex Serif", ui-serif, Georgia, serif;
+  font-size: clamp(2.1rem, 5.5vw, 3.1rem);
+  font-weight: 600;
+  line-height: 1.08;
+  letter-spacing: -0.022em;
+  text-wrap: balance;
+  margin: 0 0 1rem;
+}
+
+.standfirst {
+  font-family: "IBM Plex Serif", ui-serif, Georgia, serif;
+  font-size: 1.1875rem;
+  line-height: 1.55;
+  color: var(--ink-soft);
+  margin: 0 0 2.25rem;
+  max-width: 34em;
+}
+
+.colophon {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  gap: 1.25rem 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--line);
+}
+.colophon div { display: flex; flex-direction: column; gap: 0.2rem; }
+.colophon dt,
+.field-label {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.colophon dd {
+  margin: 0;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.8125rem;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Aviso ───────────────────────────────────────────────────── */
+.notice {
+  margin: 2.5rem 0 0;
+  padding: 1.125rem 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--sev-critical);
+  border-radius: var(--radius);
+}
+.notice p { margin: 0; font-size: 0.9375rem; color: var(--ink-soft); }
+.notice strong { color: var(--ink); }
+
+/* ── Secciones ───────────────────────────────────────────────── */
+section { padding: 3.25rem 0 0; }
+
+h2 {
+  font-family: "IBM Plex Serif", ui-serif, Georgia, serif;
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  line-height: 1.25;
+  text-wrap: balance;
+  margin: 0 0 0.5rem;
+}
+h3 {
+  font-family: "IBM Plex Sans", sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  margin: 2rem 0 0.5rem;
+}
+.section-note {
+  color: var(--muted);
+  font-size: 0.9375rem;
+  margin: 0 0 1.75rem;
+  max-width: 46em;
+}
+
+p { margin: 0 0 1.1rem; }
+p:last-child { margin-bottom: 0; }
+
+a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+a:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+code, .mono {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.875em;
+  font-variant-numeric: tabular-nums;
+}
+p code, li code, td code {
+  background: var(--surface-alt);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 0.05em 0.32em;
+}
+
+/* ── Cifras de portada ───────────────────────────────────────── */
+.figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.figure {
+  background: var(--surface);
+  padding: 1.25rem 1.25rem 1.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.figure .value {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 2rem;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.figure .value.crit { color: var(--sev-critical); }
+.figure .caption { font-size: 0.8125rem; color: var(--muted); line-height: 1.4; }
+
+/* ── Gráfico ─────────────────────────────────────────────────── */
+figure { margin: 0; }
+figcaption {
+  font-size: 0.8125rem;
+  color: var(--muted);
+  margin-top: 0.9rem;
+  max-width: 46em;
+}
+
+.chart {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1.5rem 1.5rem 1.1rem;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.15rem;
+  margin-bottom: 1.4rem;
+}
+.legend span {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+.swatch {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 2px;
+  flex: none;
+}
+.swatch.crit { background: var(--sev-critical); }
+.swatch.high { background: var(--sev-high); }
+
+.bars { display: flex; flex-direction: column; gap: 1.05rem; }
+
+.bar-row {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr 3.25rem;
+  align-items: center;
+  gap: 0.85rem;
+}
+.bar-name {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.8125rem;
+  color: var(--ink);
+}
+.bar-total {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--ink-soft);
+}
+.track {
+  position: relative;
+  height: 1.5rem;
+  background: var(--sev-track);
+  border-radius: 2px;
+  display: flex;
+  overflow: hidden;
+}
+.seg {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  padding-inline: 0.45rem;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: #ffffff;
+  white-space: nowrap;
+  border-radius: 2px;
+}
+.seg.crit {
+  background: var(--sev-critical);
+  /* Separador de 2 px del color de la superficie entre segmentos apilados */
+  border-right: 2px solid var(--surface);
+}
+.seg.high { background: var(--sev-high); }
+
+.axis {
+  display: flex;
+  justify-content: space-between;
+  margin: 0.9rem 0 0;
+  padding-left: calc(5.5rem + 0.85rem);
+  padding-right: calc(3.25rem + 0.85rem);
+  border-top: 1px solid var(--line);
+  padding-top: 0.4rem;
+}
+.axis span {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.6875rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Tablas ──────────────────────────────────────────────────── */
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+thead th {
+  text-align: left;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0.75rem 0.9rem;
+  border-bottom: 1px solid var(--line-strong);
+  white-space: nowrap;
+}
+tbody td {
+  padding: 0.7rem 0.9rem;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+tbody tr:last-child td { border-bottom: none; }
+td.num {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+td.id {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+
+/* ── Píldoras de estado ──────────────────────────────────────── */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  padding: 0.16rem 0.45rem;
+  border-radius: 2px;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+.pill::before {
+  content: "";
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+.pill.crit { color: var(--sev-critical); border-color: var(--sev-critical); }
+.pill.high { color: var(--sev-high);     border-color: var(--sev-high); }
+.pill.ok   { color: var(--ok);           border-color: var(--ok); }
+.pill.pend { color: var(--muted);        border-color: var(--line-strong); }
+
+.tag {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.6875rem;
+  color: var(--muted);
+}
+
+/* ── Hallazgos destacados ────────────────────────────────────── */
+.findings { display: flex; flex-direction: column; gap: 1px; background: var(--line);
+            border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.finding { background: var(--surface); padding: 1.4rem 1.5rem; }
+.finding-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 0.75rem;
+  margin-bottom: 0.6rem;
+}
+.finding-id {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: 0.03em;
+}
+.finding-title {
+  font-family: "IBM Plex Serif", ui-serif, Georgia, serif;
+  font-size: 1.0625rem;
+  font-weight: 500;
+  line-height: 1.3;
+  margin: 0;
+  flex: 1 1 18rem;
+}
+.finding p { font-size: 0.9375rem; color: var(--ink-soft); margin-bottom: 0.75rem; }
+.finding p:last-child { margin-bottom: 0; }
+
+/* ── Bloque de comandos ──────────────────────────────────────── */
+pre {
+  margin: 0;
+  padding: 1.1rem 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow-x: auto;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.8125rem;
+  line-height: 1.75;
+  color: var(--ink-soft);
+}
+pre .cmt { color: var(--muted); }
+pre .out { color: var(--accent); }
+
+/* ── Listas ──────────────────────────────────────────────────── */
+ul.plain { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.7rem; }
+ul.plain li {
+  padding-left: 1.15rem;
+  position: relative;
+  font-size: 0.9375rem;
+  color: var(--ink-soft);
+}
+ul.plain li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.6em;
+  width: 0.4rem;
+  height: 1px;
+  background: var(--line-strong);
+}
+
+/* ── Pie ─────────────────────────────────────────────────────── */
+footer {
+  margin-top: 4rem;
+  padding: 2rem 0 3.5rem;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+footer p { margin-bottom: 0.5rem; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .seg { transition: filter 0.15s ease; }
+  .track:hover .seg { filter: saturate(1.15); }
+}
+</style>
+
+<div class="doc">
+
+  <header class="masthead">
+    <p class="eyebrow">Identity Hub · Proyecto final de materia</p>
+    <h1>Informe de seguridad de la línea base</h1>
+    <p class="standfirst">
+      Qué encontró el pipeline cuando se le dio, a propósito, algo real que
+      encontrar. Y qué encontró que no habíamos puesto ahí.
+    </p>
+
+    <dl class="colophon">
+      <div><dt>Referencia analizada</dt><dd>v0.0.0-vuln-baseline</dd></div>
+      <div><dt>Fecha</dt><dd>2026-09-05</dd></div>
+      <div><dt>Commit</dt><dd>053e15f</dd></div>
+      <div><dt>Herramientas</dt><dd>6</dd></div>
+      <div><dt>Fichas abiertas</dt><dd>7</dd></div>
+    </dl>
+  </header>
+
+  <div class="notice">
+    <p>
+      <strong>Este informe describe código inseguro a propósito.</strong>
+      El tag <code>v0.0.0-vuln-baseline</code> nunca se despliega. Existe para
+      demostrar que cada control del pipeline detecta lo que dice detectar; la
+      rama <code>main</code> es la versión remediada.
+    </p>
+  </div>
+
+  <section>
+    <h2>Por qué existe una línea base vulnerable</h2>
+    <p class="section-note">
+      Un pipeline cuyos gates nunca han fallado es indistinguible de uno mal
+      configurado que deja pasar todo.
+    </p>
+    <p>
+      El requisito del curso pide un pipeline de DevSecOps de ciclo completo.
+      Lo fácil es construirlo, verlo en verde y darlo por bueno. Pero el verde
+      solo significa «no encontré nada», y eso tiene dos lecturas posibles: que
+      no hay nada, o que no sé mirar.
+    </p>
+    <p>
+      Para separar las dos, se sembraron vulnerabilidades reales y conocidas en
+      el commit inicial —imágenes base fuera de soporte, dependencias con avisos
+      publicados, secretos incrustados, SQL concatenado, contenedores como root,
+      cabeceras de seguridad ausentes— y se congeló el resultado en un tag. Es la
+      misma lógica de OWASP Juice Shop, aplicada a nuestra propia cadena de
+      suministro en vez de a una aplicación ajena.
+    </p>
+    <p>
+      Lo que sigue son las cifras de ese escaneo. Todas proceden de ejecuciones
+      reales sobre las imágenes construidas; ninguna es una estimación.
+    </p>
+  </section>
+
+  <section>
+    <h2>Cifras de la línea base</h2>
+    <p class="section-note">
+      Resultado agregado de las seis herramientas sobre las tres imágenes y el
+      árbol de código completo.
+    </p>
+
+    <div class="figures wide">
+      <div class="figure">
+        <span class="value crit">262</span>
+        <span class="caption">vulnerabilidades <span class="mono">HIGH</span> o <span class="mono">CRITICAL</span> en las tres imágenes</span>
+      </div>
+      <div class="figure">
+        <span class="value">64</span>
+        <span class="caption">de ellas con parche disponible: las que rompen la build</span>
+      </div>
+      <div class="figure">
+        <span class="value">12</span>
+        <span class="caption">secretos en el código y la orquestación</span>
+      </div>
+      <div class="figure">
+        <span class="value">6</span>
+        <span class="caption">dependencias vulnerables realmente alcanzables desde nuestro código</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Dónde están las vulnerabilidades de imagen</h2>
+    <p class="section-note">
+      Trivy 0.56.2, severidad <span class="mono">HIGH</span> y
+      <span class="mono">CRITICAL</span>. Las cifras cuentan paquetes del sistema
+      operativo y binarios de Go dentro de cada imagen.
+    </p>
+
+    <figure class="wide">
+      <div class="chart">
+        <div class="legend">
+          <span><i class="swatch crit"></i> Critical <span class="tag">— valor exacto en la tabla</span></span>
+          <span><i class="swatch high"></i> High</span>
+        </div>
+
+        <div class="bars">
+          <div class="bar-row">
+            <span class="bar-name">api</span>
+            <div class="track" title="api — 11 critical, 105 high, 116 en total">
+              <div class="seg crit" style="width: 9.5%"></div>
+              <div class="seg high" style="width: 90.5%">105</div>
+            </div>
+            <span class="bar-total">116</span>
+          </div>
+
+          <div class="bar-row">
+            <span class="bar-name">worker</span>
+            <div class="track" title="worker — 6 critical, 72 high, 78 en total">
+              <div class="seg crit" style="width: 5.2%"></div>
+              <div class="seg high" style="width: 62.1%">72</div>
+            </div>
+            <span class="bar-total">78</span>
+          </div>
+
+          <div class="bar-row">
+            <span class="bar-name">web</span>
+            <div class="track" title="web — 4 critical, 64 high, 68 en total">
+              <div class="seg crit" style="width: 3.4%"></div>
+              <div class="seg high" style="width: 55.2%">64</div>
+            </div>
+            <span class="bar-total">68</span>
+          </div>
+        </div>
+
+        <div class="axis">
+          <span>0</span><span>29</span><span>58</span><span>87</span><span>116</span>
+        </div>
+      </div>
+
+      <figcaption>
+        El eje llega a 116, el máximo observado. Los segmentos se apilan sobre la
+        misma escala, de modo que la longitud total de cada barra es comparable
+        entre imágenes.
+      </figcaption>
+    </figure>
+
+    <h3>Detalle por imagen</h3>
+    <div class="table-wrap wide">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Imagen</th>
+            <th scope="col">Base detectada</th>
+            <th scope="col">Soporte</th>
+            <th scope="col" style="text-align:right">Critical</th>
+            <th scope="col" style="text-align:right">High</th>
+            <th scope="col" style="text-align:right">Con parche</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="id">api</td>
+            <td class="mono">debian 11.11</td>
+            <td><span class="pill crit">fin de vida</span></td>
+            <td class="num">11</td>
+            <td class="num">105</td>
+            <td class="num">41</td>
+          </tr>
+          <tr>
+            <td class="id">worker</td>
+            <td class="mono">debian 11.11</td>
+            <td><span class="pill crit">fin de vida</span></td>
+            <td class="num">6</td>
+            <td class="num">72</td>
+            <td class="num">23</td>
+          </tr>
+          <tr>
+            <td class="id">web</td>
+            <td class="mono">debian 13.6</td>
+            <td><span class="pill ok">vigente</span></td>
+            <td class="num">4</td>
+            <td class="num">64</td>
+            <td class="num">0</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>La fila de <span class="mono">web</span> dice algo distinto que las otras dos</h3>
+    <p>
+      <code>api</code> y <code>worker</code> parten de <code>debian:11-slim</code>,
+      una rama que ya no recibe actualizaciones de seguridad. Trivy lo señala
+      explícitamente: <em>«esta versión del sistema operativo ya no está
+      soportada por la distribución»</em>. De ahí que 64 de sus vulnerabilidades
+      tengan parche y el resto simplemente no vaya a tenerlo nunca.
+    </p>
+    <p>
+      <code>web</code> parte de <code>nginx:latest</code>, y hoy eso resuelve a
+      Debian 13: moderna, con soporte, y con <strong>cero</strong>
+      vulnerabilidades corregibles. Un gate que solo mirara el conteo daría esa
+      imagen por buena.
+    </p>
+    <p>
+      Y sin embargo es la más frágil de las tres, porque <code>latest</code> es
+      una etiqueta móvil: la construcción de hoy y la de mañana pueden no ser la
+      misma imagen. El hallazgo aquí no es un CVE, es la pérdida de
+      reproducibilidad —y lo detecta Hadolint con
+      <span class="mono">DL3007</span>, no Trivy. Ninguna herramienta sola habría
+      visto el problema entero.
+    </p>
+  </section>
+
+  <section>
+    <h2>Qué encontró cada gate</h2>
+    <p class="section-note">
+      Cada control necesita al menos un hallazgo propio. Si un gate no encuentra
+      nada en la línea base, no hay forma de saber que funciona.
+    </p>
+
+    <div class="table-wrap wide">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Gate</th>
+            <th scope="col">Herramienta</th>
+            <th scope="col">Qué encontró</th>
+            <th scope="col">Verificado</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="id">secrets</td>
+            <td class="mono">gitleaks 8.18.4</td>
+            <td>12 secretos: claves AWS y Slack, contraseñas de PostgreSQL y RabbitMQ, dos <code>ENV</code> del Dockerfile</td>
+            <td><span class="pill ok">sí</span></td>
+          </tr>
+          <tr>
+            <td class="id">sca</td>
+            <td class="mono">govulncheck</td>
+            <td>6 vulnerabilidades alcanzables en 4 módulos: <span class="mono">chi</span>, <span class="mono">golang-jwt/v4</span>, <span class="mono">pgx</span>, <span class="mono">x/text</span></td>
+            <td><span class="pill ok">sí</span></td>
+          </tr>
+          <tr>
+            <td class="id">lint</td>
+            <td class="mono">gosec</td>
+            <td>MD5 como derivación de contraseñas <span class="mono">(G401)</span>, SQL concatenado <span class="mono">(G201)</span>, <span class="mono">math/rand</span> para tokens <span class="mono">(G404)</span>, credenciales incrustadas <span class="mono">(G101)</span></td>
+            <td><span class="pill ok">sí</span></td>
+          </tr>
+          <tr>
+            <td class="id">lint</td>
+            <td class="mono">hadolint 2.12</td>
+            <td><span class="mono">DL3008</span> apt sin fijar versión · <span class="mono">DL3007</span> etiqueta <code>latest</code> sin fijar</td>
+            <td><span class="pill ok">sí</span></td>
+          </tr>
+          <tr>
+            <td class="id">image-scan</td>
+            <td class="mono">trivy 0.56.2</td>
+            <td>262 vulnerabilidades <span class="mono">HIGH</span>/<span class="mono">CRITICAL</span>, 64 corregibles</td>
+            <td><span class="pill ok">sí</span></td>
+          </tr>
+          <tr>
+            <td class="id">dast</td>
+            <td class="mono">owasp zap</td>
+            <td>Cabeceras ausentes y <code>server_tokens on</code> confirmados a mano contra el stack; el gate se cablea en la semana 3</td>
+            <td><span class="pill pend">parcial</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Comprobado contra el sistema en ejecución</h3>
+    <p>
+      Un escáner informa de un patrón; que el patrón sea explotable es otra
+      afirmación. Estas se verificaron contra los contenedores en marcha:
+    </p>
+    <ul class="plain">
+      <li>La inyección SQL llega literal a la consulta: <code>… WHERE email = '' OR '1'='1 -- '</code></li>
+      <li>El endpoint responde con <code>Access-Control-Allow-Origin: *</code> junto a <code>Allow-Credentials: true</code></li>
+      <li>Nginx no emite ninguna de las cinco cabeceras de seguridad, y se identifica como <code>nginx/1.31.5</code></li>
+      <li>Los secretos son legibles en el manifiesto de la imagen con <code>docker image inspect</code></li>
+      <li>Los tres contenedores corren con <code>uid=0</code></li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Los tres hallazgos que no habíamos sembrado</h2>
+    <p class="section-note">
+      Lo sembrado confirma que los gates funcionan, pero no enseña nada nuevo:
+      ya sabíamos que estaba ahí. Estos tres los encontró el pipeline por su
+      cuenta, y son el argumento entero a favor de tenerlo.
+    </p>
+
+    <div class="findings wide">
+
+      <article class="finding">
+        <div class="finding-head">
+          <span class="finding-id">VULN-020</span>
+          <h3 class="finding-title" style="margin:0">Suplantación de IP en <span class="mono">middleware.RealIP</span> de chi</h3>
+          <span class="pill high">high</span>
+        </div>
+        <p>
+          Se eligió <span class="mono">chi</span> como router sin saber que su
+          middleware <span class="mono">RealIP</span> acepta la cabecera
+          <code>X-Forwarded-For</code> sin validar de quién viene. Como cualquier
+          cliente puede enviarla, el atacante controla la IP que la aplicación
+          cree estar viendo.
+        </p>
+        <p>
+          En esta aplicación eso rompe dos cosas a la vez. El bloqueo por fuerza
+          bruta agrupa los intentos fallidos por IP: rotando la cabecera, el
+          umbral de cinco intentos no se alcanza nunca. Y la columna
+          <span class="mono">ip</span> del registro de auditoría queda bajo
+          control del atacante, que puede firmar sus intentos con la dirección de
+          otra persona. Un registro falsificable no sirve como evidencia.
+        </p>
+        <p>
+          Es exactamente la frontera de confianza <span class="mono">T2</span> de
+          nuestro propio modelo de amenazas —cabeceras reenviadas por el proxy—
+          mal implementada en el código. El aviso confirmó que esa frontera
+          estaba mal dibujada.
+        </p>
+      </article>
+
+      <article class="finding">
+        <div class="finding-head">
+          <span class="finding-id">VULN-022</span>
+          <h3 class="finding-title" style="margin:0">Inyección SQL en el driver <span class="mono">pgx</span>, por debajo de nuestro código</h3>
+          <span class="pill high">high</span>
+        </div>
+        <p>
+          Es la incómoda. <span class="mono">VULN-005</span> documenta una
+          inyección SQL nuestra: la escribimos, la vemos, la arreglamos. Esta
+          está en el driver, y desmonta la respuesta cómoda de «uso consultas
+          parametrizadas, luego estoy a salvo».
+        </p>
+        <p>
+          El fallo permite que un mensaje del protocolo manipulado altere la
+          sentencia que llega al servidor. Es decir: la parametrización correcta
+          no protege si la capa que la implementa está rota. Ninguna revisión de
+          nuestro código lo habría encontrado; solo una herramienta que conoce el
+          árbol completo de dependencias.
+        </p>
+      </article>
+
+      <article class="finding">
+        <div class="finding-head">
+          <span class="finding-id">VULN-023</span>
+          <h3 class="finding-title" style="margin:0">Las reglas por defecto de Gitleaks veían 2 de 12 secretos</h3>
+          <span class="pill crit">crítico para el control</span>
+        </div>
+        <p>
+          Se sembraron doce secretos. Gitleaks con su configuración por defecto
+          encontró dos: la clave de AWS y el token de Slack. Los otros diez
+          —incluidas todas las contraseñas de PostgreSQL y RabbitMQ— pasaron sin
+          ser vistos.
+        </p>
+        <p>
+          La causa es que las reglas por defecto identifican secretos por su
+          forma: una clave de AWS empieza por <code>AKIA</code>, un token de
+          Slack por <code>xoxb-</code>. Una contraseña propia no tiene forma
+          reconocible, y para encontrarla hay que buscar por contexto —el nombre
+          de la variable—, lo que exige reglas propias.
+        </p>
+        <p>
+          El detalle que casi se nos escapa: la primera versión de la regla
+          propia tampoco la encontraba, porque <code>\b</code> no marca frontera
+          dentro de <code>POSTGRES_PASSWORD</code> —el guion bajo es carácter de
+          palabra—. Una regla con la intención correcta y un fallo de una sola
+          letra habría dejado el gate igual de ciego, y en verde.
+        </p>
+        <p>
+          Con <code>.gitleaks.toml</code> propio la detección pasó de 2 a 12 sin
+          falsos positivos. <strong>Sin la línea base deliberada, ese job habría
+          estado en verde y lo habríamos leído como «no hay secretos», cuando lo
+          que decía era «no hay secretos con formato reconocible».</strong>
+        </p>
+      </article>
+
+    </div>
+  </section>
+
+  <section>
+    <h2>Comparativa <span class="mono">baseline</span> → <span class="mono">main</span></h2>
+    <p class="section-note">
+      La columna de la derecha es el objetivo de la fase de remediación, no una
+      medición. Se rellenará cuando <span class="mono">main</span> pase el
+      pipeline entero en verde.
+    </p>
+
+    <div class="table-wrap wide">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Métrica</th>
+            <th scope="col" style="text-align:right">Línea base · medido</th>
+            <th scope="col" style="text-align:right">main · objetivo</th>
+            <th scope="col">Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>CVE <span class="mono">HIGH</span>/<span class="mono">CRITICAL</span> corregibles en imágenes</td>
+            <td class="num">64</td>
+            <td class="num">0</td>
+            <td><span class="pill pend">sin medir</span></td>
+          </tr>
+          <tr>
+            <td>Secretos en el repositorio</td>
+            <td class="num">12</td>
+            <td class="num">0</td>
+            <td><span class="pill pend">sin medir</span></td>
+          </tr>
+          <tr>
+            <td>Dependencias vulnerables alcanzables</td>
+            <td class="num">6</td>
+            <td class="num">0</td>
+            <td><span class="pill pend">sin medir</span></td>
+          </tr>
+          <tr>
+            <td>Contenedores ejecutándose como root</td>
+            <td class="num">3</td>
+            <td class="num">0</td>
+            <td><span class="pill pend">sin medir</span></td>
+          </tr>
+          <tr>
+            <td>Cabeceras de seguridad emitidas por Nginx</td>
+            <td class="num">0</td>
+            <td class="num">5</td>
+            <td><span class="pill pend">sin medir</span></td>
+          </tr>
+          <tr>
+            <td>Imágenes base fijadas por digest</td>
+            <td class="num">0</td>
+            <td class="num">3</td>
+            <td><span class="pill pend">sin medir</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Cómo reproducir estas cifras</h2>
+    <p class="section-note">
+      Los mismos controles del pipeline corren en local, con idénticas versiones
+      de las herramientas. Si divergen, el pipeline deja de ser una red de
+      seguridad y pasa a ser una sorpresa.
+    </p>
+
+    <pre><span class="cmt"># Todos los gates de seguridad, igual que en CI</span>
+make scan
+
+<span class="cmt"># Solo dependencias, con análisis de alcanzabilidad</span>
+cd backend &amp;&amp; govulncheck ./...
+<span class="out">  → 6 vulnerabilidades en 4 módulos</span>
+
+<span class="cmt"># Secretos, con las reglas propias de .gitleaks.toml</span>
+gitleaks detect --source=. --config=.gitleaks.toml
+<span class="out">  → 12 hallazgos</span>
+
+<span class="cmt"># Imágenes</span>
+trivy image --severity HIGH,CRITICAL identity-hub-api:latest
+<span class="out">  → 116 (11 critical · 105 high)</span></pre>
+
+    <p style="margin-top:1.25rem">
+      La evidencia cruda de cada ejecución está versionada en
+      <code>security/evidence/</code>, y cada hallazgo tiene su ficha en
+      <code>security/findings/VULN-NNN-*.md</code> con la salida literal del
+      escáner, el impacto concreto en esta aplicación y la remediación prevista.
+    </p>
+  </section>
+
+  <section>
+    <h2>Limitaciones de este informe</h2>
+    <p class="section-note">
+      Lo que todavía no se ha medido, dicho antes de que lo pregunte quien lo lea.
+    </p>
+    <ul class="plain">
+      <li>El pipeline aún no se ha ejecutado en GitHub Actions: todas las cifras proceden de ejecuciones locales con las mismas versiones de las herramientas.</li>
+      <li>No hay resultados de CodeQL ni de Semgrep, que solo corren en CI. Los hallazgos de análisis estático listados provienen de gosec.</li>
+      <li>El escaneo DAST con OWASP ZAP no está cableado; las cabeceras ausentes se verificaron a mano con <code>curl</code>.</li>
+      <li>La columna <span class="mono">main</span> está vacía porque la remediación empieza en la semana 3. Rellenarla es el cierre de este informe.</li>
+      <li>No se ha hecho modelado de amenazas de la cadena de suministro del propio pipeline más allá de restringir los permisos por job.</li>
+    </ul>
+  </section>
+
+  <footer>
+    <p>
+      Identity Hub · proyecto final de materia · licencia Apache-2.0.
+      Cifras medidas el 2026-09-05 sobre <span class="mono">v0.0.0-vuln-baseline</span>
+      (<span class="mono">053e15f</span>).
+    </p>
+    <p>
+      Documentos relacionados: <span class="mono">specs/05-security/threat-model.md</span> ·
+      <span class="mono">specs/adr/0007-linea-base-vulnerable-deliberada.md</span> ·
+      <span class="mono">docs/BITACORA.md</span>
+    </p>
+  </footer>
+
+</div>

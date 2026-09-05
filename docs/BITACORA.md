@@ -102,6 +102,14 @@ Dockerfile y Nginx.
 - `ci.yml` **en rojo a propósito**: los gates encuentran lo sembrado.
 - El pipeline aún **no se ha ejecutado en GitHub Actions** (falta subir el repo).
 
+### Entregables publicados
+
+- **Informe de seguridad de la línea base** —
+  https://claude.ai/code/artifact/c652b965-baba-49f8-a283-c57ca7fae1c4
+  Fuente versionada en `docs/security-report.html`; se republica desde ese mismo
+  archivo, de modo que el documento y el repositorio no pueden divergir.
+  La columna `main` está vacía a propósito hasta que exista la medición.
+
 ### Siguiente paso
 
 1. Crear el repositorio en GitHub y subirlo. Confirmar que los tres workflows

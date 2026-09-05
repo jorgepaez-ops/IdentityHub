@@ -1,0 +1,42 @@
+{
+  "api": {
+    "base": "debian 11.11",
+    "eol": true,
+    "critical": 11,
+    "high": 105,
+    "total": 116,
+    "con_parche": 41,
+    "por_tipo": {
+      "debian": 75,
+      "gobinary": 41
+    }
+  },
+  "worker": {
+    "base": "debian 11.11",
+    "eol": true,
+    "critical": 6,
+    "high": 72,
+    "total": 78,
+    "con_parche": 23,
+    "por_tipo": {
+      "debian": 55,
+      "gobinary": 23
+    }
+  },
+  "web": {
+    "base": "debian 13.6",
+    "eol": false,
+    "critical": 4,
+    "high": 64,
+    "total": 68,
+    "con_parche": 0,
+    "por_tipo": {
+      "debian": 68
+    }
+  },
+  "_total": {
+    "total": 262,
+    "critical": 21,
+    "con_parche": 64
+  }
+}
