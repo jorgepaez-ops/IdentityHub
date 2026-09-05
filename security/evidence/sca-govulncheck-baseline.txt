@@ -1,0 +1,78 @@
+=== Symbol Results ===
+
+Vulnerability #1: GO-2026-5970
+    Infinite loop on invalid input in golang.org/x/text
+  More info: https://pkg.go.dev/vuln/GO-2026-5970
+  Module: golang.org/x/text
+    Found in: golang.org/x/text@v0.14.0
+    Fixed in: golang.org/x/text@v0.39.0
+    Example traces found:
+      #1: internal/store/store.go:36:36: store.New calls pgxpool.NewWithConfig, which eventually calls norm.Form.Properties
+      #2: internal/store/store.go:36:36: store.New calls pgxpool.NewWithConfig, which eventually calls norm.Form.Span
+      #3: internal/store/store.go:36:36: store.New calls pgxpool.NewWithConfig, which eventually calls norm.Form.Transform
+
+Vulnerability #2: GO-2026-5777
+    Chi's RealIP Middleware allows IP spoofing via unvalidated X-Forwarded-For
+    header in github.com/go-chi/chi
+  More info: https://pkg.go.dev/vuln/GO-2026-5777
+  Module: github.com/go-chi/chi/v5
+    Found in: github.com/go-chi/chi/v5@v5.0.11
+    Fixed in: github.com/go-chi/chi/v5@v5.3.0
+    Example traces found:
+      #1: internal/api/server.go:45:7: api.Server.Routes calls chi.Mux.Get, which eventually calls middleware.RealIP
+
+Vulnerability #3: GO-2026-5775
+    Chi Middleware vulnerable to IP spoofing via X-Forwarded-For header in
+    github.com/go-chi/chi
+  More info: https://pkg.go.dev/vuln/GO-2026-5775
+  Module: github.com/go-chi/chi/v5
+    Found in: github.com/go-chi/chi/v5@v5.0.11
+    Fixed in: github.com/go-chi/chi/v5@v5.3.0
+    Example traces found:
+      #1: internal/api/server.go:45:7: api.Server.Routes calls chi.Mux.Get, which eventually calls middleware.RealIP
+
+Vulnerability #4: GO-2025-3553
+    Excessive memory allocation during header parsing in
+    github.com/golang-jwt/jwt
+  More info: https://pkg.go.dev/vuln/GO-2025-3553
+  Module: github.com/golang-jwt/jwt/v4
+    Found in: github.com/golang-jwt/jwt/v4@v4.5.0
+    Fixed in: github.com/golang-jwt/jwt/v4@v4.5.2
+    Example traces found:
+      #1: internal/api/legacy_auth.go:84:18: api.legacyParseToken calls jwt.Parse, which eventually calls jwt.Parser.ParseUnverified
+
+Vulnerability #5: GO-2024-3250
+    Improper error handling in ParseWithClaims and bad documentation may cause
+    dangerous situations in github.com/golang-jwt/jwt
+  More info: https://pkg.go.dev/vuln/GO-2024-3250
+  Module: github.com/golang-jwt/jwt/v4
+    Found in: github.com/golang-jwt/jwt/v4@v4.5.0
+    Fixed in: github.com/golang-jwt/jwt/v4@v4.5.1
+    Example traces found:
+      #1: internal/api/legacy_auth.go:84:18: api.legacyParseToken calls jwt.Parse
+
+Vulnerability #6: GO-2024-2606
+    SQL injection in github.com/jackc/pgproto3 and github.com/jackc/pgx
+  More info: https://pkg.go.dev/vuln/GO-2024-2606
+  Module: github.com/jackc/pgx/v5
+    Found in: github.com/jackc/pgx/v5@v5.5.1
+    Fixed in: github.com/jackc/pgx/v5@v5.5.4
+    Example traces found:
+      #1: internal/store/store.go:36:36: store.New calls pgxpool.NewWithConfig, which eventually calls pgconn.ConnectConfig
+      #2: internal/store/store.go:57:20: store.Store.Ping calls pgxpool.Pool.Ping, which eventually calls pgconn.PgConn.Close
+      #3: internal/store/store.go:57:20: store.Store.Ping calls pgxpool.Pool.Ping, which eventually calls pgconn.PgConn.Ping
+      #4: internal/store/store.go:57:20: store.Store.Ping calls pgxpool.Pool.Ping, which eventually calls pgproto3.Frontend.Flush
+      #5: internal/store/store.go:57:20: store.Store.Ping calls pgxpool.Pool.Ping, which eventually calls pgproto3.Frontend.Send
+      #6: internal/store/store.go:36:36: store.New calls pgxpool.NewWithConfig, which eventually calls pgproto3.Frontend.SendBind
+      #7: internal/store/store.go:36:36: store.New calls pgxpool.NewWithConfig, which eventually calls pgproto3.Frontend.SendDescribe
+      #8: internal/store/store.go:36:36: store.New calls pgxpool.NewWithConfig, which eventually calls pgproto3.Frontend.SendExecute
+      #9: internal/store/store.go:36:36: store.New calls pgxpool.NewWithConfig, which eventually calls pgproto3.Frontend.SendParse
+      #10: internal/store/store.go:57:20: store.Store.Ping calls pgxpool.Pool.Ping, which eventually calls pgproto3.Frontend.SendQuery
+      #11: internal/store/store.go:36:36: store.New calls pgxpool.NewWithConfig, which eventually calls pgproto3.Frontend.SendSync
+
+Your code is affected by 6 vulnerabilities from 4 modules.
+This scan also found 4 vulnerabilities in packages you import and 25
+vulnerabilities in modules you require, but your code doesn't appear to call
+these vulnerabilities.
+Use '-show verbose' for more details.
+exit status 3
