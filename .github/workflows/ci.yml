@@ -34,6 +34,7 @@ jobs:
   spec-drift:
     name: 1 · Deriva entre specs y código
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -55,6 +56,7 @@ jobs:
   lint:
     name: 2 · Lint y tipos
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -104,6 +106,7 @@ jobs:
   secrets:
     name: 3 · Secretos en el historial
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
@@ -119,6 +122,7 @@ jobs:
   sast:
     name: 4 · SAST
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
       security-events: write   # necesario para publicar los SARIF
@@ -149,6 +153,7 @@ jobs:
   semgrep:
     name: 4b · Semgrep (OWASP)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
       security-events: write
@@ -175,6 +180,7 @@ jobs:
   sca:
     name: 5 · Dependencias vulnerables
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -214,6 +220,7 @@ jobs:
   test-unit:
     name: 6 · Pruebas unitarias
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -252,6 +259,7 @@ jobs:
   iac-scan:
     name: 8 · Configuración de contenedores
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
       security-events: write
@@ -286,6 +294,7 @@ jobs:
   image:
     name: 9-10 · Construir y escanear imágenes
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: [lint]
     permissions:
       contents: read
