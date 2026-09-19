@@ -70,8 +70,12 @@ pruebas Playwright, `docs/runbook.md`. `make e2e` es un placeholder.
 4. Un Conventional Commit por tarea (`feat(auth): ...`, `fix(...)`, `test(...)`, `docs(...)`,
    `ci(...)`, `build(...)`, `chore(...)`), con pruebas y docs en el mismo commit.
    **Sin líneas `Co-Authored-By` ni atribución a IA.** Solo español/inglés técnico sobrio.
-5. Marca la casilla de la tarea **solo tras ver pasar** sus comprobaciones, y anota el SHA en
-   su línea `Commit:`. No marques casillas de `Usuario` ni de `Claude (revisión)`.
+5. Marca la casilla de la tarea **solo tras ver pasar** sus comprobaciones. Un commit no puede
+   contener su propio SHA, así que cada tarea cierra con **dos commits**: (a) el commit de la
+   tarea (código, pruebas y docs); (b) un commit de registro, `docs(tasks): registra evidencia
+   de T<id>`, que marca la casilla, anota el SHA de (a) en su línea `Commit:` y añade la nota de
+   handoff. Nunca mezcles (b) con cambios de código, ni enmiendes (a) para meter su SHA.
+   No marques casillas de `Usuario` ni de `Claude (revisión)`.
 6. Nunca hagas `git push`, no abras PR, no uses `--force`, `reset --hard` ni reescribas
    historial, no crees ni muevas tags. Push, PR, tags y merge son del usuario.
 7. Si un spec es ambiguo o contradictorio: **no adivines**. Anótalo en "Preguntas nuevas" (dentro de
@@ -130,7 +134,8 @@ pruebas Playwright, `docs/runbook.md`. `make e2e` es un placeholder.
 - [ ] `python3 scripts/traceability.py` ejecutado y su salida commiteada si cambió.
 - [ ] Código generado regenerado (sin diff) cuando la tarea toca specs, sqlc u OpenAPI.
 - [ ] Docs/ficha/ADR afectados actualizados en el mismo commit.
-- [ ] Un commit convencional sin atribución; casilla marcada; SHA anotado; handoff escrito.
+- [ ] Commit de la tarea convencional y sin atribución, más el commit `docs(tasks)` de registro
+      (casilla marcada, SHA del primero anotado, handoff escrito).
 
 ## Protocolo de traspaso
 
