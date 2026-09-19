@@ -196,7 +196,8 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
 (`AGENTS.md`, `odd/`).
 
 ### T0.1 — Crear el repo en GitHub y subir `main` y el tag
-- [ ] Estado · Ejecutor: `Claude`, solo tras autorización explícita del usuario (destino, operación y credencial SSH) · Cubre: RNF-002 · Remedia: —
+- [x] Estado · Ejecutor: `Claude`, solo tras autorización explícita del usuario (destino, operación y credencial SSH) · Cubre: RNF-002 · Remedia: —
+- **Hecho 2026-09-19.** `git ls-remote --heads --tags origin` lista `refs/heads/main` (`9f04fec`) y `refs/tags/v0.0.0-vuln-baseline` (`053e15f`). El primer push fue rechazado por GitHub push protection (Slack API Token en `legacy_auth.go:46` y `security/evidence/gitleaks-baseline.json:97-98`, commit `053e15f`); el usuario lo permitió en GitHub con la razón "It's used in tests" y el push se repitió sin `--force`. Ese bloqueo es evidencia "antes" de VULN-001 (detección por formato, ver VULN-023).
 - Repo **público** (Q10): `git@github.com:jorgepaez-ops/IdentityHub.git`. Claude añade el
   remoto (`git remote add origin git@github.com:jorgepaez-ops/IdentityHub.git`) y hace el push
   (sin `--force`) únicamente cuando el usuario lo autorice; Codex no configura el remoto ni sube nada.
