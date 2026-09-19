@@ -147,6 +147,17 @@ Resumen: por hallazgo, `docs/evidencia/VULN-XXX/` con `before.png`, `after.png` 
 remediación, dejar la ficha `security/findings/VULN-XXX-*.md` con "Commit de remediación" y
 estado actualizado, y no ejecutar ningún commit de remediación antes de que exista el "antes".
 
+## Reglas de revisión de Go (`.gga` usa este archivo como `RULES_FILE`)
+
+- SQL solo por `sqlc` o consultas parametrizadas; nunca `fmt.Sprintf`/concatenación en SQL (VULN-005, VULN-022).
+- Aleatoriedad de seguridad con `crypto/rand`, nunca `math/rand`; comparaciones de secretos y MAC con `subtle.ConstantTimeCompare`.
+- Contraseñas solo con Argon2id (ADR 0004); nunca MD5/SHA-1/SHA-256 directo para contraseñas.
+- Ni contraseñas, tokens, refresh tokens ni cuerpos de mensajes en logs ni en errores devueltos al cliente.
+- Errores envueltos con contexto (`%w`), `context.Context` propagado y sin `panic` en rutas de petición.
+- La IP de cliente sale solo de la lógica de proxies confiables (T6); nunca de `X-Forwarded-For` sin validar (VULN-020).
+- Código generado (`gen.go`, `*.sql.go`) no se revisa ni se edita a mano.
+- Cada cambio de comportamiento trae su prueba (RED antes de GREEN) en el mismo commit.
+
 ## Reglas de revisión de frontend (`.gga` usa este archivo como `RULES_FILE`)
 
 - Sin `dangerouslySetInnerHTML` ni `eval` (AM-015, RNF-009); tokens nunca en `localStorage`.
