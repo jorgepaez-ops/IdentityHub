@@ -278,7 +278,7 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
 ## Fase 1 — Contrato ejecutable (RNF-011)
 
 ### T1a — Enmendar OpenAPI: refresh token por cookie
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RNF-009, AM-015, RF-005, RF-007 · Remedia: — · Solo spec · Depende de: —
+- [x] Estado · Ejecutor: `Codex` · Cubre: RNF-009, AM-015, RF-005, RF-007 · Remedia: — · Solo spec · Depende de: —
 - **Autorización explícita:** el usuario autorizó esta enmienda el 2026-09-19 (respuesta a Q3:
   transporte del refresh token por cookie `HttpOnly; Secure; SameSite=Strict`, RNF-009/AM-015).
   Por eso Codex puede editar `specs/03-api/openapi.yaml` **solo en esta tarea** (C1 en "Cambios
@@ -307,7 +307,7 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
 - Verificación: `python3 -m openapi_spec_validator specs/03-api/openapi.yaml`;
   `python3 scripts/traceability.py --check` (si cambia la salida generada, regenerar y commitear);
   `git diff --stat` solo toca `specs/03-api/openapi.yaml` (y `specs/07-traceability.md` si cambia).
-- Commit:
+- Commit: d9117cb
 
 ### T1 — Generar `backend/internal/api/gen.go` con oapi-codegen
 - [ ] Estado · Ejecutor: `Codex` · Cubre: RNF-011, ADR 0003 · Remedia: — · Depende de: T1a
@@ -827,8 +827,10 @@ Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, coo
 
 ## Evidencia de verificación
 
-(Vacío. Codex añade aquí, por tarea, `<comando>: <resultado observado>` cuando cierre cada una;
+(Codex añade aquí, por tarea, `<comando>: <resultado observado>` cuando cierre cada una;
 las líneas de RED/GREEN van en el handoff.)
+
+- T1a · `python3 -m openapi_spec_validator specs/03-api/openapi.yaml`: OK; `python3 scripts/traceability.py --check`: matriz al día.
 
 ## Siguiente paso
 
@@ -886,3 +888,8 @@ Formato por tarea (3 a 5 líneas):
 ```
 
 (Sin entradas todavía.)
+
+### T1a · 2026-09-19 · d9117cb
+- Qué cambió: `TokenPair` ya no publica `refreshToken`; refresh/logout usan la cookie `refresh_token`, con `Set-Cookie` documentado en login, MFA, refresh y logout.
+- Comandos y resultado observado: RED: la aserción de contrato falló porque `RefreshRequest` seguía definido; GREEN: la aserción pasó y confirmó 22 pares `operationId`/`x-requirement` intactos; el validador OpenAPI devolvió OK y trazabilidad quedó al día.
+- Dudas abiertas: ninguna. Se corrigieron tres descripciones YAML preexistentes con comas sin comillas para que el contrato pasara la validación obligatoria sin cambiar su texto.
