@@ -232,6 +232,17 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
 - Comprobar y anotar discrepancias entre gate esperado y gate real (p. ej. `//nolint:gosec` en
   `legacy_auth.go` puede ocultar G401/G404 en el job `lint`, mientras `baseline-scan.yml` usa
   gosec directo; el job `secrets` puede no ver lo mismo que `make scan-secrets`).
+- **Avance 2026-09-19 (casilla sin marcar; quedan partes abiertas):**
+  - Hecho: `CI` sobre `main` `9f04fec` = run 35473988275 (rojo, esperado); `Escaneo de la línea base`
+    = run 35476102444 (sobre el tag, `success`, ~5 min; un primer run 35473991353 se colgó en Gitleaks y
+    se canceló; se añadió `timeout-minutes` en `acd3da8`). Artefacto guardado, sin secretos, en
+    `security/evidence/actions-35476102444/` (ver su `README.md`, con resultados y discrepancias D1-D5).
+  - Gitleaks: 12 hallazgos reales, coincide con lo previsto. **Las huellas de este run no sirven para
+    T31** (D1): T31 debe extraerlas del job `secrets` del `CI` (historial).
+  - Pendiente: `Escaneo semanal` (`workflow_dispatch`, puede abrir incidencias: requiere autorización
+    del usuario); URLs de SARIF en la pestaña Security; corregir `baseline-scan.yml` (Trivy sin socket de
+    Docker, informe de Gitleaks dentro del árbol escaneado) y repetir el escaneo de imágenes; volcar los
+    run IDs en el "Registro de evidencia"; resolver D3 y D4.
 - Commit: —
 
 ### T0.3 — Capturas y `evidencia.json` "antes" por hallazgo
