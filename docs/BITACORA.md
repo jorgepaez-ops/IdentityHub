@@ -26,6 +26,9 @@ esta entrada resume lo que importa para entender el proyecto.
 - **T0.2 y T0.3 (en curso)**: dos escaneos de la línea base (runs 35476102444 y 35534898422), los 26
   `docs/evidencia/VULN-XXX/evidencia.json` con su "antes", alertas de code scanning leídas por API,
   `curl` local sobre la imagen `web` y las 12 huellas de Gitleaks para T31.
+- **T1** (Codex): `gen.go` generado desde el OpenAPI con oapi-codegen v2.5.1 + runtime v1.1.2; el servidor implementa las 22
+  operaciones (501 las pendientes). Se descartó oapi-codegen v2.8.0: obliga a `go 1.24` y actualiza `x/text`, lo que rompe
+  Q11 y borraría la evidencia de VULN-026.
 - **Informe con capturas** (Claude Desktop, fuera del repo): 20 de los 26 VULN ya tienen captura "antes" (005, 006 y 007 cuentan como "no aparecen").
 
 ### Decisiones tomadas sobre la marcha

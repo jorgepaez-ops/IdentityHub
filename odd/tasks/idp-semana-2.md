@@ -379,7 +379,7 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
 - Commit: d9117cb
 
 ### T1 — Generar `backend/internal/api/gen.go` con oapi-codegen
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RNF-011, ADR 0003 · Remedia: — · Depende de: T1a
+- [x] Estado · Ejecutor: `Codex` · Cubre: RNF-011, ADR 0003 · Remedia: — · Depende de: T1a
 - Fijar versión de oapi-codegen (registrar la exacta en el handoff), config en
   `backend/internal/api/oapi-codegen.yaml` (paquete `api`, tipos + servidor chi), salida
   `backend/internal/api/gen.go` desde `specs/03-api/openapi.yaml`.
@@ -396,7 +396,7 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
   anotarlo en "Preguntas nuevas"; no subirla sin aprobación.
 - Verificación: `cd backend && go build ./... && go vet ./... && go test -race -short ./...`;
   regenerar con el comando registrado y `git diff --exit-code backend/internal/api/gen.go`.
-- Commit:
+- Commit: df47361
 
 ### T2 — Gate real de deriva: `make gen`, `schema.d.ts` y `ci.yml`
 - [ ] Estado · Ejecutor: `Codex` · Cubre: RNF-011 · Remedia: — · Depende de: T1
@@ -889,11 +889,11 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 | Fase | Tareas | Hechas |
 |---|---|---|
 | 0 — Línea base y evidencia "antes" | T0.1 a T0.5 (5) | 3 (T0.1, T0.3, T0.4) |
-| 1 — Contrato ejecutable | T1a, T1 a T3 (4) | 1 (T1a) |
+| 1 — Contrato ejecutable | T1a, T1 a T3 (4) | 2 (T1a, T1) |
 | 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 0 |
 | 3 — Remediación | T23 a T32 (10) | 0 |
 | 4 — Cierre | T33 a T38 (6) | 0 |
-| **Total** | **45** | **4** |
+| **Total** | **45** | **5** |
 
 Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, cookie) y `T14a`
 (enmienda ADR 0005, sin ventana de gracia). Los ids existentes no cambian.
@@ -904,6 +904,7 @@ Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, coo
 las líneas de RED/GREEN van en el handoff.)
 
 - T1a · `python3 -m openapi_spec_validator specs/03-api/openapi.yaml`: OK; `python3 scripts/traceability.py --check`: matriz al día.
+- T1 · `cd backend && go build ./... && go vet ./... && go test -race -short ./...`: OK; `go generate ./internal/api` + `git diff --exit-code backend/internal/api/gen.go`: sin diff; `go mod verify`: all modules verified; `python3 scripts/traceability.py --check`: matriz al día (RNF-011 pasa a parcial).
 - T0.4 · `git diff --stat`: 8 archivos de `security/findings/` (4 líneas cada uno) y `docs/evidencia/README.md` nuevo; `git diff --check`: sin errores; `python3 scripts/traceability.py --check`: matriz al día.
 
 ## Siguiente paso
@@ -976,3 +977,10 @@ Formato por tarea (3 a 5 líneas):
 - Qué cambió: la plantilla de `security/findings/README.md` y las 7 fichas existentes (VULN-001, 002, 005, 020, 021, 022, 023) llevan las filas vacías Evidencia antes, Commit de remediación, Evidencia después y Run de Actions; `docs/evidencia/README.md` documenta la convención de dos capas (Q16).
 - Comandos y resultado observado: solo docs, sin RED/GREEN. `git diff --check`: sin errores; `python3 scripts/traceability.py --check`: matriz al día; `git diff --stat`: solo los 8 archivos de fichas y el README nuevo, sin datos inventados ni carpetas `VULN-*` ni `evidencia.json`.
 - Dudas abiertas: ninguna. Codex dejó los cambios sin commitear porque su sandbox no puede crear `.git/index.lock`; Claude revisó el diff y creó ambos commits. Para las próximas tareas con commits hay que dar a Codex escritura en `.git` o seguir cerrando desde Claude.
+
+### T1 · 2026-09-20 · df47361
+- Qué cambió: `gen.go` generado con oapi-codegen **v2.5.1** y `github.com/oapi-codegen/runtime` **v1.1.2** (configuración en `oapi-codegen.yaml`, regenerable con `go generate ./internal/api`); `Server` implementa las 22 operaciones y las pendientes responden 501 `application/problem+json`; `/healthz` y `/readyz` salen ahora del router generado; `legacy_auth.go` y `/api/v1/auth/legacy-login` intactos.
+- Comandos y resultado observado: RED: `undefined: ServerInterface` y `undefined: TokenPair` (Codex, antes de generar). GREEN: `TestRNF011_GeneratedServerContract`; `go build`, `go vet` y `go test -race -short ./...` en verde (Claude los repitió). Regeneración byte a byte idéntica. Comprobación temporal de rutas (no commiteada): legacy-login, healthz, readyz, metrics, register y jwks registradas (32 rutas).
+- Dependencias: `go.mod` conserva `go 1.22`, chi 5.0.11, jwt v4, pgx 5.5.1 y x/text 0.14.0. Cambios: `+runtime v1.1.2`, `+go-jsonmerge/v2 v2.0.0 // indirect` y `x/crypto` indirecto de 0.9.0 a 0.17.0 (no lo cubre ningún VULN). No se usa oapi-codegen v2.8.0: exige runtime >= 1.3, que sube la directiva a `go 1.24` y actualiza x/text (rompe Q11 y borra la evidencia de VULN-026).
+- Dudas abiertas: ninguna. `go mod tidy -diff` quitaría `testify` indirecto, que ya estaba en la línea base: se deja. `golangci-lint` no está instalado localmente. Codex no pudo commitear (sandbox sin escritura en `.git`); Claude hizo ambos commits.
+
