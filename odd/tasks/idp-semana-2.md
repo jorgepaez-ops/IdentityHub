@@ -69,8 +69,8 @@ Codex puede crear y editar: `backend/**` (salvo lo sembrado, según cada tarea),
 este archivo. Excepciones puntuales, cada una solo en la tarea indicada: `specs/03-api/openapi.yaml`
 (solo T1a, C1), `specs/adr/0005-*.md` (solo T14a, C2), `scripts/traceability.py` (solo T34, para el
 estado "diferido") y `.gitleaksignore` (solo T31, con las huellas que entregue el usuario). No puede:
-modificar `specs/` fuera de C1/C2, tocar tags, escribir en `docs/evidencia/VULN-*/` (lo hace el
-usuario), ni commitear `.atl/`, `.gga`, `docs/diagramas/`.
+modificar `specs/` fuera de C1/C2, tocar tags, escribir en `docs/evidencia/VULN-*/` (lo hace Claude:
+ver "Protocolo de evidencia"), hacer capturas, ni commitear `.atl/`, `.gga`, `docs/diagramas/`.
 
 ## Criterios de aceptación de la feature
 
@@ -82,34 +82,47 @@ usuario), ni commitear `.atl/`, `.gga`, `docs/diagramas/`.
 4. Cobertura de `backend/internal/` >= 70 % y gate activo (RNF-005).
 5. Los escenarios de `specs/06-acceptance/` de autenticación, registro, rotación y control de
    acceso tienen prueba Go equivalente (E2E llega en semana 3).
-6. Cada VULN de la fase 3 tiene fila completa en el "Registro de evidencia" y su carpeta
-   `docs/evidencia/VULN-XXX/` con antes y después, o queda anotado por qué no aplica.
+6. Cada VULN de la fase 3 tiene fila completa en el "Registro de evidencia" y su
+   `docs/evidencia/VULN-XXX/evidencia.json` con `antes` y `despues` completos, y sus capturas antes/después
+   están en el informe externo (confirmado por el usuario), o queda anotado por qué no aplica.
 7. Tag del estado corregido creado por el usuario (T38).
 
 ## Protocolo de evidencia
 
 Objetivo: documentar el ciclo de vida de cada vulnerabilidad con pruebas.
 
-**Carpeta por hallazgo:** `docs/evidencia/VULN-XXX/` (todos los hallazgos tienen ya id: Q9
-asigna VULN-024 a VULN-026 a los que no lo tenían), con:
+**Dos capas (Q16, 2026-09-20).** Las capturas de pantalla **no viven en el repo**: Claude Desktop
+las toma navegando GitHub en la sesión autenticada del usuario (solo lectura; sin permisos de
+escritura sobre el repo) y las reúne en el informe externo `Evidencias-CI-LineaBase-IdentityHub.docx`
+(sin versionar, en `Claude outputs/`). Lo que sí se versiona es texto:
 
-- `before.png` y `after.png`: capturas del usuario (o de Claude Desktop con navegador): la
-  alerta como aparece en GitHub (log del job en Actions, o pestaña Security > Code scanning /
-  Dependabot). Tomarlas del mismo gate antes y después.
+1. **En el repo:** `docs/evidencia/VULN-XXX/evidencia.json` por hallazgo (todos los hallazgos
+   tienen ya id: Q9 asigna VULN-024 a VULN-026 a los que no lo tenían) y el artefacto ya guardado
+   en `security/evidence/`. Es lo que perdura cuando caducan los logs de Actions (retención de 90 días).
+2. **Fuera del repo:** el informe con las capturas `antes` y `después`. El campo `captura` de cada
+   `evidencia.json` apunta a la sección del informe donde está la imagen (`null` hasta que el
+   usuario confirme que la captura existe).
+
+Datos que Desktop entrega como **texto** (no imágenes) por cada VULN: workflow, run ID/URL, job,
+paso, SHA, y la alerta literal sin secretos. Con eso Claude escribe o completa el `evidencia.json`.
+
+**Carpeta por hallazgo:** `docs/evidencia/VULN-XXX/`, con:
+
 - `evidencia.json`: artefacto legible por máquina. Forma fija (`null` hasta conocerse):
   ```json
   {
     "vuln": "VULN-002",
     "gate": ["gosec G401 (baseline-scan)", "CodeQL", "Semgrep"],
     "antes":   {"commit_linea_base": "053e15f...", "commit_main": null, "workflow": null,
-                "run_id": null, "run_url": null, "artefacto": "security/evidence/...", "captura": "before.png"},
+                "run_id": null, "run_url": null, "artefacto": "security/evidence/...", "captura": null},
     "remediacion": {"tarea": "T23", "commit": null, "ficha": "security/findings/VULN-002-md5-para-contrasenas.md"},
-    "despues": {"commit": null, "workflow": null, "run_id": null, "run_url": null, "captura": "after.png"}
+    "despues": {"commit": null, "workflow": null, "run_id": null, "run_url": null, "captura": null}
   }
   ```
-  El artefacto "antes" reutiliza lo ya versionado en `security/evidence/*-baseline.*`; los
-  recortes SARIF/JSON nuevos se guardan ahí (ruta ya permitida en `.gitleaks.toml`), no en
-  `docs/evidencia/`.
+  `captura` es una referencia de texto a la sección del informe externo (p. ej. `"informe §VULN-002 antes"`);
+  no hay `before.png` ni `after.png` en el repo. El artefacto "antes" reutiliza lo ya versionado en
+  `security/evidence/*-baseline.*` y `security/evidence/actions-<run_id>/`; los recortes SARIF/JSON
+  nuevos se guardan ahí (ruta ya permitida en `.gitleaks.toml`), no en `docs/evidencia/`.
 - El repositorio es **público** (Q10): la subida de SARIF a code scanning (pestaña Security) está
   disponible sin GitHub Advanced Security, así que el "antes" puede salir tanto de esa pestaña
   como del log del job y de los artefactos de Actions.
@@ -118,19 +131,23 @@ asigna VULN-024 a VULN-026 a los que no lo tenían), con:
   (T0.4 actualiza la plantilla en `security/findings/README.md` y las fichas existentes).
 
 **Reglas de captura:** ninguna captura ni JSON puede mostrar secretos reales; la salida de
-Gitleaks puede revelar los valores sembrados (inventados): recortar o tapar la columna del
-secreto y borrar `Secret`/`Match` de los JSON. Cada imagen <= 512 KB (el hook
-`check-added-large-files` de `.pre-commit-config.yaml` rechaza más). Los VULN detectados solo
-por ZAP (007 parcialmente, 013, 014, 015) no tienen gate hoy: el "antes" es una captura de
-`curl -sI http://localhost:8080` (cabeceras) sobre el tag, y el "después" el mismo comando.
+Gitleaks puede revelar los valores sembrados (inventados): leer primero como texto, tapar la columna del
+secreto en la imagen y borrar `Secret`/`Match` de los JSON. El informe externo no se sube al repo
+(si algún día se sube, cada imagen <= 512 KB por el hook `check-added-large-files`). Los VULN
+detectados solo por ZAP (007 parcialmente, 013, 014, 015) no tienen gate hoy: el "antes" es la
+salida de `curl -sI http://localhost:8080` (cabeceras) sobre el tag, que ejecuta el **usuario** en
+local (Desktop no puede: es un navegador), y el "después" el mismo comando; ambas salidas van al informe
+y, como texto, al `evidencia.json`.
 
 **Cómo se obtiene el "después":** `ci.yml` corre en push a `main`, en `pull_request` y en
 `workflow_dispatch`; un push a una rama sin PR no lo dispara. El usuario abre un PR por corte
 de fase (o lanza `CI` con `workflow_dispatch` sobre la rama) y registra run ID y URL.
 
-**Responsabilidades:** Usuario = capturas, run IDs, `before`/`after`, `evidencia.json` de runs.
-Codex = commit de remediación, ficha, sin capturas. Cada tarea `Remedia:` lleva su sub-casilla
-"Evidencia" a cargo de `Usuario`.
+**Responsabilidades:** Usuario (con Claude Desktop) = navegar GitHub, capturas y su informe, run
+IDs, `curl -sI` local. Claude = convertir esos datos de texto en `evidencia.json` y commitearlos.
+Codex = commit de remediación y ficha; **no** escribe en `docs/evidencia/VULN-*/` ni hace capturas.
+Cada tarea `Remedia:` lleva su sub-casilla "Evidencia" a cargo de `Usuario`: se marca cuando la
+captura "después" está en el informe y el `evidencia.json` tiene su `despues` completo.
 
 **Regla de ids:** un id `VULN-NNN` solo se asigna cuando se crea su ficha en
 `security/findings/`; nunca se inventa en un comentario de código, en el compose ni en un
@@ -245,12 +262,21 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
     run IDs en el "Registro de evidencia"; resolver D3 y D4.
 - Commit: —
 
-### T0.3 — Capturas y `evidencia.json` "antes" por hallazgo
-- [ ] Estado · Ejecutor: `Claude` (herramienta de navegador `claude-in-chrome` si está disponible y con permisos; si no, el usuario o Claude Desktop) · Cubre: todos los VULN · Remedia: —
-- Para cada fila del "Registro de evidencia": `docs/evidencia/VULN-XXX/before.png` (sin secretos,
-  <= 512 KB) y `evidencia.json` con la sección `antes` rellena (run ID/URL, SHA, artefacto).
-- Verificación: `ls docs/evidencia/*/before.png | wc -l` cubre todas las filas con gate hoy;
-  las filas "sin gate hoy" llevan la captura de `curl -sI` y una nota.
+### T0.3 — Evidencia "antes" por hallazgo (capturas en el informe, `evidencia.json` en el repo)
+- [ ] Estado · Ejecutor: `Usuario` con Claude Desktop (navegación y capturas, informe externo) y `Claude` (escribe y commitea los `evidencia.json` con los datos de texto que entrega Desktop) · Cubre: todos los VULN · Remedia: — · Depende de: T0.2 (la parte de imágenes, D2)
+- **Reestructurada el 2026-09-20 (Q16):** ya no hay `before.png` en el repo (Desktop no puede escribir en él).
+  Para cada fila del "Registro de evidencia": `docs/evidencia/VULN-XXX/evidencia.json` con la sección
+  `antes` rellena (workflow, run ID/URL, SHA, artefacto, `captura` = sección del informe) y la captura
+  "antes" presente en el informe externo, confirmada por el usuario.
+- Dos pasadas: (1) los VULN con evidencia ya disponible en los runs 35473988275 (`CI`) y 35476102444
+  (`baseline-scan`); (2) los que dependen de T0.2 pendiente: VULN-008, 016, 019 y la parte de Trivy de 009 y 018
+  (D2: sin datos de imágenes hasta corregir `baseline-scan.yml` y repetir el escaneo). Las discrepancias D3 y D4
+  se anotan como observadas (no aparece / no se detecta), nunca se inventa la alerta.
+- Filas "sin gate hoy" (VULN-013, 014, 015): el usuario ejecuta `curl -sI http://localhost:8080` sobre el tag
+  y pega la salida (texto); no las toma Desktop.
+- Verificación: `ls docs/evidencia/*/evidencia.json | wc -l` = 26 (uno por fila del registro); cada uno con
+  `antes.run_url` o una nota que explique por qué no aplica; `python3 -m json.tool` valida cada archivo; sin
+  `Secret`/`Match` ni valores con forma de secreto (`make scan-secrets` no añade hallazgos).
 - Commit: —
 
 ### T0.4 — Plantilla de fichas y README de evidencia
@@ -258,7 +284,9 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
 - Añadir a la plantilla de `security/findings/README.md` las filas Evidencia antes, Commit de
   remediación, Evidencia después y Run de Actions (antes/después); replicarlas (vacías) en
   las 7 fichas existentes (`VULN-001`, `002`, `005`, `020`, `021`, `022`, `023`).
-- Crear `docs/evidencia/README.md` (convención, resumen del protocolo de arriba, reglas de captura).
+- Crear `docs/evidencia/README.md` (convención de dos capas de Q16: `evidencia.json` en el repo y capturas en
+  el informe externo; forma fija del JSON; reglas de captura; quién escribe qué). No mencionar `before.png` ni
+  `after.png` como archivos del repo.
 - Archivos: `security/findings/README.md`, `security/findings/VULN-*.md`, `docs/evidencia/README.md`.
 - Criterios: las fichas mantienen su formato; ningún dato inventado.
 - Verificación: `git diff --stat` solo toca esos archivos; `python3 scripts/traceability.py --check`.
@@ -405,7 +433,7 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
   proxy confiable se respeta; `govulncheck` ya no informa GO-2026-5774/5775/5777.
 - Verificación: `make test-go`; `cd backend && go run golang.org/x/vuln/cmd/govulncheck@latest ./...` (las otras alertas siguen hasta T23/T24); `make lint`.
 - Commit:
-- [ ] Evidencia (`Usuario`): `docs/evidencia/VULN-020/` chi: `after.png` tras run verde del job `sca` sin esos avisos.
+- [ ] Evidencia (`Usuario`): VULN-020 chi: captura "después" en el informe tras run verde del job `sca` sin esos avisos, y datos de texto para el `despues` de `docs/evidencia/VULN-020/evidencia.json`.
 
 ### T7 — Argon2id
 - [ ] Estado · Ejecutor: `Codex` · Cubre: RF-001, AM-001, AM-004, AM-017, invariante 1, ADR 0004 · Remedia: — (prepara VULN-002) · Depende de: T5
@@ -666,7 +694,8 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
 ## Fase 3 — Remediación de la línea base (todas `Remedia:`; bloqueadas por T0.3)
 
 Cada tarea de esta fase: el `Commit:` es el commit de remediación; después Codex actualiza la
-ficha (T36). Cada `Evidencia` la completa el `Usuario` tras el run verde del gate.
+ficha (T36). Cada `Evidencia` la completa el `Usuario` tras el run verde del gate: captura "después"
+en el informe externo (Desktop) y datos de texto para el `despues` del `evidencia.json` (lo escribe Claude).
 
 ### T23 — Retirar `legacy_auth.go` y su ruta
 - [ ] Estado · Ejecutor: `Codex` · Cubre: AM-003, AM-006, AM-012, RF-004 · Remedia: VULN-001 (código), VULN-002, VULN-004, VULN-005, VULN-006, VULN-007, VULN-021 · Bloqueada por: T0.3, T22
@@ -797,10 +826,13 @@ ficha (T36). Cada `Evidencia` la completa el `Usuario` tras el run verde del gat
 - Commit:
 
 ### T35 — CI en verde y evidencia "después"
-- [ ] Estado · Ejecutor: `Usuario` · Cubre: todos los VULN de la Fase 3
+- [ ] Estado · Ejecutor: `Usuario` con Claude Desktop (PR, run, capturas en el informe) y `Claude` (completa los `evidencia.json`) · Cubre: todos los VULN de la Fase 3
 - Abrir PR (o `workflow_dispatch`) con la rama; `CI` en verde. Registrar run ID/URL "después" en
-  el "Registro de evidencia" y en cada `evidencia.json`; `after.png` por carpeta (sin secretos, <= 512 KB).
-- Verificación: `ls docs/evidencia/*/after.png`; Actions muestra `CI` en verde sobre el SHA final.
+  el "Registro de evidencia" y, como texto, en cada `evidencia.json` (`despues`, lo completa Claude con los
+  datos que entrega Desktop); las capturas "después" van al informe externo (sin secretos). Prompt de Desktop
+  para esta captura: el "prompt después" que Claude entrega al usuario al cerrar la Fase 3.
+- Verificación: `python3 -m json.tool` valida los 26 `evidencia.json` y ninguno deja `despues.run_url` en `null`
+  sin nota; Actions muestra `CI` en verde sobre el SHA final; el usuario confirma las capturas en el informe.
 - Commit: —
 
 ### T36 — Fichas actualizadas
@@ -845,14 +877,12 @@ las líneas de RED/GREEN van en el handoff.)
 
 ## Siguiente paso
 
-1. `Usuario`, antes de nada: la **comprobación previa al push** de T0.1 (confirmar que ninguna
-   credencial sembrada en `deploy/docker-compose.yml`, el código legacy del backend, los `ENV` del
-   Dockerfile o `.env.example` es real o está reutilizada; el repo es público). Después, commitear
-   `AGENTS.md` y `odd/`, y hacer T0.1 a T0.3 (repo `git@github.com:jorgepaez-ops/IdentityHub.git`,
-   push de `main` y del tag, workflows, capturas "antes", y la lista de las 12 huellas de Gitleaks para T31).
-2. `Codex` puede empezar por **T1a** (enmienda OpenAPI a cookie) y la Fase 1 **solo cuando el usuario haya
-   commiteado estos documentos**; T14a y las tareas de Fase 2 no `Remedia:` siguen el orden del archivo.
-   T0.4 (solo docs) también puede hacerse antes; T0.5 tras T0.2.
+1. T0.1 está hecha. Quedan T0.2 (escaneo semanal, corregir `baseline-scan.yml`, repetir imágenes, D3/D4,
+   huellas para T31) y T0.3 reestructurada (Q16): el usuario toma las capturas "antes" con Claude Desktop
+   (primera pasada con el prompt "antes"), y Claude escribe los `evidencia.json` con los datos que entregue.
+2. `Codex` ya hizo **T1a**. Siguiente en orden para Codex: **T0.4** (solo docs), ahora con la convención de
+   dos capas de Q16; T0.5 tras T0.2; luego T1 y la Fase 1. Las tareas de Fase 2 no `Remedia:` siguen el
+   orden del archivo.
 3. Todas las tareas `Remedia:` (Fase 3) siguen **bloqueadas por T0.3**.
 
 ## Cambios de spec propuestos
@@ -882,6 +912,8 @@ Todas resueltas por el usuario el 2026-09-19 (las que no traen cambio se aceptar
 - **Q13 · CIDR de `TRUSTED_PROXIES`.** Decisión: fijar una subred en la red por defecto del compose y usarla como valor, fecha 2026-09-19, afecta a: T21, T6.
 - **Q14 · Alcance.** Decisión: RF-013, RF-014, RF-015, RF-016, RF-018 y RF-019 fuera de esta feature y al backlog de semana 3; se muestran como "diferido" (no olvidados) en la matriz de trazabilidad y T13 rechaza con un error claro las cuentas con MFA activado, fecha 2026-09-19, afecta a: T13, T34.
 - **Q15 · Página del enlace de verificación.** Decisión: la plantilla emite `/verify-email?token=...`; en esta feature se verifica con `curl`; la página del SPA se hace en semana 3, fecha 2026-09-19, afecta a: T12, T21.
+
+- **Q16 · Dónde vive la evidencia (2026-09-20).** Decisión: Claude Desktop no escribe en el repo (errores de permisos) y genera por su cuenta el informe `.docx` con capturas reales tomadas navegando GitHub. Por eso las capturas dejan de ser `before.png`/`after.png` versionados: en el repo queda solo `docs/evidencia/VULN-XXX/evidencia.json` (texto, lo escribe Claude a partir de los datos que entrega Desktop) y el informe externo lleva las imágenes; `captura` referencia su sección. T0.3, T0.4, T35, el criterio 6, el protocolo y `AGENTS.md` se ajustan; las tareas de código no cambian. Costo aceptado: las imágenes no quedan en el repo público; lo que perdura cuando caducan los logs es el JSON y `security/evidence/`. Fecha 2026-09-20, afecta a: T0.3, T0.4, T35, T36, criterio 6.
 
 ### Preguntas nuevas (Codex)
 

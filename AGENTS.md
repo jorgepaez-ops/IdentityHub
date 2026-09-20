@@ -147,10 +147,11 @@ El espejo en memoria del archivo de tareas lo reconcilia Claude; tú solo editas
 ## Evidencia de vulnerabilidades (antes / después)
 
 Convención completa en `odd/tasks/idp-semana-2.md`, sección "Protocolo de evidencia".
-Resumen: por hallazgo, `docs/evidencia/VULN-XXX/` con `before.png`, `after.png` y
-`evidencia.json` (los toma el **usuario**; tú no haces capturas). Tu parte: el commit de
-remediación, dejar la ficha `security/findings/VULN-XXX-*.md` con "Commit de remediación" y
-estado actualizado, y no ejecutar ningún commit de remediación antes de que exista el "antes".
+Resumen (Q16): las capturas viven en un informe externo que arma el usuario con Claude Desktop, no en
+el repo; en el repo solo hay `docs/evidencia/VULN-XXX/evidencia.json` (texto, lo escribe Claude). Tú no
+haces capturas ni escribes en `docs/evidencia/VULN-*/`. Tu parte: el commit de remediación, dejar la
+ficha `security/findings/VULN-XXX-*.md` con "Commit de remediación" y estado actualizado, y no ejecutar
+ningún commit de remediación antes de que exista el "antes" (T0.3 marcada).
 
 ## Reglas de revisión de Go (`.gga` usa este archivo como `RULES_FILE`)
 
