@@ -283,7 +283,7 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
 - Commit: —
 
 ### T0.3 — Evidencia "antes" por hallazgo (capturas en el informe, `evidencia.json` en el repo)
-- [ ] Estado · Ejecutor: `Usuario` con Claude Desktop (navegación y capturas, informe externo) y `Claude` (escribe y commitea los `evidencia.json` con los datos de texto que entrega Desktop) · Cubre: todos los VULN · Remedia: — · Depende de: T0.2 (la parte de imágenes, D2)
+- [x] Estado · Ejecutor: `Usuario` con Claude Desktop (navegación y capturas, informe externo) y `Claude` (escribe y commitea los `evidencia.json` con los datos de texto que entrega Desktop) · Cubre: todos los VULN · Remedia: — · Depende de: T0.2 (la parte de imágenes, D2)
 - **Reestructurada el 2026-09-20 (Q16):** ya no hay `before.png` en el repo (Desktop no puede escribir en él).
   Para cada fila del "Registro de evidencia": `docs/evidencia/VULN-XXX/evidencia.json` con la sección
   `antes` rellena (workflow, run ID/URL, SHA, artefacto, `captura` = sección del informe) y la captura
@@ -303,6 +303,7 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
   Falta la parte de Trivy image de VULN-008, 009, 016, 018 y 019 (run 35534898422) y confirmar las capturas.
 - Filas "sin gate hoy" (VULN-013, 014, 015): el usuario ejecuta `curl -sI http://localhost:8080` sobre el tag
   y pega la salida (texto); no las toma Desktop.
+- **Cerrada 2026-09-20:** 26 de 26 `evidencia.json` válidos, todos con `antes.run_url` o una nota; 20 con captura en el informe; VULN-013, 014 y 015 con evidencia en texto (Q18); VULN-011, 024 sin gate; VULN-023 ya remediado; el historial sigue dando 12 hallazgos de Gitleaks, todos sobre `053e15f`.
 - Verificación: `ls docs/evidencia/*/evidencia.json | wc -l` = 26 (uno por fila del registro); cada uno con
   `antes.run_url` o una nota que explique por qué no aplica; `python3 -m json.tool` valida cada archivo; sin
   `Secret`/`Match` ni valores con forma de secreto (`make scan-secrets` no añade hallazgos).
@@ -887,12 +888,12 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 
 | Fase | Tareas | Hechas |
 |---|---|---|
-| 0 — Línea base y evidencia "antes" | T0.1 a T0.5 (5) | 0 |
-| 1 — Contrato ejecutable | T1a, T1 a T3 (4) | 0 |
+| 0 — Línea base y evidencia "antes" | T0.1 a T0.5 (5) | 3 (T0.1, T0.3, T0.4) |
+| 1 — Contrato ejecutable | T1a, T1 a T3 (4) | 1 (T1a) |
 | 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 0 |
 | 3 — Remediación | T23 a T32 (10) | 0 |
 | 4 — Cierre | T33 a T38 (6) | 0 |
-| **Total** | **45** | **0** |
+| **Total** | **45** | **4** |
 
 Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, cookie) y `T14a`
 (enmienda ADR 0005, sin ventana de gracia). Los ids existentes no cambian.
@@ -946,6 +947,8 @@ Todas resueltas por el usuario el 2026-09-19 (las que no traen cambio se aceptar
 - **Q16 · Dónde vive la evidencia (2026-09-20).** Decisión: Claude Desktop no escribe en el repo (errores de permisos) y genera por su cuenta el informe `.docx` con capturas reales tomadas navegando GitHub. Por eso las capturas dejan de ser `before.png`/`after.png` versionados: en el repo queda solo `docs/evidencia/VULN-XXX/evidencia.json` (texto, lo escribe Claude a partir de los datos que entrega Desktop) y el informe externo lleva las imágenes; `captura` referencia su sección. T0.3, T0.4, T35, el criterio 6, el protocolo y `AGENTS.md` se ajustan; las tareas de código no cambian. Costo aceptado: las imágenes no quedan en el repo público; lo que perdura cuando caducan los logs es el JSON y `security/evidence/`. Fecha 2026-09-20, afecta a: T0.3, T0.4, T35, T36, criterio 6.
 
 - **Q17 · Dependabot (2026-09-20).** Decisión: no se activa Dependabot por ahora (ni alertas ni actualizaciones). La evidencia de dependencias (VULN-020, 021, 022, 025, 026) sale de govulncheck y npm audit; el escaneo semanal cubre la revisión continua. CodeQL no cubre dependencias, solo código. Se puede reconsiderar `dependabot.yml` tras remediar (semana 3). Afecta a: T0.3.
+
+- **Q18 · Evidencia de VULN-013, 014 y 015 (2026-09-20).** Decisión: se acepta la salida en texto de `security/evidence/local-web-baseline.txt` (curl -sI y ráfaga sobre la imagen `web` del tag, con fecha y método) en lugar de una captura de pantalla. La misma regla se usa para el "después" (T35): la salida del mismo comando. Afecta a: T0.3, T35.
 
 ### Preguntas nuevas (Codex)
 

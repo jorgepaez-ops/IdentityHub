@@ -82,11 +82,11 @@ esta entrada resume lo que importa para entender el proyecto.
 - Rama `feat/idp-semana-2`; los commits posteriores al push del 2026-09-20 están solo en local.
 - Con captura "antes" en el informe: 20 de 26. Sin captura aún: VULN-013, 014 y 015 (evidencia local ya guardada en
   texto), VULN-011 y 024 (ningún gate los detecta) y VULN-023 (ya remediado).
-- T0.3 no está marcada: faltan VULN-013, 014 y 015, y confirmar el informe completo.
+- **T0.3 cerrada.** VULN-013, 014 y 015 se documentan con la salida en texto (Q18). T0.2 espera el escaneo semanal (lunes 2026-09-21).
 
 ### Siguiente paso
 
-1. Decidir cómo documentar VULN-013, 014 y 015 (captura de terminal o el texto de `local-web-baseline.txt`).
+1. Cerrar T0.2 con el escaneo semanal del lunes; después T0.5 (fichas).
 2. Cerrar T0.2 (el escaneo semanal corre solo el lunes 2026-09-21) y T0.3; después T0.5.
 3. Empezar el código con T1 (oapi-codegen); Codex escribe y Claude revisa y commitea.
 
