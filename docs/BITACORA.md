@@ -26,7 +26,7 @@ esta entrada resume lo que importa para entender el proyecto.
 - **T0.2 y T0.3 (en curso)**: dos escaneos de la línea base (runs 35476102444 y 35534898422), los 26
   `docs/evidencia/VULN-XXX/evidencia.json` con su "antes", alertas de code scanning leídas por API,
   `curl` local sobre la imagen `web` y las 12 huellas de Gitleaks para T31.
-- **Informe con capturas** (Claude Desktop, fuera del repo): 14 de los 26 VULN ya tienen captura "antes".
+- **Informe con capturas** (Claude Desktop, fuera del repo): 17 de los 26 VULN ya tienen captura "antes" (005, 006 y 007 cuentan como "no aparecen").
 
 ### Decisiones tomadas sobre la marcha
 
@@ -80,8 +80,8 @@ esta entrada resume lo que importa para entender el proyecto.
 ### Estado
 
 - Rama `feat/idp-semana-2`; los commits posteriores al push del 2026-09-20 están solo en local.
-- Con "antes" completo: 17 de 26 VULN. Pendientes: VULN-011 y 024 (sin gate, solo anotados), VULN-013, 014, 015
-  (evidencia local ya guardada, faltan las capturas), VULN-023 (ya remediado) y la captura de VULN-008, 016 y 019.
+- Con captura "antes" en el informe: 17 de 26. Sin captura aún: VULN-008, 016 y 019 (run 35534898422), VULN-013,
+  014 y 015 (evidencia local ya guardada en texto), VULN-011 y 024 (ningún gate los detecta) y VULN-023 (ya remediado).
 - T0.3 no está marcada: falta cerrar las capturas de los pendientes y confirmar el informe.
 
 ### Siguiente paso
