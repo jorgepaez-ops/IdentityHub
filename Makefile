@@ -6,6 +6,8 @@
 
 COMPOSE     := docker compose -f deploy/docker-compose.yml
 COMPOSE_OBS := $(COMPOSE) --profile observability
+SQLC_VERSION := v1.31.1
+SQLC         ?= sqlc
 
 .DEFAULT_GOAL := help
 .PHONY: help up down logs ps restart build test test-go test-integration test-front e2e lint fmt gen scan scan-secrets scan-deps scan-image scan-config migrate psql rabbit mail clean
@@ -51,6 +53,9 @@ build: ## Construye las tres imágenes
 # ── Desarrollo ───────────────────────────────────────────────────────────
 gen: ## Regenera todo lo derivado de los specs (RNF-011)
 	cd backend && go generate ./internal/api
+	@test "$$($(SQLC) version)" = "$(SQLC_VERSION)" || \
+		(echo "sqlc $(SQLC_VERSION) is required" && exit 1)
+	$(SQLC) generate
 	cd frontend && npm run gen:api
 	python3 scripts/traceability.py
 

@@ -53,6 +53,11 @@ jobs:
           go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.5.1
           go generate ./internal/api
 
+      - name: Regenerar consultas SQL con sqlc
+        run: |
+          GOTOOLCHAIN=go1.26.2 go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1
+          "$(go env GOPATH)/bin/sqlc" generate
+
       # Sin `cache: npm`: todavía no hay package-lock.json (lo versiona T25) y
       # setup-node falla si la ruta de dependencias no existe.
       - uses: actions/setup-node@v4
