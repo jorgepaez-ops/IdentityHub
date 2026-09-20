@@ -423,7 +423,7 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
 ## Fase 2 — Núcleo del IdP
 
 ### T4 — Infraestructura de pruebas de integración
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RNF-005, RNF-011 · Remedia: — · Depende de: T1
+- [x] Estado · Ejecutor: `Codex` · Cubre: RNF-005, RNF-011 · Remedia: — · Depende de: T1
 - Paquete de apoyo `backend/internal/testdb` (tag `integration`): lee `TEST_DATABASE_URL`, crea
   una base temporal, aplica `db/migrations/*.up.sql` en orden con pgx (sin nuevas dependencias
   de migración) y la borra al terminar; se omite con `t.Skip` si falta la variable.
@@ -435,7 +435,7 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
   credenciales de ese compose (puerto 5432 publicado); no copiarlas a ningún archivo versionado.
 - Archivos: `backend/internal/testdb/**`, `Makefile`, `.github/workflows/ci.yml`.
 - Verificación: `make test-integration` (con la base levantada); `cd backend && go test -race -short ./...` sigue verde sin base.
-- Commit:
+- Commit: 6954cba
 
 ### T5 — sqlc: configuración y consultas base
 - [ ] Estado · Ejecutor: `Codex` · Cubre: AM-006, RNF-011, VULN-005 (parcial, la retirada va en T23) · Remedia: — · Depende de: T4
@@ -892,10 +892,10 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 |---|---|---|
 | 0 — Línea base y evidencia "antes" | T0.1 a T0.5 (5) | 3 (T0.1, T0.3, T0.4) |
 | 1 — Contrato ejecutable | T1a, T1 a T3 (4) | 4 (T1a, T1, T2, T3) |
-| 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 0 |
+| 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 1 (T4) |
 | 3 — Remediación | T23 a T32 (10) | 0 |
 | 4 — Cierre | T33 a T38 (6) | 0 |
-| **Total** | **45** | **7** |
+| **Total** | **45** | **8** |
 
 Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, cookie) y `T14a`
 (enmienda ADR 0005, sin ventana de gracia). Los ids existentes no cambian.
@@ -906,6 +906,7 @@ Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, coo
 las líneas de RED/GREEN van en el handoff.)
 
 - T1a · `python3 -m openapi_spec_validator specs/03-api/openapi.yaml`: OK; `python3 scripts/traceability.py --check`: matriz al día.
+- T4 · `make test-integration` y `go test -race -tags=integration ./internal/testdb/...` dos veces contra PostgreSQL 14 local: PASS y sin bases temporales sobrantes; sin `TEST_DATABASE_URL`: SKIP; `go vet` con y sin la etiqueta, `go test -race -short ./...`, trazabilidad y YAML: en verde; Gitleaks sobre `ci.yml` y `Makefile`: 0 hallazgos.
 - T2 · `make gen` dos veces: mismo checksum de `gen.go`, `schema.d.ts` y la matriz; `npm run lint`, `typecheck` y `test` (2/2) en verde; `go build`, `go vet` y `go test -race -short ./...` en verde; sonda negativa del gate: `git diff --exit-code` = 1.
 - T1 · `cd backend && go build ./... && go vet ./... && go test -race -short ./...`: OK; `go generate ./internal/api` + `git diff --exit-code backend/internal/api/gen.go`: sin diff; `go mod verify`: all modules verified; `python3 scripts/traceability.py --check`: matriz al día (RNF-011 pasa a parcial).
 - T0.4 · `git diff --stat`: 8 archivos de `security/findings/` (4 líneas cada uno) y `docs/evidencia/README.md` nuevo; `git diff --check`: sin errores; `python3 scripts/traceability.py --check`: matriz al día.
@@ -991,4 +992,10 @@ Formato por tarea (3 a 5 líneas):
 - Qué cambió: `make gen` regenera `gen.go` (oapi-codegen v2.5.1), `frontend/src/api/schema.d.ts` (openapi-typescript 6.7.6) y la matriz de trazabilidad; el job `spec-drift` regenera lo mismo y falla con cualquier diff o archivo sin seguimiento (`git diff --exit-code` y `git status --porcelain`). `schema.d.ts` generado (786 líneas, sin `refreshToken`).
 - Comandos y resultado observado: RED: `make gen` solo corría la trazabilidad y `schema.d.ts` no existía. GREEN: `make gen` de punta a punta y sin diff en la segunda ejecución; frontend lint, typecheck y tests en verde; backend build, vet y tests con `-race` en verde. Claude repitió todo y añadió la sonda negativa.
 - Dudas abiertas: ninguna. Ajuste de Claude: sin `cache: npm` en el `setup-node` de `spec-drift` (falta el lockfile, ver T3). Node 18 en CI (`NODE_VERSION`), Node 24 en local. Codex no pudo restaurar con `git checkout` (sandbox sin `.git`) y restauró desde una copia; sin restos.
+
+### T4 · 2026-09-20 · 6954cba
+- Qué cambió: paquete `backend/internal/testdb` (etiqueta `integration`): `testdb.New(t)` crea una base temporal con nombre aleatorio (`crypto/rand`) a partir de `TEST_DATABASE_URL`, aplica las migraciones `*.up.sql` con pgx y la borra al terminar; se omite si falta la variable. `make test-integration`. Job `6b · Pruebas de integración` en `ci.yml` con PostgreSQL **16.15** fijado por digest (`postgres:16-bookworm@sha256:efedf359…`), contraseña de servicio efímera derivada de `github.run_id`. Prueba `TestRNF011_MigracionesSeAplicanSobreBaseVacia` (tablas esperadas, un MD5 viola `users_password_hash_is_argon2id` con código 23514, un hash `$argon2id$` entra).
+- Comandos y resultado observado: RED (Codex): faltaba el paquete auxiliar. GREEN (Claude, con la base real, dos veces): PASS y `pg_database` sin bases temporales. Sin variable: SKIP. Todo lo demás en verde. El sandbox de Codex no llega a `localhost:5432` (`operation not permitted`): no dio GREEN de integración y lo dejó dicho; Claude lo ejecutó.
+- Ajuste de Claude: el pool que devuelve `testdb.New` usaba el protocolo simple de pgx en todas las consultas; ahora solo las migraciones (varias sentencias por archivo) lo usan, y el resto queda en el protocolo extendido, igual que producción y que el código de sqlc de T5.
+- Dudas abiertas: ninguna. El job del CI arma la URL con `format()` para que Gitleaks no marque un literal `postgres://usuario:clave@`; no se amplió ninguna lista de excepciones. Codex ejecutó `gentle-ai codegraph init` y creó `.codegraph/` (sin versionar, fuera de la tarea): no se commitea.
 
