@@ -42,9 +42,6 @@ func (s *Server) Routes() http.Handler {
 	})
 	r.Use(Metrics)
 
-	r.Get("/healthz", s.Health)
-	r.Get("/readyz", s.Readiness)
-
 	// /metrics no se expone al exterior: Nginx no lo proxea y en producción el
 	// puerto de la API no se publica al host. Solo Prometheus, dentro de la red
 	// de Docker, puede alcanzarlo.
@@ -56,5 +53,44 @@ func (s *Server) Routes() http.Handler {
 		r.Get("/auth/legacy-login", s.LegacyLogin)
 	})
 
-	return r
+	return HandlerFromMux(s, r)
+}
+
+func (s *Server) GetJwks(w http.ResponseWriter, r *http.Request) { s.notImplemented(w) }
+func (s *Server) ListAuditLog(w http.ResponseWriter, r *http.Request, params ListAuditLogParams) {
+	s.notImplemented(w)
+}
+func (s *Server) ListUsers(w http.ResponseWriter, r *http.Request, params ListUsersParams) {
+	s.notImplemented(w)
+}
+func (s *Server) GetUser(w http.ResponseWriter, r *http.Request, userID UserId) { s.notImplemented(w) }
+func (s *Server) UpdateUser(w http.ResponseWriter, r *http.Request, userID UserId) {
+	s.notImplemented(w)
+}
+func (s *Server) Login(w http.ResponseWriter, r *http.Request) { s.notImplemented(w) }
+func (s *Server) Logout(w http.ResponseWriter, r *http.Request, params LogoutParams) {
+	s.notImplemented(w)
+}
+func (s *Server) VerifyMfa(w http.ResponseWriter, r *http.Request)            { s.notImplemented(w) }
+func (s *Server) ConfirmPasswordReset(w http.ResponseWriter, r *http.Request) { s.notImplemented(w) }
+func (s *Server) RequestPasswordReset(w http.ResponseWriter, r *http.Request) { s.notImplemented(w) }
+func (s *Server) RefreshSession(w http.ResponseWriter, r *http.Request, params RefreshSessionParams) {
+	s.notImplemented(w)
+}
+func (s *Server) Register(w http.ResponseWriter, r *http.Request)          { s.notImplemented(w) }
+func (s *Server) VerifyEmail(w http.ResponseWriter, r *http.Request)       { s.notImplemented(w) }
+func (s *Server) GetCurrentUser(w http.ResponseWriter, r *http.Request)    { s.notImplemented(w) }
+func (s *Server) UpdateCurrentUser(w http.ResponseWriter, r *http.Request) { s.notImplemented(w) }
+func (s *Server) DisableMfa(w http.ResponseWriter, r *http.Request)        { s.notImplemented(w) }
+func (s *Server) ActivateMfa(w http.ResponseWriter, r *http.Request)       { s.notImplemented(w) }
+func (s *Server) EnrollMfa(w http.ResponseWriter, r *http.Request)         { s.notImplemented(w) }
+func (s *Server) ListSessions(w http.ResponseWriter, r *http.Request)      { s.notImplemented(w) }
+func (s *Server) RevokeSession(w http.ResponseWriter, r *http.Request, sessionID SessionId) {
+	s.notImplemented(w)
+}
+func (s *Server) GetHealth(w http.ResponseWriter, r *http.Request)    { s.Health(w, r) }
+func (s *Server) GetReadiness(w http.ResponseWriter, r *http.Request) { s.Readiness(w, r) }
+
+func (s *Server) notImplemented(w http.ResponseWriter) {
+	writeProblem(w, http.StatusNotImplemented, "not-implemented", "Not Implemented", "This operation is not implemented yet.")
 }

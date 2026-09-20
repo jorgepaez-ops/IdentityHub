@@ -39,10 +39,10 @@ declaración de buenas intenciones.
 | **RNF-008** | Contenedores endurecidos | P0 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-009** | Cabeceras de seguridad | P0 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-010** | Latencia | P1 | — | — | — | — | 🔴 sin cubrir |
-| **RNF-011** | Los specs son la fuente de verdad | P0 | — | — | — | — | 🔴 sin cubrir |
+| **RNF-011** | Los specs son la fuente de verdad | P0 | — | — | 1 | — | 🟡 parcial |
 | **RNF-012** | Logs sin datos sensibles | P0 | — | — | 2 | — | 🟡 parcial |
 
-**Resumen:** 31 requisitos · 0 completos · 17 parciales · 14 sin cubrir.
+**Resumen:** 31 requisitos · 0 completos · 18 parciales · 13 sin cubrir.
 
 Leyenda de estado: *completo* = verificado por al menos dos de las tres
 columnas de prueba · *parcial* = una sola · *sin cubrir* = ninguna.
