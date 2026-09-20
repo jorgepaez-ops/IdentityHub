@@ -10,7 +10,7 @@
     "run_id": "35476102444",
     "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444",
     "artefacto": "security/evidence/actions-35476102444/hadolint.txt",
-    "captura": null,
+    "captura": "informe Desktop §3 VULN-017",
     "hallazgos": [
       "Hadolint DL3007 en frontend/Dockerfile:31 (imagen con etiqueta latest)"
     ]

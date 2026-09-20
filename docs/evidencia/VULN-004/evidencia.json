@@ -11,7 +11,7 @@
     "run_id": "35476102444",
     "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444",
     "artefacto": "security/evidence/actions-35476102444/gosec.json",
-    "captura": null,
+    "captura": "informe Desktop §3 VULN-004",
     "hallazgos": [
       "gosec G404 en legacy_auth.go:66 (el código trae //nolint:gosec // VULN-004)",
       "Semgrep math-random-used en legacy_auth.go:30 (Security > Code scanning, alerta #42)"

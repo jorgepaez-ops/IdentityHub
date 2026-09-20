@@ -10,7 +10,7 @@
     "run_id": "35476102444",
     "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444",
     "artefacto": "security/evidence/actions-35476102444/govulncheck.txt",
-    "captura": null,
+    "captura": "informe Desktop §3 VULN-020",
     "hallazgos": [
       "GO-2026-5777 (Vulnerability #7) y GO-2026-5775 (#8) en github.com/go-chi/chi/v5@v5.0.11, traza en internal/api/server.go:45"
     ],

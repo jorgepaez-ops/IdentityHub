@@ -10,7 +10,7 @@
     "run_id": "35476102444",
     "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444",
     "artefacto": "security/evidence/actions-35476102444/gitleaks.redacted.json",
-    "captura": null,
+    "captura": "informe Desktop §3 VULN-003",
     "hallazgos": [
       "7 hallazgos en deploy/docker-compose.yml: contrasena-en-variable-de-entorno en líneas 24 y 42; url-de-conexion-con-credenciales en líneas 82, 102, 103, 133 y 134"
     ]

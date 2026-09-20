@@ -10,7 +10,7 @@
     "run_id": "35476102444",
     "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444",
     "artefacto": "security/evidence/actions-35476102444/govulncheck.txt",
-    "captura": null,
+    "captura": "informe Desktop §3 VULN-026",
     "hallazgos": [
       "GO-2026-5970 (#5) en golang.org/x/text@v0.14.0, corregido en v0.39.0"
     ],

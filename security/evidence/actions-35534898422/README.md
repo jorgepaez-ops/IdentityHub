@@ -4,8 +4,9 @@
   (workflow en `70f7d88`) con `ref=v0.0.0-vuln-baseline`; conclusión `success`.
 - Run: https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35534898422
 - Código escaneado: tag `v0.0.0-vuln-baseline` (`053e15fb27b1aaf974c7c818108eee64628973e9`).
-- Datos tomados del log del job (lectura autorizada). El JSON compacto de Trivy está solo en el artefacto
-  `evidencia-linea-base` (retención 90 días); no se ha descargado.
+- Datos tomados del log del job y del artefacto `evidencia-linea-base` (retención 90 días), descargado con
+  autorización del usuario y guardado fuera del repo. Resumen por gravedad en `trivy-resumen.txt`; registro de
+  construcción (con la contraseña sembrada redactada) en `docker-build.txt`.
 
 ## Gitleaks (D1 corregido)
 `leaks found: 12`: ya no hay hallazgos autorreferenciales (en el run 35476102444 eran 28).
@@ -17,7 +18,7 @@
 | `baseline/worker` (target worker) | exit code 1 (mismo motivo) |
 | `baseline/web` (target web) | exit code 0 |
 
-Trivy no se ejecuta sobre `api` ni `worker` (no existen); sobre `baseline/web` sí, con resultado solo en el artefacto.
+Trivy no se ejecuta sobre `api` ni `worker` (no existen); sobre `baseline/web` da 64 (1 CRITICAL, 63 HIGH, 0 con corrección), base debian 13.7 (`nginx:latest` de hoy).
 
 ## Trivy sobre imágenes base (HIGH + CRITICAL, Trivy 0.56.2, resueltas el 2026-09-20)
 Cuentas brutas de vulnerabilidades HIGH y CRITICAL, incluidas las sin corrección. Las etiquetas móviles

@@ -12,9 +12,10 @@
     "artefacto": "security/evidence/actions-35534898422/README.md",
     "captura": null,
     "hallazgos": [
-      "Trivy sobre node:18-bullseye (builder del frontend): 2103 vulnerabilidades HIGH/CRITICAL"
+      "Trivy sobre node:18-bullseye (builder del frontend): 2103 vulnerabilidades HIGH/CRITICAL (218 CRITICAL, 1885 HIGH)",
+      "Trivy sobre baseline/web (imagen final construida): 64 (1 CRITICAL, 63 HIGH), base debian 13.7 porque nginx:latest se resuelve hoy"
     ],
-    "observacion": "Se escanea la imagen base por nombre, no la imagen construida. Cuenta bruta con las etiquetas resueltas el 2026-09-20. Trivy sobre baseline/web (imagen final) solo está en el artefacto del run."
+    "observacion": "Se escanea la imagen base por nombre; detalle por gravedad en security/evidence/actions-35534898422/trivy-resumen.txt. Cuentas con las etiquetas resueltas el 2026-09-20."
   },
   "remediacion": {
     "tarea": "T28",

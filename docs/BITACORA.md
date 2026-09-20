@@ -12,6 +12,86 @@ retomar el trabajo no exija reconstruir el contexto desde cero.
 
 ---
 
+## 2026-09-20 · Semana 2 (inicio) — Evidencia "antes", hallazgos del pipeline y reestructuración
+
+Cubre el 2026-09-19 y el 2026-09-20. Seguimiento fino por tarea en `odd/tasks/idp-semana-2.md`;
+esta entrada resume lo que importa para entender el proyecto.
+
+### Hecho
+
+- **T0.1**: repo público publicado (`main` y el tag `v0.0.0-vuln-baseline`). GitHub bloqueó el primer push por
+  *push protection* (token de Slack sembrado en `legacy_auth.go`): evidencia "antes" de VULN-001.
+- **T1a**: OpenAPI enmendado, el refresh token viaja en cookie `HttpOnly; Secure; SameSite=Strict`.
+- **T0.4**: plantilla de fichas con filas de evidencia y `docs/evidencia/README.md`.
+- **T0.2 y T0.3 (en curso)**: dos escaneos de la línea base (runs 35476102444 y 35534898422), los 26
+  `docs/evidencia/VULN-XXX/evidencia.json` con su "antes", alertas de code scanning leídas por API,
+  `curl` local sobre la imagen `web` y las 12 huellas de Gitleaks para T31.
+- **Informe con capturas** (Claude Desktop, fuera del repo): 14 de los 26 VULN ya tienen captura "antes".
+
+### Decisiones tomadas sobre la marcha
+
+- **Q16 · Evidencia en dos capas.** Claude Desktop no puede escribir en el repo (errores de permisos), así que
+  las capturas viven en su informe `.docx` y el repo guarda solo `evidencia.json` (texto). Se rehízo T0.3.
+- **Q17 · Sin Dependabot por ahora.** La evidencia de dependencias sale de govulncheck y npm audit.
+- **Cierre de tareas de Codex.** El sandbox de Codex no puede escribir en `.git`: Claude revisa el diff y hace
+  los dos commits de cada tarea (el de la tarea y el de registro).
+- **Comprobar antes de creer.** Contrastar lo que informa cada herramienta con los archivos de evidencia corrigió
+  varias suposiciones (ver Hallazgos).
+
+### Hallazgos
+
+**Correcciones al registro de evidencia** (la columna "Gate" ya refleja lo observado):
+
+- Ningún gate detecta VULN-005, 006, 007, 011 ni 024. Que el pipeline esté en verde sobre ellos no es una garantía.
+- `USER root` (VULN-009, 018) lo detecta Trivy config `DS002`, no Hadolint. Los secretos en `ENV` (VULN-012) también
+  los marca Trivy (`DS031`).
+- `GO-2026-5774`, citado en la ficha de VULN-020, no aparece en govulncheck; sí 5775 y 5777.
+
+**Defectos del propio pipeline:**
+
+- **D2 · La imagen `api` no se puede construir hoy.** `apt-get` sobre `debian:11-slim` da 404 en
+  `bullseye-security` (Debian 11 ya no recibe paquetes). Es evidencia de VULN-008 y afecta a T27.
+- **D6 · El job `secrets` del CI no escaneó nada** en el push inicial: `053e15f^..9f04fec` no existe porque
+  `053e15f` es el primer commit. Un gate en rojo por la causa equivocada.
+- **D7 · El job "Configuración de contenedores" falla en "Set up job"**: Hadolint y Trivy config no corren en CI.
+- **D8 · El job "Dependencias vulnerables" se detiene en govulncheck** y `npm audit` y `osv-scanner` no se ejecutan.
+- **D1 · Gitleaks se escaneaba a sí mismo** (16 de 28 hallazgos). Corregido: ahora da 12.
+
+**Hallazgos sin ficha ni id** (el id solo se asigna al crear la ficha; decidir en T0.5 si se abren):
+
+- CodeQL #81 `go/log-injection` (Medium, `legacy_auth.go:113`).
+- `amqp091-go` GO-2026-6372 (`broker.go` y `cmd/worker`), y 26 avisos de la biblioteca estándar de Go 1.22 que solo
+  se corrigen con Go 1.25 (decisión Q11).
+- Semgrep: 40 acciones de GitHub fijadas por etiqueta, 1 `run-shell-injection` en `baseline-scan.yml`, 2
+  `request-host-used` en `default.conf`. gosec G104 x3 en `broker.go`.
+- 33 alertas CodeQL `js/remote-property-injection` en `docs/diagramas/*.html`: ruido de diagramas generados;
+  excluirlas de CodeQL sería tocar un gate y requiere aprobación.
+
+### Dónde queda cada cosa
+
+| Qué | Dónde |
+|---|---|
+| Estado y decisiones por tarea | `odd/tasks/idp-semana-2.md` (registro de evidencia, Q1 a Q17) |
+| Evidencia por VULN, en texto | `docs/evidencia/VULN-XXX/evidencia.json` (26) |
+| Salidas de los escáneres y su análisis | `security/evidence/actions-<run>/README.md`, `local-web-baseline.txt` |
+| Capturas de pantalla | Informe de Claude Desktop (fuera del repo) |
+| Fichas de hallazgos | `security/findings/` (7 hoy; T0.5 crea 19 más) |
+
+### Estado
+
+- Rama `feat/idp-semana-2`; los commits posteriores al push del 2026-09-20 están solo en local.
+- Con "antes" completo: 17 de 26 VULN. Pendientes: VULN-011 y 024 (sin gate, solo anotados), VULN-013, 014, 015
+  (evidencia local ya guardada, faltan las capturas), VULN-023 (ya remediado) y la captura de VULN-008, 016 y 019.
+- T0.3 no está marcada: falta cerrar las capturas de los pendientes y confirmar el informe.
+
+### Siguiente paso
+
+1. Que Desktop capture el run 35534898422 (construcción fallida y Trivy sobre imágenes base) y las de VULN-013 a 015.
+2. Cerrar T0.2 (el escaneo semanal corre solo el lunes 2026-09-21) y T0.3; después T0.5.
+3. Empezar el código con T1 (oapi-codegen); Codex escribe y Claude revisa y commitea.
+
+---
+
 ## 2026-09-05 · Semana 1 — Specs, esqueleto y línea base vulnerable
 
 ### Hecho

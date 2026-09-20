@@ -12,7 +12,7 @@
     "run_id": "35476102444",
     "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444",
     "artefacto": "security/evidence/actions-35476102444/gitleaks.redacted.json",
-    "captura": null,
+    "captura": "informe Desktop §3 VULN-001",
     "hallazgos": [
       "Gitleaks: 12 hallazgos reales en total (legacy_auth.go 2: aws-access-token y slack-bot-token; docker-compose.yml 7; backend/Dockerfile 3)",
       "gosec G101 en legacy_auth.go:44 y :45",

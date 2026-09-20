@@ -12,7 +12,7 @@
     "run_id": "35476102444",
     "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444",
     "artefacto": "security/evidence/actions-35476102444/gosec.json",
-    "captura": null,
+    "captura": "informe Desktop §3 VULN-002",
     "hallazgos": [
       "gosec G401 en legacy_auth.go:54 (md5.Sum)",
       "gosec G501 en legacy_auth.go:27 (import crypto/md5)",

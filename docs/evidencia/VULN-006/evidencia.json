@@ -8,7 +8,7 @@
     "run_id": "35476102444",
     "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444",
     "artefacto": "security/evidence/actions-35476102444/semgrep.json",
-    "captura": null,
+    "captura": "informe Desktop §3 VULN-005/006/007 (no aparecen)",
     "observacion": "Ningún gate lo detecta (D3 confirmado). Semgrep hardcoded-jwt-key (legacy_auth.go:121) es otro problema (clave incrustada, VULN-001), no la falta de validación del algoritmo."
   },
   "remediacion": {

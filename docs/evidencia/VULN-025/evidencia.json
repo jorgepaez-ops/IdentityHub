@@ -11,7 +11,7 @@
     "run_id": "35476102444",
     "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444",
     "artefacto": "security/evidence/actions-35476102444/npm-audit.json",
-    "captura": null,
+    "captura": "informe Desktop §3 VULN-025",
     "hallazgos": [
       "npm audit: 17 vulnerabilidades (2 critical, 10 high, 5 moderate); axios <=0.32.0 (high) y lodash <=4.17.23 (high)"
     ],

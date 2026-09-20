@@ -10,7 +10,7 @@
     "run_id": "35476102444",
     "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444",
     "artefacto": "security/evidence/actions-35476102444/trivy-config.json",
-    "captura": null,
+    "captura": "informe Desktop §3 VULN-009/018",
     "hallazgos": [
       "Trivy config DS002 HIGH en backend/Dockerfile: Image user should not be 'root'"
     ],
