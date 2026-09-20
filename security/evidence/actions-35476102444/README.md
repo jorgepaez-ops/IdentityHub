@@ -83,3 +83,20 @@ sobre el run en Actions.
   use-of-md5, #44 hardcoded-jwt-key, #45 y #46 request-host-used en `default.conf`, 40
   github-actions-mutable-action-tag y 1 run-shell-injection). Además 33 alertas CodeQL
   `js/remote-property-injection` (High) en `docs/diagramas/*.html`, ajenas a los VULN de la línea base.
+
+## Hallazgos del CI y de la reconstrucción (2026-09-20)
+
+- **D2, causa raíz.** La imagen `api` no se construye: `apt-get install ca-certificates curl` sobre
+  `debian:11-slim` devuelve 404 en `bullseye-security` (Debian 11 ya no recibe paquetes). Como los pasos
+  corren con `bash -e`, ese primer fallo cortó el paso y `worker` y `web` no se llegaron a construir. Extracto en
+  `docker-build-api.txt`. Es en sí evidencia de VULN-008. El `web` sí se construye (se probó en local).
+- **D6 · El job `secrets` del CI no escaneó nada.** En el run 35473988275 (push inicial) falló con
+  `ambiguous argument '053e15f^..9f04fec'`: `053e15f` es el primer commit y no tiene padre. Resultado:
+  `scanned ~0 bytes` y sin hallazgos, con el job en rojo por otra causa. En un PR el rango sí existe.
+  Las 12 huellas para T31 salen de un escaneo local del historial: `../gitleaks-huellas-historial.txt`.
+- **D7 · Job "8 · Configuración de contenedores" falla en "Set up job"** (antes de ejecutar nada), así
+  que Hadolint y Trivy config no corren en el CI; la evidencia de esos gates sale de este workflow.
+- **D8 · El job "5 · Dependencias vulnerables" se detiene en govulncheck** (exit code 3) y `npm audit` y
+  `osv-scanner` no llegan a ejecutarse.
+- **Web local.** `curl -sI` y ráfaga sobre la imagen `web` del tag: `../local-web-baseline.txt` (VULN-013, 014, 015).
+- **Dependabot alerts:** desactivado (captura de Claude Desktop, 2026-09-20).
