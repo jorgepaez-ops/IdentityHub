@@ -26,7 +26,7 @@ esta entrada resume lo que importa para entender el proyecto.
 - **T0.2 y T0.3 (en curso)**: dos escaneos de la línea base (runs 35476102444 y 35534898422), los 26
   `docs/evidencia/VULN-XXX/evidencia.json` con su "antes", alertas de code scanning leídas por API,
   `curl` local sobre la imagen `web` y las 12 huellas de Gitleaks para T31.
-- **Informe con capturas** (Claude Desktop, fuera del repo): 17 de los 26 VULN ya tienen captura "antes" (005, 006 y 007 cuentan como "no aparecen").
+- **Informe con capturas** (Claude Desktop, fuera del repo): 20 de los 26 VULN ya tienen captura "antes" (005, 006 y 007 cuentan como "no aparecen").
 
 ### Decisiones tomadas sobre la marcha
 
@@ -80,13 +80,13 @@ esta entrada resume lo que importa para entender el proyecto.
 ### Estado
 
 - Rama `feat/idp-semana-2`; los commits posteriores al push del 2026-09-20 están solo en local.
-- Con captura "antes" en el informe: 17 de 26. Sin captura aún: VULN-008, 016 y 019 (run 35534898422), VULN-013,
-  014 y 015 (evidencia local ya guardada en texto), VULN-011 y 024 (ningún gate los detecta) y VULN-023 (ya remediado).
-- T0.3 no está marcada: falta cerrar las capturas de los pendientes y confirmar el informe.
+- Con captura "antes" en el informe: 20 de 26. Sin captura aún: VULN-013, 014 y 015 (evidencia local ya guardada en
+  texto), VULN-011 y 024 (ningún gate los detecta) y VULN-023 (ya remediado).
+- T0.3 no está marcada: faltan VULN-013, 014 y 015, y confirmar el informe completo.
 
 ### Siguiente paso
 
-1. Que Desktop capture el run 35534898422 (construcción fallida y Trivy sobre imágenes base) y las de VULN-013 a 015.
+1. Decidir cómo documentar VULN-013, 014 y 015 (captura de terminal o el texto de `local-web-baseline.txt`).
 2. Cerrar T0.2 (el escaneo semanal corre solo el lunes 2026-09-21) y T0.3; después T0.5.
 3. Empezar el código con T1 (oapi-codegen); Codex escribe y Claude revisa y commitea.
 

@@ -171,7 +171,7 @@ los archivos sembrados y fichas). Celdas vacías = aún no conocidas.
 | VULN-005 | SQL por concatenación | Ninguno hoy (D3 confirmado: sin G201/G202, Semgrep ni CodeQL) | run 35476102444 (no detectado) / informe §3 | | | T23 (con T5) |
 | VULN-006 | JWT sin validar algoritmo | Ninguno hoy (D3 confirmado) | run 35476102444 (no detectado) / informe §3 | | | T23 (con T8) |
 | VULN-007 | CORS comodín con credenciales | Ninguno hoy (D3 confirmado; ZAP en semana 3) | run 35476102444 (no detectado) / informe §3 | | | T23 |
-| VULN-008 | Base Debian 11 (backend) | `docker build` (falla: Debian 11 sin paquetes) y Trivy image sobre `debian:11-slim` | run 35476102444 / sin captura | | | T27 |
+| VULN-008 | Base Debian 11 (backend) | `docker build` (falla: Debian 11 sin paquetes) y Trivy image sobre `debian:11-slim` | run 35476102444 / informe §3 | | | T27 |
 | VULN-009 | `USER root` (backend) | Trivy config DS002 (Hadolint no emite DL3002, D4); Trivy image pendiente (D2) | run 35476102444 / informe §3 | | | T27 |
 | VULN-010 | `apt-get` sin fijar ni limpiar | Hadolint DL3008/DL3009 | run 35476102444 / informe §3 | | | T27 |
 | VULN-011 | `ADD` desde URL remota | Ninguno hoy (Hadolint no marca un `ADD` con URL, D4) | run 35476102444 (no detectado) / sin captura | | | T27 |
@@ -179,10 +179,10 @@ los archivos sembrados y fichas). Celdas vacías = aún no conocidas.
 | VULN-013 | Sin CSP, HSTS, X-Frame-Options, nosniff | ZAP (semana 3; sin gate hoy) | local (`security/evidence/local-web-baseline.txt`) / sin captura | | | T29 |
 | VULN-014 | `server_tokens on` | ZAP (sin gate hoy) | local (`security/evidence/local-web-baseline.txt`) / sin captura | | | T29 |
 | VULN-015 | Sin `limit_req` en `/api/v1/auth/*` | AM-001/AM-017 (sin gate hoy) | local (`security/evidence/local-web-baseline.txt`) / sin captura | | | T29 |
-| VULN-016 | `node:18-bullseye` | Trivy image sobre `node:18-bullseye` (por nombre) | run 35534898422 / sin captura | | | T28 |
+| VULN-016 | `node:18-bullseye` | Trivy image sobre `node:18-bullseye` (por nombre) | run 35534898422 / informe §3 | | | T28 |
 | VULN-017 | `nginx:latest` | Hadolint DL3007 | run 35476102444 / informe §3 | | | T28 |
 | VULN-018 | Imagen final del frontend como root | Trivy config DS002 (Hadolint no emite DL3002, D4) | run 35476102444 / informe §3 | | | T28 |
-| VULN-019 | Imágenes base antiguas en compose | Trivy image sobre las imágenes del compose (por nombre) | run 35534898422 / sin captura | | | T30 |
+| VULN-019 | Imágenes base antiguas en compose | Trivy image sobre las imágenes del compose (por nombre) | run 35534898422 / informe §3 | | | T30 |
 | VULN-020 | `RealIP` de chi suplantable (GO-2026-5774/5775/5777) | govulncheck (`sca`) | run 35476102444 / informe §3 | | | T6 |
 | VULN-021 | `golang-jwt/jwt/v4` (GO-2024-3250, GO-2025-3553) | govulncheck | run 35476102444 / informe §3 | | | T23 |
 | VULN-022 | pgx 5.5.1 (GO-2024-2606) | govulncheck | run 35476102444 / informe §3 | | | T24 |

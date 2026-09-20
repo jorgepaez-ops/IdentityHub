@@ -10,7 +10,7 @@
     "run_id": "35534898422",
     "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35534898422",
     "artefacto": "security/evidence/actions-35534898422/README.md",
-    "captura": null,
+    "captura": "informe Desktop §3 VULN-016",
     "hallazgos": [
       "Trivy sobre node:18-bullseye (builder del frontend): 2103 vulnerabilidades HIGH/CRITICAL (218 CRITICAL, 1885 HIGH)",
       "Trivy sobre baseline/web (imagen final construida): 64 (1 CRITICAL, 63 HIGH), base debian 13.7 porque nginx:latest se resuelve hoy"
