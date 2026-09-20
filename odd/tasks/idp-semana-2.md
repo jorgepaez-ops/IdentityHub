@@ -171,7 +171,7 @@ los archivos sembrados y fichas). Celdas vacías = aún no conocidas.
 | VULN-005 | SQL por concatenación | Ninguno hoy (D3 confirmado: sin G201/G202, Semgrep ni CodeQL) | | | | T23 (con T5) |
 | VULN-006 | JWT sin validar algoritmo | Ninguno hoy (D3 confirmado) | | | | T23 (con T8) |
 | VULN-007 | CORS comodín con credenciales | Ninguno hoy (D3 confirmado; ZAP en semana 3) | | | | T23 |
-| VULN-008 | Base Debian 11 (backend) | Trivy image | | | | T27 |
+| VULN-008 | Base Debian 11 (backend) | `docker build` (falla: Debian 11 sin paquetes) y Trivy image sobre `debian:11-slim` | | | | T27 |
 | VULN-009 | `USER root` (backend) | Trivy config DS002 (Hadolint no emite DL3002, D4); Trivy image pendiente (D2) | | | | T27 |
 | VULN-010 | `apt-get` sin fijar ni limpiar | Hadolint DL3008/DL3009 | | | | T27 |
 | VULN-011 | `ADD` desde URL remota | Ninguno hoy (Hadolint no marca un `ADD` con URL, D4) | | | | T27 |
@@ -179,10 +179,10 @@ los archivos sembrados y fichas). Celdas vacías = aún no conocidas.
 | VULN-013 | Sin CSP, HSTS, X-Frame-Options, nosniff | ZAP (semana 3; sin gate hoy) | | | | T29 |
 | VULN-014 | `server_tokens on` | ZAP (sin gate hoy) | | | | T29 |
 | VULN-015 | Sin `limit_req` en `/api/v1/auth/*` | AM-001/AM-017 (sin gate hoy) | | | | T29 |
-| VULN-016 | `node:18-bullseye` | Trivy image | | | | T28 |
+| VULN-016 | `node:18-bullseye` | Trivy image sobre `node:18-bullseye` (por nombre) | | | | T28 |
 | VULN-017 | `nginx:latest` | Hadolint DL3007 | | | | T28 |
 | VULN-018 | Imagen final del frontend como root | Trivy config DS002 (Hadolint no emite DL3002, D4) | | | | T28 |
-| VULN-019 | Imágenes base antiguas en compose | Trivy image | | | | T30 |
+| VULN-019 | Imágenes base antiguas en compose | Trivy image sobre las imágenes del compose (por nombre) | | | | T30 |
 | VULN-020 | `RealIP` de chi suplantable (GO-2026-5774/5775/5777) | govulncheck (`sca`) | | | | T6 |
 | VULN-021 | `golang-jwt/jwt/v4` (GO-2024-3250, GO-2025-3553) | govulncheck | | | | T23 |
 | VULN-022 | pgx 5.5.1 (GO-2024-2606) | govulncheck | | | | T24 |
@@ -272,6 +272,10 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
     `secrets` no escaneó nada: rango `053e15f^..9f04fec` sin padre), D7 (job 8 falla en "Set up job"), D8 (job 5 se
     detiene en govulncheck). **Las 12 huellas de T31** ya están en `security/evidence/gitleaks-huellas-historial.txt`
     (escaneo local del historial, exactamente 12, todas sobre `053e15f`). Dependabot alerts: desactivado.
+  - **Avance 2026-09-20 (4):** run 35534898422 terminó en `success` con el workflow corregido: Gitleaks da 12
+    hallazgos (D1 resuelto); `api` y `worker` no se construyen (exit 1, mismo 404 de Debian 11) y `web` sí;
+    Trivy sobre imágenes base da cuentas para VULN-008, 016 y 019 (`security/evidence/actions-35534898422/README.md`).
+    Falta el JSON de Trivy sobre `baseline/web`, que solo está en el artefacto (descarga pendiente de autorización).
   - Pendiente: `Escaneo semanal` (`workflow_dispatch`, puede abrir incidencias: requiere autorización
     del usuario); URLs de SARIF en la pestaña Security; corregir `baseline-scan.yml` (Trivy sin socket de
     Docker, informe de Gitleaks dentro del árbol escaneado) y repetir el escaneo de imágenes; volcar los
