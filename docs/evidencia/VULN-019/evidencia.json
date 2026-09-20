@@ -1,15 +1,20 @@
 {
   "vuln": "VULN-019",
-  "gate": [],
+  "gate": [
+    "Trivy image sobre las imágenes del compose (baseline-scan)"
+  ],
   "antes": {
     "commit_linea_base": "053e15fb27b1aaf974c7c818108eee64628973e9",
     "commit_main": null,
-    "workflow": null,
-    "run_id": null,
-    "run_url": null,
-    "artefacto": null,
+    "workflow": "Escaneo de la línea base",
+    "run_id": "35534898422",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35534898422",
+    "artefacto": "security/evidence/actions-35534898422/README.md",
     "captura": null,
-    "observacion": "Pendiente: Trivy no encontró la imagen baseline/*:scan en el demonio de Docker (la construcción previa no la dejó disponible; el workflow sí monta docker.sock); causa por confirmar con el log del paso de construcción."
+    "hallazgos": [
+      "Trivy HIGH/CRITICAL: postgres:14-bullseye 197; rabbitmq:3.11-management 3; axllent/mailpit:v1.20 69; migrate/migrate:v4.17.0 65; prom/prometheus:v2.51.0 112; grafana/loki:2.9.4 59; grafana/alloy:v1.0.0 79; grafana/grafana:10.4.0 126"
+    ],
+    "observacion": "Se escanean las imágenes por nombre, tal como las declara deploy/docker-compose.yml. Cuentas brutas resueltas el 2026-09-20."
   },
   "remediacion": {
     "tarea": "T30",

@@ -1,15 +1,20 @@
 {
   "vuln": "VULN-016",
-  "gate": [],
+  "gate": [
+    "Trivy image sobre node:18-bullseye (baseline-scan)"
+  ],
   "antes": {
     "commit_linea_base": "053e15fb27b1aaf974c7c818108eee64628973e9",
     "commit_main": null,
-    "workflow": null,
-    "run_id": null,
-    "run_url": null,
-    "artefacto": null,
+    "workflow": "Escaneo de la línea base",
+    "run_id": "35534898422",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35534898422",
+    "artefacto": "security/evidence/actions-35534898422/README.md",
     "captura": null,
-    "observacion": "Pendiente: Trivy no encontró la imagen baseline/*:scan en el demonio de Docker (la construcción previa no la dejó disponible; el workflow sí monta docker.sock); causa por confirmar con el log del paso de construcción."
+    "hallazgos": [
+      "Trivy sobre node:18-bullseye (builder del frontend): 2103 vulnerabilidades HIGH/CRITICAL"
+    ],
+    "observacion": "Se escanea la imagen base por nombre, no la imagen construida. Cuenta bruta con las etiquetas resueltas el 2026-09-20. Trivy sobre baseline/web (imagen final) solo está en el artefacto del run."
   },
   "remediacion": {
     "tarea": "T28",
