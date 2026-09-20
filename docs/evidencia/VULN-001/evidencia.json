@@ -1,0 +1,35 @@
+{
+  "vuln": "VULN-001",
+  "gate": [
+    "Gitleaks (baseline-scan)",
+    "gosec G101 (baseline-scan)",
+    "golangci-lint gosec G101 (CI, job lint)"
+  ],
+  "antes": {
+    "commit_linea_base": "053e15fb27b1aaf974c7c818108eee64628973e9",
+    "commit_main": null,
+    "workflow": "Escaneo de la línea base",
+    "run_id": "35476102444",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444",
+    "artefacto": "security/evidence/actions-35476102444/gitleaks.redacted.json",
+    "captura": null,
+    "hallazgos": [
+      "Gitleaks: 12 hallazgos reales en total (legacy_auth.go 2: aws-access-token y slack-bot-token; docker-compose.yml 7; backend/Dockerfile 3)",
+      "gosec G101 en legacy_auth.go:44 y :45",
+      "Semgrep hardcoded-jwt-key en legacy_auth.go:121"
+    ],
+    "observacion": "Recuento por regla verificado por Claude en gitleaks.redacted.json: contrasena-en-variable-de-entorno x5 y url-de-conexion-con-credenciales x5 (Desktop informó x9 y x3). G101 también en el job lint del CI (run 35473988275, main 9f04fec), según Desktop."
+  },
+  "remediacion": {
+    "tarea": "T23, T26",
+    "commit": null,
+    "ficha": "security/findings/VULN-001-credenciales-incrustadas.md"
+  },
+  "despues": {
+    "commit": null,
+    "workflow": null,
+    "run_id": null,
+    "run_url": null,
+    "captura": null
+  }
+}

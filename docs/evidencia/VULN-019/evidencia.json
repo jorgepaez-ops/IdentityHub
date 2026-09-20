@@ -1,0 +1,26 @@
+{
+  "vuln": "VULN-019",
+  "gate": [],
+  "antes": {
+    "commit_linea_base": "053e15fb27b1aaf974c7c818108eee64628973e9",
+    "commit_main": null,
+    "workflow": null,
+    "run_id": null,
+    "run_url": null,
+    "artefacto": null,
+    "captura": null,
+    "observacion": "Pendiente: sin datos de imágenes hasta corregir baseline-scan.yml y repetir el escaneo de Trivy (D2)."
+  },
+  "remediacion": {
+    "tarea": "T30",
+    "commit": null,
+    "ficha": null
+  },
+  "despues": {
+    "commit": null,
+    "workflow": null,
+    "run_id": null,
+    "run_url": null,
+    "captura": null
+  }
+}

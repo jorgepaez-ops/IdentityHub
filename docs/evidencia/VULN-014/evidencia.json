@@ -1,0 +1,26 @@
+{
+  "vuln": "VULN-014",
+  "gate": [],
+  "antes": {
+    "commit_linea_base": "053e15fb27b1aaf974c7c818108eee64628973e9",
+    "commit_main": null,
+    "workflow": null,
+    "run_id": null,
+    "run_url": null,
+    "artefacto": null,
+    "captura": null,
+    "observacion": "Sin gate hoy: el 'antes' es la salida de curl -sI http://localhost:8080 sobre el tag, que ejecuta el usuario en local."
+  },
+  "remediacion": {
+    "tarea": "T29",
+    "commit": null,
+    "ficha": null
+  },
+  "despues": {
+    "commit": null,
+    "workflow": null,
+    "run_id": null,
+    "run_url": null,
+    "captura": null
+  }
+}

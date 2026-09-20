@@ -1,0 +1,30 @@
+{
+  "vuln": "VULN-022",
+  "gate": [
+    "govulncheck (baseline-scan)"
+  ],
+  "antes": {
+    "commit_linea_base": "053e15fb27b1aaf974c7c818108eee64628973e9",
+    "commit_main": null,
+    "workflow": "Escaneo de la línea base",
+    "run_id": "35476102444",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444",
+    "artefacto": "security/evidence/actions-35476102444/govulncheck.txt",
+    "captura": null,
+    "hallazgos": [
+      "GO-2024-2606 (#33) en github.com/jackc/pgx/v5@v5.5.1, traza en internal/store/store.go:36 y :57"
+    ]
+  },
+  "remediacion": {
+    "tarea": "T24",
+    "commit": null,
+    "ficha": "security/findings/VULN-022-pgx-sql-injection.md"
+  },
+  "despues": {
+    "commit": null,
+    "workflow": null,
+    "run_id": null,
+    "run_url": null,
+    "captura": null
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "vuln": "VULN-010",
+  "gate": [
+    "Hadolint DL3008/DL3009 (baseline-scan)",
+    "Trivy config DS029"
+  ],
+  "antes": {
+    "commit_linea_base": "053e15fb27b1aaf974c7c818108eee64628973e9",
+    "commit_main": null,
+    "workflow": "Escaneo de la línea base",
+    "run_id": "35476102444",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444",
+    "artefacto": "security/evidence/actions-35476102444/hadolint.txt",
+    "captura": null,
+    "hallazgos": [
+      "Hadolint DL3008 en backend/Dockerfile líneas 24, 51 y 66",
+      "Hadolint DL3009 en línea 66",
+      "Hadolint DL3015 en líneas 24, 51 y 66",
+      "Trivy config DS029 HIGH x3 (apt-get sin --no-install-recommends)"
+    ]
+  },
+  "remediacion": {
+    "tarea": "T27",
+    "commit": null,
+    "ficha": null
+  },
+  "despues": {
+    "commit": null,
+    "workflow": null,
+    "run_id": null,
+    "run_url": null,
+    "captura": null
+  }
+}

@@ -48,3 +48,28 @@ regla, archivo, línea y huella, con `Secret`, `Match` y `Line` redactados.
   posible inyección en `baseline-scan.yml:132` (cadena de suministro del propio pipeline). Además,
   `govulncheck` lista 26 vulnerabilidades de la biblioteca estándar que solo se corrigen con Go 1.25
   (Q11), y `amqp091-go` (GO-2026-6372). Requieren fichas nuevas (T0.5).
+
+## Resolución de D3 y D4 y correcciones (2026-09-20)
+
+Contrastado con los archivos de esta carpeta (`semgrep.json`, `trivy-config.json`, `gosec.json`,
+`hadolint.txt`, `govulncheck.txt`, `gitleaks.redacted.json`) y con las observaciones de Claude Desktop
+sobre el run en Actions.
+
+- **D3 confirmado.** VULN-005, VULN-006 y VULN-007 no los detecta ningún gate: sin G201/G202 en gosec,
+  sin regla de Semgrep y sin alerta de inyección SQL en CodeQL. Semgrep `hardcoded-jwt-key`
+  (`legacy_auth.go:121`) es otro problema (VULN-001). CodeQL informa además #81 "Log entries created
+  from user input" (Medium) en `legacy_auth.go:113`, sin VULN asignado (según Desktop).
+- **D4 resuelto.**
+  - Hadolint v2.12.0 no emite DL3002 ni DL3020. `backend/Dockerfile:44` sí contiene
+    `ADD https://...`, pero Hadolint no lo marca: VULN-011 no tiene gate.
+  - `USER root` (VULN-009 y VULN-018) lo detecta **Trivy config DS002** (backend y frontend).
+  - Trivy config también detecta DS029 x3 (`apt-get` sin `--no-install-recommends`, relacionado con
+    VULN-010) y DS031 CRITICAL (secretos en `ENV`, VULN-012).
+- **VULN-024 sin gate hoy.** Los 6 hallazgos de Trivy config (DS002 x2, DS029 x3, DS031) son de los
+  Dockerfiles; ninguno de `deploy/docker-compose.yml`.
+- **D5 corregido.** Semgrep informa **40** `github-actions-mutable-action-tag` (no 41); el total de 46 =
+  40 + 2 `request-host-used` + `run-shell-injection` + `math-random-used` + `use-of-md5` + `hardcoded-jwt-key`.
+- **VULN-020.** `GO-2026-5774`, que cita la ficha, no aparece en `govulncheck.txt`; sí GO-2026-5775 y 5777.
+- **VULN-001.** Los 12 hallazgos de Gitleaks son: `contrasena-en-variable-de-entorno` x5,
+  `url-de-conexion-con-credenciales` x5, `aws-access-token` x1 y `slack-bot-token` x1.
+- **VULN-025.** `osv-scanner` corre en `ci.yml`, no en este workflow.

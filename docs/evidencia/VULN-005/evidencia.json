@@ -1,0 +1,26 @@
+{
+  "vuln": "VULN-005",
+  "gate": [],
+  "antes": {
+    "commit_linea_base": "053e15fb27b1aaf974c7c818108eee64628973e9",
+    "commit_main": null,
+    "workflow": "Escaneo de la línea base",
+    "run_id": "35476102444",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444",
+    "artefacto": "security/evidence/actions-35476102444/gosec.json",
+    "captura": null,
+    "observacion": "Ningún gate lo detecta (D3 confirmado): sin G201/G202 en gosec, sin regla en Semgrep y sin alerta de inyección SQL en CodeQL. CodeQL sí informa #81 'Log entries created from user input' (Medium) en legacy_auth.go:113, sin VULN asignado."
+  },
+  "remediacion": {
+    "tarea": "T23",
+    "commit": null,
+    "ficha": "security/findings/VULN-005-sql-por-concatenacion.md"
+  },
+  "despues": {
+    "commit": null,
+    "workflow": null,
+    "run_id": null,
+    "run_url": null,
+    "captura": null
+  }
+}

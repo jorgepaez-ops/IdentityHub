@@ -58,6 +58,9 @@ URLs ni referencias de captura.
 ```
 
 `captura` es una referencia de texto, por ejemplo, `"informe §VULN-002 antes"`.
+Dentro de `antes` y `despues` se admiten dos campos opcionales de texto: `hallazgos` (lista con la
+alerta tal como la muestra el gate, sin secretos) y `observacion` (matices, como "ningún gate lo
+detecta" o "falta la parte de Trivy image"). Un `gate` vacío significa que ningún gate lo detecta hoy.
 Los datos de antes reutilizan `security/evidence/*-baseline.*` y
 `security/evidence/actions-<run_id>/`; los recortes SARIF o JSON nuevos también
 se guardan allí.

@@ -1,0 +1,36 @@
+{
+  "vuln": "VULN-002",
+  "gate": [
+    "gosec G401/G501 (baseline-scan)",
+    "Semgrep use-of-md5",
+    "CodeQL"
+  ],
+  "antes": {
+    "commit_linea_base": "053e15fb27b1aaf974c7c818108eee64628973e9",
+    "commit_main": null,
+    "workflow": "Escaneo de la línea base",
+    "run_id": "35476102444",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444",
+    "artefacto": "security/evidence/actions-35476102444/gosec.json",
+    "captura": null,
+    "hallazgos": [
+      "gosec G401 en legacy_auth.go:54 (md5.Sum)",
+      "gosec G501 en legacy_auth.go:27 (import crypto/md5)",
+      "Semgrep use-of-md5 en legacy_auth.go:54",
+      "CodeQL alerta #80 (High) en legacy_auth.go:54"
+    ],
+    "observacion": "CodeQL #80 lo informó Desktop; Claude no lo ha verificado. Semgrep verificado en semgrep.json."
+  },
+  "remediacion": {
+    "tarea": "T23",
+    "commit": null,
+    "ficha": "security/findings/VULN-002-md5-para-contrasenas.md"
+  },
+  "despues": {
+    "commit": null,
+    "workflow": null,
+    "run_id": null,
+    "run_url": null,
+    "captura": null
+  }
+}

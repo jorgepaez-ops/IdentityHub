@@ -1,0 +1,33 @@
+{
+  "vuln": "VULN-012",
+  "gate": [
+    "Gitleaks (baseline-scan)",
+    "Trivy config DS031"
+  ],
+  "antes": {
+    "commit_linea_base": "053e15fb27b1aaf974c7c818108eee64628973e9",
+    "commit_main": null,
+    "workflow": "Escaneo de la línea base",
+    "run_id": "35476102444",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444",
+    "artefacto": "security/evidence/actions-35476102444/gitleaks.redacted.json",
+    "captura": null,
+    "hallazgos": [
+      "Gitleaks: 3 hallazgos contrasena-en-variable-de-entorno en backend/Dockerfile líneas 48, 49 y 64",
+      "Trivy config DS031 CRITICAL en backend/Dockerfile: Secrets passed via build-args or envs or copied secret files"
+    ],
+    "observacion": "Desktop no encontró el componente Trivy en el log de texto; existe en trivy-config.json (DS031), versionado en el repo."
+  },
+  "remediacion": {
+    "tarea": "T26",
+    "commit": null,
+    "ficha": null
+  },
+  "despues": {
+    "commit": null,
+    "workflow": null,
+    "run_id": null,
+    "run_url": null,
+    "captura": null
+  }
+}

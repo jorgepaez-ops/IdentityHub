@@ -1,0 +1,26 @@
+{
+  "vuln": "VULN-015",
+  "gate": [],
+  "antes": {
+    "commit_linea_base": "053e15fb27b1aaf974c7c818108eee64628973e9",
+    "commit_main": null,
+    "workflow": null,
+    "run_id": null,
+    "run_url": null,
+    "artefacto": null,
+    "captura": null,
+    "observacion": "Sin gate hoy: el 'antes' lo ejecuta el usuario en local sobre el tag (curl -sI y una ráfaga contra /api/v1/auth/login para comprobar la ausencia de limit_req)."
+  },
+  "remediacion": {
+    "tarea": "T29",
+    "commit": null,
+    "ficha": null
+  },
+  "despues": {
+    "commit": null,
+    "workflow": null,
+    "run_id": null,
+    "run_url": null,
+    "captura": null
+  }
+}

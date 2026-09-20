@@ -1,0 +1,32 @@
+{
+  "vuln": "VULN-025",
+  "gate": [
+    "npm audit (baseline-scan)",
+    "osv-scanner (CI)"
+  ],
+  "antes": {
+    "commit_linea_base": "053e15fb27b1aaf974c7c818108eee64628973e9",
+    "commit_main": null,
+    "workflow": "Escaneo de la línea base",
+    "run_id": "35476102444",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444",
+    "artefacto": "security/evidence/actions-35476102444/npm-audit.json",
+    "captura": null,
+    "hallazgos": [
+      "npm audit: 17 vulnerabilidades (2 critical, 10 high, 5 moderate); axios <=0.32.0 (high) y lodash <=4.17.23 (high)"
+    ],
+    "observacion": "osv-scanner no corre en baseline-scan.yml sino en ci.yml (job con osv-scanner-action): pendiente de mirarlo en el run de CI 35473988275."
+  },
+  "remediacion": {
+    "tarea": "T25",
+    "commit": null,
+    "ficha": null
+  },
+  "despues": {
+    "commit": null,
+    "workflow": null,
+    "run_id": null,
+    "run_url": null,
+    "captura": null
+  }
+}

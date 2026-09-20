@@ -1,0 +1,26 @@
+{
+  "vuln": "VULN-023",
+  "gate": [],
+  "antes": {
+    "commit_linea_base": "053e15fb27b1aaf974c7c818108eee64628973e9",
+    "commit_main": null,
+    "workflow": null,
+    "run_id": null,
+    "run_url": null,
+    "artefacto": null,
+    "captura": null,
+    "observacion": "Hallazgo sobre la herramienta, ya remediado (comparación manual, ver ficha); sin run de referencia."
+  },
+  "remediacion": {
+    "tarea": "T31",
+    "commit": null,
+    "ficha": "security/findings/VULN-023-reglas-por-defecto-de-gitleaks-insuficientes.md"
+  },
+  "despues": {
+    "commit": null,
+    "workflow": null,
+    "run_id": null,
+    "run_url": null,
+    "captura": null
+  }
+}
