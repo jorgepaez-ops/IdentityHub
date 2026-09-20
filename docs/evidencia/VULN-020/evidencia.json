@@ -14,7 +14,7 @@
     "hallazgos": [
       "GO-2026-5777 (Vulnerability #7) y GO-2026-5775 (#8) en github.com/go-chi/chi/v5@v5.0.11, traza en internal/api/server.go:45"
     ],
-    "observacion": "GO-2026-5774, citado en la ficha, no aparece en govulncheck.txt (0 coincidencias): discrepancia por revisar al remediar (T6)."
+    "observacion": "GO-2026-5774, citado en la ficha, no aparece en govulncheck.txt (0 coincidencias): discrepancia por revisar al remediar (T6). Idéntico en el job 5 del CI (run 35473988275, main 9f04fec), según Desktop."
   },
   "remediacion": {
     "tarea": "T6",

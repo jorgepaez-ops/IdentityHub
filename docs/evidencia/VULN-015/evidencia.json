@@ -7,9 +7,12 @@
     "workflow": null,
     "run_id": null,
     "run_url": null,
-    "artefacto": null,
+    "artefacto": "security/evidence/local-web-baseline.txt",
     "captura": null,
-    "observacion": "Sin gate hoy: el 'antes' lo ejecuta el usuario en local sobre el tag (curl -sI y una ráfaga contra /api/v1/auth/login para comprobar la ausencia de limit_req)."
+    "hallazgos": [
+      "30 POST seguidos a /api/v1/auth/login: 30 respuestas 502 y ninguna 429 (sin limit_req)"
+    ],
+    "observacion": "Sin gate hoy. El 502 se debe a que no hay API detrás en esta ejecución; con limit_req activo Nginx respondería 429 antes de intentar el proxy."
   },
   "remediacion": {
     "tarea": "T29",

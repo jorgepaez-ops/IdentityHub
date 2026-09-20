@@ -1,15 +1,20 @@
 {
   "vuln": "VULN-008",
-  "gate": [],
+  "gate": [
+    "docker build (baseline-scan)"
+  ],
   "antes": {
     "commit_linea_base": "053e15fb27b1aaf974c7c818108eee64628973e9",
     "commit_main": null,
-    "workflow": null,
-    "run_id": null,
-    "run_url": null,
-    "artefacto": null,
+    "workflow": "Escaneo de la línea base",
+    "run_id": "35476102444",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444",
+    "artefacto": "security/evidence/actions-35476102444/docker-build-api.txt",
     "captura": null,
-    "observacion": "Pendiente: Trivy no encontró la imagen baseline/*:scan en el demonio de Docker (la construcción previa no la dejó disponible; el workflow sí monta docker.sock). Causa por confirmar con el log del paso de construcción."
+    "hallazgos": [
+      "docker build de backend (target api) sobre debian:11-slim falla en apt-get install: 404 en bullseye-security (Debian 11 sin soporte), exit code 100"
+    ],
+    "observacion": "El fallo de construcción es en sí evidencia de que la base ya no recibe paquetes. Sin datos de Trivy image (las imágenes no se construyeron); el escaneo de debian:11-slim queda para la pasada 2. Extracto del log en docker-build-api.txt."
   },
   "remediacion": {
     "tarea": "T27",

@@ -14,7 +14,7 @@
     "hallazgos": [
       "GO-2026-5970 (#5) en golang.org/x/text@v0.14.0, corregido en v0.39.0"
     ],
-    "observacion": "Desktop no lo informó; el dato sale de govulncheck.txt, versionado en el repo."
+    "observacion": "Desktop no lo informó; el dato sale de govulncheck.txt, versionado en el repo. Idéntico en el job 5 del CI (run 35473988275, main 9f04fec), según Desktop."
   },
   "remediacion": {
     "tarea": "T24",

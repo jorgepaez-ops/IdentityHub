@@ -7,9 +7,12 @@
     "workflow": null,
     "run_id": null,
     "run_url": null,
-    "artefacto": null,
+    "artefacto": "security/evidence/local-web-baseline.txt",
     "captura": null,
-    "observacion": "Sin gate hoy: el 'antes' es la salida de curl -sI http://localhost:8080 sobre el tag, que ejecuta el usuario en local."
+    "hallazgos": [
+      "curl -sI http://localhost:8080/: la respuesta no trae Content-Security-Policy, Strict-Transport-Security, X-Content-Type-Options, X-Frame-Options ni Referrer-Policy"
+    ],
+    "observacion": "Sin gate hoy. Ejecución local del 2026-09-20 con la imagen web construida desde frontend/ (idéntico al tag) y --add-host api:127.0.0.1 porque la imagen api no se puede construir (ver VULN-008)."
   },
   "remediacion": {
     "tarea": "T29",

@@ -7,9 +7,12 @@
     "workflow": null,
     "run_id": null,
     "run_url": null,
-    "artefacto": null,
+    "artefacto": "security/evidence/local-web-baseline.txt",
     "captura": null,
-    "observacion": "Sin gate hoy: el 'antes' es la salida de curl -sI http://localhost:8080 sobre el tag, que ejecuta el usuario en local."
+    "hallazgos": [
+      "curl -sI http://localhost:8080/: cabecera 'Server: nginx/1.31.6' (server_tokens on)"
+    ],
+    "observacion": "Sin gate hoy. Misma ejecución local que VULN-013."
   },
   "remediacion": {
     "tarea": "T29",

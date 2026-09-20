@@ -15,7 +15,7 @@
     "hallazgos": [
       "npm audit: 17 vulnerabilidades (2 critical, 10 high, 5 moderate); axios <=0.32.0 (high) y lodash <=4.17.23 (high)"
     ],
-    "observacion": "osv-scanner no corre en baseline-scan.yml sino en ci.yml (job con osv-scanner-action): pendiente de mirarlo en el run de CI 35473988275."
+    "observacion": "osv-scanner corre en ci.yml, no en baseline-scan.yml, pero en el run 35473988275 los pasos npm audit y osv-scanner del job 5 no se ejecutan porque govulncheck falla antes (exit code 3); el antes sale de baseline-scan. Dependabot alerts está desactivado (captura de Desktop, 2026-09-20)."
   },
   "remediacion": {
     "tarea": "T25",
