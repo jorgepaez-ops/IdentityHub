@@ -280,7 +280,7 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
 - Commit: —
 
 ### T0.4 — Plantilla de fichas y README de evidencia
-- [ ] Estado · Ejecutor: `Codex` · Cubre: ADR 0007 · Remedia: — · Solo docs
+- [x] Estado · Ejecutor: `Codex` · Cubre: ADR 0007 · Remedia: — · Solo docs
 - Añadir a la plantilla de `security/findings/README.md` las filas Evidencia antes, Commit de
   remediación, Evidencia después y Run de Actions (antes/después); replicarlas (vacías) en
   las 7 fichas existentes (`VULN-001`, `002`, `005`, `020`, `021`, `022`, `023`).
@@ -290,7 +290,7 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
 - Archivos: `security/findings/README.md`, `security/findings/VULN-*.md`, `docs/evidencia/README.md`.
 - Criterios: las fichas mantienen su formato; ningún dato inventado.
 - Verificación: `git diff --stat` solo toca esos archivos; `python3 scripts/traceability.py --check`.
-- Commit:
+- Commit: 54c3525
 
 ### T0.5 — Fichas faltantes de la línea base
 - [ ] Estado · Ejecutor: `Codex` · Cubre: ADR 0007 · Remedia: — · Solo docs · Depende de: T0.2
@@ -874,6 +874,7 @@ Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, coo
 las líneas de RED/GREEN van en el handoff.)
 
 - T1a · `python3 -m openapi_spec_validator specs/03-api/openapi.yaml`: OK; `python3 scripts/traceability.py --check`: matriz al día.
+- T0.4 · `git diff --stat`: 8 archivos de `security/findings/` (4 líneas cada uno) y `docs/evidencia/README.md` nuevo; `git diff --check`: sin errores; `python3 scripts/traceability.py --check`: matriz al día.
 
 ## Siguiente paso
 
@@ -936,3 +937,8 @@ Formato por tarea (3 a 5 líneas):
 - Qué cambió: `TokenPair` ya no publica `refreshToken`; refresh/logout usan la cookie `refresh_token`, con `Set-Cookie` documentado en login, MFA, refresh y logout.
 - Comandos y resultado observado: RED: la aserción de contrato falló porque `RefreshRequest` seguía definido; GREEN: la aserción pasó y confirmó 22 pares `operationId`/`x-requirement` intactos; el validador OpenAPI devolvió OK y trazabilidad quedó al día.
 - Dudas abiertas: ninguna. Se corrigieron tres descripciones YAML preexistentes con comas sin comillas para que el contrato pasara la validación obligatoria sin cambiar su texto.
+
+### T0.4 · 2026-09-20 · 54c3525
+- Qué cambió: la plantilla de `security/findings/README.md` y las 7 fichas existentes (VULN-001, 002, 005, 020, 021, 022, 023) llevan las filas vacías Evidencia antes, Commit de remediación, Evidencia después y Run de Actions; `docs/evidencia/README.md` documenta la convención de dos capas (Q16).
+- Comandos y resultado observado: solo docs, sin RED/GREEN. `git diff --check`: sin errores; `python3 scripts/traceability.py --check`: matriz al día; `git diff --stat`: solo los 8 archivos de fichas y el README nuevo, sin datos inventados ni carpetas `VULN-*` ni `evidencia.json`.
+- Dudas abiertas: ninguna. Codex dejó los cambios sin commitear porque su sandbox no puede crear `.git/index.lock`; Claude revisó el diff y creó ambos commits. Para las próximas tareas con commits hay que dar a Codex escritura en `.git` o seguir cerrando desde Claude.
