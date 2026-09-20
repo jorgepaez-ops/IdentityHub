@@ -941,6 +941,8 @@ Todas resueltas por el usuario el 2026-09-19 (las que no traen cambio se aceptar
 
 - **Q16 · Dónde vive la evidencia (2026-09-20).** Decisión: Claude Desktop no escribe en el repo (errores de permisos) y genera por su cuenta el informe `.docx` con capturas reales tomadas navegando GitHub. Por eso las capturas dejan de ser `before.png`/`after.png` versionados: en el repo queda solo `docs/evidencia/VULN-XXX/evidencia.json` (texto, lo escribe Claude a partir de los datos que entrega Desktop) y el informe externo lleva las imágenes; `captura` referencia su sección. T0.3, T0.4, T35, el criterio 6, el protocolo y `AGENTS.md` se ajustan; las tareas de código no cambian. Costo aceptado: las imágenes no quedan en el repo público; lo que perdura cuando caducan los logs es el JSON y `security/evidence/`. Fecha 2026-09-20, afecta a: T0.3, T0.4, T35, T36, criterio 6.
 
+- **Q17 · Dependabot (2026-09-20).** Decisión: no se activa Dependabot por ahora (ni alertas ni actualizaciones). La evidencia de dependencias (VULN-020, 021, 022, 025, 026) sale de govulncheck y npm audit; el escaneo semanal cubre la revisión continua. CodeQL no cubre dependencias, solo código. Se puede reconsiderar `dependabot.yml` tras remediar (semana 3). Afecta a: T0.3.
+
 ### Preguntas nuevas (Codex)
 
 (Ninguna. Codex anota aquí cualquier ambigüedad nueva y detiene esa tarea; no hay nada abierto hoy.)
