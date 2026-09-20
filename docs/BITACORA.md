@@ -29,6 +29,8 @@ esta entrada resume lo que importa para entender el proyecto.
 - **T1** (Codex): `gen.go` generado desde el OpenAPI con oapi-codegen v2.5.1 + runtime v1.1.2; el servidor implementa las 22
   operaciones (501 las pendientes). Se descartó oapi-codegen v2.8.0: obliga a `go 1.24` y actualiza `x/text`, lo que rompe
   Q11 y borraría la evidencia de VULN-026.
+- **T5** (Codex): sqlc v1.31.1 con consultas parametrizadas para usuarios y auditoría, y un adaptador que oculta los
+  tipos generados. El hook de revisión previo al commit detectó errores sin contexto en el adaptador y se corrigieron.
 - **T4** (Codex): paquete `testdb` que crea y borra una base PostgreSQL temporal por prueba, `make test-integration` y el
   job 6b del CI con PostgreSQL 16.15 fijado por digest. Claude ejecutó las pruebas contra una base real (el sandbox de
   Codex no llega a `localhost:5432`).

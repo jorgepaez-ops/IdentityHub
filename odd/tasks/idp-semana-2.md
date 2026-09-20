@@ -438,7 +438,7 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
 - Commit: 6954cba
 
 ### T5 — sqlc: configuración y consultas base
-- [ ] Estado · Ejecutor: `Codex` · Cubre: AM-006, RNF-011, VULN-005 (parcial, la retirada va en T23) · Remedia: — · Depende de: T4
+- [x] Estado · Ejecutor: `Codex` · Cubre: AM-006, RNF-011, VULN-005 (parcial, la retirada va en T23) · Remedia: — · Depende de: T4
 - `sqlc.yaml` (esquema `db/migrations`, consultas `db/queries/`, driver `pgx/v5`, paquete
   generado bajo `backend/internal/store/`); fijar versión de sqlc y registrarla. Tipos: `citext`
   como `string`, `inet` como `netip.Addr`, UUID de `google/uuid` (ajustar si la generación exige otra cosa).
@@ -449,7 +449,7 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
 - Criterios (integración): crear usuario con hash de forma Argon2id y leerlo por correo con
   distinta capitalización (citext); entrada `' OR '1'='1' --` llega como valor literal y no devuelve filas.
 - Verificación: `make gen && git diff --exit-code`; `make test-integration`; `make test-go`.
-- Commit:
+- Commit: d387fed
 
 ### T6 — IP de cliente confiable y chi >= v5.3.0
 - [ ] Estado · Ejecutor: `Codex` · Cubre: AM-001, AM-010, frontera T2 · Remedia: VULN-020 (chi) · Bloqueada por: T0.3
@@ -892,10 +892,10 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 |---|---|---|
 | 0 — Línea base y evidencia "antes" | T0.1 a T0.5 (5) | 3 (T0.1, T0.3, T0.4) |
 | 1 — Contrato ejecutable | T1a, T1 a T3 (4) | 4 (T1a, T1, T2, T3) |
-| 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 1 (T4) |
+| 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 2 (T4, T5) |
 | 3 — Remediación | T23 a T32 (10) | 0 |
 | 4 — Cierre | T33 a T38 (6) | 0 |
-| **Total** | **45** | **8** |
+| **Total** | **45** | **9** |
 
 Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, cookie) y `T14a`
 (enmienda ADR 0005, sin ventana de gracia). Los ids existentes no cambian.
@@ -906,6 +906,7 @@ Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, coo
 las líneas de RED/GREEN van en el handoff.)
 
 - T1a · `python3 -m openapi_spec_validator specs/03-api/openapi.yaml`: OK; `python3 scripts/traceability.py --check`: matriz al día.
+- T5 · `make gen` dos veces: mismo checksum de todo lo generado (`gen.go`, `schema.d.ts`, matriz y código de sqlc); `backend/go.mod` sin diff; `go build`, `go vet` (con y sin `integration`) y `go test -race -short ./...` en verde; integración contra PostgreSQL 14 local, dos veces: `TestRNF011_ConsultasBaseSqlcUsanParametros` y `TestRNF011_MigracionesSeAplicanSobreBaseVacia` PASS y sin bases sobrantes.
 - T4 · `make test-integration` y `go test -race -tags=integration ./internal/testdb/...` dos veces contra PostgreSQL 14 local: PASS y sin bases temporales sobrantes; sin `TEST_DATABASE_URL`: SKIP; `go vet` con y sin la etiqueta, `go test -race -short ./...`, trazabilidad y YAML: en verde; Gitleaks sobre `ci.yml` y `Makefile`: 0 hallazgos.
 - T2 · `make gen` dos veces: mismo checksum de `gen.go`, `schema.d.ts` y la matriz; `npm run lint`, `typecheck` y `test` (2/2) en verde; `go build`, `go vet` y `go test -race -short ./...` en verde; sonda negativa del gate: `git diff --exit-code` = 1.
 - T1 · `cd backend && go build ./... && go vet ./... && go test -race -short ./...`: OK; `go generate ./internal/api` + `git diff --exit-code backend/internal/api/gen.go`: sin diff; `go mod verify`: all modules verified; `python3 scripts/traceability.py --check`: matriz al día (RNF-011 pasa a parcial).
@@ -998,4 +999,10 @@ Formato por tarea (3 a 5 líneas):
 - Comandos y resultado observado: RED (Codex): faltaba el paquete auxiliar. GREEN (Claude, con la base real, dos veces): PASS y `pg_database` sin bases temporales. Sin variable: SKIP. Todo lo demás en verde. El sandbox de Codex no llega a `localhost:5432` (`operation not permitted`): no dio GREEN de integración y lo dejó dicho; Claude lo ejecutó.
 - Ajuste de Claude: el pool que devuelve `testdb.New` usaba el protocolo simple de pgx en todas las consultas; ahora solo las migraciones (varias sentencias por archivo) lo usan, y el resto queda en el protocolo extendido, igual que producción y que el código de sqlc de T5.
 - Dudas abiertas: ninguna. El job del CI arma la URL con `format()` para que Gitleaks no marque un literal `postgres://usuario:clave@`; no se amplió ninguna lista de excepciones. Codex ejecutó `gentle-ai codegraph init` y creó `.codegraph/` (sin versionar, fuera de la tarea): no se commitea.
+
+### T5 · 2026-09-20 · d387fed
+- Qué cambió: `sqlc.yaml` (sqlc **v1.31.1**, solo las migraciones `*.up.sql`, pgx/v5; `citext` a `string`, `inet` a `netip.Addr`, `uuid` a `google/uuid`); consultas parametrizadas `CreateUser`, `GetUserByEmail`, `GetUserByID` e `InsertAuditEvent` en `db/queries/`; código generado en `backend/internal/store/internal/sqlc` (paquete `internal`: las capas superiores no pueden importarlo); adaptador manual en `store.go` con tipos propios (`User`, `AuditEvent`, `CreateUserParams`, `InsertAuditEventParams`), `NewWithPool` y errores envueltos con `%w`; `make gen` ejecuta `sqlc generate` y comprueba la versión; el job `spec-drift` instala sqlc con `GOTOOLCHAIN=go1.26.2` (su `go.mod` exige Go 1.26) y regenera.
+- Comandos y resultado observado: RED (Codex): el adaptador no existía. GREEN (Claude, con la base real, dos veces): `TestRNF011_ConsultasBaseSqlcUsanParametros` PASS (correo con distinta capitalización por `citext`, `' OR '1'='1' --` como valor literal devuelve `pgx.ErrNoRows`, ida y vuelta de `InsertAuditEvent`); `make gen` idempotente; `go.mod` sin diff. El sandbox de Codex no llega a PostgreSQL: solo compiló las pruebas de integración.
+- Ajuste de Claude: el hook de revisión previo al commit rechazó el primer intento porque el adaptador devolvía los errores de sqlc sin contexto y con la estructura a medio llenar; ahora envuelve con `%w` y devuelve el valor cero. `errors.Is(err, pgx.ErrNoRows)` sigue funcionando (lo comprueba la prueba).
+- Dudas abiertas: ninguna. `backend/internal/store/store.go` (archivo de la línea base) recibió el adaptador y sus tipos: las llamadas a `pgxpool.NewWithConfig` y `Ping` que citan las trazas de VULN-022 pasaron de las líneas 36 y 57 a la 85 y la 92; el "antes" quedó registrado con las líneas originales en el run del tag. sqlc v1.28.0 no compila en este macOS por cgo, por eso se fijó v1.31.1. T5 tardó unos 28 minutos (Codex iteró sobre `sqlc.yaml` y el adaptador).
 
