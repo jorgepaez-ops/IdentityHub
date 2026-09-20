@@ -8,7 +8,7 @@ COMPOSE     := docker compose -f deploy/docker-compose.yml
 COMPOSE_OBS := $(COMPOSE) --profile observability
 
 .DEFAULT_GOAL := help
-.PHONY: help up down logs ps restart build test test-go test-front e2e lint fmt gen scan scan-secrets scan-deps scan-image scan-config migrate psql rabbit mail clean
+.PHONY: help up down logs ps restart build test test-go test-integration test-front e2e lint fmt gen scan scan-secrets scan-deps scan-image scan-config migrate psql rabbit mail clean
 
 help: ## Muestra esta ayuda
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -67,6 +67,9 @@ test: test-go test-front ## Todas las pruebas
 test-go: ## Pruebas de Go con detector de carreras
 	cd backend && go test -race -coverprofile=coverage.out -covermode=atomic ./...
 	cd backend && go tool cover -func=coverage.out | tail -1
+
+test-integration: ## Pruebas de integración con PostgreSQL temporal
+	cd backend && go test -race -tags=integration ./...
 
 test-front: ## Pruebas del frontend
 	cd frontend && npm run test

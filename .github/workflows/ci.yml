@@ -271,6 +271,39 @@ jobs:
           npm install
           npm run test
 
+  # ── 6b. Pruebas de integración ─────────────────────────────────────────
+  test-integration:
+    name: 6b · Pruebas de integración
+    runs-on: ubuntu-latest
+    env:
+      # github.run_id is a per-run, throwaway service password, not a secret.
+      TEST_DATABASE_URL: ${{ format('{0}{1}{2}', 'postgres://identity:', github.run_id, '@localhost:5432/identity?sslmode=disable') }}
+    services:
+      postgres:
+        image: postgres:16-bookworm@sha256:efedf3595f1d6f415c08568ba171029bf54052e754cc9f030e3f2412b21f3d67
+        env:
+          POSTGRES_USER: identity
+          POSTGRES_PASSWORD: ${{ github.run_id }}
+          POSTGRES_DB: identity
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U identity -d identity"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: backend/go.sum
+
+      - name: go test integration
+        working-directory: backend
+        run: go test -race -tags=integration ./...
+
   # ── 8. Configuración e infraestructura ──────────────────────────────────
   iac-scan:
     name: 8 · Configuración de contenedores
