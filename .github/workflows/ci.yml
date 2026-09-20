@@ -42,14 +42,37 @@ jobs:
           python3 -m pip install --quiet 'openapi-spec-validator==0.7.1'
           python3 -m openapi_spec_validator specs/03-api/openapi.yaml
 
-      - name: Regenerar la matriz de trazabilidad
-        run: python3 scripts/traceability.py --check
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: backend/go.sum
 
-      # A partir de la semana 2, aquí se regeneran también
-      # backend/internal/api/gen.go y frontend/src/api/schema.d.ts y se
-      # comprueba que no difieren de lo commiteado (RNF-011).
+      - name: Regenerar la API Go
+        working-directory: backend
+        run: |
+          go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.5.1
+          go generate ./internal/api
+
+      # Sin `cache: npm`: todavía no hay package-lock.json (lo versiona T25) y
+      # setup-node falla si la ruta de dependencias no existe.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Regenerar los tipos de la API
+        working-directory: frontend
+        run: |
+          npm install --no-package-lock --ignore-scripts
+          npm run gen:api
+
+      - name: Regenerar la matriz de trazabilidad
+        run: python3 scripts/traceability.py
+
       - name: El árbol de trabajo debe quedar limpio
-        run: git diff --exit-code
+        run: |
+          # git diff omite archivos sin seguimiento; status los hace fallar también.
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
 
   # ── 2. Estilo y tipos ───────────────────────────────────────────────────
   lint:

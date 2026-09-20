@@ -50,8 +50,9 @@ build: ## Construye las tres imágenes
 
 # ── Desarrollo ───────────────────────────────────────────────────────────
 gen: ## Regenera todo lo derivado de los specs (RNF-011)
+	cd backend && go generate ./internal/api
+	cd frontend && npm run gen:api
 	python3 scripts/traceability.py
-	@echo "Pendiente para la semana 2: oapi-codegen y openapi-typescript."
 
 fmt: ## Formatea el código
 	cd backend && gofmt -w .
