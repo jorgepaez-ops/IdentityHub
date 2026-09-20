@@ -399,7 +399,7 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
 - Commit: df47361
 
 ### T2 — Gate real de deriva: `make gen`, `schema.d.ts` y `ci.yml`
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RNF-011 · Remedia: — · Depende de: T1
+- [x] Estado · Ejecutor: `Codex` · Cubre: RNF-011 · Remedia: — · Depende de: T1
 - `make gen` regenera `gen.go`, `frontend/src/api/schema.d.ts` (`npm run gen:api`) y la matriz.
 - `ci.yml`, job `spec-drift`: regenerar ambos y mantener `git diff --exit-code` (ya existe; el
   comentario del job pide justo esto). Solo endurecer.
@@ -408,12 +408,14 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
 - Criterios: tras `make gen` el árbol queda limpio; alterar `specs/03-api/openapi.yaml`
   (p. ej. cambiar un `operationId` en una copia local) y no regenerar hace fallar el paso de deriva.
 - Verificación: `make gen && git diff --exit-code`; `cd frontend && npm run lint && npm run typecheck && npm run test`; `python3 scripts/traceability.py --check`.
-- Commit:
+- Commit: f3d8a0e
 
 ### T3 — Revisión de la Fase 1
-- [ ] Estado · Ejecutor: `Claude (revisión)` · Cubre: T1a, T1, T2
+- [x] Estado · Ejecutor: `Claude (revisión)` · Cubre: T1a, T1, T2
 - Revisar los tres commits contra sus handoff; comprobar que el diff de T1a solo cambia lo
   autorizado en `openapi.yaml` (cookie, sin `refreshToken` en cuerpos) y que el gate de deriva falla de verdad.
+- **Revisión hecha 2026-09-20.** T1a: 22 operaciones con el mismo `operationId`, método, ruta y `x-requirement`; `TokenPair` sin `refreshToken`; `refreshSession` y `logout` sin cuerpo y con el parámetro de cookie; `Set-Cookie` en login, verifyMfa, refresh y logout; la única diferencia extra es el arreglo de tres descripciones YAML mal formadas (texto conservado). T1: ver su handoff; Claude repitió build, vet y tests, comprobó la regeneración y las rutas. T2: `make gen` idempotente (mismo checksum dos veces); sonda negativa: cambiar un `operationId` en el spec altera `gen.go` y `schema.d.ts` y `git diff --exit-code` sale con 1; se restauró sin residuos. Ajuste de Claude en T2: se quitó `cache: npm` del `setup-node` del job `spec-drift`, porque `package-lock.json` aún no existe y `setup-node` falla si falta.
+- **Defecto latente para T25:** el job 2 de `ci.yml` (frontend) usa el mismo `cache: npm` con `frontend/package-lock.json`; fallará hasta que T25 versione el lockfile (no se vio antes porque el job se cortaba en pasos anteriores). Al versionarlo, se puede reactivar la caché en `spec-drift`.
 - Commit: —
 
 ---
@@ -889,11 +891,11 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 | Fase | Tareas | Hechas |
 |---|---|---|
 | 0 — Línea base y evidencia "antes" | T0.1 a T0.5 (5) | 3 (T0.1, T0.3, T0.4) |
-| 1 — Contrato ejecutable | T1a, T1 a T3 (4) | 2 (T1a, T1) |
+| 1 — Contrato ejecutable | T1a, T1 a T3 (4) | 4 (T1a, T1, T2, T3) |
 | 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 0 |
 | 3 — Remediación | T23 a T32 (10) | 0 |
 | 4 — Cierre | T33 a T38 (6) | 0 |
-| **Total** | **45** | **5** |
+| **Total** | **45** | **7** |
 
 Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, cookie) y `T14a`
 (enmienda ADR 0005, sin ventana de gracia). Los ids existentes no cambian.
@@ -904,6 +906,7 @@ Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, coo
 las líneas de RED/GREEN van en el handoff.)
 
 - T1a · `python3 -m openapi_spec_validator specs/03-api/openapi.yaml`: OK; `python3 scripts/traceability.py --check`: matriz al día.
+- T2 · `make gen` dos veces: mismo checksum de `gen.go`, `schema.d.ts` y la matriz; `npm run lint`, `typecheck` y `test` (2/2) en verde; `go build`, `go vet` y `go test -race -short ./...` en verde; sonda negativa del gate: `git diff --exit-code` = 1.
 - T1 · `cd backend && go build ./... && go vet ./... && go test -race -short ./...`: OK; `go generate ./internal/api` + `git diff --exit-code backend/internal/api/gen.go`: sin diff; `go mod verify`: all modules verified; `python3 scripts/traceability.py --check`: matriz al día (RNF-011 pasa a parcial).
 - T0.4 · `git diff --stat`: 8 archivos de `security/findings/` (4 líneas cada uno) y `docs/evidencia/README.md` nuevo; `git diff --check`: sin errores; `python3 scripts/traceability.py --check`: matriz al día.
 
@@ -983,4 +986,9 @@ Formato por tarea (3 a 5 líneas):
 - Comandos y resultado observado: RED: `undefined: ServerInterface` y `undefined: TokenPair` (Codex, antes de generar). GREEN: `TestRNF011_GeneratedServerContract`; `go build`, `go vet` y `go test -race -short ./...` en verde (Claude los repitió). Regeneración byte a byte idéntica. Comprobación temporal de rutas (no commiteada): legacy-login, healthz, readyz, metrics, register y jwks registradas (32 rutas).
 - Dependencias: `go.mod` conserva `go 1.22`, chi 5.0.11, jwt v4, pgx 5.5.1 y x/text 0.14.0. Cambios: `+runtime v1.1.2`, `+go-jsonmerge/v2 v2.0.0 // indirect` y `x/crypto` indirecto de 0.9.0 a 0.17.0 (no lo cubre ningún VULN). No se usa oapi-codegen v2.8.0: exige runtime >= 1.3, que sube la directiva a `go 1.24` y actualiza x/text (rompe Q11 y borra la evidencia de VULN-026).
 - Dudas abiertas: ninguna. `go mod tidy -diff` quitaría `testify` indirecto, que ya estaba en la línea base: se deja. `golangci-lint` no está instalado localmente. Codex no pudo commitear (sandbox sin escritura en `.git`); Claude hizo ambos commits.
+
+### T2 · 2026-09-20 · f3d8a0e
+- Qué cambió: `make gen` regenera `gen.go` (oapi-codegen v2.5.1), `frontend/src/api/schema.d.ts` (openapi-typescript 6.7.6) y la matriz de trazabilidad; el job `spec-drift` regenera lo mismo y falla con cualquier diff o archivo sin seguimiento (`git diff --exit-code` y `git status --porcelain`). `schema.d.ts` generado (786 líneas, sin `refreshToken`).
+- Comandos y resultado observado: RED: `make gen` solo corría la trazabilidad y `schema.d.ts` no existía. GREEN: `make gen` de punta a punta y sin diff en la segunda ejecución; frontend lint, typecheck y tests en verde; backend build, vet y tests con `-race` en verde. Claude repitió todo y añadió la sonda negativa.
+- Dudas abiertas: ninguna. Ajuste de Claude: sin `cache: npm` en el `setup-node` de `spec-drift` (falta el lockfile, ver T3). Node 18 en CI (`NODE_VERSION`), Node 24 en local. Codex no pudo restaurar con `git checkout` (sandbox sin `.git`) y restauró desde una copia; sin restos.
 

@@ -29,6 +29,8 @@ esta entrada resume lo que importa para entender el proyecto.
 - **T1** (Codex): `gen.go` generado desde el OpenAPI con oapi-codegen v2.5.1 + runtime v1.1.2; el servidor implementa las 22
   operaciones (501 las pendientes). Se descartó oapi-codegen v2.8.0: obliga a `go 1.24` y actualiza `x/text`, lo que rompe
   Q11 y borraría la evidencia de VULN-026.
+- **T2 y T3** (Codex y Claude): `make gen` regenera el servidor Go, los tipos TypeScript y la matriz; el job `spec-drift`
+  del CI falla con cualquier deriva (comprobado con una sonda negativa). Fase 1 cerrada.
 - **Informe con capturas** (Claude Desktop, fuera del repo): 20 de los 26 VULN ya tienen captura "antes" (005, 006 y 007 cuentan como "no aparecen").
 
 ### Decisiones tomadas sobre la marcha
