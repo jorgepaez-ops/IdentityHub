@@ -9,6 +9,10 @@
 | **Aviso** | GO-2024-2606 |
 | **Amenaza** | AM-006 (manipulación) |
 | **Sembrada** | parcialmente — la versión antigua sí; este aviso concreto, no |
+| **Evidencia antes** | |
+| **Commit de remediación** | |
+| **Evidencia después** | |
+| **Run de Actions (antes/después)** | |
 
 ## Evidencia
 

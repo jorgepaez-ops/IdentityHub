@@ -8,6 +8,10 @@
 | **Componente** | `backend/internal/api/legacy_auth.go:52-55` |
 | **Amenaza** | AM-001 (suplantación por fuerza bruta) |
 | **Sembrada** | sí |
+| **Evidencia antes** | |
+| **Commit de remediación** | |
+| **Evidencia después** | |
+| **Run de Actions (antes/después)** | |
 
 ## Evidencia
 

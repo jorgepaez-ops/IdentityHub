@@ -8,6 +8,10 @@
 | **Componente** | `backend/internal/api/legacy_auth.go:38-45`, `deploy/docker-compose.yml`, `backend/Dockerfile` |
 | **Amenaza** | AM-012 (divulgación de información) |
 | **Sembrada** | sí |
+| **Evidencia antes** | |
+| **Commit de remediación** | |
+| **Evidencia después** | |
+| **Run de Actions (antes/después)** | |
 
 ## Evidencia
 

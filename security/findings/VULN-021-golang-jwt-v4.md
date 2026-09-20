@@ -9,6 +9,10 @@
 | **Avisos** | GO-2024-3250 (corregido en v4.5.1) · GO-2025-3553 (corregido en v4.5.2) |
 | **Amenaza** | AM-003 (suplantación), AM-017 (denegación de servicio) |
 | **Sembrada** | sí |
+| **Evidencia antes** | |
+| **Commit de remediación** | |
+| **Evidencia después** | |
+| **Run de Actions (antes/después)** | |
 
 ## Evidencia
 
