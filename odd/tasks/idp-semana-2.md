@@ -168,27 +168,27 @@ los archivos sembrados y fichas). Celdas vacías = aún no conocidas.
 | VULN-002 | MD5 para contraseñas | gosec G401/G501, CodeQL, Semgrep | | | | T23 (con T7) |
 | VULN-003 | Credenciales en el compose | Gitleaks | | | | T26 |
 | VULN-004 | `math/rand` para tokens | gosec G404 | | | | T23 |
-| VULN-005 | SQL por concatenación | gosec G201, CodeQL, Semgrep | | | | T23 (con T5) |
-| VULN-006 | JWT sin validar algoritmo | Semgrep, CodeQL | | | | T23 (con T8) |
-| VULN-007 | CORS comodín con credenciales | Semgrep (ZAP en semana 3) | | | | T23 |
+| VULN-005 | SQL por concatenación | Ninguno hoy (D3 confirmado: sin G201/G202, Semgrep ni CodeQL) | | | | T23 (con T5) |
+| VULN-006 | JWT sin validar algoritmo | Ninguno hoy (D3 confirmado) | | | | T23 (con T8) |
+| VULN-007 | CORS comodín con credenciales | Ninguno hoy (D3 confirmado; ZAP en semana 3) | | | | T23 |
 | VULN-008 | Base Debian 11 (backend) | Trivy image | | | | T27 |
-| VULN-009 | `USER root` (backend) | Hadolint DL3002, Trivy | | | | T27 |
+| VULN-009 | `USER root` (backend) | Trivy config DS002 (Hadolint no emite DL3002, D4); Trivy image pendiente (D2) | | | | T27 |
 | VULN-010 | `apt-get` sin fijar ni limpiar | Hadolint DL3008/DL3009 | | | | T27 |
-| VULN-011 | `ADD` desde URL remota | Hadolint DL3020 | | | | T27 |
-| VULN-012 | Secreto en `ENV` | Trivy secret, Gitleaks | | | | T26 |
+| VULN-011 | `ADD` desde URL remota | Ninguno hoy (Hadolint no marca un `ADD` con URL, D4) | | | | T27 |
+| VULN-012 | Secreto en `ENV` | Gitleaks, Trivy config DS031 | | | | T26 |
 | VULN-013 | Sin CSP, HSTS, X-Frame-Options, nosniff | ZAP (semana 3; sin gate hoy) | | | | T29 |
 | VULN-014 | `server_tokens on` | ZAP (sin gate hoy) | | | | T29 |
 | VULN-015 | Sin `limit_req` en `/api/v1/auth/*` | AM-001/AM-017 (sin gate hoy) | | | | T29 |
 | VULN-016 | `node:18-bullseye` | Trivy image | | | | T28 |
 | VULN-017 | `nginx:latest` | Hadolint DL3007 | | | | T28 |
-| VULN-018 | Imagen final del frontend como root | Hadolint DL3002 | | | | T28 |
+| VULN-018 | Imagen final del frontend como root | Trivy config DS002 (Hadolint no emite DL3002, D4) | | | | T28 |
 | VULN-019 | Imágenes base antiguas en compose | Trivy image | | | | T30 |
 | VULN-020 | `RealIP` de chi suplantable (GO-2026-5774/5775/5777) | govulncheck (`sca`) | | | | T6 |
 | VULN-021 | `golang-jwt/jwt/v4` (GO-2024-3250, GO-2025-3553) | govulncheck | | | | T23 |
 | VULN-022 | pgx 5.5.1 (GO-2024-2606) | govulncheck | | | | T24 |
 | VULN-023 | Reglas por defecto de Gitleaks insuficientes | comparación manual (ya `remediado`) | | | | T31 (revisión) |
-| VULN-024 | Sin endurecimiento de contenedores (en el comentario del compose figura como VULN-020) | Trivy config | | | | T30 |
-| VULN-025 | axios 0.21.1 / lodash 4.17.15 | npm audit, osv-scanner | | | | T25 |
+| VULN-024 | Sin endurecimiento de contenedores (en el comentario del compose figura como VULN-020) | Ninguno hoy (Trivy config solo cubre los Dockerfiles, no el compose) | | | | T30 |
+| VULN-025 | axios 0.21.1 / lodash 4.17.15 | npm audit (baseline-scan), osv-scanner (solo en `ci.yml`) | | | | T25 |
 | VULN-026 | `golang.org/x/text` (GO-2026-5970) | govulncheck | | | | T24 |
 
 Nota (Q9): `VULN-020` queda como el hallazgo de chi `RealIP`. VULN-024 a VULN-026 se asignan al
@@ -256,6 +256,9 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
     `security/evidence/actions-35476102444/` (ver su `README.md`, con resultados y discrepancias D1-D5).
   - Gitleaks: 12 hallazgos reales, coincide con lo previsto. **Las huellas de este run no sirven para
     T31** (D1): T31 debe extraerlas del job `secrets` del `CI` (historial).
+  - **Avance 2026-09-20:** D3 y D4 resueltas y D5 corregida (40 `github-actions-mutable-action-tag`, no 41), ver
+    `security/evidence/actions-35476102444/README.md`. La columna "Gate" del registro ya refleja lo observado:
+    ningún gate detecta VULN-005, 006, 007, 011 ni 024; `USER root` lo detecta Trivy config DS002, no Hadolint.
   - Pendiente: `Escaneo semanal` (`workflow_dispatch`, puede abrir incidencias: requiere autorización
     del usuario); URLs de SARIF en la pestaña Security; corregir `baseline-scan.yml` (Trivy sin socket de
     Docker, informe de Gitleaks dentro del árbol escaneado) y repetir el escaneo de imágenes; volcar los
@@ -272,6 +275,11 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
   (`baseline-scan`); (2) los que dependen de T0.2 pendiente: VULN-008, 016, 019 y la parte de Trivy de 009 y 018
   (D2: sin datos de imágenes hasta corregir `baseline-scan.yml` y repetir el escaneo). Las discrepancias D3 y D4
   se anotan como observadas (no aparece / no se detecta), nunca se inventa la alerta.
+- **Avance 2026-09-20 (casilla sin marcar):** pasada 1 hecha en `31211ca`: los 26 `evidencia.json` existen con
+  `antes` rellenado (o nulos con nota) a partir del run 35476102444; `captura` sigue en `null` hasta que el usuario
+  confirme cada captura en el informe. Faltan: la pasada 2 (VULN-008, 016, 019 y la parte de Trivy image de 009 y
+  018, tras corregir `baseline-scan.yml`), la salida local de `curl -sI` para VULN-013 a 015, el `antes` desde el
+  run de `CI` (osv-scanner de VULN-025, CodeQL) y las capturas en el informe.
 - Filas "sin gate hoy" (VULN-013, 014, 015): el usuario ejecuta `curl -sI http://localhost:8080` sobre el tag
   y pega la salida (texto); no las toma Desktop.
 - Verificación: `ls docs/evidencia/*/evidencia.json | wc -l` = 26 (uno por fila del registro); cada uno con
