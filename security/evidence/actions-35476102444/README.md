@@ -35,8 +35,7 @@ regla, archivo, línea y huella, con `Secret`, `Match` y `Line` redactados.
   `secrets` del CI, que escanea el historial (formato `<commit>:<ruta>:<regla>:<línea>`). T31 debe
   extraerlas del run del CI, no de este.
 - **D2 · Trivy sobre imágenes falló y el paso salió "success".** `No such image: baseline/api:scan`: el
-  contenedor de Trivy no ve el demonio de Docker (falta montar `/var/run/docker.sock`); el
-  `continue-on-error` lo ocultó. Sin evidencia automática hoy para VULN-008, VULN-016 y VULN-019, ni
+  `continue-on-error` lo ocultó. (Diagnóstico inicial, corregido abajo: no era el socket.) Sin evidencia automática hoy para VULN-008, VULN-016 y VULN-019, ni
   para la parte de Trivy de VULN-009 y VULN-018.
 - **D3 · SQL por concatenación (VULN-005) no aparece** en gosec (no hay G201/G202) ni en Semgrep. Tampoco
   CORS comodín (VULN-007) ni JWT sin validar algoritmo (VULN-006). Pendiente: comprobar CodeQL en la
@@ -73,3 +72,14 @@ sobre el run en Actions.
 - **VULN-001.** Los 12 hallazgos de Gitleaks son: `contrasena-en-variable-de-entorno` x5,
   `url-de-conexion-con-credenciales` x5, `aws-access-token` x1 y `slack-bot-token` x1.
 - **VULN-025.** `osv-scanner` corre en `ci.yml`, no en este workflow.
+- **D2 corregido.** `baseline-scan.yml` ya monta `/var/run/docker.sock` en los dos `docker run` de Trivy
+  (líneas 114 y 119) y el demonio respondió `No such image: baseline/api:scan`: el socket funciona y la
+  imagen no existía, es decir, el paso anterior "Construir las imágenes de la línea base" (también con
+  `continue-on-error`) no la dejó disponible. La causa de ese fallo se confirma con el log de ese paso; no se
+  corrige nada en Trivy hasta entonces. VULN-008, 016 y 019 siguen sin evidencia de imagen.
+- **Code scanning (lectura por API, 2026-09-20).** Alertas abiertas sobre `main` (commit `acd3da8`):
+  CodeQL #80 `go/weak-sensitive-data-hashing` (High, `legacy_auth.go:54`) y #81 `go/log-injection` (Medium,
+  `legacy_auth.go:113`, sin VULN); Semgrep OSS con nombre de regla y línea (#42 math-random-used, #43
+  use-of-md5, #44 hardcoded-jwt-key, #45 y #46 request-host-used en `default.conf`, 40
+  github-actions-mutable-action-tag y 1 run-shell-injection). Además 33 alertas CodeQL
+  `js/remote-property-injection` (High) en `docs/diagramas/*.html`, ajenas a los VULN de la línea base.

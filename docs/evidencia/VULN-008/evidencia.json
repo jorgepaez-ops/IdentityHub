@@ -9,7 +9,7 @@
     "run_url": null,
     "artefacto": null,
     "captura": null,
-    "observacion": "Pendiente: sin datos de imágenes hasta corregir baseline-scan.yml y repetir el escaneo de Trivy (D2)."
+    "observacion": "Pendiente: Trivy no encontró la imagen baseline/*:scan en el demonio de Docker (la construcción previa no la dejó disponible; el workflow sí monta docker.sock). Causa por confirmar con el log del paso de construcción."
   },
   "remediacion": {
     "tarea": "T27",
