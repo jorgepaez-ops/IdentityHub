@@ -259,6 +259,11 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
   - **Avance 2026-09-20:** D3 y D4 resueltas y D5 corregida (40 `github-actions-mutable-action-tag`, no 41), ver
     `security/evidence/actions-35476102444/README.md`. La columna "Gate" del registro ya refleja lo observado:
     ningún gate detecta VULN-005, 006, 007, 011 ni 024; `USER root` lo detecta Trivy config DS002, no Hadolint.
+  - **Avance 2026-09-20 (2):** alertas CodeQL #80 y #81 verificadas por API (abiertas, `main` `acd3da8`). **D2
+    corregido:** el workflow ya monta `docker.sock`; el fallo es la construcción de las imágenes (Trivy respondió
+    `No such image`), no el socket; la causa se confirma con el log de ese paso antes de tocar el workflow.
+    `Escaneo semanal`: corre solo los lunes 06:00 UTC en `main` (próximo: 2026-09-21) y abre una incidencia con
+    la salida de govulncheck; no hace falta lanzarlo a mano si se acepta esperar a ese run.
   - Pendiente: `Escaneo semanal` (`workflow_dispatch`, puede abrir incidencias: requiere autorización
     del usuario); URLs de SARIF en la pestaña Security; corregir `baseline-scan.yml` (Trivy sin socket de
     Docker, informe de Gitleaks dentro del árbol escaneado) y repetir el escaneo de imágenes; volcar los
