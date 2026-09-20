@@ -264,6 +264,14 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
     `No such image`), no el socket; la causa se confirma con el log de ese paso antes de tocar el workflow.
     `Escaneo semanal`: corre solo los lunes 06:00 UTC en `main` (próximo: 2026-09-21) y abre una incidencia con
     la salida de govulncheck; no hace falta lanzarlo a mano si se acepta esperar a ese run.
+  - **Avance 2026-09-20 (3):** causa de D2: la imagen `api` no se construye (Debian 11 devuelve 404 en
+    `bullseye-security`), evidencia de VULN-008 (`docker-build-api.txt`). `baseline-scan.yml` corregido (`70f7d88`:
+    construcción por imagen, Gitleaks fuera del árbol escaneado, Trivy también sobre las imágenes base) y relanzado
+    desde `feat/idp-semana-2` (run 35534898422; ver su resultado abajo cuando termine). El `curl` local dio la
+    evidencia de VULN-013, 014 y 015 (`security/evidence/local-web-baseline.txt`). Nuevos hallazgos del CI: D6 (el job
+    `secrets` no escaneó nada: rango `053e15f^..9f04fec` sin padre), D7 (job 8 falla en "Set up job"), D8 (job 5 se
+    detiene en govulncheck). **Las 12 huellas de T31** ya están en `security/evidence/gitleaks-huellas-historial.txt`
+    (escaneo local del historial, exactamente 12, todas sobre `053e15f`). Dependabot alerts: desactivado.
   - Pendiente: `Escaneo semanal` (`workflow_dispatch`, puede abrir incidencias: requiere autorización
     del usuario); URLs de SARIF en la pestaña Security; corregir `baseline-scan.yml` (Trivy sin socket de
     Docker, informe de Gitleaks dentro del árbol escaneado) y repetir el escaneo de imágenes; volcar los
@@ -285,6 +293,10 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
   confirme cada captura en el informe. Faltan: la pasada 2 (VULN-008, 016, 019 y la parte de Trivy image de 009 y
   018, tras corregir `baseline-scan.yml`), la salida local de `curl -sI` para VULN-013 a 015, el `antes` desde el
   run de `CI` (osv-scanner de VULN-025, CodeQL) y las capturas en el informe.
+- **Avance 2026-09-20 (2, casilla sin marcar):** `curl` local hecho (VULN-013, 014, 015) y VULN-008 con el error de
+  construcción como "antes"; Desktop ya entregó las capturas de la pasada 1 (secciones del informe por VULN, pendientes
+  de que el usuario las confirme para rellenar `captura`). El "antes" del CI (VULN-025) queda como "no se ejecutó" (D8).
+  Falta la parte de Trivy image de VULN-008, 009, 016, 018 y 019 (run 35534898422) y confirmar las capturas.
 - Filas "sin gate hoy" (VULN-013, 014, 015): el usuario ejecuta `curl -sI http://localhost:8080` sobre el tag
   y pega la salida (texto); no las toma Desktop.
 - Verificación: `ls docs/evidencia/*/evidencia.json | wc -l` = 26 (uno por fila del registro); cada uno con
