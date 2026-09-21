@@ -1,6 +1,6 @@
 # 0005 — Refresh tokens opacos, rotativos y agrupados en familias
 
-Estado: aceptada · 2026-09-05
+Estado: aceptada · 2026-09-05 · Enmienda C2 · 2026-09-19
 
 ## Contexto
 
@@ -25,9 +25,16 @@ expire. La sesión larga necesita un mecanismo distinto que sí sea revocable.
 
 - Cada renovación es una escritura en base de datos. Aceptable a esta escala; en
   otra habría que pensar en particionar o en Redis.
-- Una condición de carrera legítima (dos pestañas renovando a la vez) puede
-  disparar un falso positivo y cerrar la sesión. Se acota con una ventana de
-  gracia de 10 segundos durante la cual se acepta reutilizar el token recién
-  rotado devolviendo el mismo par ya emitido.
+- No hay ventana de gracia: contradice el escenario «reutilizar un refresh
+  rotado revoca la familia», que es inmediato, y devolver el mismo par ya
+  emitido exigiría almacenar el token en claro, cuando solo se guarda su
+  SHA-256. Se acepta el riesgo residual de que dos pestañas o clientes que
+  renueven simultáneamente con el mismo token provoquen un falso positivo y
+  cierren la sesión, pues el segundo uso se interpreta como reuso. Como
+  mitigación para el frontend de la semana 3, el cliente tendrá un único
+  refrescador compartido entre pestañas: solo habrá una renovación en vuelo por
+  sesión —por ejemplo, mediante Web Locks API o `BroadcastChannel`— y las demás
+  pestañas esperarán y reutilizarán el resultado. Se descartó la alternativa de
+  devolver el mismo par ya emitido durante una ventana de gracia.
 - Un cliente que pierda la respuesta de la renovación pierde la sesión. Es el
   precio de detectar el robo, y se prefiere pecar por ese lado.
