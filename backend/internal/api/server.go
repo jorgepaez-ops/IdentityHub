@@ -8,6 +8,7 @@ package api
 import (
 	"log/slog"
 	"net/http"
+	"net/netip"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -18,10 +19,11 @@ import (
 )
 
 type Server struct {
-	logger  *slog.Logger
-	version string
-	deps    map[string]Checker
-	tokens  *token.Service
+	logger         *slog.Logger
+	version        string
+	deps           map[string]Checker
+	tokens         *token.Service
+	trustedProxies []netip.Prefix
 }
 
 func NewServer(logger *slog.Logger, version string, deps map[string]Checker) *Server {
@@ -30,10 +32,14 @@ func NewServer(logger *slog.Logger, version string, deps map[string]Checker) *Se
 
 func (s *Server) SetTokenService(tokens *token.Service) { s.tokens = tokens }
 
+func (s *Server) SetTrustedProxies(prefixes []netip.Prefix) {
+	s.trustedProxies = append([]netip.Prefix(nil), prefixes...)
+}
+
 func (s *Server) Routes() http.Handler {
 	r := chi.NewRouter()
 
-	r.Use(middleware.RealIP)
+	r.Use(ClientIP(s.trustedProxies))
 	r.Use(TraceID)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(30 * time.Second))

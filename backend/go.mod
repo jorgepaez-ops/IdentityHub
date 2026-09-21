@@ -2,15 +2,15 @@ module github.com/jorgepaez/identity-hub
 
 // ⚠️  LÍNEA BASE VULNERABLE — ver specs/adr/0007-linea-base-vulnerable-deliberada.md
 //
-// La directiva `go` apunta a 1.22 y no a la versión actual del toolchain, y
+// La directiva `go` se elevó a 1.25 en T6 (decisión Q11 enmendada), y
 // golang-jwt está fijado en la rama v4 con un CVE publicado. Es DELIBERADO:
 // existe para que `govulncheck` tenga algo real que informar en el job `sca`.
 // No actualizar sin leer el ADR y sin registrar la remediación en
 // security/findings/.
-go 1.22
+go 1.25
 
 require (
-	github.com/go-chi/chi/v5 v5.0.11
+	github.com/go-chi/chi/v5 v5.3.2
 	github.com/golang-jwt/jwt/v4 v4.5.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.5.1

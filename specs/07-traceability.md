@@ -20,13 +20,13 @@ declaración de buenas intenciones.
 | **RF-008** | Perfil propio | P0 | `getCurrentUser`, `updateCurrentUser` | — | — | — | 🔴 sin cubrir |
 | **RF-009** | Control de acceso por roles | P0 | — | 2 | — | — | 🟡 parcial |
 | **RF-010** | Administración de usuarios | P0 | `listUsers`, `getUser`, `updateUser` | 2 | — | — | 🟡 parcial |
-| **RF-011** | Registro de auditoría | P0 | `listAuditLog` | 1 | — | — | 🟡 parcial |
+| **RF-011** | Registro de auditoría | P0 | `listAuditLog` | 1 | 1 | — | ✅ completo |
 | **RF-012** | Notificaciones asíncronas | P0 | — | — | 3 | — | 🟡 parcial |
 | **RF-013** | Alta de segundo factor (TOTP) | P1 | `enrollMfa`, `activateMfa`, `disableMfa` | 1 | — | — | 🟡 parcial |
 | **RF-014** | Inicio de sesión con segundo factor | P1 | `verifyMfa` | 1 | — | — | 🟡 parcial |
 | **RF-015** | Restablecimiento de contraseña | P1 | `requestPasswordReset`, `confirmPasswordReset` | — | — | — | 🔴 sin cubrir |
 | **RF-016** | Sesiones activas | P1 | `listSessions`, `revokeSession` | 1 | — | — | 🟡 parcial |
-| **RF-017** | Bloqueo por fuerza bruta | P1 | — | 1 | — | — | 🟡 parcial |
+| **RF-017** | Bloqueo por fuerza bruta | P1 | — | 1 | 1 | — | ✅ completo |
 | **RF-018** | Claves de servicio | P2 | — | — | — | — | 🔴 sin cubrir |
 | **RF-019** | Exportación del audit log | P2 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-001** | Contenerización total | P0 | — | — | — | — | 🔴 sin cubrir |
@@ -42,7 +42,7 @@ declaración de buenas intenciones.
 | **RNF-011** | Los specs son la fuente de verdad | P0 | — | — | 3 | — | 🟡 parcial |
 | **RNF-012** | Logs sin datos sensibles | P0 | — | — | 2 | — | 🟡 parcial |
 
-**Resumen:** 31 requisitos · 2 completos · 16 parciales · 13 sin cubrir.
+**Resumen:** 31 requisitos · 4 completos · 14 parciales · 13 sin cubrir.
 
 Leyenda de estado: *completo* = verificado por al menos dos de las tres
 columnas de prueba · *parcial* = una sola · *sin cubrir* = ninguna.

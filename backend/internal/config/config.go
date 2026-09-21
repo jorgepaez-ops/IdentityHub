@@ -8,6 +8,7 @@ package config
 import (
 	"encoding/base64"
 	"fmt"
+	"net/netip"
 	"os"
 	"strconv"
 	"strings"
@@ -32,20 +33,21 @@ type PasswordConfig struct {
 }
 
 type Config struct {
-	Port          int
-	LogLevel      string
-	Version       string
-	DatabaseURL   Secret
-	RabbitURL     Secret
-	SMTPHost      string
-	SMTPPort      int
-	SMTPFrom      string
-	JWTSigningKey Secret
-	JWTIssuer     string
-	JWTAudience   string
-	AccessTTL     time.Duration
-	RefreshTTL    time.Duration
-	Password      PasswordConfig
+	Port           int
+	LogLevel       string
+	Version        string
+	DatabaseURL    Secret
+	RabbitURL      Secret
+	SMTPHost       string
+	SMTPPort       int
+	SMTPFrom       string
+	JWTSigningKey  Secret
+	JWTIssuer      string
+	JWTAudience    string
+	AccessTTL      time.Duration
+	RefreshTTL     time.Duration
+	Password       PasswordConfig
+	TrustedProxies []netip.Prefix
 }
 
 // Load lee el entorno y acumula TODOS los errores antes de fallar, en vez de
@@ -98,21 +100,23 @@ func Load() (*Config, error) {
 	passwordIterations := passwordNum("ARGON2_ITERATIONS", "3", int(^uint32(0)))
 	passwordParallelism := passwordNum("ARGON2_PARALLELISM", "2", 255)
 	passwordConcurrency := passwordNum("ARGON2_CONCURRENCY", "4", int(^uint(0)>>1))
+	trustedProxies := parseTrustedProxies(os.Getenv("TRUSTED_PROXIES"), &problems)
 
 	cfg := &Config{
-		Port:          num("API_PORT", "8081"),
-		LogLevel:      opt("LOG_LEVEL", "info"),
-		Version:       opt("APP_VERSION", "dev"),
-		DatabaseURL:   Secret(req("DATABASE_URL")),
-		RabbitURL:     Secret(req("RABBITMQ_URL")),
-		SMTPHost:      opt("SMTP_HOST", "mailpit"),
-		SMTPPort:      num("SMTP_PORT", "1025"),
-		SMTPFrom:      opt("SMTP_FROM", "no-reply@identity.local"),
-		JWTSigningKey: Secret(jwtSigningKey),
-		JWTIssuer:     opt("JWT_ISSUER", "http://localhost:8080"),
-		JWTAudience:   opt("JWT_AUDIENCE", "identity-hub"),
-		AccessTTL:     dur("JWT_ACCESS_TTL", "15m"),
-		RefreshTTL:    dur("JWT_REFRESH_TTL", "720h"),
+		Port:           num("API_PORT", "8081"),
+		LogLevel:       opt("LOG_LEVEL", "info"),
+		Version:        opt("APP_VERSION", "dev"),
+		DatabaseURL:    Secret(req("DATABASE_URL")),
+		RabbitURL:      Secret(req("RABBITMQ_URL")),
+		SMTPHost:       opt("SMTP_HOST", "mailpit"),
+		SMTPPort:       num("SMTP_PORT", "1025"),
+		SMTPFrom:       opt("SMTP_FROM", "no-reply@identity.local"),
+		JWTSigningKey:  Secret(jwtSigningKey),
+		JWTIssuer:      opt("JWT_ISSUER", "http://localhost:8080"),
+		JWTAudience:    opt("JWT_AUDIENCE", "identity-hub"),
+		AccessTTL:      dur("JWT_ACCESS_TTL", "15m"),
+		RefreshTTL:     dur("JWT_REFRESH_TTL", "720h"),
+		TrustedProxies: trustedProxies,
 		Password: PasswordConfig{
 			MemoryKiB:   uint32(passwordMemory),
 			Iterations:  uint32(passwordIterations),
@@ -125,4 +129,21 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("configuración inválida:\n  - %s", strings.Join(problems, "\n  - "))
 	}
 	return cfg, nil
+}
+
+func parseTrustedProxies(value string, problems *[]string) []netip.Prefix {
+	var prefixes []netip.Prefix
+	for _, entry := range strings.Split(value, ",") {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		prefix, err := netip.ParsePrefix(entry)
+		if err != nil {
+			*problems = append(*problems, fmt.Sprintf("TRUSTED_PROXIES contiene un CIDR inválido %q: %v", entry, err))
+			continue
+		}
+		prefixes = append(prefixes, prefix)
+	}
+	return prefixes
 }
