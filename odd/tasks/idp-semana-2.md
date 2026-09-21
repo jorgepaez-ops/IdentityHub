@@ -468,7 +468,7 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
 - [ ] Evidencia (`Usuario`): VULN-020 chi: captura "después" en el informe tras run verde del job `sca` sin esos avisos, y datos de texto para el `despues` de `docs/evidencia/VULN-020/evidencia.json`.
 
 ### T7 — Argon2id
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RF-001, AM-001, AM-004, AM-017, invariante 1, ADR 0004 · Remedia: — (prepara VULN-002) · Depende de: T5
+- [x] Estado · Ejecutor: `Codex` · Cubre: RF-001, AM-001, AM-004, AM-017, invariante 1, ADR 0004 · Remedia: — (prepara VULN-002) · Depende de: T5
 - Paquete `backend/internal/auth/password`: `Hash`, `Verify` (tiempo constante), `NeedsRehash`,
   formato PHC (`$argon2id$v=19$m=...,t=...,p=...$sal$hash`) que cumple el `CHECK` existente;
   parámetros de ADR 0004 (64 MiB, 3 iteraciones, paralelismo 2, sal 16 B `crypto/rand`, clave 32 B) en `config`;
@@ -481,7 +481,7 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
   El manejo de la restricción `CHECK` no requiere migración: no hay usuarios previos ni filas MD5 (confirmarlo en el handoff).
 - Archivos: `backend/internal/auth/password/**`, `backend/internal/config/**`, `backend/go.mod`.
 - Verificación: `make test-go`; `make test-integration`; `make lint`.
-- Commit:
+- Commit: 4e8c653
 
 ### T8 — JWT Ed25519, JWKS y middleware de autenticación
 - [ ] Estado · Ejecutor: `Codex` · Cubre: RF-004, AM-003, RNF-003 · Remedia: — (prepara VULN-006/021) · Depende de: T1
@@ -892,10 +892,10 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 |---|---|---|
 | 0 — Línea base y evidencia "antes" | T0.1 a T0.5 (5) | 3 (T0.1, T0.3, T0.4) |
 | 1 — Contrato ejecutable | T1a, T1 a T3 (4) | 4 (T1a, T1, T2, T3) |
-| 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 2 (T4, T5) |
+| 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 3 (T4, T5, T7) |
 | 3 — Remediación | T23 a T32 (10) | 0 |
 | 4 — Cierre | T33 a T38 (6) | 0 |
-| **Total** | **45** | **9** |
+| **Total** | **45** | **10** |
 
 Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, cookie) y `T14a`
 (enmienda ADR 0005, sin ventana de gracia). Los ids existentes no cambian.
@@ -906,6 +906,7 @@ Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, coo
 las líneas de RED/GREEN van en el handoff.)
 
 - T1a · `python3 -m openapi_spec_validator specs/03-api/openapi.yaml`: OK; `python3 scripts/traceability.py --check`: matriz al día.
+- T7 · `go build`, `go vet` (con y sin `integration`) y `go test -race -short ./...` en verde; `go test -race ./internal/auth/password/...` PASS (unas 20 s por los hashes de 64 MiB); integración contra PostgreSQL 14 local, dos veces: `TestRF001_UsersAceptaArgon2idYRechazaMD5` PASS y sin bases sobrantes; `git diff backend/go.mod`: solo `x/crypto` de indirecta a directa.
 - T5 · `make gen` dos veces: mismo checksum de todo lo generado (`gen.go`, `schema.d.ts`, matriz y código de sqlc); `backend/go.mod` sin diff; `go build`, `go vet` (con y sin `integration`) y `go test -race -short ./...` en verde; integración contra PostgreSQL 14 local, dos veces: `TestRNF011_ConsultasBaseSqlcUsanParametros` y `TestRNF011_MigracionesSeAplicanSobreBaseVacia` PASS y sin bases sobrantes.
 - T4 · `make test-integration` y `go test -race -tags=integration ./internal/testdb/...` dos veces contra PostgreSQL 14 local: PASS y sin bases temporales sobrantes; sin `TEST_DATABASE_URL`: SKIP; `go vet` con y sin la etiqueta, `go test -race -short ./...`, trazabilidad y YAML: en verde; Gitleaks sobre `ci.yml` y `Makefile`: 0 hallazgos.
 - T2 · `make gen` dos veces: mismo checksum de `gen.go`, `schema.d.ts` y la matriz; `npm run lint`, `typecheck` y `test` (2/2) en verde; `go build`, `go vet` y `go test -race -short ./...` en verde; sonda negativa del gate: `git diff --exit-code` = 1.
@@ -1005,4 +1006,11 @@ Formato por tarea (3 a 5 líneas):
 - Comandos y resultado observado: RED (Codex): el adaptador no existía. GREEN (Claude, con la base real, dos veces): `TestRNF011_ConsultasBaseSqlcUsanParametros` PASS (correo con distinta capitalización por `citext`, `' OR '1'='1' --` como valor literal devuelve `pgx.ErrNoRows`, ida y vuelta de `InsertAuditEvent`); `make gen` idempotente; `go.mod` sin diff. El sandbox de Codex no llega a PostgreSQL: solo compiló las pruebas de integración.
 - Ajuste de Claude: el hook de revisión previo al commit rechazó el primer intento porque el adaptador devolvía los errores de sqlc sin contexto y con la estructura a medio llenar; ahora envuelve con `%w` y devuelve el valor cero. `errors.Is(err, pgx.ErrNoRows)` sigue funcionando (lo comprueba la prueba).
 - Dudas abiertas: ninguna. `backend/internal/store/store.go` (archivo de la línea base) recibió el adaptador y sus tipos: las llamadas a `pgxpool.NewWithConfig` y `Ping` que citan las trazas de VULN-022 pasaron de las líneas 36 y 57 a la 85 y la 92; el "antes" quedó registrado con las líneas originales en el run del tag. sqlc v1.28.0 no compila en este macOS por cgo, por eso se fijó v1.31.1. T5 tardó unos 28 minutos (Codex iteró sobre `sqlc.yaml` y el adaptador).
+
+### T7 · 2026-09-20 · 4e8c653
+- Qué cambió: paquete `backend/internal/auth/password` con `Hash`, `Verify` (comparación en tiempo constante con `subtle`), `NeedsRehash`, `VerifyDecoy` (hash señuelo generado una vez) y un semáforo que acota la concurrencia; formato PHC `$argon2id$v=19$m=65536,t=3,p=2$…`; contraseña vacía o de más de 128 caracteres rechazada con error tipado (`InvalidPasswordError`). Configuración nueva: `ARGON2_MEMORY_KIB` (65536), `ARGON2_ITERATIONS` (3), `ARGON2_PARALLELISM` (2) y `ARGON2_CONCURRENCY` (4), validadas en `config.Load` con su patrón de acumulación de errores. `golang.org/x/crypto` sigue en **v0.17.0** y solo pasa de indirecta a directa.
+- Comandos y resultado observado: RED (Codex): `undefined: Configure`, `undefined: config.PasswordConfig`, `undefined: Hash`, `undefined: NeedsRehash` y `FAIL [build failed]`. GREEN: pruebas unitarias en verde; integración con la base real (Claude), dos veces: PASS.
+- Concurrencia por defecto **4**: cada verificación usa 64 MiB, así que acota Argon2id a unos 256 MiB simultáneos sin serializar todos los inicios de sesión. No hace falta migración: no hay usuarios previos ni filas MD5.
+- Ajuste de Claude: la prueba de integración de Codex no podía pasar (el sandbox no llega a la base y no la ejecutó): sus `INSERT` omitían `display_name` (`NOT NULL`), y el rechazo del MD5 habría fallado por esa columna (23502) antes de llegar a la restricción (23514). Se añadió `display_name`, se usa `errors.As` y se comprueba también el nombre `users_password_hash_is_argon2id`.
+- Dudas abiertas / pendientes de otras tareas (observaciones del hook de revisión, no bloqueantes): (1) `Hash` y `Verify` bloquean en el semáforo sin `context.Context`: una petición cancelada seguirá en cola; se plantea al integrarlos en el inicio de sesión (T13). (2) El hash señuelo usa los parámetros de la primera llamada: `Configure` debe ejecutarse antes de la primera petición. (3) Posibles avisos gosec G115 por las conversiones `uint32`/`uint8` de la configuración: los límites se validan antes, pero el linter del CI (golangci-lint v1.59) puede no verlo; `golangci-lint` no está instalado en local, se revisará en el primer run de CI. `x/crypto` no se sube: subirlo actualiza de rebote `x/text` (0.14.0 a 0.21.0), así que queda para T24.
 
