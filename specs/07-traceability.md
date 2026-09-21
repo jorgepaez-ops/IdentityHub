@@ -10,7 +10,7 @@ declaración de buenas intenciones.
 
 | Requisito | Título | Pri | Operaciones de la API | Escenarios | Pruebas Go | E2E | Estado |
 |---|---|---|---|---|---|---|---|
-| **RF-001** | Registro de cuenta | P0 | `register` | 3 | — | — | 🟡 parcial |
+| **RF-001** | Registro de cuenta | P0 | `register` | 3 | 6 | — | ✅ completo |
 | **RF-002** | Verificación de correo | P0 | `verifyEmail` | 2 | — | — | 🟡 parcial |
 | **RF-003** | Inicio de sesión | P0 | `login` | 3 | — | — | 🟡 parcial |
 | **RF-004** | Emisión y validación de JWT | P0 | `getJwks` | 2 | — | — | 🟡 parcial |
@@ -42,7 +42,7 @@ declaración de buenas intenciones.
 | **RNF-011** | Los specs son la fuente de verdad | P0 | — | — | 3 | — | 🟡 parcial |
 | **RNF-012** | Logs sin datos sensibles | P0 | — | — | 2 | — | 🟡 parcial |
 
-**Resumen:** 31 requisitos · 0 completos · 18 parciales · 13 sin cubrir.
+**Resumen:** 31 requisitos · 1 completos · 17 parciales · 13 sin cubrir.
 
 Leyenda de estado: *completo* = verificado por al menos dos de las tres
 columnas de prueba · *parcial* = una sola · *sin cubrir* = ninguna.

@@ -23,6 +23,13 @@ func (s Secret) GoString() string             { return "[REDACTADO]" }
 func (s Secret) Reveal() string               { return string(s) }
 func (s Secret) MarshalJSON() ([]byte, error) { return []byte(`"[REDACTADO]"`), nil }
 
+type PasswordConfig struct {
+	MemoryKiB   uint32
+	Iterations  uint32
+	Parallelism uint8
+	Concurrency int
+}
+
 type Config struct {
 	Port        int
 	LogLevel    string
@@ -35,6 +42,7 @@ type Config struct {
 	JWTIssuer   string
 	AccessTTL   time.Duration
 	RefreshTTL  time.Duration
+	Password    PasswordConfig
 }
 
 // Load lee el entorno y acumula TODOS los errores antes de fallar, en vez de
@@ -70,6 +78,18 @@ func Load() (*Config, error) {
 		}
 		return n
 	}
+	passwordNum := func(key, def string, max int) int {
+		n := num(key, def)
+		if n <= 0 || n > max {
+			problems = append(problems, fmt.Sprintf("%s debe estar entre 1 y %d", key, max))
+		}
+		return n
+	}
+
+	passwordMemory := passwordNum("ARGON2_MEMORY_KIB", "65536", int(^uint32(0)))
+	passwordIterations := passwordNum("ARGON2_ITERATIONS", "3", int(^uint32(0)))
+	passwordParallelism := passwordNum("ARGON2_PARALLELISM", "2", 255)
+	passwordConcurrency := passwordNum("ARGON2_CONCURRENCY", "4", int(^uint(0)>>1))
 
 	cfg := &Config{
 		Port:        num("API_PORT", "8081"),
@@ -83,6 +103,12 @@ func Load() (*Config, error) {
 		JWTIssuer:   opt("JWT_ISSUER", "http://localhost:8080"),
 		AccessTTL:   dur("JWT_ACCESS_TTL", "15m"),
 		RefreshTTL:  dur("JWT_REFRESH_TTL", "720h"),
+		Password: PasswordConfig{
+			MemoryKiB:   uint32(passwordMemory),
+			Iterations:  uint32(passwordIterations),
+			Parallelism: uint8(passwordParallelism),
+			Concurrency: passwordConcurrency,
+		},
 	}
 
 	if len(problems) > 0 {
