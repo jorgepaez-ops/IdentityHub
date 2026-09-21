@@ -25,7 +25,7 @@ func TestRF004_VigenciaDe15Minutos(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Validate: %v", err)
 	}
-	if got := claims.ExpiresAt.Time.Sub(claims.IssuedAt.Time); got != 15*time.Minute {
+	if got := claims.ExpiresAt.Sub(claims.IssuedAt.Time); got != 15*time.Minute {
 		t.Fatalf("exp - iat = %s, want 15m", got)
 	}
 

@@ -22,7 +22,7 @@ type readiness struct {
 }
 
 // Health responde la sonda de vitalidad: ¿está vivo el proceso?
-// Deliberadamente no consulta dependencias — si lo hiciera, una base de datos
+// Deliberadamente no consulta servicios externos — si lo hiciera, una base de datos
 // caída provocaría que el orquestador reiniciara la API en bucle sin motivo.
 func (s *Server) Health(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{
@@ -32,7 +32,7 @@ func (s *Server) Health(w http.ResponseWriter, _ *http.Request) {
 }
 
 // Readiness responde la sonda de disponibilidad: ¿puede atender tráfico?
-// Aquí sí se consultan las dependencias; un fallo devuelve 503 y saca la
+// Aquí sí se consultan los servicios externos; un fallo devuelve 503 y saca la
 // instancia de rotación sin matarla.
 func (s *Server) Readiness(w http.ResponseWriter, r *http.Request) {
 	out := readiness{Status: "ready", Checks: map[string]checkResult{}}

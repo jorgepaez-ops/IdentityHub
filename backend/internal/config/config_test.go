@@ -87,7 +87,7 @@ func TestRNF012_SecretNoSeRevelaAlFormatearla(t *testing.T) {
 
 	comprobaciones := map[string]string{
 		"%v con String()":  fmt.Sprintf("%v", s),
-		"%s con String()":  fmt.Sprintf("%s", s),
+		"%s con String()":  fmt.Sprint(s),
 		"%q":               fmt.Sprintf("%q", s),
 		"%#v con GoString": fmt.Sprintf("%#v", s),
 		"dentro de struct": fmt.Sprintf("%+v", struct{ URL Secret }{s}),

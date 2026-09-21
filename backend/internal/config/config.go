@@ -8,6 +8,7 @@ package config
 import (
 	"encoding/base64"
 	"fmt"
+	"math"
 	"net/netip"
 	"os"
 	"strconv"
@@ -118,9 +119,9 @@ func Load() (*Config, error) {
 		RefreshTTL:     dur("JWT_REFRESH_TTL", "720h"),
 		TrustedProxies: trustedProxies,
 		Password: PasswordConfig{
-			MemoryKiB:   uint32(passwordMemory),
-			Iterations:  uint32(passwordIterations),
-			Parallelism: uint8(passwordParallelism),
+			MemoryKiB:   boundedUint32(passwordMemory),
+			Iterations:  boundedUint32(passwordIterations),
+			Parallelism: boundedUint8(passwordParallelism),
 			Concurrency: passwordConcurrency,
 		},
 	}
@@ -129,6 +130,22 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("configuración inválida:\n  - %s", strings.Join(problems, "\n  - "))
 	}
 	return cfg, nil
+}
+
+// boundedUint32 and boundedUint8 narrow values that passwordNum has already
+// validated; the explicit range check makes the conversion safe on its own.
+func boundedUint32(n int) uint32 {
+	if n < 0 || n > math.MaxUint32 {
+		return 0
+	}
+	return uint32(n)
+}
+
+func boundedUint8(n int) uint8 {
+	if n < 0 || n > math.MaxUint8 {
+		return 0
+	}
+	return uint8(n)
 }
 
 func parseTrustedProxies(value string, problems *[]string) []netip.Prefix {

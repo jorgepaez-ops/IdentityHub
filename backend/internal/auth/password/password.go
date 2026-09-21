@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"sync"
@@ -164,6 +165,11 @@ func parse(encoded string) (parsedHash, error) {
 	if err != nil || memory == 0 || iterations == 0 || parallelism == 0 {
 		return parsedHash{}, ErrMalformedHash
 	}
+	// parseUint already bounded each value by its bit size; the explicit range
+	// check keeps the narrowing conversions below provably safe.
+	if memory > math.MaxUint32 || iterations > math.MaxUint32 || parallelism > math.MaxUint8 {
+		return parsedHash{}, ErrMalformedHash
+	}
 	salt, err := base64.RawStdEncoding.DecodeString(parts[4])
 	if err != nil || len(salt) == 0 {
 		return parsedHash{}, ErrMalformedHash
@@ -182,7 +188,7 @@ func parseUint(part, name string, bitSize int) (uint64, error) {
 	}
 	value, err := strconv.ParseUint(strings.TrimPrefix(part, prefix), 10, bitSize)
 	if err != nil {
-		return 0, fmt.Errorf("%w: %v", ErrMalformedHash, err)
+		return 0, fmt.Errorf("%w: %w", ErrMalformedHash, err)
 	}
 	return value, nil
 }

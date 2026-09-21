@@ -66,7 +66,7 @@ type AuditEvent struct {
 }
 
 // New abre el pool y verifica la conexión antes de devolver. Fallar aquí es
-// preferible a descubrir la base de datos caída en la primera petición real.
+// mejor que descubrir la base de datos caída en la primera petición real.
 func New(ctx context.Context, dsn string) (*Store, error) {
 	cfg, err := pgxpool.ParseConfig(dsn)
 	if err != nil {

@@ -52,7 +52,7 @@ func TestRF012_ElSobreSerializadoRespetaElContrato(t *testing.T) {
 	// Nombres tomados del componente Envelope del AsyncAPI.
 	for _, obligatorio := range []string{"eventId", "eventType", "occurredAt", "version"} {
 		if _, ok := campos[obligatorio]; !ok {
-			t.Errorf("falta el campo %q exigido por specs/04-events/asyncapi.yaml; presentes: %v", obligatorio, claves(campos))
+			t.Errorf("falta el campo %q exigido por specs/04-events/asyncapi.yaml; encontrados: %v", obligatorio, claves(campos))
 		}
 	}
 }

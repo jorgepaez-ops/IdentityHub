@@ -45,7 +45,10 @@ func New(seed []byte, issuer, audience string, clock Clock) (*Service, error) {
 	}
 
 	privateKey := ed25519.NewKeyFromSeed(seed)
-	publicKey := privateKey.Public().(ed25519.PublicKey)
+	publicKey, ok := privateKey.Public().(ed25519.PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("ed25519 private key returned an unexpected public key type")
+	}
 	fingerprint := sha256.Sum256(publicKey)
 	return &Service{
 		privateKey: privateKey,
