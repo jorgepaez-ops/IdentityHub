@@ -822,18 +822,18 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 ### T31 — Gitleaks frente al historial: `.gitleaksignore` por huella exacta
 - [ ] Estado · Ejecutor: `Codex` (decisión ya tomada por el `Usuario`, Q8) · Cubre: RNF-003, AM-012 · Remedia: relacionada con VULN-023 · Bloqueada por: T26 y por la lista de huellas que entrega el `Usuario` desde el run de Gitleaks de T0.2
 - El job `secrets` usa `fetch-depth: 0`: los secretos sembrados permanecerán en el historial aunque T23/T26 los retiren, así que el gate no
-  pasará solo. **Decisión del usuario (2026-09-19): opción (a)**, `.gitleaksignore` en la raíz con **huella exacta**, limitado a los **12 hallazgos conocidos de la línea base**. Las opciones (b) allowlist por commit y (c) reescribir historial quedan **descartadas** ((c) también por el ADR 0007: el historial es la evidencia). Esta decisión es la aprobación explícita del usuario para esta excepción concreta; no autoriza ninguna otra.
-- **Decisión pendiente Q20 (2026-09-21):** al escanear el historial publicado hay **14** huellas y no 12: las 12 de la línea base
-  más 2 falsos positivos nuestros, en commits ya subidos (T7: la regla de contraseñas leyó el literal de estructura
-  `Password: PasswordConfig{` de `config.go`; T4: una nota de handoff citaba un patrón de URL con credenciales). Ya no están en
-  el árbol de trabajo, pero el job `secrets` escanea el rango de commits del PR y las verá. Opciones: (a) **recomendada**: el
-  usuario aprueba añadir esas 2 huellas al `.gitleaksignore` con su justificación (falso positivo en código propio, sin secreto);
-  (b) reescribir la rama antes de abrir el PR (`--force` sobre una rama de trabajo; contradice `AGENTS.md` salvo orden expresa).
-  Hasta que se decida, T31 mantiene solo las 12 aprobadas. Las huellas están en `security/evidence/gitleaks-huellas-historial.txt`.
-- Entrada: el usuario entrega a Codex la lista de las 12 huellas (`Fingerprint`, formato `commit:archivo:regla:línea`, sin `Secret` ni `Match`) tomadas del run de T0.2. Si la lista no llega, la tarea sigue bloqueada; si no son exactamente 12 o alguna no corresponde a un VULN, detenerse y anotarlo en "Preguntas nuevas".
+  pasará solo. **Decisión del usuario (2026-09-19): opción (a)**, `.gitleaksignore` en la raíz con **huella exacta**, limitado a los **12 hallazgos conocidos de la línea base y a las 2 huellas de la decisión Q20 (14 en total)**. Las opciones (b) allowlist por commit y (c) reescribir historial quedan **descartadas** ((c) también por el ADR 0007: el historial es la evidencia). Esta decisión es la aprobación explícita del usuario para esta excepción concreta; no autoriza ninguna otra.
+- **Q20 · APROBADA por el usuario (2026-09-21).** Al escanear el historial publicado hay **14** huellas y no 12: las 12 de la línea
+  base más 2 falsos positivos nuestros, en commits ya subidos (T7, `4e8c653`: la regla de contraseñas leyó el literal de estructura
+  `Password: PasswordConfig{` de `config.go`; T4, `f987772`: una nota de handoff citaba un patrón de URL con credenciales). Ya no
+  están en el árbol de trabajo, pero el job `secrets` escanea el rango de commits del PR y las ve. **Decisión: opción (a)**, se
+  añaden esas 2 huellas al `.gitleaksignore` con su justificación ("falso positivo en código propio, sin secreto"); la opción (b)
+  (reescribir la rama) queda descartada. Esta aprobación es explícita para esas 2 huellas concretas y no autoriza ninguna otra.
+  Las 14 huellas están en `security/evidence/gitleaks-huellas-historial.txt` (las 2 nuevas, en su sección final).
+- Entrada: el usuario entrega a Codex la lista de las 14 huellas (12 de la línea base y las 2 de Q20; ver `security/evidence/gitleaks-huellas-historial.txt`) (`Fingerprint`, formato `commit:archivo:regla:línea`, sin `Secret` ni `Match`) tomadas del run de T0.2. Si la lista no llega, la tarea sigue bloqueada; si no son exactamente 12 o alguna no corresponde a un VULN, detenerse y anotarlo en "Preguntas nuevas".
 - Crear `.gitleaksignore`: una línea por huella, cada una precedida por un comentario con su `VULN-NNN` y una justificación breve ("secreto sembrado de la línea base, ADR 0007; se conserva como evidencia del antes"). Sin comodines, sin rutas ni patrones, sin huellas adicionales; no tocar `.gitleaks.toml`.
-- Criterios: `secrets` en verde; exactamente 12 huellas, cada una con su VULN y justificación; un secreto nuevo de prueba (añadido en local y descartado, nunca commiteado) sigue siendo detectado; VULN-023 sigue `remediado` (12 de 12 con `.gitleaks.toml`).
-- Verificación: `make scan-secrets` y run de `CI` job `secrets`; `grep -c '^[^#[:space:]]' .gitleaksignore` = 12.
+- Criterios: `secrets` en verde; exactamente 14 huellas: las 12 de la línea base con su VULN y justificación, y las 2 de Q20 con la justificación "falso positivo en código propio"; un secreto nuevo de prueba (añadido en local y descartado, nunca commiteado) sigue siendo detectado; VULN-023 sigue `remediado` (12 de 12 con `.gitleaks.toml`).
+- Verificación: `make scan-secrets` y run de `CI` job `secrets`; `grep -c '^[^#[:space:]]' .gitleaksignore` = 14.
 - Commit:
 - Evidencia (`Usuario`):  - [ ] VULN-023 (antes/después de la política acordada)
 

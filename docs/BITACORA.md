@@ -29,10 +29,10 @@ esta entrada resume lo que importa para entender el proyecto.
 - **T1** (Codex): `gen.go` generado desde el OpenAPI con oapi-codegen v2.5.1 + runtime v1.1.2; el servidor implementa las 22
   operaciones (501 las pendientes). Se descartó oapi-codegen v2.8.0: obliga a `go 1.24` y actualiza `x/text`, lo que rompe
   Q11 y borraría la evidencia de VULN-026.
-- **Gitleaks sobre nuestro propio historial (decisión Q20 pendiente).** Tras publicar la rama, el escaneo del historial da
+- **Gitleaks sobre nuestro propio historial (decisión Q20 aprobada).** Tras publicar la rama, el escaneo del historial da
   14 huellas: las 12 de la línea base y 2 falsos positivos nuestros (`Password: PasswordConfig{` en `config.go` y una nota de
-  handoff con un patrón de URL). Ya están corregidos en el árbol; el historial los conserva y el CI los verá. Hace falta que
-  el usuario apruebe añadirlos al `.gitleaksignore` de T31, o reescribir la rama. Desde ahora se ejecuta
+  handoff con un patrón de URL). Ya están corregidos en el árbol; el historial los conserva y el CI los verá. **El usuario
+  aprobó añadirlos al `.gitleaksignore` de T31** (14 huellas en total) y descartó reescribir la rama. Desde ahora se ejecuta
   `gitleaks protect --staged` antes de cada commit (el hook de `pre-commit` no está instalado en esta máquina).
 - **T6** (Codex): se retira `middleware.RealIP` de chi (VULN-020) y `ClientIP` solo confía en `X-Forwarded-For` desde los
   proxies configurados (`TRUSTED_PROXIES`, vacío por defecto). chi pasa a v5.3.2 y **Go a 1.25** (Q19, aprobado por el
