@@ -457,7 +457,7 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
 - Commit: d387fed
 
 ### T6 — IP de cliente confiable y chi >= v5.3.0
-- [ ] Estado · Ejecutor: `Codex` · Cubre: AM-001, AM-010, frontera T2 · Remedia: VULN-020 (chi) · Bloqueada por: T0.3
+- [x] Estado · Ejecutor: `Codex` · Cubre: AM-001, AM-010, frontera T2 · Remedia: VULN-020 (chi) · Bloqueada por: T0.3
 - Subir `github.com/go-chi/chi/v5` a >= v5.3.0 y retirar `middleware.RealIP` de `Server.Routes`.
 - Middleware propio `ClientIP`: por defecto usa `r.RemoteAddr`; solo si `RemoteAddr` está en la
   lista configurada `TRUSTED_PROXIES` (CIDR; opcional, vacío = ninguno; config validada) toma la
@@ -469,7 +469,7 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
   `TestRF011_LaIPDelAuditLogNoEsFalsificable`; XFF desde peer no confiable se ignora; desde
   proxy confiable se respeta; `govulncheck` ya no informa GO-2026-5774/5775/5777.
 - Verificación: `make test-go`; `cd backend && go run golang.org/x/vuln/cmd/govulncheck@latest ./...` (las otras alertas siguen hasta T23/T24); `make lint`.
-- Commit:
+- Commit: 902a047
 - [ ] Evidencia (`Usuario`): VULN-020 chi: captura "después" en el informe tras run verde del job `sca` sin esos avisos, y datos de texto para el `despues` de `docs/evidencia/VULN-020/evidencia.json`.
 
 ### T7 — Argon2id
@@ -897,10 +897,10 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 |---|---|---|
 | 0 — Línea base y evidencia "antes" | T0.1 a T0.5 (5) | 5 (T0.1 a T0.5) |
 | 1 — Contrato ejecutable | T1a, T1 a T3 (4) | 4 (T1a, T1, T2, T3) |
-| 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 5 (T4, T5, T7, T8, T14a) |
+| 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 6 (T4, T5, T6, T7, T8, T14a) |
 | 3 — Remediación | T23 a T32 (10) | 0 |
 | 4 — Cierre | T33 a T38 (6) | 0 |
-| **Total** | **45** | **14** |
+| **Total** | **45** | **15** |
 
 Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, cookie) y `T14a`
 (enmienda ADR 0005, sin ventana de gracia). Los ids existentes no cambian.
@@ -961,6 +961,7 @@ Todas resueltas por el usuario el 2026-09-19 (las que no traen cambio se aceptar
 
 - **Q16 · Dónde vive la evidencia (2026-09-20).** Decisión: Claude Desktop no escribe en el repo (errores de permisos) y genera por su cuenta el informe `.docx` con capturas reales tomadas navegando GitHub. Por eso las capturas dejan de ser `before.png`/`after.png` versionados: en el repo queda solo `docs/evidencia/VULN-XXX/evidencia.json` (texto, lo escribe Claude a partir de los datos que entrega Desktop) y el informe externo lleva las imágenes; `captura` referencia su sección. T0.3, T0.4, T35, el criterio 6, el protocolo y `AGENTS.md` se ajustan; las tareas de código no cambian. Costo aceptado: las imágenes no quedan en el repo público; lo que perdura cuando caducan los logs es el JSON y `security/evidence/`. Fecha 2026-09-20, afecta a: T0.3, T0.4, T35, T36, criterio 6.
 
+- **Q19 · Subida a Go 1.25 (2026-09-21).** Decisión del usuario (amplía Q11): la directiva `go` de `backend/go.mod` y `GO_VERSION` del CI y del escaneo semanal pasan de 1.22 a **1.25**, de una sola vez. Motivos: chi >= v5.3.0 (corrige GO-2026-5775 y 5777) exige `go 1.23`; los 26 avisos de la biblioteca estándar se corrigen entre Go 1.23.8 y 1.25.13; el job 5 del CI (`govulncheck`) solo puede ponerse en verde con un Go >= 1.25.13; y lo más probable es que T24 también lo pida. `baseline-scan.yml` se queda en 1.22 porque analiza el tag de la línea base. Efecto colateral: `golangci-lint` v1 (compilado con Go 1.22) no analiza código que apunte a Go 1.25, así que el CI usa v2.13.2 con la configuración migrada. Afecta a: T6, T24, T27, CI.
 - **Q17 · Dependabot (2026-09-20).** Decisión: no se activa Dependabot por ahora (ni alertas ni actualizaciones). La evidencia de dependencias (VULN-020, 021, 022, 025, 026) sale de govulncheck y npm audit; el escaneo semanal cubre la revisión continua. CodeQL no cubre dependencias, solo código. Se puede reconsiderar `dependabot.yml` tras remediar (semana 3). Afecta a: T0.3.
 
 - **Q18 · Evidencia de VULN-013, 014 y 015 (2026-09-20).** Decisión: se acepta la salida en texto de `security/evidence/local-web-baseline.txt` (curl -sI y ráfaga sobre la imagen `web` del tag, con fecha y método) en lugar de una captura de pantalla. La misma regla se usa para el "después" (T35): la salida del mismo comando. Afecta a: T0.3, T35.
@@ -1038,4 +1039,10 @@ Formato por tarea (3 a 5 líneas):
 - Comandos y resultado observado: solo documentación, sin RED/GREEN. Claude revisó las 19 con un script (AM existentes, ruta y URL coherentes con el JSON, estado `abierto`, campos de remediación vacíos, sin patrones de secreto) y comprobó las severidades contra `gosec.json` (G404 HIGH, G101 HIGH) y `trivy-config.json` (DS002 y DS029 HIGH, DS031 CRITICAL).
 - Ajuste de Claude: VULN-024 arrastraba una frase interna del proceso ("Desktop los había asignado a este VULN por error"); se reescribió con lo que hace `trivy config` (solo analiza Dockerfiles).
 - Dudas abiertas: los hallazgos sin id (CodeQL #81, `amqp091-go`, alertas de Semgrep de las acciones y de `default.conf`, alertas de los diagramas, avisos de la biblioteca estándar) siguen sin ficha: un id solo se asigna al crear su ficha y la decisión de abrirlas queda pendiente (ver la bitácora).
+
+### T6 · 2026-09-21 · 902a047
+- Qué cambió: se retira `middleware.RealIP` y se añade `ClientIP` (`backend/internal/api/clientip.go`): la IP del cliente es el par del socket, y solo si ese par está en `TRUSTED_PROXIES` se lee `X-Forwarded-For` y se toma la dirección **más a la derecha que no sea de confianza**; una cabecera ausente, mal formada o de origen no confiable se ignora entera. `ClientIPFrom(ctx)` la expone para auditoría y bloqueo. `TRUSTED_PROXIES` (CIDR separados por comas, opcional, vacío = ninguno) se valida al arrancar y acumula errores como el resto de `config.Load`. `Server.SetTrustedProxies` la inyecta (la firma de `NewServer` no cambia; T21 la cablea en `main.go`). chi **v5.0.11 a v5.3.2** y directiva `go` **1.22 a 1.25** (Q19).
+- Comandos y resultado observado: RED (Codex): `undefined: ClientIP` y `undefined: ClientIPFrom`. GREEN: `go build`, `go vet` (con y sin `integration`), `go test -race -short ./...` y la integración completa contra PostgreSQL local, todo en verde (Claude las repitió). `git diff backend/go.mod`: solo la frase del comentario, la directiva y chi. **`govulncheck` (Claude, con Go 1.27.1): GO-2026-5775 y GO-2026-5777 ya no aparecen y los 26 avisos de la biblioteca estándar tampoco**; quedan 7: `jwt/v4` x2 (T23), `pgx` x3 y `x/text` (T24) y `amqp091-go` GO-2026-6372 (sin ficha). Aparecen dos de `pgx` que el "antes" no listaba (GO-2026-5004, corregido en v5.9.2, y GO-2024-2567, en v5.5.2): T24 debe subir `pgx` a la última estable.
+- Ajustes de Claude: (1) el CI y la configuración del linter se migraron a Go 1.25 y golangci-lint v2 (commit `fd24b09`); (2) `make lint` escondía los fallos con un `|| echo` y ahora solo avisa si falta el linter; (3) limpieza de los avisos propios del linter v2 sin `//nolint` (commit `a75cc36`): aserción de tipo comprobada, `%w` en ambos errores, conversiones de enteros acotadas (G115) y cuatro comentarios reformulados. Con el linter v2 sobre el árbol solo quedan 3 avisos, todos de la línea base sembrada (`legacy_auth.go`, hasta T23): G101 x2 y `nolintlint`.
+- Dudas abiertas: si todos los saltos de `X-Forwarded-For` son de confianza se devuelve la IP del par (seguro, pero todos los clientes detrás de ese proxy compartirían IP y límite); `Routes()` lee `trustedProxies` al construir, así que `SetTrustedProxies` debe llamarse antes (T21). Observaciones del hook sin ficha: `Readiness` devuelve `err.Error()` de cada dependencia en el cuerpo de `/readyz`, lo que puede exponer host, usuario o base de datos; y `tipo[:9]` en `events_test.go` puede entrar en pánico con tipos cortos. Para T35: `VULN-020` necesita su captura "después" tras un CI verde.
 

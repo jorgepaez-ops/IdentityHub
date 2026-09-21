@@ -18,7 +18,7 @@
   },
   "remediacion": {
     "tarea": "T6",
-    "commit": null,
+    "commit": "902a047",
     "ficha": "security/findings/VULN-020-chi-realip-spoofing.md"
   },
   "despues": {
