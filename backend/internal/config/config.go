@@ -47,7 +47,7 @@ type Config struct {
 	JWTAudience    string
 	AccessTTL      time.Duration
 	RefreshTTL     time.Duration
-	Password       PasswordConfig
+	Argon2         PasswordConfig
 	TrustedProxies []netip.Prefix
 }
 
@@ -118,7 +118,7 @@ func Load() (*Config, error) {
 		AccessTTL:      dur("JWT_ACCESS_TTL", "15m"),
 		RefreshTTL:     dur("JWT_REFRESH_TTL", "720h"),
 		TrustedProxies: trustedProxies,
-		Password: PasswordConfig{
+		Argon2: PasswordConfig{
 			MemoryKiB:   boundedUint32(passwordMemory),
 			Iterations:  boundedUint32(passwordIterations),
 			Parallelism: boundedUint8(passwordParallelism),
