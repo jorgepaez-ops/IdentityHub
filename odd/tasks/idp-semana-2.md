@@ -233,7 +233,7 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
 - Commit: —
 
 ### T0.2 — Ejecutar los tres workflows y guardar los resultados
-- [ ] Estado · Ejecutor: `Claude` (con `gh`/navegador según autorización del usuario) · Cubre: RNF-002, RNF-004 · Remedia: —
+- [x] Estado · Ejecutor: `Claude` (con `gh`/navegador según autorización del usuario) · Cubre: RNF-002, RNF-004 · Remedia: —
 - `CI` sobre `main` (esperado: en rojo). `Escaneo de la línea base` sobre el tag
   (`workflow_dispatch` con `ref` = `v0.0.0-vuln-baseline` si hace falta relanzar). `Escaneo
   semanal` con `workflow_dispatch`.
@@ -276,7 +276,12 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
     hallazgos (D1 resuelto); `api` y `worker` no se construyen (exit 1, mismo 404 de Debian 11) y `web` sí;
     Trivy sobre imágenes base da cuentas para VULN-008, 016 y 019 (`security/evidence/actions-35534898422/README.md`).
     Falta el JSON de Trivy sobre `baseline/web`, que solo está en el artefacto (descarga pendiente de autorización).
-  - Pendiente: `Escaneo semanal` (`workflow_dispatch`, puede abrir incidencias: requiere autorización
+  - **Cerrada 2026-09-21:** `Escaneo semanal` lanzado a mano sobre `main` con autorización del usuario: run 35547924202
+    (`success`, `govulncheck` encontró 33 vulnerabilidades; ver `security/evidence/actions-35547924202/README.md`).
+    **D9:** ese run no abrió la incidencia prevista porque `govulncheck | tee` sin `pipefail` termina en éxito; corregido
+    con `shell: bash` en `scheduled-scan.yml`. Los tres workflows tienen run y su evidencia está guardada; D1 a D9 anotadas;
+    huellas para T31 en `security/evidence/gitleaks-huellas-historial.txt`. Puerta T0 (T0.1 a T0.3) cumplida.
+  - (Pendiente histórico) `Escaneo semanal` (`workflow_dispatch`, puede abrir incidencias: requiere autorización
     del usuario); URLs de SARIF en la pestaña Security; corregir `baseline-scan.yml` (Trivy sin socket de
     Docker, informe de Gitleaks dentro del árbol escaneado) y repetir el escaneo de imágenes; volcar los
     run IDs en el "Registro de evidencia"; resolver D3 y D4.
@@ -890,12 +895,12 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 
 | Fase | Tareas | Hechas |
 |---|---|---|
-| 0 — Línea base y evidencia "antes" | T0.1 a T0.5 (5) | 3 (T0.1, T0.3, T0.4) |
+| 0 — Línea base y evidencia "antes" | T0.1 a T0.5 (5) | 4 (T0.1 a T0.4) |
 | 1 — Contrato ejecutable | T1a, T1 a T3 (4) | 4 (T1a, T1, T2, T3) |
 | 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 5 (T4, T5, T7, T8, T14a) |
 | 3 — Remediación | T23 a T32 (10) | 0 |
 | 4 — Cierre | T33 a T38 (6) | 0 |
-| **Total** | **45** | **12** |
+| **Total** | **45** | **13** |
 
 Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, cookie) y `T14a`
 (enmienda ADR 0005, sin ventana de gracia). Los ids existentes no cambian.
