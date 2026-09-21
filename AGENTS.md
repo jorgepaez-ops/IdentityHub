@@ -92,8 +92,8 @@ pruebas Playwright, `docs/runbook.md`. `make e2e` es un placeholder.
   archivos, sembrados a propósito y necesarios como evidencia "antes", hasta que lo haga la
   tarea designada (entre paréntesis):
   `backend/internal/api/legacy_auth.go` y su ruta `/auth/legacy-login` en `server.go`
-  (VULN-001, 002, 004, 005, 006, 007; T23) · `backend/go.mod` con chi 5.0.11, jwt v4, pgx 5.5.1,
-  x/text y la directiva `go 1.22` (VULN-020 chi T6, VULN-021 T23, VULN-022 y x/text T24) ·
+  (VULN-001, 002, 004, 005, 006, 007; T23) · `backend/go.mod` con jwt v4, pgx 5.5.1 y
+  x/text (VULN-021 T23, VULN-022 y x/text T24; chi y la directiva `go` ya se remediaron en T6: `go 1.25`, decisión Q19) ·
   `backend/Dockerfile` (VULN-008 a 012; T26, T27) · `frontend/Dockerfile` (VULN-016 a 018; T28) ·
   `frontend/nginx/default.conf` (VULN-013 a 015; T29) · `frontend/package.json` con axios y
   lodash antiguos (T25) · `deploy/docker-compose.yml` (VULN-003, 019 y 024; T26, T30). Su comentario de endurecimiento dice hoy
