@@ -44,19 +44,21 @@ e2e/tests/      vacío; Playwright llega en la semana 3
 | Tests como en CI | `cd backend && go test -race -short ./...` |
 | Tests frontend | `make test-front` (= `cd frontend && npm run test`) |
 | Todo | `make test` |
-| Lint + tipos | `make lint` (`go vet`, `golangci-lint` con gosec, `npm run lint`; si falta golangci-lint solo avisa, instálalo); tipos front: `cd frontend && npm run typecheck` |
+| Lint + tipos | `make lint` (`go vet`, `golangci-lint` v2 con gosec, `npm run lint`; si falta golangci-lint solo avisa: `go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2`; falla ante hallazgos, salvo los sembrados de `legacy_auth.go` hasta T23); tipos front: `cd frontend && npm run typecheck` |
 | Formato Go | `make fmt` (gofmt) |
 | Validar OpenAPI | `python3 -m openapi_spec_validator specs/03-api/openapi.yaml` (`pip install openapi-spec-validator==0.7.1`) |
 | Trazabilidad | `python3 scripts/traceability.py` (escribe `specs/07-traceability.md`) · `--check` (falla si está desactualizada) |
-| Gate de deriva local | `make gen` (hoy solo corre traceability.py; oapi-codegen/openapi-typescript los añade T2) |
+| Gate de deriva local | `make gen` regenera `gen.go` (oapi-codegen **v2.5.1**), `schema.d.ts` (openapi-typescript 6.7.6), el código de sqlc (**v1.31.1**, exige Go 1.26 para compilarse) y la matriz. No uses versiones más nuevas de oapi-codegen: obligan a subir `go` y mueven `x/text` |
 | Tipos del cliente TS | `cd frontend && npm run gen:api` (script existente; requiere `npm install`) |
 | Escaneos locales | `make scan` · `scan-secrets` · `scan-deps` · `scan-config` · `scan-image` (todos terminan con `\|\| true`: leer la salida, no el exit code) |
 | BD | `make migrate` · `make psql` |
 | Hooks locales | `pre-commit install` (gitleaks, gofmt, go build, traceability) |
 
 Puertos del stack: web 8080, api 8081, Mailpit 8025, RabbitMQ 15672.
-**No existen todavía** (los crean las tareas): sqlc, oapi-codegen, `make test-integration`,
-pruebas Playwright, `docs/runbook.md`. `make e2e` es un placeholder.
+**No existen todavía** (los crean las tareas): pruebas Playwright y `docs/runbook.md`. `make e2e` es un
+placeholder. Las pruebas de integración usan `make test-integration` y `TEST_DATABASE_URL` (una PostgreSQL local):
+tu sandbox no llega a ella, así que déjalas compilando (`go vet -tags=integration ./...`) y avisa: Claude las ejecuta.
+Go es 1.25 (`go.mod`, decisión Q19); `x/crypto` se queda en v0.17.0 hasta T24.
 
 ## Cómo trabajas (acuerdo con Codex)
 
@@ -108,7 +110,7 @@ pruebas Playwright, `docs/runbook.md`. `make e2e` es un placeholder.
   aprobación del usuario. Endurecer un gate sí es válido.
 - Los contratos de `specs/` (OpenAPI, AsyncAPI, requisitos, ADR, features) no se modifican
   sin pasar por "Cambios de spec propuestos". `specs/07-traceability.md` es generado.
-- El repo aún no tiene remoto (lo crea el usuario en `T0.1`; será público); no intentes configurarlo.
+- El repo tiene remoto (`origin`, público, creado en `T0.1`); no lo reconfigures y no hagas push: es del usuario.
 
 ## Seguridad del núcleo IdP (referencias, no repetir aquí)
 
