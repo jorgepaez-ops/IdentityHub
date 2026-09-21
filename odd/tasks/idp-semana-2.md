@@ -484,7 +484,7 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
 - Commit: 4e8c653
 
 ### T8 — JWT Ed25519, JWKS y middleware de autenticación
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RF-004, AM-003, RNF-003 · Remedia: — (prepara VULN-006/021) · Depende de: T1
+- [x] Estado · Ejecutor: `Codex` · Cubre: RF-004, AM-003, RNF-003 · Remedia: — (prepara VULN-006/021) · Depende de: T1
 - Añadir `github.com/golang-jwt/jwt/v5` **junto a** v4 (v4 sigue hasta T23). Paquete
   `backend/internal/auth/token`: emisión (`iss`, `sub`, `aud`, `exp` a 15 min, `iat`, `jti`, `roles`, `kid`),
   validación con `WithValidMethods([]string{"EdDSA"})`, emisor y expiración obligatorios.
@@ -499,7 +499,7 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
   `TestRF004_VigenciaDe15Minutos`; `TestRNF003_FaltaClaveDeFirmaImpideElArranque`; la clave privada no aparece en logs (`config.Secret`).
 - Archivos: `backend/internal/auth/token/**`, `backend/internal/api/{jwks.go,auth_middleware.go}` (+ pruebas), `backend/internal/config/**`, `backend/go.mod`.
 - Verificación: `make test-go`; `make lint` (sin hallazgos nuevos de gosec).
-- Commit:
+- Commit: 5da3fcf
 
 ### T9 — Registro de auditoría: escritor y migración 000002
 - [ ] Estado · Ejecutor: `Codex` · Cubre: RF-011, AM-010, AM-011, invariante 5 · Remedia: — · Depende de: T5, T6
@@ -892,10 +892,10 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 |---|---|---|
 | 0 — Línea base y evidencia "antes" | T0.1 a T0.5 (5) | 3 (T0.1, T0.3, T0.4) |
 | 1 — Contrato ejecutable | T1a, T1 a T3 (4) | 4 (T1a, T1, T2, T3) |
-| 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 3 (T4, T5, T7) |
+| 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 4 (T4, T5, T7, T8) |
 | 3 — Remediación | T23 a T32 (10) | 0 |
 | 4 — Cierre | T33 a T38 (6) | 0 |
-| **Total** | **45** | **10** |
+| **Total** | **45** | **11** |
 
 Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, cookie) y `T14a`
 (enmienda ADR 0005, sin ventana de gracia). Los ids existentes no cambian.
@@ -906,6 +906,7 @@ Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, coo
 las líneas de RED/GREEN van en el handoff.)
 
 - T1a · `python3 -m openapi_spec_validator specs/03-api/openapi.yaml`: OK; `python3 scripts/traceability.py --check`: matriz al día.
+- T8 · `go build`, `go vet` (con y sin `integration`) y `go test -race -short ./...` en verde; `TestRF004_*` (token, JWKS, algoritmo alterado, sin sujeto o firmado por otra clave) y `TestRNF003_*` (falta la clave, no se revela) PASS; `git diff backend/go.mod`: solo `jwt/v5 v5.3.1`; `gen.go` y `legacy_auth.go` sin diff; trazabilidad regenerada y al día.
 - T7 · `go build`, `go vet` (con y sin `integration`) y `go test -race -short ./...` en verde; `go test -race ./internal/auth/password/...` PASS (unas 20 s por los hashes de 64 MiB); integración contra PostgreSQL 14 local, dos veces: `TestRF001_UsersAceptaArgon2idYRechazaMD5` PASS y sin bases sobrantes; `git diff backend/go.mod`: solo `x/crypto` de indirecta a directa.
 - T5 · `make gen` dos veces: mismo checksum de todo lo generado (`gen.go`, `schema.d.ts`, matriz y código de sqlc); `backend/go.mod` sin diff; `go build`, `go vet` (con y sin `integration`) y `go test -race -short ./...` en verde; integración contra PostgreSQL 14 local, dos veces: `TestRNF011_ConsultasBaseSqlcUsanParametros` y `TestRNF011_MigracionesSeAplicanSobreBaseVacia` PASS y sin bases sobrantes.
 - T4 · `make test-integration` y `go test -race -tags=integration ./internal/testdb/...` dos veces contra PostgreSQL 14 local: PASS y sin bases temporales sobrantes; sin `TEST_DATABASE_URL`: SKIP; `go vet` con y sin la etiqueta, `go test -race -short ./...`, trazabilidad y YAML: en verde; Gitleaks sobre `ci.yml` y `Makefile`: 0 hallazgos.
@@ -1013,4 +1014,10 @@ Formato por tarea (3 a 5 líneas):
 - Concurrencia por defecto **4**: cada verificación usa 64 MiB, así que acota Argon2id a unos 256 MiB simultáneos sin serializar todos los inicios de sesión. No hace falta migración: no hay usuarios previos ni filas MD5.
 - Ajuste de Claude: la prueba de integración de Codex no podía pasar (el sandbox no llega a la base y no la ejecutó): sus `INSERT` omitían `display_name` (`NOT NULL`), y el rechazo del MD5 habría fallado por esa columna (23502) antes de llegar a la restricción (23514). Se añadió `display_name`, se usa `errors.As` y se comprueba también el nombre `users_password_hash_is_argon2id`.
 - Dudas abiertas / pendientes de otras tareas (observaciones del hook de revisión, no bloqueantes): (1) `Hash` y `Verify` bloquean en el semáforo sin `context.Context`: una petición cancelada seguirá en cola; se plantea al integrarlos en el inicio de sesión (T13). (2) El hash señuelo usa los parámetros de la primera llamada: `Configure` debe ejecutarse antes de la primera petición. (3) Posibles avisos gosec G115 por las conversiones `uint32`/`uint8` de la configuración: los límites se validan antes, pero el linter del CI (golangci-lint v1.59) puede no verlo; `golangci-lint` no está instalado en local, se revisará en el primer run de CI. `x/crypto` no se sube: subirlo actualiza de rebote `x/text` (0.14.0 a 0.21.0), así que queda para T24.
+
+### T8 · 2026-09-20 · 5da3fcf
+- Qué cambió: paquete `backend/internal/auth/token` (`golang-jwt/jwt/v5` **v5.3.1**, junto a v4 que sigue hasta T23): tokens EdDSA de 15 minutos con `iss`, `sub`, `aud`, `exp`, `iat`, `jti`, `roles` y `kid` (primeros 16 caracteres hexadecimales del SHA-256 de la clave pública); validación solo EdDSA, con `kid`, emisor, audiencia, sujeto y caducidad obligatorios y reloj inyectable. `GET /.well-known/jwks.json` (`jwks.go`, OKP Ed25519, `x` en base64url) y middleware `RequireAuth` (`auth_middleware.go`, 401 `problem+json` sin decir el motivo). Configuración: `JWT_SIGNING_KEY` obligatoria (semilla Ed25519 de 32 bytes en base64, `config.Secret`, sin valor por defecto: sin ella la API no arranca, RNF-003), `JWT_ISSUER` (`http://localhost:8080`) y `JWT_AUDIENCE` (`identity-hub`). `Server.SetTokenService` inyecta el servicio: la firma de `NewServer` no cambia; sin servicio, JWKS responde 503 y `RequireAuth` 401.
+- Comandos y resultado observado: RED (Codex): faltaban `token.New` y la validación de `JWT_SIGNING_KEY`. GREEN: suite completa y pruebas de T8 en verde (Claude las repitió).
+- Ajustes de Claude: (1) la prueba de confusión de algoritmo de Codex firmaba los tokens falsos **sin `kid`**, así que se habrían rechazado por "clave desconocida" aunque no existiera la restricción de algoritmo; ahora llevan el `kid` y todas las claims correctas (solo cambia el algoritmo) y hay un control positivo con un token EdDSA válido. (2) `Validate` exigía todo menos el sujeto: ahora rechaza un token sin `sub`. (3) Nueva prueba `TestRF004_RechazaTokenSinSujetoOFirmadoPorOtraClave` (sin sujeto, y firmado por otra clave con el `kid` correcto). (4) Se regeneró `specs/07-traceability.md`, que Codex dejó desactualizada. Nota: en `jwt/v5` los tokens `none` y HS256 con la clave pública también fallarían por tipo de clave; la restricción de algoritmo es defensa en profundidad y la prueba fija el resultado observable.
+- Dudas abiertas / para T13 y T21: `config.Config.AccessTTL` (`JWT_ACCESS_TTL`, ya estaba en la línea base) no se usa: el servicio fija los 15 minutos de RF-004; al cablear en T21 conviene retirar esa variable o validarla a 15 minutos. `RequireAuth` reconoce el esquema `Bearer` con esa capitalización exacta. T21 debe decodificar `JWT_SIGNING_KEY`, crear el servicio y llamar a `SetTokenService`. Clave de desarrollo: `openssl rand -base64 32` en un `.env` git-ignorado; jamás en el repositorio.
 

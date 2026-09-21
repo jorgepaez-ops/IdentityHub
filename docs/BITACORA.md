@@ -29,6 +29,9 @@ esta entrada resume lo que importa para entender el proyecto.
 - **T1** (Codex): `gen.go` generado desde el OpenAPI con oapi-codegen v2.5.1 + runtime v1.1.2; el servidor implementa las 22
   operaciones (501 las pendientes). Se descartó oapi-codegen v2.8.0: obliga a `go 1.24` y actualiza `x/text`, lo que rompe
   Q11 y borraría la evidencia de VULN-026.
+- **T8** (Codex): tokens de acceso EdDSA de 15 minutos, `GET /.well-known/jwks.json` y el middleware `RequireAuth`; la clave
+  de firma es obligatoria (`JWT_SIGNING_KEY`). La prueba de confusión de algoritmo de Codex firmaba tokens sin `kid` y
+  habría pasado por otra razón: se rehízo para que solo el algoritmo pueda causar el rechazo.
 - **T7** (Codex): Argon2id con los parámetros de la ADR 0004, verificación en tiempo constante, hash señuelo y un semáforo
   que acota a unos 256 MiB simultáneos. La prueba de integración de Codex no podía pasar (omitía una columna `NOT NULL`)
   y se corrigió al ejecutarla contra la base real.
