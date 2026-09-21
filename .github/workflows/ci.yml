@@ -26,7 +26,9 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: "1.22"
+  # Go 1.25: chi >= 5.3.0 exige go 1.23 y los avisos de la biblioteca estándar solo se
+  # corrigen a partir de Go 1.25.13 (decisión Q11 ampliada, 2026-09-21).
+  GO_VERSION: "1.25"
   NODE_VERSION: "18"
 
 jobs:
@@ -91,10 +93,11 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: backend/go.sum
 
+      # golangci-lint v2: la v1 se compila con Go 1.22 y no analiza código que apunte a Go 1.25.
       - name: golangci-lint (incluye gosec)
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v9
         with:
-          version: v1.59
+          version: v2.13.2
           working-directory: backend
           args: --timeout=5m
 

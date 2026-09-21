@@ -1,21 +1,24 @@
-# Configuración de golangci-lint.
+# Configuración de golangci-lint (formato v2).
 #
 # gosec va aquí y no como herramienta aparte para que un solo comando cubra
 # estilo y seguridad: cuantos menos pasos tenga que recordar alguien, más
 # probable es que los ejecute antes de abrir el PR.
+#
+# Migrada de v1 a v2 al subir Go a 1.25 (T6, decisión Q11 ampliada): golangci-lint
+# v1 se compila con Go 1.22 y se niega a analizar código que apunte a Go 1.25.
+# Se conservan los mismos linters, ajustes y exclusiones; los "presets" de
+# `exclusions` son los que v1 aplicaba por defecto (`exclude-use-default`), así
+# que el comportamiento no se relaja ni se endurece con la migración.
+version: "2"
 
 run:
-  timeout: 5m
   tests: true
 
 linters:
+  # Además de los linters estándar de v2 (errcheck, govet, ineffassign,
+  # staticcheck, unused).
   enable:
     - gosec         # análisis de seguridad (G101 credenciales, G201 SQL, G401 hash débil…)
-    - errcheck      # errores ignorados
-    - govet
-    - staticcheck
-    - ineffassign
-    - unused
     - misspell
     - bodyclose     # cuerpos de respuesta HTTP sin cerrar
     - noctx         # peticiones HTTP sin contexto
@@ -24,31 +27,40 @@ linters:
     - errorlint     # comparación de errores sin errors.Is/As
     - copyloopvar
     - nolintlint    # obliga a justificar cada //nolint
-
-linters-settings:
-  gosec:
-    excludes: []
-    severity: low
-    confidence: low
-
-  errcheck:
-    check-type-assertions: true
-
-  misspell:
-    locale: US
-
-  nolintlint:
-    require-explanation: true
-    require-specific: true
-    allow-unused: false
+  settings:
+    gosec:
+      severity: low
+      confidence: low
+    errcheck:
+      check-type-assertions: true
+    misspell:
+      locale: US
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+      allow-unused: false
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      # Los archivos de la línea base vulnerable llevan sus propios //nolint con
+      # explicación y referencia a la ficha VULN-NNN correspondiente. No se
+      # excluyen aquí: se quiere que gosec los siga marcando en el informe.
+      - path: _test\.go
+        linters:
+          - gosec
+          - errcheck
+          - bodyclose
+          - noctx
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
 
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0
-
-  exclude-rules:
-    # Los archivos de la línea base vulnerable llevan sus propios //nolint con
-    # explicación y referencia a la ficha VULN-NNN correspondiente. No se
-    # excluyen aquí: se quiere que gosec los siga marcando en el informe.
-    - path: _test\.go
-      linters: [gosec, errcheck, bodyclose, noctx]

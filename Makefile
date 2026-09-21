@@ -64,7 +64,7 @@ fmt: ## Formatea el código
 
 lint: ## Lint y comprobación de tipos
 	cd backend && go vet ./...
-	cd backend && golangci-lint run --timeout=5m || echo "  (golangci-lint no instalado: brew install golangci-lint)"
+	@if command -v golangci-lint >/dev/null 2>&1; then cd backend && golangci-lint run --timeout=5m; else echo "  (golangci-lint no instalado: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2)"; fi
 	cd frontend && npm run lint
 
 test: test-go test-front ## Todas las pruebas
