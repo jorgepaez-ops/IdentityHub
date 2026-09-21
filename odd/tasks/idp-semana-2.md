@@ -579,7 +579,7 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
 - Commit:
 
 ### T14a — Enmendar ADR 0005: retirar la ventana de gracia
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RF-006, AM-002, ADR 0005 · Remedia: — · Solo docs · Depende de: —
+- [x] Estado · Ejecutor: `Codex` · Cubre: RF-006, AM-002, ADR 0005 · Remedia: — · Solo docs · Depende de: —
 - **Autorización explícita:** el usuario decidió el 2026-09-19 (Q4) que **no** hay ventana de gracia.
   Por eso Codex puede editar `specs/adr/0005-refresh-tokens-rotativos-con-familia.md` **solo en esta
   tarea** (C2 en "Cambios de spec propuestos", aceptado). Ningún otro archivo de `specs/` se toca.
@@ -597,7 +597,7 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
 - Criterios: la ADR ya no describe la ventana de gracia como mecanismo vigente (solo como alternativa
   descartada) y documenta el riesgo residual y la mitigación; el resto de la ADR no cambia.
 - Verificación: `git diff --stat` solo toca esa ADR y este archivo; `python3 scripts/traceability.py --check`.
-- Commit:
+- Commit: 67de318
 
 ### T14 — Rotación de refresh y detección de reuso (RF-005, RF-006)
 - [ ] Estado · Ejecutor: `Codex` · Cubre: RF-005, RF-006, AM-002, AM-015, invariante 3, ADR 0005 · Remedia: — · Depende de: T13, T14a
@@ -892,10 +892,10 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 |---|---|---|
 | 0 — Línea base y evidencia "antes" | T0.1 a T0.5 (5) | 3 (T0.1, T0.3, T0.4) |
 | 1 — Contrato ejecutable | T1a, T1 a T3 (4) | 4 (T1a, T1, T2, T3) |
-| 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 4 (T4, T5, T7, T8) |
+| 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 5 (T4, T5, T7, T8, T14a) |
 | 3 — Remediación | T23 a T32 (10) | 0 |
 | 4 — Cierre | T33 a T38 (6) | 0 |
-| **Total** | **45** | **11** |
+| **Total** | **45** | **12** |
 
 Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, cookie) y `T14a`
 (enmienda ADR 0005, sin ventana de gracia). Los ids existentes no cambian.
@@ -906,6 +906,7 @@ Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, coo
 las líneas de RED/GREEN van en el handoff.)
 
 - T1a · `python3 -m openapi_spec_validator specs/03-api/openapi.yaml`: OK; `python3 scripts/traceability.py --check`: matriz al día.
+- T14a · `git diff --stat`: solo `specs/adr/0005-refresh-tokens-rotativos-con-familia.md` (+17 −6); la ventana de gracia solo aparece como decisión descartada y alternativa rechazada; `python3 scripts/traceability.py --check`: matriz al día.
 - T8 · `go build`, `go vet` (con y sin `integration`) y `go test -race -short ./...` en verde; `TestRF004_*` (token, JWKS, algoritmo alterado, sin sujeto o firmado por otra clave) y `TestRNF003_*` (falta la clave, no se revela) PASS; `git diff backend/go.mod`: solo `jwt/v5 v5.3.1`; `gen.go` y `legacy_auth.go` sin diff; trazabilidad regenerada y al día.
 - T7 · `go build`, `go vet` (con y sin `integration`) y `go test -race -short ./...` en verde; `go test -race ./internal/auth/password/...` PASS (unas 20 s por los hashes de 64 MiB); integración contra PostgreSQL 14 local, dos veces: `TestRF001_UsersAceptaArgon2idYRechazaMD5` PASS y sin bases sobrantes; `git diff backend/go.mod`: solo `x/crypto` de indirecta a directa.
 - T5 · `make gen` dos veces: mismo checksum de todo lo generado (`gen.go`, `schema.d.ts`, matriz y código de sqlc); `backend/go.mod` sin diff; `go build`, `go vet` (con y sin `integration`) y `go test -race -short ./...` en verde; integración contra PostgreSQL 14 local, dos veces: `TestRNF011_ConsultasBaseSqlcUsanParametros` y `TestRNF011_MigracionesSeAplicanSobreBaseVacia` PASS y sin bases sobrantes.
@@ -1020,4 +1021,9 @@ Formato por tarea (3 a 5 líneas):
 - Comandos y resultado observado: RED (Codex): faltaban `token.New` y la validación de `JWT_SIGNING_KEY`. GREEN: suite completa y pruebas de T8 en verde (Claude las repitió).
 - Ajustes de Claude: (1) la prueba de confusión de algoritmo de Codex firmaba los tokens falsos **sin `kid`**, así que se habrían rechazado por "clave desconocida" aunque no existiera la restricción de algoritmo; ahora llevan el `kid` y todas las claims correctas (solo cambia el algoritmo) y hay un control positivo con un token EdDSA válido. (2) `Validate` exigía todo menos el sujeto: ahora rechaza un token sin `sub`. (3) Nueva prueba `TestRF004_RechazaTokenSinSujetoOFirmadoPorOtraClave` (sin sujeto, y firmado por otra clave con el `kid` correcto). (4) Se regeneró `specs/07-traceability.md`, que Codex dejó desactualizada. Nota: en `jwt/v5` los tokens `none` y HS256 con la clave pública también fallarían por tipo de clave; la restricción de algoritmo es defensa en profundidad y la prueba fija el resultado observable.
 - Dudas abiertas / para T13 y T21: `config.Config.AccessTTL` (`JWT_ACCESS_TTL`, ya estaba en la línea base) no se usa: el servicio fija los 15 minutos de RF-004; al cablear en T21 conviene retirar esa variable o validarla a 15 minutos. `RequireAuth` reconoce el esquema `Bearer` con esa capitalización exacta. T21 debe decodificar `JWT_SIGNING_KEY`, crear el servicio y llamar a `SetTokenService`. Clave de desarrollo: `openssl rand -base64 32` en un `.env` git-ignorado; jamás en el repositorio.
+
+### T14a · 2026-09-20 · 67de318
+- Qué cambió: la ADR 0005 (enmienda C2, decisión Q4) pasa a decir que **no hay ventana de gracia**: contradice el escenario de reuso inmediato y devolver el mismo par exigiría guardar el token en claro (la ADR solo guarda su SHA-256); se acepta el riesgo residual (dos pestañas que renuevan a la vez pueden provocar un falso positivo y cerrar la sesión) y la mitigación queda para el frontend de la semana 3 (un único refrescador compartido entre pestañas, con Web Locks API o `BroadcastChannel`). La línea de estado registra "Enmienda C2 · 2026-09-19".
+- Comandos y resultado observado: solo documentación, sin RED/GREEN. Claude revisó el diff línea por línea: solo cambia esa ADR y el resto del texto no se toca.
+- Dudas abiertas: ninguna.
 
