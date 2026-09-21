@@ -29,6 +29,7 @@ esta entrada resume lo que importa para entender el proyecto.
 - **T1** (Codex): `gen.go` generado desde el OpenAPI con oapi-codegen v2.5.1 + runtime v1.1.2; el servidor implementa las 22
   operaciones (501 las pendientes). Se descartó oapi-codegen v2.8.0: obliga a `go 1.24` y actualiza `x/text`, lo que rompe
   Q11 y borraría la evidencia de VULN-026.
+- **T0.5** (Codex): las 19 fichas que faltaban; ya hay una por cada VULN-001 a VULN-026. **Fase 0 cerrada.**
 - **T0.2 cerrada.** El escaneo semanal (run 35547924202) encontró 33 vulnerabilidades y aun así terminó en éxito sin abrir la
   incidencia: `govulncheck | tee` sin `pipefail` esconde el fallo (D9). Corregido en `scheduled-scan.yml`.
 - **T14a** (Codex): la ADR 0005 retira la ventana de gracia de 10 segundos (Q4) y documenta el riesgo residual y su

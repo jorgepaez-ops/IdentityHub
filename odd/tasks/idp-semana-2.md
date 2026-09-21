@@ -328,7 +328,7 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
 - Commit: 54c3525
 
 ### T0.5 — Fichas faltantes de la línea base
-- [ ] Estado · Ejecutor: `Codex` · Cubre: ADR 0007 · Remedia: — · Solo docs · Depende de: T0.2
+- [x] Estado · Ejecutor: `Codex` · Cubre: ADR 0007 · Remedia: — · Solo docs · Depende de: T0.2
 - Crear `security/findings/VULN-NNN-<slug>.md` para los ids sembrados sin ficha: 003, 004 y 006 a
   019 (16 fichas; son los ids únicos que aparecen en los comentarios de `deploy/docker-compose.yml`,
   `backend/**` y `frontend/**`, y se **conservan tal cual**), más los tres ids nuevos de Q9:
@@ -345,7 +345,7 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
 - Verificación: `ls security/findings/VULN-*.md | wc -l` (26); `git diff --stat` no toca compose,
   Dockerfiles, `backend/` ni `frontend/`; gitleaks local (`make scan-secrets`) no añade hallazgos
   fuera de los ya conocidos (rutas de `security/findings/` están permitidas).
-- Commit:
+- Commit: 4b2d4f4
 
 ---
 
@@ -895,12 +895,12 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 
 | Fase | Tareas | Hechas |
 |---|---|---|
-| 0 — Línea base y evidencia "antes" | T0.1 a T0.5 (5) | 4 (T0.1 a T0.4) |
+| 0 — Línea base y evidencia "antes" | T0.1 a T0.5 (5) | 5 (T0.1 a T0.5) |
 | 1 — Contrato ejecutable | T1a, T1 a T3 (4) | 4 (T1a, T1, T2, T3) |
 | 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 5 (T4, T5, T7, T8, T14a) |
 | 3 — Remediación | T23 a T32 (10) | 0 |
 | 4 — Cierre | T33 a T38 (6) | 0 |
-| **Total** | **45** | **13** |
+| **Total** | **45** | **14** |
 
 Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, cookie) y `T14a`
 (enmienda ADR 0005, sin ventana de gracia). Los ids existentes no cambian.
@@ -911,6 +911,7 @@ Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, coo
 las líneas de RED/GREEN van en el handoff.)
 
 - T1a · `python3 -m openapi_spec_validator specs/03-api/openapi.yaml`: OK; `python3 scripts/traceability.py --check`: matriz al día.
+- T0.5 · `ls security/findings/VULN-*.md | wc -l` = 26 (una por id, VULN-001 a VULN-026); AM-NNN citadas comprobadas contra `specs/05-security/threat-model.md`; severidades comprobadas contra `gosec.json` y `trivy-config.json`; sin patrones de secreto; `git diff --stat` vacío para compose, Dockerfiles, `backend/` y `frontend/`.
 - T14a · `git diff --stat`: solo `specs/adr/0005-refresh-tokens-rotativos-con-familia.md` (+17 −6); la ventana de gracia solo aparece como decisión descartada y alternativa rechazada; `python3 scripts/traceability.py --check`: matriz al día.
 - T8 · `go build`, `go vet` (con y sin `integration`) y `go test -race -short ./...` en verde; `TestRF004_*` (token, JWKS, algoritmo alterado, sin sujeto o firmado por otra clave) y `TestRNF003_*` (falta la clave, no se revela) PASS; `git diff backend/go.mod`: solo `jwt/v5 v5.3.1`; `gen.go` y `legacy_auth.go` sin diff; trazabilidad regenerada y al día.
 - T7 · `go build`, `go vet` (con y sin `integration`) y `go test -race -short ./...` en verde; `go test -race ./internal/auth/password/...` PASS (unas 20 s por los hashes de 64 MiB); integración contra PostgreSQL 14 local, dos veces: `TestRF001_UsersAceptaArgon2idYRechazaMD5` PASS y sin bases sobrantes; `git diff backend/go.mod`: solo `x/crypto` de indirecta a directa.
@@ -1031,4 +1032,10 @@ Formato por tarea (3 a 5 líneas):
 - Qué cambió: la ADR 0005 (enmienda C2, decisión Q4) pasa a decir que **no hay ventana de gracia**: contradice el escenario de reuso inmediato y devolver el mismo par exigiría guardar el token en claro (la ADR solo guarda su SHA-256); se acepta el riesgo residual (dos pestañas que renuevan a la vez pueden provocar un falso positivo y cerrar la sesión) y la mitigación queda para el frontend de la semana 3 (un único refrescador compartido entre pestañas, con Web Locks API o `BroadcastChannel`). La línea de estado registra "Enmienda C2 · 2026-09-19".
 - Comandos y resultado observado: solo documentación, sin RED/GREEN. Claude revisó el diff línea por línea: solo cambia esa ADR y el resto del texto no se toca.
 - Dudas abiertas: ninguna.
+
+### T0.5 · 2026-09-21 · 4b2d4f4
+- Qué cambió: 19 fichas nuevas en `security/findings/` (VULN-003, 004, 006 a 019, 024, 025 y 026), con las 7 existentes suman las 26. Cada una lleva la severidad del propio escáner (o "no informada por ningún escáner" donde ningún gate lo detecta: 006, 007, 011 y 024), los gates de su `evidencia.json`, `AM-NNN` reales del modelo de amenazas, la ruta de la evidencia y la URL del run "antes". VULN-024 documenta que el comentario del compose la llama VULN-020 (id de chi) y que se corrige en T30. No se toca compose, Dockerfiles, `backend/` ni `frontend/`.
+- Comandos y resultado observado: solo documentación, sin RED/GREEN. Claude revisó las 19 con un script (AM existentes, ruta y URL coherentes con el JSON, estado `abierto`, campos de remediación vacíos, sin patrones de secreto) y comprobó las severidades contra `gosec.json` (G404 HIGH, G101 HIGH) y `trivy-config.json` (DS002 y DS029 HIGH, DS031 CRITICAL).
+- Ajuste de Claude: VULN-024 arrastraba una frase interna del proceso ("Desktop los había asignado a este VULN por error"); se reescribió con lo que hace `trivy config` (solo analiza Dockerfiles).
+- Dudas abiertas: los hallazgos sin id (CodeQL #81, `amqp091-go`, alertas de Semgrep de las acciones y de `default.conf`, alertas de los diagramas, avisos de la biblioteca estándar) siguen sin ficha: un id solo se asigna al crear su ficha y la decisión de abrirlas queda pendiente (ver la bitácora).
 
