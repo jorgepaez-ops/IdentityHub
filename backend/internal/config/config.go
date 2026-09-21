@@ -6,6 +6,7 @@
 package config
 
 import (
+	"encoding/base64"
 	"fmt"
 	"os"
 	"strconv"
@@ -31,18 +32,20 @@ type PasswordConfig struct {
 }
 
 type Config struct {
-	Port        int
-	LogLevel    string
-	Version     string
-	DatabaseURL Secret
-	RabbitURL   Secret
-	SMTPHost    string
-	SMTPPort    int
-	SMTPFrom    string
-	JWTIssuer   string
-	AccessTTL   time.Duration
-	RefreshTTL  time.Duration
-	Password    PasswordConfig
+	Port          int
+	LogLevel      string
+	Version       string
+	DatabaseURL   Secret
+	RabbitURL     Secret
+	SMTPHost      string
+	SMTPPort      int
+	SMTPFrom      string
+	JWTSigningKey Secret
+	JWTIssuer     string
+	JWTAudience   string
+	AccessTTL     time.Duration
+	RefreshTTL    time.Duration
+	Password      PasswordConfig
 }
 
 // Load lee el entorno y acumula TODOS los errores antes de fallar, en vez de
@@ -86,23 +89,30 @@ func Load() (*Config, error) {
 		return n
 	}
 
+	jwtSigningKey := req("JWT_SIGNING_KEY")
+	if decoded, err := base64.StdEncoding.DecodeString(jwtSigningKey); err != nil || len(decoded) != 32 {
+		problems = append(problems, "JWT_SIGNING_KEY debe ser una semilla Ed25519 en base64 de 32 bytes")
+	}
+
 	passwordMemory := passwordNum("ARGON2_MEMORY_KIB", "65536", int(^uint32(0)))
 	passwordIterations := passwordNum("ARGON2_ITERATIONS", "3", int(^uint32(0)))
 	passwordParallelism := passwordNum("ARGON2_PARALLELISM", "2", 255)
 	passwordConcurrency := passwordNum("ARGON2_CONCURRENCY", "4", int(^uint(0)>>1))
 
 	cfg := &Config{
-		Port:        num("API_PORT", "8081"),
-		LogLevel:    opt("LOG_LEVEL", "info"),
-		Version:     opt("APP_VERSION", "dev"),
-		DatabaseURL: Secret(req("DATABASE_URL")),
-		RabbitURL:   Secret(req("RABBITMQ_URL")),
-		SMTPHost:    opt("SMTP_HOST", "mailpit"),
-		SMTPPort:    num("SMTP_PORT", "1025"),
-		SMTPFrom:    opt("SMTP_FROM", "no-reply@identity.local"),
-		JWTIssuer:   opt("JWT_ISSUER", "http://localhost:8080"),
-		AccessTTL:   dur("JWT_ACCESS_TTL", "15m"),
-		RefreshTTL:  dur("JWT_REFRESH_TTL", "720h"),
+		Port:          num("API_PORT", "8081"),
+		LogLevel:      opt("LOG_LEVEL", "info"),
+		Version:       opt("APP_VERSION", "dev"),
+		DatabaseURL:   Secret(req("DATABASE_URL")),
+		RabbitURL:     Secret(req("RABBITMQ_URL")),
+		SMTPHost:      opt("SMTP_HOST", "mailpit"),
+		SMTPPort:      num("SMTP_PORT", "1025"),
+		SMTPFrom:      opt("SMTP_FROM", "no-reply@identity.local"),
+		JWTSigningKey: Secret(jwtSigningKey),
+		JWTIssuer:     opt("JWT_ISSUER", "http://localhost:8080"),
+		JWTAudience:   opt("JWT_AUDIENCE", "identity-hub"),
+		AccessTTL:     dur("JWT_ACCESS_TTL", "15m"),
+		RefreshTTL:    dur("JWT_REFRESH_TTL", "720h"),
 		Password: PasswordConfig{
 			MemoryKiB:   uint32(passwordMemory),
 			Iterations:  uint32(passwordIterations),

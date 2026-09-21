@@ -13,17 +13,22 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	"github.com/jorgepaez/identity-hub/internal/auth/token"
 )
 
 type Server struct {
 	logger  *slog.Logger
 	version string
 	deps    map[string]Checker
+	tokens  *token.Service
 }
 
 func NewServer(logger *slog.Logger, version string, deps map[string]Checker) *Server {
 	return &Server{logger: logger, version: version, deps: deps}
 }
+
+func (s *Server) SetTokenService(tokens *token.Service) { s.tokens = tokens }
 
 func (s *Server) Routes() http.Handler {
 	r := chi.NewRouter()
@@ -56,7 +61,6 @@ func (s *Server) Routes() http.Handler {
 	return HandlerFromMux(s, r)
 }
 
-func (s *Server) GetJwks(w http.ResponseWriter, r *http.Request) { s.notImplemented(w) }
 func (s *Server) ListAuditLog(w http.ResponseWriter, r *http.Request, params ListAuditLogParams) {
 	s.notImplemented(w)
 }

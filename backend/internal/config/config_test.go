@@ -119,3 +119,35 @@ func TestRNF012_SecretNoSeRevelaAlFormatearla(t *testing.T) {
 		t.Errorf("Reveal() = %q; se esperaba %q", s.Reveal(), valor)
 	}
 }
+
+func TestRNF003_FaltaClaveDeFirmaImpideElArranque(t *testing.T) {
+	t.Setenv("DATABASE_URL", "")
+	t.Setenv("RABBITMQ_URL", "")
+	t.Setenv("JWT_SIGNING_KEY", "")
+	_, err := Load()
+	if err == nil || !strings.Contains(err.Error(), "JWT_SIGNING_KEY") || !strings.Contains(err.Error(), "DATABASE_URL") || !strings.Contains(err.Error(), "RABBITMQ_URL") {
+		t.Fatalf("Load did not accumulate mandatory configuration errors: %v", err)
+	}
+
+	t.Setenv("DATABASE_URL", "postgres://x")
+	t.Setenv("RABBITMQ_URL", "amqp://x")
+	t.Setenv("JWT_SIGNING_KEY", "not-base64")
+	_, err = Load()
+	if err == nil || !strings.Contains(err.Error(), "JWT_SIGNING_KEY") {
+		t.Fatalf("Load malformed JWT_SIGNING_KEY error = %v", err)
+	}
+}
+
+func TestRNF003_ClaveDeFirmaNoSeRevelaEnConfig(t *testing.T) {
+	const encodedSeed = "MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE="
+	t.Setenv("DATABASE_URL", "postgres://x")
+	t.Setenv("RABBITMQ_URL", "amqp://x")
+	t.Setenv("JWT_SIGNING_KEY", encodedSeed)
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if output := fmt.Sprintf("%+v", cfg); strings.Contains(output, encodedSeed) {
+		t.Fatalf("formatted config leaked signing key: %s", output)
+	}
+}

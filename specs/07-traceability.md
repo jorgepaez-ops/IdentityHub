@@ -13,7 +13,7 @@ declaración de buenas intenciones.
 | **RF-001** | Registro de cuenta | P0 | `register` | 3 | 6 | — | ✅ completo |
 | **RF-002** | Verificación de correo | P0 | `verifyEmail` | 2 | — | — | 🟡 parcial |
 | **RF-003** | Inicio de sesión | P0 | `login` | 3 | — | — | 🟡 parcial |
-| **RF-004** | Emisión y validación de JWT | P0 | `getJwks` | 2 | — | — | 🟡 parcial |
+| **RF-004** | Emisión y validación de JWT | P0 | `getJwks` | 2 | 7 | — | ✅ completo |
 | **RF-005** | Renovación de sesión | P0 | `refreshSession` | 1 | — | — | 🟡 parcial |
 | **RF-006** | Detección de reuso de refresh token | P0 | — | 1 | — | — | 🟡 parcial |
 | **RF-007** | Cierre de sesión | P0 | `logout` | 1 | — | — | 🟡 parcial |
@@ -31,7 +31,7 @@ declaración de buenas intenciones.
 | **RF-019** | Exportación del audit log | P2 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-001** | Contenerización total | P0 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-002** | Pipeline de ciclo completo | P0 | — | — | — | — | 🔴 sin cubrir |
-| **RNF-003** | Cero secretos en el repositorio | P0 | — | — | 2 | — | 🟡 parcial |
+| **RNF-003** | Cero secretos en el repositorio | P0 | — | — | 4 | — | 🟡 parcial |
 | **RNF-004** | Imágenes sin vulnerabilidades corregibles | P0 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-005** | Cobertura de pruebas ≥ 70 % | P0 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-006** | Procedencia verificable | P0 | — | — | — | — | 🔴 sin cubrir |
@@ -42,7 +42,7 @@ declaración de buenas intenciones.
 | **RNF-011** | Los specs son la fuente de verdad | P0 | — | — | 3 | — | 🟡 parcial |
 | **RNF-012** | Logs sin datos sensibles | P0 | — | — | 2 | — | 🟡 parcial |
 
-**Resumen:** 31 requisitos · 1 completos · 17 parciales · 13 sin cubrir.
+**Resumen:** 31 requisitos · 2 completos · 16 parciales · 13 sin cubrir.
 
 Leyenda de estado: *completo* = verificado por al menos dos de las tres
 columnas de prueba · *parcial* = una sola · *sin cubrir* = ninguna.
