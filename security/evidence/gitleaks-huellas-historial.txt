@@ -14,3 +14,9 @@
 053e15fb27b1aaf974c7c818108eee64628973e9:deploy/docker-compose.yml:url-de-conexion-con-credenciales:133
 053e15fb27b1aaf974c7c818108eee64628973e9:deploy/docker-compose.yml:url-de-conexion-con-credenciales:134
 053e15fb27b1aaf974c7c818108eee64628973e9:deploy/docker-compose.yml:url-de-conexion-con-credenciales:82
+
+# ── FUERA de la línea base (2026-09-21): falsos positivos nuestros, ya en el historial publicado ──
+# NO están aprobadas para .gitleaksignore: T31 solo tiene autorizadas las 12 anteriores. Requieren la decisión Q20.
+# Ya no aparecen en el árbol de trabajo (config.go renombrado y nota reformulada), pero el historial las conserva.
+4e8c6532a50c7766dd03d39b532af6d9e79648fc:backend/internal/config/config.go:contrasena-en-variable-de-entorno:106
+f987772528ced85c71b6ee55c4453d0f5370d513:odd/tasks/idp-semana-2.md:url-de-conexion-con-credenciales:1000
