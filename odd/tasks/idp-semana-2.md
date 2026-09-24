@@ -507,7 +507,7 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
 - Commit: 5da3fcf
 
 ### T9 — Registro de auditoría: escritor y migración 000002
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RF-011, AM-010, AM-011, invariante 5 · Remedia: — · Depende de: T5, T6
+- [x] Estado · Ejecutor: `Codex` · Cubre: RF-011, AM-010, AM-011, invariante 5 · Remedia: — · Depende de: T5, T6
 - Servicio `audit.Record` (actor, acción, recurso, IP de `ClientIPFrom`, user-agent, metadata jsonb; sin
   contraseñas, tokens ni códigos). Acciones nombradas como en RF-011 y los `.feature`
   (`login_succeeded`, `login_failed`, `refresh_reuse_detected`, `user_disabled`, ...).
@@ -521,7 +521,7 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
   el trigger sigue bloqueando a un superusuario; la inserción funciona; el `down` revierte.
 - Archivos: `db/migrations/000002_*`, `backend/internal/audit/**`, `db/queries/audit.sql`, `backend/internal/store/**`.
 - Verificación: `make gen && git diff --exit-code`; `make test-integration`; `make test-go`.
-- Commit:
+- Commit: `bacd932`
 
 ### T10 — Registro de cuenta (RF-001)
 - [ ] Estado · Ejecutor: `Codex` · Cubre: RF-001, RF-012, AM-004, ADR 0006 · Remedia: — · Depende de: T7, T9
@@ -904,10 +904,10 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 |---|---|---|
 | 0 — Línea base y evidencia "antes" | T0.1 a T0.5 (5) | 5 (T0.1 a T0.5) |
 | 1 — Contrato ejecutable | T1a, T1 a T3 (4) | 4 (T1a, T1, T2, T3) |
-| 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 6 (T4, T5, T6, T7, T8, T14a) |
+| 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 7 (T4, T5, T6, T7, T8, T9, T14a) |
 | 3 — Remediación | T23 a T32 (10) | 0 |
 | 4 — Cierre | T33 a T38 (6) | 0 |
-| **Total** | **45** | **15** |
+| **Total** | **45** | **16** |
 
 Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, cookie) y `T14a`
 (enmienda ADR 0005, sin ventana de gracia). Los ids existentes no cambian.
@@ -917,6 +917,7 @@ Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, coo
 (Codex añade aquí, por tarea, `<comando>: <resultado observado>` cuando cierre cada una;
 las líneas de RED/GREEN van en el handoff.)
 
+- T9 · RED (Codex): `undefined: Record`, `Event`, `LoginFailed` (`FAIL .../internal/audit [build failed]`). GREEN unitario (Codex): `ok .../internal/audit 1.622s`. `gofmt -l` marcó `audit.go` y `audit_integration_test.go` (alineación de constantes y línea en blanco final); Claude corrigió con `gofmt -w`, sin cambios de comportamiento. Integración contra PostgreSQL 14 local (Claude, Codex no llega a la BD): primera corrida de `TestRF011_IdentityAppNoTieneUpdateNiDeleteSobreAuditLog` FAIL (el superusuario pasaba sin error porque los triggers seguían deshabilitados hasta el `t.Cleanup` final); Claude reordenó la prueba para reactivarlos antes de la comprobación del superusuario y quedó en verde. `make test-integration` completo: PASS. `down 1` con `migrate/migrate` confirma que `identity_app` desaparece de `pg_roles`; `up` lo reaplica sin diff. `python3 scripts/traceability.py --check`: matriz al día (RF-011 pasa de 1 a 3 pruebas). `make test-go` (`-race -short`): PASS, cobertura total 30.0%. `golangci-lint` sigue sin instalar (solo avisa, como documenta el Makefile).
 - T1a · `python3 -m openapi_spec_validator specs/03-api/openapi.yaml`: OK; `python3 scripts/traceability.py --check`: matriz al día.
 - T0.5 · `ls security/findings/VULN-*.md | wc -l` = 26 (una por id, VULN-001 a VULN-026); AM-NNN citadas comprobadas contra `specs/05-security/threat-model.md`; severidades comprobadas contra `gosec.json` y `trivy-config.json`; sin patrones de secreto; `git diff --stat` vacío para compose, Dockerfiles, `backend/` y `frontend/`.
 - T14a · `git diff --stat`: solo `specs/adr/0005-refresh-tokens-rotativos-con-familia.md` (+17 −6); la ventana de gracia solo aparece como decisión descartada y alternativa rechazada; `python3 scripts/traceability.py --check`: matriz al día.
@@ -1052,4 +1053,10 @@ Formato por tarea (3 a 5 líneas):
 - Comandos y resultado observado: RED (Codex): `undefined: ClientIP` y `undefined: ClientIPFrom`. GREEN: `go build`, `go vet` (con y sin `integration`), `go test -race -short ./...` y la integración completa contra PostgreSQL local, todo en verde (Claude las repitió). `git diff backend/go.mod`: solo la frase del comentario, la directiva y chi. **`govulncheck` (Claude, con Go 1.27.1): GO-2026-5775 y GO-2026-5777 ya no aparecen y los 26 avisos de la biblioteca estándar tampoco**; quedan 7: `jwt/v4` x2 (T23), `pgx` x3 y `x/text` (T24) y `amqp091-go` GO-2026-6372 (sin ficha). Aparecen dos de `pgx` que el "antes" no listaba (GO-2026-5004, corregido en v5.9.2, y GO-2024-2567, en v5.5.2): T24 debe subir `pgx` a la última estable.
 - Ajustes de Claude: (1) el CI y la configuración del linter se migraron a Go 1.25 y golangci-lint v2 (commit `fd24b09`); (2) `make lint` escondía los fallos con un `|| echo` y ahora solo avisa si falta el linter; (3) limpieza de los avisos propios del linter v2 sin `//nolint` (commit `a75cc36`): aserción de tipo comprobada, `%w` en ambos errores, conversiones de enteros acotadas (G115) y cuatro comentarios reformulados. Con el linter v2 sobre el árbol solo quedan 3 avisos, todos de la línea base sembrada (`legacy_auth.go`, hasta T23): G101 x2 y `nolintlint`.
 - Dudas abiertas: si todos los saltos de `X-Forwarded-For` son de confianza se devuelve la IP del par (seguro, pero todos los clientes detrás de ese proxy compartirían IP y límite); `Routes()` lee `trustedProxies` al construir, así que `SetTrustedProxies` debe llamarse antes (T21). Observaciones del hook sin ficha: `Readiness` devuelve `err.Error()` de cada dependencia en el cuerpo de `/readyz`, lo que puede exponer host, usuario o base de datos; y `tipo[:9]` en `events_test.go` puede entrar en pánico con tipos cortos. Para T35: `VULN-020` necesita su captura "después" tras un CI verde.
+
+### T9 · 2026-09-24 · bacd932
+- Qué cambió: `audit.Record` (`backend/internal/audit/audit.go`) escribe eventos con IP de `api.ClientIPFrom(ctx)`, user-agent y metadata jsonb, rechazando cualquier metadata cuya clave contenga `password`, `token`, `code` o `secret` (RNF-012). Migración `000002_identity_app_audit_permissions`: crea el rol `identity_app` (idempotente, sin contraseña) con el mínimo privilegio por tabla y `SELECT, INSERT` en `audit_log`, y `REVOKE UPDATE, DELETE` sobre esa tabla como defensa en profundidad encima del trigger de append-only de 000001 (no se toca el trigger).
+- Comandos y resultado observado: ver la entrada de T9 en "Evidencia de verificación" arriba (RED/GREEN, el bug de orden en la prueba de integración y su corrección, `test-integration`, `down`/`up` y trazabilidad).
+- Ajuste de Claude: reordenó `audit_integration_test.go` para reactivar los triggers `audit_log_no_update`/`audit_log_no_delete` inmediatamente después de la comprobación de permisos de `identity_app`, en vez de dejarlo solo en `t.Cleanup` (que corre al final del test, después de la aserción que necesita el trigger ya activo). Aplicó `gofmt -w` a los dos archivos que Codex dejó sin formatear.
+- Dudas abiertas: ninguna nueva. Codex no pudo commitear (`Unable to create '.git/index.lock': Operation not permitted`, sin proceso git en curso al revisar); Claude verificó el árbol y creó ambos commits, igual que en T0.4, T1, T2 y T4.
 
