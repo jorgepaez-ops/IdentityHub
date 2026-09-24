@@ -20,7 +20,7 @@ declaración de buenas intenciones.
 | **RF-008** | Perfil propio | P0 | `getCurrentUser`, `updateCurrentUser` | — | — | — | 🔴 sin cubrir |
 | **RF-009** | Control de acceso por roles | P0 | — | 2 | — | — | 🟡 parcial |
 | **RF-010** | Administración de usuarios | P0 | `listUsers`, `getUser`, `updateUser` | 2 | — | — | 🟡 parcial |
-| **RF-011** | Registro de auditoría | P0 | `listAuditLog` | 1 | 1 | — | ✅ completo |
+| **RF-011** | Registro de auditoría | P0 | `listAuditLog` | 1 | 3 | — | ✅ completo |
 | **RF-012** | Notificaciones asíncronas | P0 | — | — | 3 | — | 🟡 parcial |
 | **RF-013** | Alta de segundo factor (TOTP) | P1 | `enrollMfa`, `activateMfa`, `disableMfa` | 1 | — | — | 🟡 parcial |
 | **RF-014** | Inicio de sesión con segundo factor | P1 | `verifyMfa` | 1 | — | — | 🟡 parcial |
