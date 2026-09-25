@@ -325,6 +325,38 @@ func (q *Queries) RotateRefreshToken(ctx context.Context, arg RotateRefreshToken
 	return i, err
 }
 
+const updateDisplayName = `-- name: UpdateDisplayName :one
+UPDATE users
+SET display_name = $2
+WHERE id = $1
+RETURNING id, email, password_hash, display_name, status, mfa_enabled, mfa_secret_enc, failed_login_count, locked_until, last_login_at, created_at, updated_at
+`
+
+type UpdateDisplayNameParams struct {
+	ID          uuid.UUID
+	DisplayName string
+}
+
+func (q *Queries) UpdateDisplayName(ctx context.Context, arg UpdateDisplayNameParams) (User, error) {
+	row := q.db.QueryRow(ctx, updateDisplayName, arg.ID, arg.DisplayName)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.PasswordHash,
+		&i.DisplayName,
+		&i.Status,
+		&i.MfaEnabled,
+		&i.MfaSecretEnc,
+		&i.FailedLoginCount,
+		&i.LockedUntil,
+		&i.LastLoginAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const updateLoginSuccess = `-- name: UpdateLoginSuccess :exec
 UPDATE users
 SET password_hash = $2,

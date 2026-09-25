@@ -39,6 +39,9 @@ type User struct {
 	PasswordHash string
 	DisplayName  string
 	Status       string
+	MFAEnabled   bool
+	LastLoginAt  *time.Time
+	CreatedAt    time.Time
 }
 
 // InsertAuditEventParams contains the fields accepted when appending an audit
@@ -141,6 +144,25 @@ func (s *Store) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 	return userFromGenerated(user), nil
 }
 
+// ListRolesForUser retrieves the current role assignments for a user. Callers
+// must use this value for authorization instead of roles embedded in a token.
+func (s *Store) ListRolesForUser(ctx context.Context, id uuid.UUID) ([]string, error) {
+	roles, err := s.queries.ListRolesForUser(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("list roles for user: %w", err)
+	}
+	return roles, nil
+}
+
+// UpdateDisplayName changes the only profile field a user may modify.
+func (s *Store) UpdateDisplayName(ctx context.Context, id uuid.UUID, displayName string) (User, error) {
+	user, err := s.queries.UpdateDisplayName(ctx, generated.UpdateDisplayNameParams{ID: id, DisplayName: displayName})
+	if err != nil {
+		return User{}, fmt.Errorf("update display name: %w", err)
+	}
+	return userFromGenerated(user), nil
+}
+
 // InsertAuditEvent appends a fully parameterized audit event through the
 // generated query.
 func (s *Store) InsertAuditEvent(ctx context.Context, params InsertAuditEventParams) (AuditEvent, error) {
@@ -166,6 +188,9 @@ func userFromGenerated(user generated.User) User {
 		PasswordHash: user.PasswordHash,
 		DisplayName:  user.DisplayName,
 		Status:       string(user.Status),
+		MFAEnabled:   user.MfaEnabled,
+		LastLoginAt:  optionalTime(user.LastLoginAt),
+		CreatedAt:    user.CreatedAt.Time,
 	}
 }
 
@@ -209,6 +234,14 @@ func optionalText(value pgtype.Text) *string {
 		return nil
 	}
 	result := value.String
+	return &result
+}
+
+func optionalTime(value pgtype.Timestamptz) *time.Time {
+	if !value.Valid {
+		return nil
+	}
+	result := value.Time
 	return &result
 }
 
