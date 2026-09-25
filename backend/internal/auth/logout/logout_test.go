@@ -3,6 +3,7 @@ package logout
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"net/netip"
 	"testing"
@@ -39,10 +40,11 @@ func TestRF007_LogoutRevocaElTokenYRegistraAuditoria(t *testing.T) {
 	userID := uuid.New()
 	ip := netip.MustParseAddr("203.0.113.10")
 	repo := &repositoryStub{userID: userID}
-	if err := New(repo).Logout(context.Background(), Input{RefreshToken: "current-refresh", IP: &ip}); err != nil {
+	token := base64.RawURLEncoding.EncodeToString([]byte("current-refresh-raw-bytes"))
+	if err := New(repo).Logout(context.Background(), Input{RefreshToken: token, IP: &ip}); err != nil {
 		t.Fatalf("Logout: %v", err)
 	}
-	wantHash := sha256.Sum256([]byte("current-refresh"))
+	wantHash := sha256.Sum256([]byte("current-refresh-raw-bytes"))
 	if len(repo.revoked) != 1 || string(repo.revoked[0]) != string(wantHash[:]) {
 		t.Fatalf("revoked=%v", repo.revoked)
 	}

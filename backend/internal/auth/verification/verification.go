@@ -4,6 +4,7 @@ package verification
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/netip"
@@ -49,7 +50,14 @@ func (s *Service) Verify(ctx context.Context, input Input) error {
 	if strings.TrimSpace(input.Token) == "" {
 		return ErrInvalidInput
 	}
-	tokenHash := sha256.Sum256([]byte(input.Token))
+	// registration.Service emits the raw token bytes base64url-encoded (see
+	// registration.go); hash the same raw bytes here, never the encoded
+	// string, or a real emailed link can never match what was stored.
+	raw, err := base64.RawURLEncoding.DecodeString(input.Token)
+	if err != nil {
+		return ErrTokenInvalid
+	}
+	tokenHash := sha256.Sum256(raw)
 	return s.repository.WithinEmailVerificationTransaction(ctx, func(writer store.EmailVerificationWriter) error {
 		user, err := writer.ConsumeEmailVerificationToken(ctx, tokenHash[:])
 		if err != nil {

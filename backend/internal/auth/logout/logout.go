@@ -4,6 +4,7 @@ package logout
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/netip"
@@ -51,7 +52,14 @@ func (s *Service) Logout(ctx context.Context, input Input) error {
 	if s.repository == nil || input.RefreshToken == "" {
 		return ErrInvalidRefreshToken
 	}
-	tokenHash := sha256.Sum256([]byte(input.RefreshToken))
+	// The cookie carries the raw token base64url-encoded (see login.Service
+	// and refresh.Service); hash the decoded bytes, never the encoded
+	// string, or a real cookie can never match what was stored.
+	raw, err := base64.RawURLEncoding.DecodeString(input.RefreshToken)
+	if err != nil {
+		return ErrInvalidRefreshToken
+	}
+	tokenHash := sha256.Sum256(raw)
 	return s.repository.WithinLogoutTransaction(ctx, func(writer Writer) error {
 		userID, err := writer.RevokeRefreshToken(ctx, tokenHash[:])
 		if err != nil {

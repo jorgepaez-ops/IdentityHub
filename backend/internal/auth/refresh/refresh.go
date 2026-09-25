@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/netip"
@@ -131,7 +132,11 @@ func (s *Service) Refresh(ctx context.Context, input Input) (Result, error) {
 	var event *SecurityEvent
 	var refreshErr error
 	err := s.repository.WithinRefreshTransaction(ctx, func(writer Writer) error {
-		rotation, err := writer.RotateRefreshToken(ctx, hashRefreshToken(input.RefreshToken), RefreshToken{
+		presentedHash, err := hashRefreshToken(input.RefreshToken)
+		if err != nil {
+			return ErrInvalidRefreshToken
+		}
+		rotation, err := writer.RotateRefreshToken(ctx, presentedHash, RefreshToken{
 			TokenHash: nextHash[:], IP: input.IP, UserAgent: input.UserAgent, ExpiresAt: s.now().Add(s.refreshTTL),
 		})
 		if err != nil {
@@ -150,7 +155,7 @@ func (s *Service) Refresh(ctx context.Context, input Input) (Result, error) {
 			if err != nil {
 				return fmt.Errorf("issue access token: %w", err)
 			}
-			result = Result{AccessToken: accessToken, RefreshToken: string(raw), TokenType: "Bearer", ExpiresIn: accessTokenExpiresIn}
+			result = Result{AccessToken: accessToken, RefreshToken: base64.RawURLEncoding.EncodeToString(raw), TokenType: "Bearer", ExpiresIn: accessTokenExpiresIn}
 			return nil
 		case RotationReused:
 			revokedCount, err := writer.RevokeRefreshFamily(ctx, rotation.FamilyID)
@@ -186,7 +191,14 @@ func (s *Service) Refresh(ctx context.Context, input Input) (Result, error) {
 	return result, nil
 }
 
-func hashRefreshToken(raw string) []byte {
-	hash := sha256.Sum256([]byte(raw))
-	return hash[:]
+// hashRefreshToken decodes the base64url token carried in the cookie back to
+// its raw bytes before hashing, matching how login.Service and this
+// service's own rotation hash the raw bytes on the issuing side.
+func hashRefreshToken(raw string) ([]byte, error) {
+	decoded, err := base64.RawURLEncoding.DecodeString(raw)
+	if err != nil {
+		return nil, err
+	}
+	hash := sha256.Sum256(decoded)
+	return hash[:], nil
 }

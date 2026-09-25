@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"net/netip"
 	"testing"
@@ -28,7 +29,7 @@ func (r *repositoryStub) RotateRefreshToken(_ context.Context, hash []byte, next
 	if string(hash) == "error" {
 		return Rotation{}, errors.New("database unavailable")
 	}
-	if bytes.Equal(hash, hashRefreshToken("missing-token")) {
+	if missingHash, err := hashRefreshToken("missing-token"); err == nil && bytes.Equal(hash, missingHash) {
 		return Rotation{}, pgx.ErrNoRows
 	}
 	r.rotated = append(r.rotated, next)
@@ -61,11 +62,12 @@ func TestRF005_RenovarEmiteParDistintoEInvalidaElAnterior(t *testing.T) {
 	userID, familyID := uuid.New(), uuid.New()
 	repo := &repositoryStub{rotation: Rotation{Status: RotationSucceeded, UserID: userID, FamilyID: familyID, Roles: []string{"user"}}}
 	service := New(repo, signer, time.Hour)
-	result, err := service.Refresh(context.Background(), Input{RefreshToken: "old-token"})
+	oldToken := base64.RawURLEncoding.EncodeToString([]byte("old-refresh-token"))
+	result, err := service.Refresh(context.Background(), Input{RefreshToken: oldToken})
 	if err != nil {
 		t.Fatalf("Refresh: %v", err)
 	}
-	if result.AccessToken == "" || result.RefreshToken == "" || result.RefreshToken == "old-token" {
+	if result.AccessToken == "" || result.RefreshToken == "" || result.RefreshToken == oldToken {
 		t.Fatalf("result = %+v", result)
 	}
 	if len(repo.rotated) != 1 || len(repo.rotated[0].TokenHash) != sha256.Size {
@@ -126,9 +128,20 @@ func TestRF005_TokenInexistenteDevuelveInvalido(t *testing.T) {
 }
 
 func TestRF005_HashRefreshToken(t *testing.T) {
-	got := hashRefreshToken("opaque")
-	want := sha256.Sum256([]byte("opaque"))
+	raw := []byte("opaque-raw-bytes")
+	encoded := base64.RawURLEncoding.EncodeToString(raw)
+	got, err := hashRefreshToken(encoded)
+	if err != nil {
+		t.Fatalf("hashRefreshToken() error = %v", err)
+	}
+	want := sha256.Sum256(raw)
 	if string(got) != string(want[:]) {
-		t.Fatal("refresh token must be SHA-256 hashed")
+		t.Fatal("refresh token must be SHA-256 hashed from the decoded raw bytes, not the encoded string")
+	}
+}
+
+func TestRF005_HashRefreshTokenRechazaBase64Invalido(t *testing.T) {
+	if _, err := hashRefreshToken("not base64!!"); err == nil {
+		t.Fatal("hashRefreshToken() accepted a malformed token")
 	}
 }

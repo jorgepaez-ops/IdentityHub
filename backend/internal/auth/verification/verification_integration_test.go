@@ -4,7 +4,9 @@ package verification
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"testing"
 	"time"
@@ -31,8 +33,16 @@ func TestRF002_VerificarConsumeTokenYActivaCuenta(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateUser: %v", err)
 	}
-	rawToken := "one-time-email-token"
-	tokenHash := sha256.Sum256([]byte(rawToken))
+	// Mirror registration.Service exactly: hash the raw bytes for storage,
+	// base64url-encode the same raw bytes for what actually goes in the
+	// email link. Hashing the encoded string here (instead of decoding it
+	// first) is the real bug this test now guards against.
+	rawToken := make([]byte, 32)
+	if _, err := rand.Read(rawToken); err != nil {
+		t.Fatalf("generate raw token: %v", err)
+	}
+	tokenHash := sha256.Sum256(rawToken)
+	emailedToken := base64.RawURLEncoding.EncodeToString(rawToken)
 	err = repository.WithinRegistrationTransaction(ctx, func(writer store.RegistrationWriter) error {
 		return writer.CreateVerificationToken(ctx, store.CreateVerificationTokenParams{UserID: user.ID, TokenHash: tokenHash[:], ExpiresAt: time.Now().Add(time.Hour)})
 	})
@@ -41,7 +51,7 @@ func TestRF002_VerificarConsumeTokenYActivaCuenta(t *testing.T) {
 	}
 
 	service := New(repository, integrationPublisher{})
-	if err := service.Verify(ctx, Input{Token: rawToken}); err != nil {
+	if err := service.Verify(ctx, Input{Token: emailedToken}); err != nil {
 		t.Fatalf("Verify: %v", err)
 	}
 	active, err := repository.GetUserByID(ctx, user.ID)
@@ -51,7 +61,7 @@ func TestRF002_VerificarConsumeTokenYActivaCuenta(t *testing.T) {
 	if active.Status != "active" {
 		t.Fatalf("status = %q, want active", active.Status)
 	}
-	if err := service.Verify(ctx, Input{Token: rawToken}); !errors.Is(err, ErrTokenInvalid) {
+	if err := service.Verify(ctx, Input{Token: emailedToken}); !errors.Is(err, ErrTokenInvalid) {
 		t.Fatalf("second Verify() error = %v, want ErrTokenInvalid", err)
 	}
 }

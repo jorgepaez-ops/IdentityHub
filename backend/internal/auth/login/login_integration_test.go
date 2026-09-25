@@ -5,6 +5,7 @@ package login_test
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"testing"
 	"time"
@@ -53,7 +54,11 @@ func TestRF003_LoginPersisteRefreshTokenYAuditoriaEnPostgres(t *testing.T) {
 		t.Fatalf("result = %+v", result)
 	}
 
-	wantHash := sha256.Sum256([]byte(result.RefreshToken))
+	rawRefreshToken, err := base64.RawURLEncoding.DecodeString(result.RefreshToken)
+	if err != nil {
+		t.Fatalf("decode refresh token: %v", err)
+	}
+	wantHash := sha256.Sum256(rawRefreshToken)
 	var storedHash []byte
 	if err := pool.QueryRow(ctx, `SELECT token_hash FROM refresh_tokens WHERE user_id = $1`, user.ID).Scan(&storedHash); err != nil {
 		t.Fatalf("read refresh token: %v", err)

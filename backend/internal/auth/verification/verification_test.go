@@ -2,6 +2,7 @@ package verification
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"strings"
@@ -91,14 +92,15 @@ func TestRF002_TokenExpiradoDevuelve410(t *testing.T) {
 func TestRNF012_VerificacionNoIncluyeTokenEnElEvento(t *testing.T) {
 	repo := &fakeRepository{writer: &fakeWriter{user: store.User{ID: uuid.New(), Email: "ada@example.com", DisplayName: "Ada", Status: "active"}}}
 	publisher := &fakePublisher{}
-	if err := New(repo, publisher).Verify(context.Background(), Input{Token: "secret-verification-token"}); err != nil {
+	token := base64.RawURLEncoding.EncodeToString([]byte("secret-verification-token"))
+	if err := New(repo, publisher).Verify(context.Background(), Input{Token: token}); err != nil {
 		t.Fatalf("Verify() error = %v", err)
 	}
 	encoded, err := json.Marshal(publisher.event)
 	if err != nil {
 		t.Fatalf("marshal event: %v", err)
 	}
-	if strings.Contains(string(encoded), "secret-verification-token") {
+	if strings.Contains(string(encoded), token) {
 		t.Fatalf("email verified event exposes token: %s", encoded)
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/netip"
@@ -257,7 +258,7 @@ func (s *Service) Login(ctx context.Context, input Input) (Result, error) {
 		if err := writer.InsertAuditEvent(ctx, AuditEvent{ActorUserID: &user.ID, Action: "login_succeeded", IP: input.IP, UserAgent: input.UserAgent}); err != nil {
 			return fmt.Errorf("record successful login audit: %w", err)
 		}
-		result = Result{AccessToken: accessToken, RefreshToken: string(refreshRaw), TokenType: "Bearer", ExpiresIn: accessTokenExpiresIn}
+		result = Result{AccessToken: accessToken, RefreshToken: base64.RawURLEncoding.EncodeToString(refreshRaw), TokenType: "Bearer", ExpiresIn: accessTokenExpiresIn}
 		return nil
 	})
 	if err != nil {
