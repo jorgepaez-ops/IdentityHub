@@ -678,7 +678,7 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
 - Commit: 1ddbdd6
 
 ### T20 — Bloqueo por fuerza bruta (RF-017)
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RF-017, AM-001, VULN-020 (chi, frontera T2), estado `locked` · Remedia: — · Depende de: T13, T6, T12
+- [x] Estado · Ejecutor: `Codex` · Cubre: RF-017, AM-001, VULN-020 (chi, frontera T2), estado `locked` · Remedia: — · Depende de: T13, T6, T12
 - **Decisión Q1: bloqueo por CUENTA (RF-017) y además un límite por IP con el mismo mecanismo.**
   - Por cuenta: 5 intentos fallidos en 15 minutos bloquean la cuenta 15 minutos (`users.status`/`locked_until`
     según el modelo de dominio); 423 `Locked` problem+json; la contraseña correcta también falla mientras
@@ -705,7 +705,7 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
   distintas de `X-Forwarded-For` se cuentan por separado).
 - Archivos: `backend/internal/auth/**`, `backend/internal/api/login.go` (+ pruebas), `db/queries/*.sql`, posible migración `000003_*`/`000004_*`.
 - Verificación: `make test-go`; `make test-integration`; `make lint`.
-- Commit:
+- Commit: 37c17a5, bd5a702
 
 ### T21 — Composición, configuración y humo con el stack
 - [ ] Estado · Ejecutor: `Codex` · Cubre: RNF-001, RNF-003, RF-001 a RF-011 · Remedia: — · Depende de: T10 a T20
@@ -906,10 +906,10 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 |---|---|---|
 | 0 — Línea base y evidencia "antes" | T0.1 a T0.5 (5) | 5 (T0.1 a T0.5) |
 | 1 — Contrato ejecutable | T1a, T1 a T3 (4) | 4 (T1a, T1, T2, T3) |
-| 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 17 (T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T14a, T15, T16, T17, T18, T19) |
+| 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 18 (T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T14a, T15, T16, T17, T18, T19, T20) |
 | 3 — Remediación | T23 a T32 (10) | 0 |
 | 4 — Cierre | T33 a T38 (6) | 0 |
-| **Total** | **45** | **26** |
+| **Total** | **45** | **27** |
 
 Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, cookie) y `T14a`
 (enmienda ADR 0005, sin ventana de gracia). Los ids existentes no cambian.
@@ -1124,6 +1124,13 @@ Formato por tarea (3 a 5 líneas):
 - Comandos y resultado observado: RED (Codex): servicio inexistente. GREEN: `go test -race ./internal/api ./internal/auth/admin ./internal/store` y la suite completa `go test -race ./...`, ambos en verde (Claude los repitió con `-count=1` tras su propio cambio, ver más abajo). `make gen` sin deriva de `gen.go`/`schema.d.ts`; `specs/07-traceability.md` pasa RF-010 de "parcial" a "completo". `make lint`: solo los 3 avisos preexistentes de `legacy_auth.go` (línea base, hasta T23). Integración no ejecutada (`TEST_DATABASE_URL` no definido en este entorno).
 - Ajuste de Claude: encontró un bug real de concurrencia que ninguna prueba (unitaria con stub) podía ver: `LockActiveAdminUsers` bloqueaba varias filas con `FOR UPDATE OF u` **sin `ORDER BY`**, lo que en PostgreSQL puede producir deadlocks entre transacciones concurrentes que no adquieren los bloqueos en el mismo orden. Se añadió `ORDER BY u.id` a la consulta (`db/queries/users.sql`), se regeneró con `sqlc generate` y se repitió la suite completa: sigue en verde. Con el orden fijo, cualquier `updateUser` concurrente contiende primero por el mismo conjunto (admins activos, orden por id) antes de tocar su fila objetivo, así que queda serializado sin interbloqueo.
 - Dudas abiertas: ninguna bloqueante. `cmd/api/main.go` sigue sin componer ningún servicio (ni los de T16/T17 tampoco): `SetAdminUserService` existe pero nada lo llama todavía, así que estos endpoints devuelven 503 hasta T21 ("Composición, configuración y humo con el stack") — mismo patrón ya usado para T13 a T17, no es una regresión de T18. Codex no pudo commitear (mismo bloqueo de sandbox); Claude creó el commit tras revisar, verificar y aplicar la corrección de `ORDER BY`.
+
+### T20 · 2026-09-25 · 37c17a5, bd5a702
+- Qué cambió: dos límites independientes de ventana deslizante sobre `login_failed` (Decisión Q1). Por cuenta: `LoginAccountMaxFailures` (5) fallos en `LoginFailureWindow` (15 min) ponen `users.status = 'locked'` con `locked_until` real; el propio `Login` lo desbloquea de forma perezosa en el siguiente intento si `locked_until` ya venció (no hay cron). Por IP: `LoginIPMaxFailures` (20, deliberadamente alto para no bloquear una NAT entera) sobre `audit_log` filtrado por `ip`, contando cualquier cuenta incluidas las inexistentes; nuevo índice `audit_log (ip, created_at)` en la migración `000003`. Ambos chequeos corren **antes** de verificar la contraseña, así que una contraseña correcta también falla con 423 mientras dura cualquiera de los dos bloqueos, y la respuesta (`login-locked`, RFC 7807) es idéntica en ambos casos para no revelar cuál se activó. La IP viene siempre de `requestClientIP(r)` (T6): un `X-Forwarded-For` falsificado desde un peer no confiable no cambia nada.
+- Comandos y resultado observado: RED (Codex): paquete de lockout inexistente. GREEN (Codex): pruebas del paquete `login` y suite completa. Claude repitió todo con PostgreSQL real (`docker compose up -d db` + migración `000003` aplicada): `go test -race -tags=integration -count=1 ./...` completo en verde dos veces (antes y después del ajuste de abajo), `make lint` solo con los 3 hallazgos preexistentes de `legacy_auth.go`, `make gen` sin deriva real (`specs/07-traceability.md` es el único archivo que cambia) y `python3 scripts/traceability.py --check` al día.
+- Ajuste de Claude (primer commit): (1) **bug real de generación**: Codex dejó `db/queries/users.sql`/`audit.sql` con las consultas nuevas (`LockLoginUser`, `UnlockLoginUser`, `CountLoginFailuresByAccount`, `CountLoginFailuresByIP`, y `GetLoginUserByEmail` con `locked_until` y `FOR UPDATE`), pero **nunca corrió `sqlc generate` de verdad**: el código generado seguía reflejando las consultas viejas (`GetLoginUserByEmailRow` sin `LockedUntil`). En vez de regenerar, `backend/internal/store/login.go` traía SQL crudo escrito a mano dentro de `loginWriter`, sorteando sqlc por completo — el mismo antipatrón ya corregido una vez en T5. Claude corrió `sqlc generate` (sí produjo diff real, confirmando el problema), reescribió `loginWriter` para usar `w.queries.*` generado, y repitió toda la suite. (2) **requisito faltante**: Q1 pide auditoría `account_locked` y evento `security.account_locked` además del bloqueo; Codex solo hizo el `UPDATE` de `status`/`locked_until`, sin auditoría ni evento — ningún `TestRF017_*` pedido lo hubiera detectado, porque ninguno verifica ese efecto secundario. Claude agregó `login.SecurityEvent`/`EventPublisher`/`WithEventPublisher` (mismo patrón que `refresh.Service`, commit aparte `bd5a702`), la auditoría dentro de la transacción y una prueba nueva (`TestRF017_CuentaBloqueadaRegistraAuditoriaYPublicaEvento`). Un fallo al publicar el evento se propaga con `errors.Join` (no se traga en silencio) porque el bloqueo y su auditoría ya quedaron comprometidos en la transacción, igual que hace T14 con el reuso de refresh.
+- Dudas abiertas: ninguna bloqueante. `cmd/api/main.go` sigue sin componer nada (T21); `WithEventPublisher` queda sin llamar hasta entonces, igual que en `refresh.Service` desde T14. Codex no pudo commitear (mismo bloqueo de sandbox); Claude creó ambos commits.
+
 
 ### T19 · 2026-09-25 · 1ddbdd6
 - Qué cambió: `listAuditLog` compuesto directamente en `*Server` (`backend/internal/api/audit_log.go`, nuevo), reemplazando el `s.notImplemented(w)` que T17 ya envolvía con `RequireAuth(s.tokens)(RequireRole(s.currentUsers, "admin")(...))`. Paquete nuevo `backend/internal/auth/auditlog` (separado de `internal/audit`, el escritor append-only, para evitar un ciclo de imports con `internal/api`): filtros `action`/`actorId`/`since` como parámetros sqlc ligados (`db/queries/audit.sql`, consulta nueva `ListAuditLog`), paginación por cursor con el `id` del evento en orden descendente (coincide con los índices `(created_at DESC)` ya existentes desde 000001). Adaptador `backend/internal/store/audit_log.go` reutiliza los mismos helpers (`optionalUUID`, `optionalText`, `nullableUUID`) que el adaptador de T18.
