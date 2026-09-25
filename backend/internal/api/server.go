@@ -6,6 +6,7 @@
 package api
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/netip"
@@ -109,11 +110,13 @@ func (s *Server) Routes() http.Handler {
 // RF-005/RF-007, not surface as a generic bad request.
 func (s *Server) handleBindingError(w http.ResponseWriter, r *http.Request, err error) {
 	var paramName string
-	switch e := err.(type) {
-	case *RequiredParamError:
-		paramName = e.ParamName
-	case *InvalidParamFormatError:
-		paramName = e.ParamName
+	var required *RequiredParamError
+	var invalidFormat *InvalidParamFormatError
+	switch {
+	case errors.As(err, &required):
+		paramName = required.ParamName
+	case errors.As(err, &invalidFormat):
+		paramName = invalidFormat.ParamName
 	}
 	if paramName == refreshCookieName {
 		clearRefreshCookie(w)

@@ -38,8 +38,14 @@ func refreshCookie(value string) *http.Cookie {
 }
 
 func clearRefreshCookie(w http.ResponseWriter) {
-	cookie := refreshCookie("")
-	cookie.MaxAge = -1
-	cookie.Expires = time.Unix(1, 0)
-	http.SetCookie(w, cookie)
+	http.SetCookie(w, &http.Cookie{
+		Name:     refreshCookieName,
+		Value:    "",
+		Path:     "/api/v1/auth",
+		Expires:  time.Unix(1, 0),
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
+	})
 }
