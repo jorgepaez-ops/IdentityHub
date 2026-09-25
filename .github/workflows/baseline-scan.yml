@@ -170,11 +170,13 @@ jobs:
       # ── Resumen ─────────────────────────────────────────────────────────
       - name: Resumen de hallazgos
         if: always()
+        env:
+          SCANNED_REF: ${{ inputs.ref || github.ref_name }}
         run: |
           {
             echo "## Inventario de la línea base vulnerable"
             echo
-            echo "Referencia escaneada: \`${{ inputs.ref || github.ref_name }}\`"
+            echo "Referencia escaneada: \`$SCANNED_REF\`"
             echo
             echo "| Herramienta | Hallazgos |"
             echo "|---|---|"
