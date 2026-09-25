@@ -539,13 +539,13 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
 - Commit: `43d2464`
 
 ### T11 — Verificación de correo (RF-002)
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RF-002, AM-016 · Remedia: — · Depende de: T10
+- [x] Estado · Ejecutor: `Codex` · Cubre: RF-002, AM-016 · Remedia: — · Depende de: T10
 - `verifyEmail` (`POST /api/v1/auth/verify-email`, cuerpo `{token}`): token de un solo uso, 24 h, hash SHA-256;
   204 y cuenta `active`; segundo uso o expirado -> 410; desconocido -> 410 o 400 (elegir y documentar sin filtrar información); evento `user.email_verified`; audit.
 - Criterios: `TestRF002_VerificarActivaLaCuenta`; `TestRF002_EnlaceDeUnSoloUso` (410); `TestRF002_TokenExpiradoDevuelve410`; el token nunca se registra en logs (RNF-012).
 - Archivos: `backend/internal/auth/**`, `backend/internal/api/verify_email.go` (+ pruebas), `db/queries/*.sql`.
 - Verificación: `make test-go`; `make test-integration`; `make lint`.
-- Commit:
+- Commit: `4ad6038`
 
 ### T12 — Worker: plantillas por tipo de evento
 - [ ] Estado · Ejecutor: `Codex` · Cubre: RF-012, RF-002, RF-006, RF-017, AM-016, RNF-012 · Remedia: — · Depende de: T11
@@ -904,10 +904,10 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 |---|---|---|
 | 0 — Línea base y evidencia "antes" | T0.1 a T0.5 (5) | 5 (T0.1 a T0.5) |
 | 1 — Contrato ejecutable | T1a, T1 a T3 (4) | 4 (T1a, T1, T2, T3) |
-| 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 8 (T4, T5, T6, T7, T8, T9, T10, T14a) |
+| 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 9 (T4, T5, T6, T7, T8, T9, T10, T11, T14a) |
 | 3 — Remediación | T23 a T32 (10) | 0 |
 | 4 — Cierre | T33 a T38 (6) | 0 |
-| **Total** | **45** | **17** |
+| **Total** | **45** | **18** |
 
 Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, cookie) y `T14a`
 (enmienda ADR 0005, sin ventana de gracia). Los ids existentes no cambian.
@@ -917,6 +917,7 @@ Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, coo
 (Codex añade aquí, por tarea, `<comando>: <resultado observado>` cuando cierre cada una;
 las líneas de RED/GREEN van en el handoff.)
 
+- T11 · GREEN (Codex): `TestRF002_*` de servicio, API e integración en verde; `make test-go` y `make test-integration`: PASS; `make lint`: solo los 3 hallazgos sembrados de `legacy_auth.go`. `gofmt -l`: limpio (Claude). `make gen` repetido por Claude: sin diff adicional. Integración contra PostgreSQL 14 local (Claude): suite completa PASS, incluida `TestRF002_VerificarConsumeTokenYActivaCuenta` (verifica dos veces el mismo token: activa y luego 410). Claude añadió y corrió una prueba manual no commiteada (`zz_manual_expiry_check_test.go`, borrada después) para confirmar contra PostgreSQL real que un token ya vencido (`expires_at` en el pasado) se rechaza con `ErrTokenInvalid` y la cuenta queda en `pending_verification`: PASS. `python3 scripts/traceability.py --check`: matriz al día (RF-002 pasa de "parcial" a "completo", 9 pruebas; RNF-012 sube a 3).
 - T10 · RED (Codex): faltaban los tipos de servicio/transacción de registro. GREEN (Codex): pruebas RF-001 de API y de servicio en verde; `make gen`: PASS; `make test-go` y `make test-integration`: PASS (revalidados por Claude); `make lint`: solo los 3 hallazgos sembrados de `legacy_auth.go`, sin hallazgos nuevos. `gofmt -l`: limpio. `make gen` repetido por Claude: sin diff adicional (determinista). Integración contra PostgreSQL 14 local (Claude): suite completa PASS, incluida `TestRF001_RegistroPersisteHashArgon2id`. Claude añadió y corrió una prueba manual no commiteada (`zz_manual_dup_check_test.go`, borrada después) para confirmar contra PostgreSQL real que un `UNIQUE` violado en `users.email` se traduce en `ErrEmailExists` a través de `errors.As`/`SQLState()` sobre el error envuelto: PASS. `python3 scripts/traceability.py --check`: matriz al día (RF-001 pasa de 6 a 15 pruebas). El hook GGA marcó como punto a revisar si AM-004 exige código idéntico a 201; se confirmó contra `specs/06-acceptance/registro-y-verificacion.feature:29-35` que el escenario Gherkin concreto exige 409 sin la palabra "existe" y ≤50 ms de diferencia (no un código idéntico), que es lo implementado.
 - T9 · RED (Codex): `undefined: Record`, `Event`, `LoginFailed` (`FAIL .../internal/audit [build failed]`). GREEN unitario (Codex): `ok .../internal/audit 1.622s`. `gofmt -l` marcó `audit.go` y `audit_integration_test.go` (alineación de constantes y línea en blanco final); Claude corrigió con `gofmt -w`, sin cambios de comportamiento. Integración contra PostgreSQL 14 local (Claude, Codex no llega a la BD): primera corrida de `TestRF011_IdentityAppNoTieneUpdateNiDeleteSobreAuditLog` FAIL (el superusuario pasaba sin error porque los triggers seguían deshabilitados hasta el `t.Cleanup` final); Claude reordenó la prueba para reactivarlos antes de la comprobación del superusuario y quedó en verde. `make test-integration` completo: PASS. `down 1` con `migrate/migrate` confirma que `identity_app` desaparece de `pg_roles`; `up` lo reaplica sin diff. `python3 scripts/traceability.py --check`: matriz al día (RF-011 pasa de 1 a 3 pruebas). `make test-go` (`-race -short`): PASS, cobertura total 30.0%. `golangci-lint` sigue sin instalar (solo avisa, como documenta el Makefile).
 - T1a · `python3 -m openapi_spec_validator specs/03-api/openapi.yaml`: OK; `python3 scripts/traceability.py --check`: matriz al día.
@@ -1066,4 +1067,10 @@ Formato por tarea (3 a 5 líneas):
 - Comandos y resultado observado: ver la entrada de T10 en "Evidencia de verificación" arriba.
 - Ajuste de Claude: ninguno al código; se limitó a verificar. Revisó los 8 archivos del diff línea por línea, confirmó que `writer.CreateUser` detecta la violación `UNIQUE` real de Postgres (código 23505) a través de `errors.As` sobre el error envuelto con `%w` — lo probó con una prueba manual temporal (no commiteada) que registró el mismo correo dos veces contra PostgreSQL real — y que el escenario Gherkin de AM-004 (409, sin la palabra "existe", ≤50 ms) es la fuente correcta, no la frase genérica de una sola línea del modelo de amenazas que el hook GGA citó como duda.
 - Dudas abiertas: ninguna. Codex volvió a bloquearse en `.git/index.lock` (mismo runtime de solo lectura que T9); Claude creó ambos commits.
+
+### T11 · 2026-09-25 · 4ad6038
+- Qué cambió: `backend/internal/auth/verification` (nuevo): `Service.Verify` calcula el hash SHA-256 del token recibido y delega en una única sentencia SQL (CTE `ConsumeEmailVerificationToken`) que marca el token usado y activa la cuenta atómicamente, solo si el hash coincide, no fue usado y no venció; el bloqueo de fila de Postgres hace que dos intentos concurrentes con el mismo token no puedan activarse ambos. Token desconocido, vencido o ya usado comparten un único `410 Gone` (AM-016, elegido y documentado en el propio handler: "deliberately share this response to avoid revealing which token state was observed"). Registra auditoría `email_verified` y publica `user.email_verified` con confirms, dentro de la misma transacción (`store.WithinEmailVerificationTransaction`, nuevo). `POST /api/v1/auth/verify-email` cableado: 204/400/410/503.
+- Comandos y resultado observado: ver la entrada de T11 en "Evidencia de verificación" arriba.
+- Ajuste de Claude: ninguno al código. Revisó los 7 archivos entregados más los 2 que el hook GGA no pudo ver (`db/queries/users.sql`, `users.sql.go`) para confirmar que el `WHERE used_at IS NULL AND expires_at > now()` de la CTE es correcto y no deja condiciones de carrera (el `UPDATE` re-evalúa su `WHERE` tras adquirir el lock de fila). Probó el caso de expiración contra PostgreSQL real con una prueba manual temporal (no commiteada), ya que la única prueba de integración de Codex solo cubría uso repetido, no vencimiento.
+- Dudas abiertas: ninguna. Mismo bloqueo de `.git/index.lock` que T9 y T10; Claude creó ambos commits.
 
