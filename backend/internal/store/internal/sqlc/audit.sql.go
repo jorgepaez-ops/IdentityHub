@@ -12,6 +12,46 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countLoginFailuresByAccount = `-- name: CountLoginFailuresByAccount :one
+SELECT count(*)::bigint
+FROM audit_log
+WHERE actor_user_id = $1
+  AND action = 'login_failed'
+  AND created_at >= $2
+`
+
+type CountLoginFailuresByAccountParams struct {
+	ActorUserID pgtype.UUID
+	CreatedAt   pgtype.Timestamptz
+}
+
+func (q *Queries) CountLoginFailuresByAccount(ctx context.Context, arg CountLoginFailuresByAccountParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countLoginFailuresByAccount, arg.ActorUserID, arg.CreatedAt)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const countLoginFailuresByIP = `-- name: CountLoginFailuresByIP :one
+SELECT count(*)::bigint
+FROM audit_log
+WHERE ip = $1
+  AND action = 'login_failed'
+  AND created_at >= $2
+`
+
+type CountLoginFailuresByIPParams struct {
+	Ip        *netip.Addr
+	CreatedAt pgtype.Timestamptz
+}
+
+func (q *Queries) CountLoginFailuresByIP(ctx context.Context, arg CountLoginFailuresByIPParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countLoginFailuresByIP, arg.Ip, arg.CreatedAt)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const insertAuditEvent = `-- name: InsertAuditEvent :one
 INSERT INTO audit_log (
     actor_user_id,

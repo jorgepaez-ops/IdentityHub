@@ -34,22 +34,26 @@ type PasswordConfig struct {
 }
 
 type Config struct {
-	Port           int
-	LogLevel       string
-	Version        string
-	DatabaseURL    Secret
-	RabbitURL      Secret
-	SMTPHost       string
-	SMTPPort       int
-	SMTPFrom       string
-	PublicBaseURL  string
-	JWTSigningKey  Secret
-	JWTIssuer      string
-	JWTAudience    string
-	AccessTTL      time.Duration
-	RefreshTTL     time.Duration
-	Argon2         PasswordConfig
-	TrustedProxies []netip.Prefix
+	Port                    int
+	LogLevel                string
+	Version                 string
+	DatabaseURL             Secret
+	RabbitURL               Secret
+	SMTPHost                string
+	SMTPPort                int
+	SMTPFrom                string
+	PublicBaseURL           string
+	JWTSigningKey           Secret
+	JWTIssuer               string
+	JWTAudience             string
+	AccessTTL               time.Duration
+	RefreshTTL              time.Duration
+	LoginAccountMaxFailures int
+	LoginIPMaxFailures      int
+	LoginFailureWindow      time.Duration
+	LoginLockoutDuration    time.Duration
+	Argon2                  PasswordConfig
+	TrustedProxies          []netip.Prefix
 }
 
 // Load lee el entorno y acumula TODOS los errores antes de fallar, en vez de
@@ -92,6 +96,20 @@ func Load() (*Config, error) {
 		}
 		return n
 	}
+	positiveNum := func(key, def string) int {
+		n := num(key, def)
+		if n <= 0 {
+			problems = append(problems, fmt.Sprintf("%s debe ser mayor que 0", key))
+		}
+		return n
+	}
+	positiveDuration := func(key, def string) time.Duration {
+		d := dur(key, def)
+		if d <= 0 {
+			problems = append(problems, fmt.Sprintf("%s debe ser una duración mayor que 0", key))
+		}
+		return d
+	}
 
 	jwtSigningKey := req("JWT_SIGNING_KEY")
 	if decoded, err := base64.StdEncoding.DecodeString(jwtSigningKey); err != nil || len(decoded) != 32 {
@@ -105,21 +123,25 @@ func Load() (*Config, error) {
 	trustedProxies := parseTrustedProxies(os.Getenv("TRUSTED_PROXIES"), &problems)
 
 	cfg := &Config{
-		Port:           num("API_PORT", "8081"),
-		LogLevel:       opt("LOG_LEVEL", "info"),
-		Version:        opt("APP_VERSION", "dev"),
-		DatabaseURL:    Secret(req("DATABASE_URL")),
-		RabbitURL:      Secret(req("RABBITMQ_URL")),
-		SMTPHost:       opt("SMTP_HOST", "mailpit"),
-		SMTPPort:       num("SMTP_PORT", "1025"),
-		SMTPFrom:       opt("SMTP_FROM", "no-reply@identity.local"),
-		PublicBaseURL:  opt("PUBLIC_BASE_URL", "http://localhost:8080"),
-		JWTSigningKey:  Secret(jwtSigningKey),
-		JWTIssuer:      opt("JWT_ISSUER", "http://localhost:8080"),
-		JWTAudience:    opt("JWT_AUDIENCE", "identity-hub"),
-		AccessTTL:      dur("JWT_ACCESS_TTL", "15m"),
-		RefreshTTL:     dur("JWT_REFRESH_TTL", "720h"),
-		TrustedProxies: trustedProxies,
+		Port:                    num("API_PORT", "8081"),
+		LogLevel:                opt("LOG_LEVEL", "info"),
+		Version:                 opt("APP_VERSION", "dev"),
+		DatabaseURL:             Secret(req("DATABASE_URL")),
+		RabbitURL:               Secret(req("RABBITMQ_URL")),
+		SMTPHost:                opt("SMTP_HOST", "mailpit"),
+		SMTPPort:                num("SMTP_PORT", "1025"),
+		SMTPFrom:                opt("SMTP_FROM", "no-reply@identity.local"),
+		PublicBaseURL:           opt("PUBLIC_BASE_URL", "http://localhost:8080"),
+		JWTSigningKey:           Secret(jwtSigningKey),
+		JWTIssuer:               opt("JWT_ISSUER", "http://localhost:8080"),
+		JWTAudience:             opt("JWT_AUDIENCE", "identity-hub"),
+		AccessTTL:               dur("JWT_ACCESS_TTL", "15m"),
+		RefreshTTL:              dur("JWT_REFRESH_TTL", "720h"),
+		LoginAccountMaxFailures: positiveNum("LOGIN_ACCOUNT_MAX_FAILURES", "5"),
+		LoginIPMaxFailures:      positiveNum("LOGIN_IP_MAX_FAILURES", "20"),
+		LoginFailureWindow:      positiveDuration("LOGIN_FAILURE_WINDOW", "15m"),
+		LoginLockoutDuration:    positiveDuration("LOGIN_LOCKOUT_DURATION", "15m"),
+		TrustedProxies:          trustedProxies,
 		Argon2: PasswordConfig{
 			MemoryKiB:   boundedUint32(passwordMemory),
 			Iterations:  boundedUint32(passwordIterations),

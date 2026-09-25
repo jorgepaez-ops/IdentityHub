@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/netip"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -32,11 +34,41 @@ func (s *Store) WithinLoginTransaction(ctx context.Context, fn func(login.Writer
 type loginWriter struct{ queries *generated.Queries }
 
 func (w *loginWriter) GetLoginUserByEmail(ctx context.Context, email string) (login.User, error) {
-	user, err := w.queries.GetLoginUserByEmail(ctx, email)
+	row, err := w.queries.GetLoginUserByEmail(ctx, email)
 	if err != nil {
 		return login.User{}, fmt.Errorf("get login user by email: %w", err)
 	}
-	return login.User{ID: user.ID, Email: user.Email, PasswordHash: user.PasswordHash, Status: login.Status(user.Status), MFAEnabled: user.MfaEnabled}, nil
+	return login.User{ID: row.ID, Email: row.Email, PasswordHash: row.PasswordHash, Status: login.Status(row.Status), LockedUntil: optionalTime(row.LockedUntil), MFAEnabled: row.MfaEnabled}, nil
+}
+
+func (w *loginWriter) CountLoginFailuresByAccount(ctx context.Context, userID uuid.UUID, since time.Time) (int64, error) {
+	count, err := w.queries.CountLoginFailuresByAccount(ctx, generated.CountLoginFailuresByAccountParams{ActorUserID: nullableUUID(&userID), CreatedAt: pgtype.Timestamptz{Time: since, Valid: true}})
+	if err != nil {
+		return 0, fmt.Errorf("count login failures by account: %w", err)
+	}
+	return count, nil
+}
+
+func (w *loginWriter) CountLoginFailuresByIP(ctx context.Context, ip netip.Addr, since time.Time) (int64, error) {
+	count, err := w.queries.CountLoginFailuresByIP(ctx, generated.CountLoginFailuresByIPParams{Ip: &ip, CreatedAt: pgtype.Timestamptz{Time: since, Valid: true}})
+	if err != nil {
+		return 0, fmt.Errorf("count login failures by IP: %w", err)
+	}
+	return count, nil
+}
+
+func (w *loginWriter) LockLoginUser(ctx context.Context, userID uuid.UUID, lockedUntil time.Time) error {
+	if err := w.queries.LockLoginUser(ctx, generated.LockLoginUserParams{ID: userID, LockedUntil: pgtype.Timestamptz{Time: lockedUntil, Valid: true}}); err != nil {
+		return fmt.Errorf("lock login user: %w", err)
+	}
+	return nil
+}
+
+func (w *loginWriter) UnlockLoginUser(ctx context.Context, userID uuid.UUID) error {
+	if err := w.queries.UnlockLoginUser(ctx, userID); err != nil {
+		return fmt.Errorf("unlock login user: %w", err)
+	}
+	return nil
 }
 
 func (w *loginWriter) ListRolesForUser(ctx context.Context, userID uuid.UUID) ([]string, error) {

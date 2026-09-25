@@ -175,3 +175,49 @@ func TestRF012_PublicBaseURLTieneValorPorDefectoYAdmiteOverride(t *testing.T) {
 		t.Errorf("override PublicBaseURL = %q", cfg.PublicBaseURL)
 	}
 }
+
+func TestRF017_ConfiguraLimitesDeFuerzaBruta(t *testing.T) {
+	const seed = "MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE="
+	t.Setenv("DATABASE_URL", "postgres://x")
+	t.Setenv("RABBITMQ_URL", "amqp://x")
+	t.Setenv("JWT_SIGNING_KEY", seed)
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load defaults: %v", err)
+	}
+	if cfg.LoginAccountMaxFailures != 5 || cfg.LoginIPMaxFailures != 20 || cfg.LoginFailureWindow.String() != "15m0s" || cfg.LoginLockoutDuration.String() != "15m0s" {
+		t.Fatalf("default lockout config = %+v", cfg)
+	}
+	t.Setenv("LOGIN_ACCOUNT_MAX_FAILURES", "7")
+	t.Setenv("LOGIN_IP_MAX_FAILURES", "25")
+	t.Setenv("LOGIN_FAILURE_WINDOW", "10m")
+	t.Setenv("LOGIN_LOCKOUT_DURATION", "30m")
+	cfg, err = Load()
+	if err != nil {
+		t.Fatalf("Load overrides: %v", err)
+	}
+	if cfg.LoginAccountMaxFailures != 7 || cfg.LoginIPMaxFailures != 25 || cfg.LoginFailureWindow.String() != "10m0s" || cfg.LoginLockoutDuration.String() != "30m0s" {
+		t.Fatalf("override lockout config = %+v", cfg)
+	}
+}
+
+func TestRF017_RechazaLimitesDeFuerzaBrutaNoPositivos(t *testing.T) {
+	const seed = "MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE="
+	t.Setenv("DATABASE_URL", "postgres://x")
+	t.Setenv("RABBITMQ_URL", "amqp://x")
+	t.Setenv("JWT_SIGNING_KEY", seed)
+	t.Setenv("LOGIN_ACCOUNT_MAX_FAILURES", "0")
+	t.Setenv("LOGIN_IP_MAX_FAILURES", "-1")
+	t.Setenv("LOGIN_FAILURE_WINDOW", "0s")
+	t.Setenv("LOGIN_LOCKOUT_DURATION", "0s")
+	_, err := Load()
+	if err == nil {
+		t.Fatal("Load accepted unsafe brute-force limits")
+	}
+	for _, key := range []string{"LOGIN_ACCOUNT_MAX_FAILURES", "LOGIN_IP_MAX_FAILURES", "LOGIN_FAILURE_WINDOW", "LOGIN_LOCKOUT_DURATION"} {
+		if !strings.Contains(err.Error(), key) {
+			t.Errorf("Load error did not name %s: %v", key, err)
+		}
+	}
+}

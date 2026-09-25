@@ -29,6 +29,8 @@ func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, TokenPair{AccessToken: result.AccessToken, TokenType: TokenPairTokenType(result.TokenType), ExpiresIn: result.ExpiresIn})
 	case errors.Is(err, login.ErrMFAUnavailable):
 		writeProblem(w, http.StatusNotImplemented, "mfa-not-supported", "Not Implemented", "A second authentication factor is required, but MFA is not supported yet.")
+	case errors.Is(err, login.ErrAccountLocked), errors.Is(err, login.ErrIPRateLimited):
+		writeProblem(w, http.StatusLocked, "login-locked", "Locked", "Login is temporarily unavailable. Please try again later.")
 	case errors.Is(err, login.ErrInvalidCredentials):
 		writeProblem(w, http.StatusUnauthorized, "invalid-credentials", "Unauthorized", "Invalid email or password.")
 	default:

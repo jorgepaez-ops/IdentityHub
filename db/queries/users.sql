@@ -76,9 +76,20 @@ WHERE id = (SELECT user_id FROM consumed)
 RETURNING *;
 
 -- name: GetLoginUserByEmail :one
-SELECT id, email, password_hash, status, mfa_enabled
+SELECT id, email, password_hash, status, locked_until, mfa_enabled
 FROM users
-WHERE email = $1;
+WHERE email = $1
+FOR UPDATE;
+
+-- name: LockLoginUser :exec
+UPDATE users
+SET status = 'locked', locked_until = $2
+WHERE id = $1 AND status = 'active';
+
+-- name: UnlockLoginUser :exec
+UPDATE users
+SET status = 'active', locked_until = NULL
+WHERE id = $1 AND status = 'locked';
 
 -- name: ListRolesForUser :many
 SELECT roles.name

@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestRF017_BloqueoNoSeEvitaFalsificandoXForwardedFor(t *testing.T) {
+func TestClientIP_UntrustedForwardedForIsIgnored(t *testing.T) {
 	first := resolvedClientIP(t, nil, "198.51.100.10:443", "203.0.113.1")
 	second := resolvedClientIP(t, nil, "198.51.100.10:443", "203.0.113.2")
 	if first != "198.51.100.10" || second != first {

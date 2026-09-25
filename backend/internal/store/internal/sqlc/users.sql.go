@@ -153,9 +153,10 @@ func (q *Queries) DeleteUserRoles(ctx context.Context, userID uuid.UUID) error {
 }
 
 const getLoginUserByEmail = `-- name: GetLoginUserByEmail :one
-SELECT id, email, password_hash, status, mfa_enabled
+SELECT id, email, password_hash, status, locked_until, mfa_enabled
 FROM users
 WHERE email = $1
+FOR UPDATE
 `
 
 type GetLoginUserByEmailRow struct {
@@ -163,6 +164,7 @@ type GetLoginUserByEmailRow struct {
 	Email        string
 	PasswordHash string
 	Status       UserStatus
+	LockedUntil  pgtype.Timestamptz
 	MfaEnabled   bool
 }
 
@@ -174,6 +176,7 @@ func (q *Queries) GetLoginUserByEmail(ctx context.Context, email string) (GetLog
 		&i.Email,
 		&i.PasswordHash,
 		&i.Status,
+		&i.LockedUntil,
 		&i.MfaEnabled,
 	)
 	return i, err
@@ -373,6 +376,22 @@ func (q *Queries) LockActiveAdminUsers(ctx context.Context) ([]uuid.UUID, error)
 	return items, nil
 }
 
+const lockLoginUser = `-- name: LockLoginUser :exec
+UPDATE users
+SET status = 'locked', locked_until = $2
+WHERE id = $1 AND status = 'active'
+`
+
+type LockLoginUserParams struct {
+	ID          uuid.UUID
+	LockedUntil pgtype.Timestamptz
+}
+
+func (q *Queries) LockLoginUser(ctx context.Context, arg LockLoginUserParams) error {
+	_, err := q.db.Exec(ctx, lockLoginUser, arg.ID, arg.LockedUntil)
+	return err
+}
+
 const revokeRefreshFamily = `-- name: RevokeRefreshFamily :one
 WITH revoked AS (
     UPDATE refresh_tokens
@@ -467,6 +486,17 @@ func (q *Queries) RotateRefreshToken(ctx context.Context, arg RotateRefreshToken
 		&i.Rotated,
 	)
 	return i, err
+}
+
+const unlockLoginUser = `-- name: UnlockLoginUser :exec
+UPDATE users
+SET status = 'active', locked_until = NULL
+WHERE id = $1 AND status = 'locked'
+`
+
+func (q *Queries) UnlockLoginUser(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, unlockLoginUser, id)
+	return err
 }
 
 const updateAdminUserStatus = `-- name: UpdateAdminUserStatus :one

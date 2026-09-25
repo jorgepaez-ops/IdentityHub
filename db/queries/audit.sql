@@ -19,6 +19,20 @@ VALUES (
 )
 RETURNING *;
 
+-- name: CountLoginFailuresByAccount :one
+SELECT count(*)::bigint
+FROM audit_log
+WHERE actor_user_id = $1
+  AND action = 'login_failed'
+  AND created_at >= $2;
+
+-- name: CountLoginFailuresByIP :one
+SELECT count(*)::bigint
+FROM audit_log
+WHERE ip = $1
+  AND action = 'login_failed'
+  AND created_at >= $2;
+
 -- name: ListAuditLog :many
 SELECT id, actor_user_id, action, resource_type, resource_id, ip, user_agent, metadata, created_at
 FROM audit_log

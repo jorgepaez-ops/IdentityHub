@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"errors"
+	"net/netip"
 	"testing"
 	"time"
 
@@ -126,6 +127,14 @@ func (w loginWriter) GetLoginUserByEmail(_ context.Context, email string) (login
 }
 func (w loginWriter) UpdateLoginSuccess(context.Context, uuid.UUID, string) error  { return nil }
 func (w loginWriter) CreateRefreshToken(context.Context, login.RefreshToken) error { return nil }
+func (w loginWriter) CountLoginFailuresByAccount(context.Context, uuid.UUID, time.Time) (int64, error) {
+	return 0, nil
+}
+func (w loginWriter) CountLoginFailuresByIP(context.Context, netip.Addr, time.Time) (int64, error) {
+	return 0, nil
+}
+func (w loginWriter) LockLoginUser(context.Context, uuid.UUID, time.Time) error { return nil }
+func (w loginWriter) UnlockLoginUser(context.Context, uuid.UUID) error          { return nil }
 func (w loginWriter) ListRolesForUser(ctx context.Context, id uuid.UUID) ([]string, error) {
 	return w.repositoryStub.ListRolesForUser(ctx, id)
 }

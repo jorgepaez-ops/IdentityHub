@@ -3,6 +3,7 @@ package login
 import (
 	"context"
 	"errors"
+	"net/netip"
 	"testing"
 	"time"
 
@@ -25,6 +26,38 @@ func (r *repositoryStub) WithinLoginTransaction(_ context.Context, fn func(Write
 }
 func (r *repositoryStub) GetLoginUserByEmail(context.Context, string) (User, error) {
 	return r.user, r.lookupErr
+}
+func (r *repositoryStub) CountLoginFailuresByAccount(_ context.Context, userID uuid.UUID, _ time.Time) (int64, error) {
+	var count int64
+	for _, audit := range r.audits {
+		if audit.Action == "login_failed" && audit.ActorUserID != nil && *audit.ActorUserID == userID {
+			count++
+		}
+	}
+	return count, nil
+}
+func (r *repositoryStub) CountLoginFailuresByIP(_ context.Context, ip netip.Addr, _ time.Time) (int64, error) {
+	var count int64
+	for _, audit := range r.audits {
+		if audit.Action == "login_failed" && audit.IP != nil && *audit.IP == ip {
+			count++
+		}
+	}
+	return count, nil
+}
+func (r *repositoryStub) LockLoginUser(_ context.Context, userID uuid.UUID, until time.Time) error {
+	if r.user.ID == userID {
+		r.user.Status = StatusLocked
+		r.user.LockedUntil = &until
+	}
+	return nil
+}
+func (r *repositoryStub) UnlockLoginUser(_ context.Context, userID uuid.UUID) error {
+	if r.user.ID == userID {
+		r.user.Status = StatusActive
+		r.user.LockedUntil = nil
+	}
+	return nil
 }
 func (r *repositoryStub) ListRolesForUser(context.Context, uuid.UUID) ([]string, error) {
 	return r.roles, nil
@@ -140,5 +173,27 @@ func TestRF003_AM004EmailInexistenteYPasswordIncorrectoCompartenError(t *testing
 	_, wrongPasswordErr := New(wrongPassword, signer, time.Hour).Login(context.Background(), Input{Email: "known@example.com", Password: "wrong password"})
 	if !errors.Is(unknownErr, ErrInvalidCredentials) || !errors.Is(wrongPasswordErr, ErrInvalidCredentials) || unknownErr.Error() != wrongPasswordErr.Error() {
 		t.Fatalf("unknown=%v wrong-password=%v", unknownErr, wrongPasswordErr)
+	}
+}
+
+func TestRF017_SeisFallosDevuelven423(t *testing.T) {
+	hash, err := password.Hash("correct horse battery")
+	if err != nil {
+		t.Fatal(err)
+	}
+	signer, err := token.New(make([]byte, 32), "https://issuer.test", "identity-hub", time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	repository := &repositoryStub{user: User{ID: uuid.New(), Email: "ada@example.com", PasswordHash: hash, Status: StatusActive}, roles: []string{"user"}}
+	service := New(repository, signer, time.Hour)
+
+	for attempt := 1; attempt <= 5; attempt++ {
+		if _, err := service.Login(context.Background(), Input{Email: "ada@example.com", Password: "wrong password"}); !errors.Is(err, ErrInvalidCredentials) {
+			t.Fatalf("attempt %d error = %v, want invalid credentials", attempt, err)
+		}
+	}
+	if _, err := service.Login(context.Background(), Input{Email: "ada@example.com", Password: "correct horse battery"}); !errors.Is(err, ErrAccountLocked) {
+		t.Fatalf("sixth attempt error = %v, want account locked", err)
 	}
 }

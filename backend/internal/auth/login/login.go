@@ -19,19 +19,32 @@ import (
 var (
 	ErrInvalidCredentials = errors.New("invalid credentials")
 	ErrMFAUnavailable     = errors.New("multi-factor authentication is not supported")
+	ErrAccountLocked      = errors.New("account is locked")
+	ErrIPRateLimited      = errors.New("login IP is rate limited")
 )
 
 const accessTokenExpiresIn = 900
 
+const (
+	defaultAccountMaxFailures = 5
+	defaultIPMaxFailures      = 20
+	defaultFailureWindow      = 15 * time.Minute
+	defaultLockoutDuration    = 15 * time.Minute
+)
+
 type Status string
 
-const StatusActive Status = "active"
+const (
+	StatusActive Status = "active"
+	StatusLocked Status = "locked"
+)
 
 type User struct {
 	ID           uuid.UUID
 	Email        string
 	PasswordHash string
 	Status       Status
+	LockedUntil  *time.Time
 	MFAEnabled   bool
 }
 
@@ -68,6 +81,10 @@ type AuditEvent struct {
 
 type Writer interface {
 	GetLoginUserByEmail(context.Context, string) (User, error)
+	CountLoginFailuresByAccount(context.Context, uuid.UUID, time.Time) (int64, error)
+	CountLoginFailuresByIP(context.Context, netip.Addr, time.Time) (int64, error)
+	LockLoginUser(context.Context, uuid.UUID, time.Time) error
+	UnlockLoginUser(context.Context, uuid.UUID) error
 	ListRolesForUser(context.Context, uuid.UUID) ([]string, error)
 	UpdateLoginSuccess(context.Context, uuid.UUID, string) error
 	CreateRefreshToken(context.Context, RefreshToken) error
@@ -86,20 +103,57 @@ type Service struct {
 	repository Repository
 	tokens     *token.Service
 	refreshTTL time.Duration
+	lockout    LockoutConfig
 	now        func() time.Time
 }
 
-func New(repository Repository, tokens *token.Service, refreshTTL time.Duration) *Service {
-	return &Service{repository: repository, tokens: tokens, refreshTTL: refreshTTL, now: time.Now}
+// LockoutConfig controls the independent account and IP sliding-window limits.
+type LockoutConfig struct {
+	AccountMaxFailures int
+	IPMaxFailures      int
+	FailureWindow      time.Duration
+	LockoutDuration    time.Duration
+}
+
+func defaultLockoutConfig() LockoutConfig {
+	return LockoutConfig{
+		AccountMaxFailures: defaultAccountMaxFailures,
+		IPMaxFailures:      defaultIPMaxFailures,
+		FailureWindow:      defaultFailureWindow,
+		LockoutDuration:    defaultLockoutDuration,
+	}
+}
+
+// New creates the login service. The optional lockout configuration retains
+// compatibility with existing callers while allowing composition to inject the
+// environment-derived policy.
+func New(repository Repository, tokens *token.Service, refreshTTL time.Duration, lockout ...LockoutConfig) *Service {
+	policy := defaultLockoutConfig()
+	if len(lockout) == 1 {
+		policy = lockout[0]
+	}
+	return &Service{repository: repository, tokens: tokens, refreshTTL: refreshTTL, lockout: policy, now: time.Now}
 }
 
 func (s *Service) Login(ctx context.Context, input Input) (Result, error) {
-	if s.repository == nil || s.tokens == nil || s.refreshTTL <= 0 {
+	if s.repository == nil || s.tokens == nil || s.refreshTTL <= 0 || !s.lockout.valid() {
 		return Result{}, fmt.Errorf("login service is unavailable")
 	}
 	var result Result
 	var authenticationErr error
 	err := s.repository.WithinLoginTransaction(ctx, func(writer Writer) error {
+		now := s.now()
+		if input.IP != nil {
+			failures, err := writer.CountLoginFailuresByIP(ctx, *input.IP, now.Add(-s.lockout.FailureWindow))
+			if err != nil {
+				return fmt.Errorf("count login failures by IP: %w", err)
+			}
+			if failures >= int64(s.lockout.IPMaxFailures) {
+				authenticationErr = ErrIPRateLimited
+				return nil
+			}
+		}
+
 		user, err := writer.GetLoginUserByEmail(ctx, input.Email)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -114,20 +168,31 @@ func (s *Service) Login(ctx context.Context, input Input) (Result, error) {
 			}
 			return fmt.Errorf("get login user: %w", err)
 		}
+		if user.Status == StatusLocked {
+			if user.LockedUntil == nil || now.Before(*user.LockedUntil) {
+				authenticationErr = ErrAccountLocked
+				return nil
+			}
+			if err := writer.UnlockLoginUser(ctx, user.ID); err != nil {
+				return fmt.Errorf("unlock expired login lock: %w", err)
+			}
+			user.Status = StatusActive
+			user.LockedUntil = nil
+		}
 
 		valid, err := password.Verify(input.Password, user.PasswordHash)
 		if err != nil {
 			return fmt.Errorf("verify password: %w", err)
 		}
 		if !valid || user.Status != StatusActive {
-			if err := s.recordFailure(ctx, writer, &user.ID, input, "invalid_credentials"); err != nil {
+			if err := s.recordAccountFailure(ctx, writer, user, input, "invalid_credentials", now); err != nil {
 				return err
 			}
 			authenticationErr = ErrInvalidCredentials
 			return nil
 		}
 		if user.MFAEnabled {
-			if err := s.recordFailure(ctx, writer, &user.ID, input, "mfa_not_supported"); err != nil {
+			if err := s.recordAccountFailure(ctx, writer, user, input, "mfa_not_supported", now); err != nil {
 				return err
 			}
 			authenticationErr = ErrMFAUnavailable
@@ -173,6 +238,29 @@ func (s *Service) Login(ctx context.Context, input Input) (Result, error) {
 		return Result{}, authenticationErr
 	}
 	return result, nil
+}
+
+func (s *Service) recordAccountFailure(ctx context.Context, writer Writer, user User, input Input, reason string, now time.Time) error {
+	if err := s.recordFailure(ctx, writer, &user.ID, input, reason); err != nil {
+		return err
+	}
+	if user.Status != StatusActive {
+		return nil
+	}
+	failures, err := writer.CountLoginFailuresByAccount(ctx, user.ID, now.Add(-s.lockout.FailureWindow))
+	if err != nil {
+		return fmt.Errorf("count login failures by account: %w", err)
+	}
+	if failures >= int64(s.lockout.AccountMaxFailures) {
+		if err := writer.LockLoginUser(ctx, user.ID, now.Add(s.lockout.LockoutDuration)); err != nil {
+			return fmt.Errorf("lock login user: %w", err)
+		}
+	}
+	return nil
+}
+
+func (c LockoutConfig) valid() bool {
+	return c.AccountMaxFailures > 0 && c.IPMaxFailures > 0 && c.FailureWindow > 0 && c.LockoutDuration > 0
 }
 
 func (s *Service) recordFailure(ctx context.Context, writer Writer, actorID *uuid.UUID, input Input, reason string) error {
