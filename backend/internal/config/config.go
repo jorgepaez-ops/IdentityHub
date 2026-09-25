@@ -42,6 +42,7 @@ type Config struct {
 	SMTPHost       string
 	SMTPPort       int
 	SMTPFrom       string
+	PublicBaseURL  string
 	JWTSigningKey  Secret
 	JWTIssuer      string
 	JWTAudience    string
@@ -112,6 +113,7 @@ func Load() (*Config, error) {
 		SMTPHost:       opt("SMTP_HOST", "mailpit"),
 		SMTPPort:       num("SMTP_PORT", "1025"),
 		SMTPFrom:       opt("SMTP_FROM", "no-reply@identity.local"),
+		PublicBaseURL:  opt("PUBLIC_BASE_URL", "http://localhost:8080"),
 		JWTSigningKey:  Secret(jwtSigningKey),
 		JWTIssuer:      opt("JWT_ISSUER", "http://localhost:8080"),
 		JWTAudience:    opt("JWT_AUDIENCE", "identity-hub"),

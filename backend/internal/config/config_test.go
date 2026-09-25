@@ -151,3 +151,27 @@ func TestRNF003_ClaveDeFirmaNoSeRevelaEnConfig(t *testing.T) {
 		t.Fatalf("formatted config leaked signing key: %s", output)
 	}
 }
+
+func TestRF012_PublicBaseURLTieneValorPorDefectoYAdmiteOverride(t *testing.T) {
+	const seed = "MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE="
+	t.Setenv("DATABASE_URL", "postgres://x")
+	t.Setenv("RABBITMQ_URL", "amqp://x")
+	t.Setenv("JWT_SIGNING_KEY", seed)
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load default: %v", err)
+	}
+	if cfg.PublicBaseURL != "http://localhost:8080" {
+		t.Errorf("default PublicBaseURL = %q", cfg.PublicBaseURL)
+	}
+
+	t.Setenv("PUBLIC_BASE_URL", "https://identity.example")
+	cfg, err = Load()
+	if err != nil {
+		t.Fatalf("Load override: %v", err)
+	}
+	if cfg.PublicBaseURL != "https://identity.example" {
+		t.Errorf("override PublicBaseURL = %q", cfg.PublicBaseURL)
+	}
+}
