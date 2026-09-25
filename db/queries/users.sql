@@ -12,3 +12,7 @@ WHERE email = $1;
 SELECT *
 FROM users
 WHERE id = $1;
+
+-- name: CreateVerificationToken :exec
+INSERT INTO verification_tokens (user_id, token_hash, purpose, expires_at)
+VALUES ($1, $2, 'email_verification', $3);

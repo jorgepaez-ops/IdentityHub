@@ -10,7 +10,7 @@ declaración de buenas intenciones.
 
 | Requisito | Título | Pri | Operaciones de la API | Escenarios | Pruebas Go | E2E | Estado |
 |---|---|---|---|---|---|---|---|
-| **RF-001** | Registro de cuenta | P0 | `register` | 3 | 6 | — | ✅ completo |
+| **RF-001** | Registro de cuenta | P0 | `register` | 3 | 15 | — | ✅ completo |
 | **RF-002** | Verificación de correo | P0 | `verifyEmail` | 2 | — | — | 🟡 parcial |
 | **RF-003** | Inicio de sesión | P0 | `login` | 3 | — | — | 🟡 parcial |
 | **RF-004** | Emisión y validación de JWT | P0 | `getJwks` | 2 | 7 | — | ✅ completo |

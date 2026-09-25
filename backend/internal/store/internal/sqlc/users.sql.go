@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createUser = `-- name: CreateUser :one
@@ -41,6 +42,22 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const createVerificationToken = `-- name: CreateVerificationToken :exec
+INSERT INTO verification_tokens (user_id, token_hash, purpose, expires_at)
+VALUES ($1, $2, 'email_verification', $3)
+`
+
+type CreateVerificationTokenParams struct {
+	UserID    uuid.UUID
+	TokenHash []byte
+	ExpiresAt pgtype.Timestamptz
+}
+
+func (q *Queries) CreateVerificationToken(ctx context.Context, arg CreateVerificationTokenParams) error {
+	_, err := q.db.Exec(ctx, createVerificationToken, arg.UserID, arg.TokenHash, arg.ExpiresAt)
+	return err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one

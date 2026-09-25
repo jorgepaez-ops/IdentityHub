@@ -15,6 +15,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
+	"github.com/jorgepaez/identity-hub/internal/auth/registration"
 	"github.com/jorgepaez/identity-hub/internal/auth/token"
 )
 
@@ -23,6 +24,7 @@ type Server struct {
 	version        string
 	deps           map[string]Checker
 	tokens         *token.Service
+	registration   registration.Registrar
 	trustedProxies []netip.Prefix
 }
 
@@ -31,6 +33,9 @@ func NewServer(logger *slog.Logger, version string, deps map[string]Checker) *Se
 }
 
 func (s *Server) SetTokenService(tokens *token.Service) { s.tokens = tokens }
+
+// SetRegistrationService is used by composition and focused handler tests.
+func (s *Server) SetRegistrationService(service registration.Registrar) { s.registration = service }
 
 func (s *Server) SetTrustedProxies(prefixes []netip.Prefix) {
 	s.trustedProxies = append([]netip.Prefix(nil), prefixes...)
@@ -87,7 +92,7 @@ func (s *Server) RequestPasswordReset(w http.ResponseWriter, r *http.Request) { 
 func (s *Server) RefreshSession(w http.ResponseWriter, r *http.Request, params RefreshSessionParams) {
 	s.notImplemented(w)
 }
-func (s *Server) Register(w http.ResponseWriter, r *http.Request)          { s.notImplemented(w) }
+
 func (s *Server) VerifyEmail(w http.ResponseWriter, r *http.Request)       { s.notImplemented(w) }
 func (s *Server) GetCurrentUser(w http.ResponseWriter, r *http.Request)    { s.notImplemented(w) }
 func (s *Server) UpdateCurrentUser(w http.ResponseWriter, r *http.Request) { s.notImplemented(w) }

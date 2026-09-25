@@ -228,3 +228,62 @@ func (s *Store) Ping(ctx context.Context) error {
 }
 
 func (s *Store) Close() { s.pool.Close() }
+
+// CreateVerificationTokenParams contains an email-verification token hash.
+type CreateVerificationTokenParams struct {
+	UserID    uuid.UUID
+	TokenHash []byte
+	ExpiresAt time.Time
+}
+
+// RegistrationWriter groups the writes that must succeed atomically during
+// account registration.
+type RegistrationWriter interface {
+	CreateUser(context.Context, CreateUserParams) (User, error)
+	CreateVerificationToken(context.Context, CreateVerificationTokenParams) error
+	InsertAuditEvent(context.Context, InsertAuditEventParams) (AuditEvent, error)
+}
+
+// WithinRegistrationTransaction runs registration writes in one PostgreSQL
+// transaction. A publisher-confirm failure returned by fn rolls it back.
+func (s *Store) WithinRegistrationTransaction(ctx context.Context, fn func(RegistrationWriter) error) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin registration transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	writer := &registrationWriter{queries: generated.New(tx)}
+	if err := fn(writer); err != nil {
+		return err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit registration transaction: %w", err)
+	}
+	return nil
+}
+
+type registrationWriter struct{ queries *generated.Queries }
+
+func (w *registrationWriter) CreateUser(ctx context.Context, params CreateUserParams) (User, error) {
+	user, err := w.queries.CreateUser(ctx, generated.CreateUserParams{Email: params.Email, PasswordHash: params.PasswordHash, DisplayName: params.DisplayName})
+	if err != nil {
+		return User{}, fmt.Errorf("create user: %w", err)
+	}
+	return userFromGenerated(user), nil
+}
+
+func (w *registrationWriter) CreateVerificationToken(ctx context.Context, params CreateVerificationTokenParams) error {
+	if err := w.queries.CreateVerificationToken(ctx, generated.CreateVerificationTokenParams{UserID: params.UserID, TokenHash: params.TokenHash, ExpiresAt: pgtype.Timestamptz{Time: params.ExpiresAt, Valid: true}}); err != nil {
+		return fmt.Errorf("create verification token: %w", err)
+	}
+	return nil
+}
+
+func (w *registrationWriter) InsertAuditEvent(ctx context.Context, params InsertAuditEventParams) (AuditEvent, error) {
+	event, err := w.queries.InsertAuditEvent(ctx, generated.InsertAuditEventParams{ActorUserID: nullableUUID(params.ActorUserID), Action: params.Action, ResourceType: nullableText(params.ResourceType), ResourceID: nullableText(params.ResourceID), Ip: copyAddr(params.IP), UserAgent: nullableText(params.UserAgent), Metadata: params.Metadata})
+	if err != nil {
+		return AuditEvent{}, fmt.Errorf("insert audit event: %w", err)
+	}
+	return auditEventFromGenerated(event), nil
+}
