@@ -127,14 +127,24 @@ func (s *Server) handleBindingError(w http.ResponseWriter, r *http.Request, err 
 }
 
 func (s *Server) ListAuditLog(w http.ResponseWriter, r *http.Request, params ListAuditLogParams) {
-	s.notImplemented(w)
+	RequireAuth(s.tokens)(RequireRole(s.currentUsers, "admin")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		s.notImplemented(w)
+	}))).ServeHTTP(w, r)
 }
 func (s *Server) ListUsers(w http.ResponseWriter, r *http.Request, params ListUsersParams) {
-	s.notImplemented(w)
+	RequireAuth(s.tokens)(RequireRole(s.currentUsers, "admin")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		s.notImplemented(w)
+	}))).ServeHTTP(w, r)
 }
-func (s *Server) GetUser(w http.ResponseWriter, r *http.Request, userID UserId) { s.notImplemented(w) }
+func (s *Server) GetUser(w http.ResponseWriter, r *http.Request, userID UserId) {
+	RequireAuth(s.tokens)(RequireRole(s.currentUsers, "admin")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		s.notImplemented(w)
+	}))).ServeHTTP(w, r)
+}
 func (s *Server) UpdateUser(w http.ResponseWriter, r *http.Request, userID UserId) {
-	s.notImplemented(w)
+	RequireAuth(s.tokens)(RequireRole(s.currentUsers, "admin")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		s.notImplemented(w)
+	}))).ServeHTTP(w, r)
 }
 func (s *Server) VerifyMfa(w http.ResponseWriter, r *http.Request)            { s.notImplemented(w) }
 func (s *Server) ConfirmPasswordReset(w http.ResponseWriter, r *http.Request) { s.notImplemented(w) }
