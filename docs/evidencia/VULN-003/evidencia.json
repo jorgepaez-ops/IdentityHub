@@ -1,0 +1,30 @@
+{
+  "vuln": "VULN-003",
+  "gate": [
+    "Gitleaks (baseline-scan)"
+  ],
+  "antes": {
+    "commit_linea_base": "053e15fb27b1aaf974c7c818108eee64628973e9",
+    "commit_main": null,
+    "workflow": "Escaneo de la línea base",
+    "run_id": "35476102444",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444",
+    "artefacto": "security/evidence/actions-35476102444/gitleaks.redacted.json",
+    "captura": "informe Desktop §3 VULN-003",
+    "hallazgos": [
+      "7 hallazgos en deploy/docker-compose.yml: contrasena-en-variable-de-entorno en líneas 24 y 42; url-de-conexion-con-credenciales en líneas 82, 102, 103, 133 y 134"
+    ]
+  },
+  "remediacion": {
+    "tarea": "T26",
+    "commit": null,
+    "ficha": null
+  },
+  "despues": {
+    "commit": null,
+    "workflow": null,
+    "run_id": null,
+    "run_url": null,
+    "captura": null
+  }
+}

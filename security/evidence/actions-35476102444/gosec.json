@@ -1,0 +1,140 @@
+{
+	"Golang errors": {},
+	"Issues": [
+		{
+			"severity": "HIGH",
+			"confidence": "MEDIUM",
+			"cwe": {
+				"id": "338",
+				"url": "https://cwe.mitre.org/data/definitions/338.html"
+			},
+			"rule_id": "G404",
+			"details": "Use of weak random number generator (math/rand or math/rand/v2 instead of crypto/rand)",
+			"file": "/home/runner/work/IdentityHub/IdentityHub/backend/internal/api/legacy_auth.go",
+			"code": "65: \tfor i := range out {\n66: \t\tout[i] = alphabet[rand.Intn(len(alphabet))] //nolint:gosec // VULN-004\n67: \t}\n",
+			"line": "66",
+			"column": "21",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "HIGH",
+			"confidence": "LOW",
+			"cwe": {
+				"id": "798",
+				"url": "https://cwe.mitre.org/data/definitions/798.html"
+			},
+			"rule_id": "G101",
+			"details": "Potential hardcoded credentials: AWS API Key",
+			"file": "/home/runner/work/IdentityHub/IdentityHub/backend/internal/api/legacy_auth.go",
+			"code": "43: \tlegacyAdminPass  = \"Admin123!\"\n44: \tlegacyAWSKey     = \"<redactado>\"\n45: \tlegacyAWSSecret  = \"wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY\"\n",
+			"line": "44",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "HIGH",
+			"confidence": "LOW",
+			"cwe": {
+				"id": "798",
+				"url": "https://cwe.mitre.org/data/definitions/798.html"
+			},
+			"rule_id": "G101",
+			"details": "Potential hardcoded credentials",
+			"file": "/home/runner/work/IdentityHub/IdentityHub/backend/internal/api/legacy_auth.go",
+			"code": "44: \tlegacyAWSKey     = \"<redactado>\"\n45: \tlegacyAWSSecret  = \"wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY\"\n46: \tlegacySlackToken = \"<redactado>\"\n",
+			"line": "45",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "328",
+				"url": "https://cwe.mitre.org/data/definitions/328.html"
+			},
+			"rule_id": "G401",
+			"details": "Use of weak cryptographic primitive",
+			"file": "/home/runner/work/IdentityHub/IdentityHub/backend/internal/api/legacy_auth.go",
+			"code": "53: func legacyHashPassword(password string) string {\n54: \tsum := md5.Sum([]byte(password)) //nolint:gosec // VULN-002\n55: \treturn hex.EncodeToString(sum[:])\n",
+			"line": "54",
+			"column": "9",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "327",
+				"url": "https://cwe.mitre.org/data/definitions/327.html"
+			},
+			"rule_id": "G501",
+			"details": "Blocklisted import crypto/md5: weak cryptographic primitive",
+			"file": "/home/runner/work/IdentityHub/IdentityHub/backend/internal/api/legacy_auth.go",
+			"code": "26: import (\n27: \t\"crypto/md5\" //nolint:gosec // VULN-002: sembrado a propósito\n28: \t\"encoding/hex\"\n",
+			"line": "27",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/IdentityHub/IdentityHub/backend/internal/events/broker.go",
+			"code": "36: \t\tch.Close()\n37: \t\tconn.Close()\n38: \t\treturn nil, fmt.Errorf(\"no se pudo activar publisher confirms: %w\", err)\n",
+			"line": "37",
+			"column": "3",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/IdentityHub/IdentityHub/backend/internal/events/broker.go",
+			"code": "35: \tif err := ch.Confirm(false); err != nil {\n36: \t\tch.Close()\n37: \t\tconn.Close()\n",
+			"line": "36",
+			"column": "3",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/home/runner/work/IdentityHub/IdentityHub/backend/internal/events/broker.go",
+			"code": "28: \tif err != nil {\n29: \t\tconn.Close()\n30: \t\treturn nil, fmt.Errorf(\"no se pudo abrir el canal: %w\", err)\n",
+			"line": "29",
+			"column": "3",
+			"nosec": false,
+			"suppressions": null
+		}
+	],
+	"Stats": {
+		"files": 13,
+		"lines": 1120,
+		"nosec": 0,
+		"found": 8
+	},
+	"GosecVersion": "dev"
+}

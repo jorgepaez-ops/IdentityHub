@@ -1,0 +1,32 @@
+{
+  "vuln": "VULN-004",
+  "gate": [
+    "gosec G404 (baseline-scan)",
+    "Semgrep math-random-used"
+  ],
+  "antes": {
+    "commit_linea_base": "053e15fb27b1aaf974c7c818108eee64628973e9",
+    "commit_main": "acd3da850de2ab588907c669e5d188b8b1411bdf",
+    "workflow": "Escaneo de la línea base",
+    "run_id": "35476102444",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444",
+    "artefacto": "security/evidence/actions-35476102444/gosec.json",
+    "captura": "informe Desktop §3 VULN-004",
+    "hallazgos": [
+      "gosec G404 en legacy_auth.go:66 (el código trae //nolint:gosec // VULN-004)",
+      "Semgrep math-random-used en legacy_auth.go:30 (Security > Code scanning, alerta #42)"
+    ]
+  },
+  "remediacion": {
+    "tarea": "T23",
+    "commit": null,
+    "ficha": null
+  },
+  "despues": {
+    "commit": null,
+    "workflow": null,
+    "run_id": null,
+    "run_url": null,
+    "captura": null
+  }
+}

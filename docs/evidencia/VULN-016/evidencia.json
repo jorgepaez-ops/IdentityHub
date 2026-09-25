@@ -1,0 +1,32 @@
+{
+  "vuln": "VULN-016",
+  "gate": [
+    "Trivy image sobre node:18-bullseye (baseline-scan)"
+  ],
+  "antes": {
+    "commit_linea_base": "053e15fb27b1aaf974c7c818108eee64628973e9",
+    "commit_main": null,
+    "workflow": "Escaneo de la línea base",
+    "run_id": "35534898422",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35534898422",
+    "artefacto": "security/evidence/actions-35534898422/README.md",
+    "captura": "informe Desktop §3 VULN-016",
+    "hallazgos": [
+      "Trivy sobre node:18-bullseye (builder del frontend): 2103 vulnerabilidades HIGH/CRITICAL (218 CRITICAL, 1885 HIGH)",
+      "Trivy sobre baseline/web (imagen final construida): 64 (1 CRITICAL, 63 HIGH), base debian 13.7 porque nginx:latest se resuelve hoy"
+    ],
+    "observacion": "Se escanea la imagen base por nombre; detalle por gravedad en security/evidence/actions-35534898422/trivy-resumen.txt. Cuentas con las etiquetas resueltas el 2026-09-20."
+  },
+  "remediacion": {
+    "tarea": "T28",
+    "commit": null,
+    "ficha": null
+  },
+  "despues": {
+    "commit": null,
+    "workflow": null,
+    "run_id": null,
+    "run_url": null,
+    "captura": null
+  }
+}

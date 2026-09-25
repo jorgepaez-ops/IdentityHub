@@ -32,6 +32,10 @@ resumir mecánicamente en `docs/security-report.md`.
 | **Componente** | <ruta:línea o dependencia@versión> |
 | **Amenaza** | AM-NNN del modelo STRIDE |
 | **Sembrada** | sí / no |
+| **Evidencia antes** | |
+| **Commit de remediación** | |
+| **Evidencia después** | |
+| **Run de Actions (antes/después)** | |
 
 ## Evidencia
 (salida literal del escáner)

@@ -9,6 +9,10 @@
 | **Avisos** | GO-2026-5774, GO-2026-5775, GO-2026-5777 |
 | **Amenaza** | AM-001, AM-010 (frontera de confianza T2) |
 | **Sembrada** | **NO** — hallazgo no previsto |
+| **Evidencia antes** | |
+| **Commit de remediación** | |
+| **Evidencia después** | |
+| **Run de Actions (antes/después)** | |
 
 ## Por qué esta ficha importa más que las demás
 

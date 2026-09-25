@@ -28,13 +28,18 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.22"
+          go-version: "1.25"
           cache-dependency-path: backend/go.sum
 
       - name: govulncheck
         id: govuln
         continue-on-error: true
         working-directory: backend
+        # `shell: bash` activa pipefail: sin él, `govulncheck | tee` devuelve el
+        # estado de tee (0) y el paso siguiente, que abre la incidencia cuando
+        # govulncheck falla, nunca se ejecutaba (el run 35547924202 encontró 33
+        # vulnerabilidades y terminó en éxito).
+        shell: bash
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@latest
           govulncheck ./... | tee /tmp/govulncheck.txt

@@ -8,6 +8,10 @@
 | **Componente** | job `secrets` del pipeline |
 | **Amenaza** | AM-012 |
 | **Sembrada** | **NO** — hallazgo sobre la herramienta, no sobre la aplicación |
+| **Evidencia antes** | |
+| **Commit de remediación** | |
+| **Evidencia después** | |
+| **Run de Actions (antes/después)** | |
 
 ## Qué pasó
 

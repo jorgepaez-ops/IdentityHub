@@ -6,7 +6,10 @@
 package config
 
 import (
+	"encoding/base64"
 	"fmt"
+	"math"
+	"net/netip"
 	"os"
 	"strconv"
 	"strings"
@@ -23,18 +26,34 @@ func (s Secret) GoString() string             { return "[REDACTADO]" }
 func (s Secret) Reveal() string               { return string(s) }
 func (s Secret) MarshalJSON() ([]byte, error) { return []byte(`"[REDACTADO]"`), nil }
 
+type PasswordConfig struct {
+	MemoryKiB   uint32
+	Iterations  uint32
+	Parallelism uint8
+	Concurrency int
+}
+
 type Config struct {
-	Port        int
-	LogLevel    string
-	Version     string
-	DatabaseURL Secret
-	RabbitURL   Secret
-	SMTPHost    string
-	SMTPPort    int
-	SMTPFrom    string
-	JWTIssuer   string
-	AccessTTL   time.Duration
-	RefreshTTL  time.Duration
+	Port                    int
+	LogLevel                string
+	Version                 string
+	DatabaseURL             Secret
+	RabbitURL               Secret
+	SMTPHost                string
+	SMTPPort                int
+	SMTPFrom                string
+	PublicBaseURL           string
+	JWTSigningKey           Secret
+	JWTIssuer               string
+	JWTAudience             string
+	AccessTTL               time.Duration
+	RefreshTTL              time.Duration
+	LoginAccountMaxFailures int
+	LoginIPMaxFailures      int
+	LoginFailureWindow      time.Duration
+	LoginLockoutDuration    time.Duration
+	Argon2                  PasswordConfig
+	TrustedProxies          []netip.Prefix
 }
 
 // Load lee el entorno y acumula TODOS los errores antes de fallar, en vez de
@@ -70,23 +89,102 @@ func Load() (*Config, error) {
 		}
 		return n
 	}
+	passwordNum := func(key, def string, max int) int {
+		n := num(key, def)
+		if n <= 0 || n > max {
+			problems = append(problems, fmt.Sprintf("%s debe estar entre 1 y %d", key, max))
+		}
+		return n
+	}
+	positiveNum := func(key, def string) int {
+		n := num(key, def)
+		if n <= 0 {
+			problems = append(problems, fmt.Sprintf("%s debe ser mayor que 0", key))
+		}
+		return n
+	}
+	positiveDuration := func(key, def string) time.Duration {
+		d := dur(key, def)
+		if d <= 0 {
+			problems = append(problems, fmt.Sprintf("%s debe ser una duración mayor que 0", key))
+		}
+		return d
+	}
+
+	jwtSigningKey := req("JWT_SIGNING_KEY")
+	if decoded, err := base64.StdEncoding.DecodeString(jwtSigningKey); err != nil || len(decoded) != 32 {
+		problems = append(problems, "JWT_SIGNING_KEY debe ser una semilla Ed25519 en base64 de 32 bytes")
+	}
+
+	passwordMemory := passwordNum("ARGON2_MEMORY_KIB", "65536", int(^uint32(0)))
+	passwordIterations := passwordNum("ARGON2_ITERATIONS", "3", int(^uint32(0)))
+	passwordParallelism := passwordNum("ARGON2_PARALLELISM", "2", 255)
+	passwordConcurrency := passwordNum("ARGON2_CONCURRENCY", "4", int(^uint(0)>>1))
+	trustedProxies := parseTrustedProxies(os.Getenv("TRUSTED_PROXIES"), &problems)
 
 	cfg := &Config{
-		Port:        num("API_PORT", "8081"),
-		LogLevel:    opt("LOG_LEVEL", "info"),
-		Version:     opt("APP_VERSION", "dev"),
-		DatabaseURL: Secret(req("DATABASE_URL")),
-		RabbitURL:   Secret(req("RABBITMQ_URL")),
-		SMTPHost:    opt("SMTP_HOST", "mailpit"),
-		SMTPPort:    num("SMTP_PORT", "1025"),
-		SMTPFrom:    opt("SMTP_FROM", "no-reply@identity.local"),
-		JWTIssuer:   opt("JWT_ISSUER", "http://localhost:8080"),
-		AccessTTL:   dur("JWT_ACCESS_TTL", "15m"),
-		RefreshTTL:  dur("JWT_REFRESH_TTL", "720h"),
+		Port:                    num("API_PORT", "8081"),
+		LogLevel:                opt("LOG_LEVEL", "info"),
+		Version:                 opt("APP_VERSION", "dev"),
+		DatabaseURL:             Secret(req("DATABASE_URL")),
+		RabbitURL:               Secret(req("RABBITMQ_URL")),
+		SMTPHost:                opt("SMTP_HOST", "mailpit"),
+		SMTPPort:                num("SMTP_PORT", "1025"),
+		SMTPFrom:                opt("SMTP_FROM", "no-reply@identity.local"),
+		PublicBaseURL:           opt("PUBLIC_BASE_URL", "http://localhost:8080"),
+		JWTSigningKey:           Secret(jwtSigningKey),
+		JWTIssuer:               opt("JWT_ISSUER", "http://localhost:8080"),
+		JWTAudience:             opt("JWT_AUDIENCE", "identity-hub"),
+		AccessTTL:               dur("JWT_ACCESS_TTL", "15m"),
+		RefreshTTL:              dur("JWT_REFRESH_TTL", "720h"),
+		LoginAccountMaxFailures: positiveNum("LOGIN_ACCOUNT_MAX_FAILURES", "5"),
+		LoginIPMaxFailures:      positiveNum("LOGIN_IP_MAX_FAILURES", "20"),
+		LoginFailureWindow:      positiveDuration("LOGIN_FAILURE_WINDOW", "15m"),
+		LoginLockoutDuration:    positiveDuration("LOGIN_LOCKOUT_DURATION", "15m"),
+		TrustedProxies:          trustedProxies,
+		Argon2: PasswordConfig{
+			MemoryKiB:   boundedUint32(passwordMemory),
+			Iterations:  boundedUint32(passwordIterations),
+			Parallelism: boundedUint8(passwordParallelism),
+			Concurrency: passwordConcurrency,
+		},
 	}
 
 	if len(problems) > 0 {
 		return nil, fmt.Errorf("configuración inválida:\n  - %s", strings.Join(problems, "\n  - "))
 	}
 	return cfg, nil
+}
+
+// boundedUint32 and boundedUint8 narrow values that passwordNum has already
+// validated; the explicit range check makes the conversion safe on its own.
+func boundedUint32(n int) uint32 {
+	if n < 0 || n > math.MaxUint32 {
+		return 0
+	}
+	return uint32(n)
+}
+
+func boundedUint8(n int) uint8 {
+	if n < 0 || n > math.MaxUint8 {
+		return 0
+	}
+	return uint8(n)
+}
+
+func parseTrustedProxies(value string, problems *[]string) []netip.Prefix {
+	var prefixes []netip.Prefix
+	for _, entry := range strings.Split(value, ",") {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		prefix, err := netip.ParsePrefix(entry)
+		if err != nil {
+			*problems = append(*problems, fmt.Sprintf("TRUSTED_PROXIES contiene un CIDR inválido %q: %v", entry, err))
+			continue
+		}
+		prefixes = append(prefixes, prefix)
+	}
+	return prefixes
 }

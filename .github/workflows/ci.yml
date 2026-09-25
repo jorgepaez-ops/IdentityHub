@@ -26,7 +26,9 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: "1.22"
+  # Go 1.25: chi >= 5.3.0 exige go 1.23 y los avisos de la biblioteca estándar solo se
+  # corrigen a partir de Go 1.25.13 (decisión Q11 ampliada, 2026-09-21).
+  GO_VERSION: "1.25"
   NODE_VERSION: "18"
 
 jobs:
@@ -43,14 +45,42 @@ jobs:
           python3 -m pip install --quiet 'openapi-spec-validator==0.7.1'
           python3 -m openapi_spec_validator specs/03-api/openapi.yaml
 
-      - name: Regenerar la matriz de trazabilidad
-        run: python3 scripts/traceability.py --check
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: backend/go.sum
 
-      # A partir de la semana 2, aquí se regeneran también
-      # backend/internal/api/gen.go y frontend/src/api/schema.d.ts y se
-      # comprueba que no difieren de lo commiteado (RNF-011).
+      - name: Regenerar la API Go
+        working-directory: backend
+        run: |
+          go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.5.1
+          go generate ./internal/api
+
+      - name: Regenerar consultas SQL con sqlc
+        run: |
+          GOTOOLCHAIN=go1.26.2 go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1
+          "$(go env GOPATH)/bin/sqlc" generate
+
+      # Sin `cache: npm`: todavía no hay package-lock.json (lo versiona T25) y
+      # setup-node falla si la ruta de dependencias no existe.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Regenerar los tipos de la API
+        working-directory: frontend
+        run: |
+          npm install --no-package-lock --ignore-scripts
+          npm run gen:api
+
+      - name: Regenerar la matriz de trazabilidad
+        run: python3 scripts/traceability.py
+
       - name: El árbol de trabajo debe quedar limpio
-        run: git diff --exit-code
+        run: |
+          # git diff omite archivos sin seguimiento; status los hace fallar también.
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
 
   # ── 2. Estilo y tipos ───────────────────────────────────────────────────
   lint:
@@ -65,10 +95,11 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: backend/go.sum
 
+      # golangci-lint v2: la v1 se compila con Go 1.22 y no analiza código que apunte a Go 1.25.
       - name: golangci-lint (incluye gosec)
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v9
         with:
-          version: v1.59
+          version: v2.13.2
           working-directory: backend
           args: --timeout=5m
 
@@ -255,6 +286,39 @@ jobs:
           npm install
           npm run test
 
+  # ── 6b. Pruebas de integración ─────────────────────────────────────────
+  test-integration:
+    name: 6b · Pruebas de integración
+    runs-on: ubuntu-latest
+    env:
+      # github.run_id is a per-run, throwaway service password, not a secret.
+      TEST_DATABASE_URL: ${{ format('{0}{1}{2}', 'postgres://identity:', github.run_id, '@localhost:5432/identity?sslmode=disable') }}
+    services:
+      postgres:
+        image: postgres:16-bookworm@sha256:efedf3595f1d6f415c08568ba171029bf54052e754cc9f030e3f2412b21f3d67
+        env:
+          POSTGRES_USER: identity
+          POSTGRES_PASSWORD: ${{ github.run_id }}
+          POSTGRES_DB: identity
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U identity -d identity"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: backend/go.sum
+
+      - name: go test integration
+        working-directory: backend
+        run: go test -race -tags=integration ./...
+
   # ── 8. Configuración e infraestructura ──────────────────────────────────
   iac-scan:
     name: 8 · Configuración de contenedores
@@ -267,7 +331,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Trivy config
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: config
           scan-ref: .
@@ -283,7 +347,7 @@ jobs:
           category: trivy-config
 
       - name: Romper la build si hay misconfiguración HIGH o CRITICAL
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: config
           scan-ref: .
@@ -328,7 +392,7 @@ jobs:
           cache-to: type=gha,scope=${{ matrix.name }},mode=max
 
       - name: Trivy sobre la imagen (informe)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: identity-hub/${{ matrix.name }}:${{ github.sha }}
           format: sarif
@@ -346,7 +410,7 @@ jobs:
       # disponible. Bloquear por un CVE sin arreglo no protege de nada y
       # entrena al equipo a ignorar el rojo.
       - name: Romper la build si hay CVE corregibles
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: identity-hub/${{ matrix.name }}:${{ github.sha }}
           severity: HIGH,CRITICAL

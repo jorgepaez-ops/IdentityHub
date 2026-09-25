@@ -44,19 +44,21 @@ e2e/tests/      vacío; Playwright llega en la semana 3
 | Tests como en CI | `cd backend && go test -race -short ./...` |
 | Tests frontend | `make test-front` (= `cd frontend && npm run test`) |
 | Todo | `make test` |
-| Lint + tipos | `make lint` (`go vet`, `golangci-lint` con gosec, `npm run lint`; si falta golangci-lint solo avisa, instálalo); tipos front: `cd frontend && npm run typecheck` |
+| Lint + tipos | `make lint` (`go vet`, `golangci-lint` v2 con gosec, `npm run lint`; si falta golangci-lint solo avisa: `go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2`; falla ante hallazgos, salvo los sembrados de `legacy_auth.go` hasta T23); tipos front: `cd frontend && npm run typecheck` |
 | Formato Go | `make fmt` (gofmt) |
 | Validar OpenAPI | `python3 -m openapi_spec_validator specs/03-api/openapi.yaml` (`pip install openapi-spec-validator==0.7.1`) |
 | Trazabilidad | `python3 scripts/traceability.py` (escribe `specs/07-traceability.md`) · `--check` (falla si está desactualizada) |
-| Gate de deriva local | `make gen` (hoy solo corre traceability.py; oapi-codegen/openapi-typescript los añade T2) |
+| Gate de deriva local | `make gen` regenera `gen.go` (oapi-codegen **v2.5.1**), `schema.d.ts` (openapi-typescript 6.7.6), el código de sqlc (**v1.31.1**, exige Go 1.26 para compilarse) y la matriz. No uses versiones más nuevas de oapi-codegen: obligan a subir `go` y mueven `x/text` |
 | Tipos del cliente TS | `cd frontend && npm run gen:api` (script existente; requiere `npm install`) |
 | Escaneos locales | `make scan` · `scan-secrets` · `scan-deps` · `scan-config` · `scan-image` (todos terminan con `\|\| true`: leer la salida, no el exit code) |
 | BD | `make migrate` · `make psql` |
 | Hooks locales | `pre-commit install` (gitleaks, gofmt, go build, traceability) |
 
 Puertos del stack: web 8080, api 8081, Mailpit 8025, RabbitMQ 15672.
-**No existen todavía** (los crean las tareas): sqlc, oapi-codegen, `make test-integration`,
-pruebas Playwright, `docs/runbook.md`. `make e2e` es un placeholder.
+**No existen todavía** (los crean las tareas): pruebas Playwright y `docs/runbook.md`. `make e2e` es un
+placeholder. Las pruebas de integración usan `make test-integration` y `TEST_DATABASE_URL` (una PostgreSQL local):
+tu sandbox no llega a ella, así que déjalas compilando (`go vet -tags=integration ./...`) y avisa: Claude las ejecuta.
+Go es 1.25 (`go.mod`, decisión Q19); `x/crypto` se queda en v0.17.0 hasta T24.
 
 ## Cómo trabajas (acuerdo con Codex)
 
@@ -70,8 +72,12 @@ pruebas Playwright, `docs/runbook.md`. `make e2e` es un placeholder.
 4. Un Conventional Commit por tarea (`feat(auth): ...`, `fix(...)`, `test(...)`, `docs(...)`,
    `ci(...)`, `build(...)`, `chore(...)`), con pruebas y docs en el mismo commit.
    **Sin líneas `Co-Authored-By` ni atribución a IA.** Solo español/inglés técnico sobrio.
-5. Marca la casilla de la tarea **solo tras ver pasar** sus comprobaciones, y anota el SHA en
-   su línea `Commit:`. No marques casillas de `Usuario` ni de `Claude (revisión)`.
+5. Marca la casilla de la tarea **solo tras ver pasar** sus comprobaciones. Un commit no puede
+   contener su propio SHA, así que cada tarea cierra con **dos commits**: (a) el commit de la
+   tarea (código, pruebas y docs); (b) un commit de registro, `docs(tasks): registra evidencia
+   de T<id>`, que marca la casilla, anota el SHA de (a) en su línea `Commit:` y añade la nota de
+   handoff. Nunca mezcles (b) con cambios de código, ni enmiendes (a) para meter su SHA.
+   No marques casillas de `Usuario` ni de `Claude (revisión)`.
 6. Nunca hagas `git push`, no abras PR, no uses `--force`, `reset --hard` ni reescribas
    historial, no crees ni muevas tags. Push, PR, tags y merge son del usuario.
 7. Si un spec es ambiguo o contradictorio: **no adivines**. Anótalo en "Preguntas nuevas" (dentro de
@@ -88,8 +94,8 @@ pruebas Playwright, `docs/runbook.md`. `make e2e` es un placeholder.
   archivos, sembrados a propósito y necesarios como evidencia "antes", hasta que lo haga la
   tarea designada (entre paréntesis):
   `backend/internal/api/legacy_auth.go` y su ruta `/auth/legacy-login` en `server.go`
-  (VULN-001, 002, 004, 005, 006, 007; T23) · `backend/go.mod` con chi 5.0.11, jwt v4, pgx 5.5.1,
-  x/text y la directiva `go 1.22` (VULN-020 chi T6, VULN-021 T23, VULN-022 y x/text T24) ·
+  (VULN-001, 002, 004, 005, 006, 007; T23) · `backend/go.mod` con jwt v4, pgx 5.5.1 y
+  x/text (VULN-021 T23, VULN-022 y x/text T24; chi y la directiva `go` ya se remediaron en T6: `go 1.25`, decisión Q19) ·
   `backend/Dockerfile` (VULN-008 a 012; T26, T27) · `frontend/Dockerfile` (VULN-016 a 018; T28) ·
   `frontend/nginx/default.conf` (VULN-013 a 015; T29) · `frontend/package.json` con axios y
   lodash antiguos (T25) · `deploy/docker-compose.yml` (VULN-003, 019 y 024; T26, T30). Su comentario de endurecimiento dice hoy
@@ -104,7 +110,7 @@ pruebas Playwright, `docs/runbook.md`. `make e2e` es un placeholder.
   aprobación del usuario. Endurecer un gate sí es válido.
 - Los contratos de `specs/` (OpenAPI, AsyncAPI, requisitos, ADR, features) no se modifican
   sin pasar por "Cambios de spec propuestos". `specs/07-traceability.md` es generado.
-- El repo aún no tiene remoto (lo crea el usuario en `T0.1`; será público); no intentes configurarlo.
+- El repo tiene remoto (`origin`, público, creado en `T0.1`); no lo reconfigures y no hagas push: es del usuario.
 
 ## Seguridad del núcleo IdP (referencias, no repetir aquí)
 
@@ -130,7 +136,8 @@ pruebas Playwright, `docs/runbook.md`. `make e2e` es un placeholder.
 - [ ] `python3 scripts/traceability.py` ejecutado y su salida commiteada si cambió.
 - [ ] Código generado regenerado (sin diff) cuando la tarea toca specs, sqlc u OpenAPI.
 - [ ] Docs/ficha/ADR afectados actualizados en el mismo commit.
-- [ ] Un commit convencional sin atribución; casilla marcada; SHA anotado; handoff escrito.
+- [ ] Commit de la tarea convencional y sin atribución, más el commit `docs(tasks)` de registro
+      (casilla marcada, SHA del primero anotado, handoff escrito).
 
 ## Protocolo de traspaso
 
@@ -142,10 +149,11 @@ El espejo en memoria del archivo de tareas lo reconcilia Claude; tú solo editas
 ## Evidencia de vulnerabilidades (antes / después)
 
 Convención completa en `odd/tasks/idp-semana-2.md`, sección "Protocolo de evidencia".
-Resumen: por hallazgo, `docs/evidencia/VULN-XXX/` con `before.png`, `after.png` y
-`evidencia.json` (los toma el **usuario**; tú no haces capturas). Tu parte: el commit de
-remediación, dejar la ficha `security/findings/VULN-XXX-*.md` con "Commit de remediación" y
-estado actualizado, y no ejecutar ningún commit de remediación antes de que exista el "antes".
+Resumen (Q16): las capturas viven en un informe externo que arma el usuario con Claude Desktop, no en
+el repo; en el repo solo hay `docs/evidencia/VULN-XXX/evidencia.json` (texto, lo escribe Claude). Tú no
+haces capturas ni escribes en `docs/evidencia/VULN-*/`. Tu parte: el commit de remediación, dejar la
+ficha `security/findings/VULN-XXX-*.md` con "Commit de remediación" y estado actualizado, y no ejecutar
+ningún commit de remediación antes de que exista el "antes" (T0.3 marcada).
 
 ## Reglas de revisión de Go (`.gga` usa este archivo como `RULES_FILE`)
 

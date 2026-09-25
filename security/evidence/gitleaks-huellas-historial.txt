@@ -1,0 +1,22 @@
+# Huellas (Fingerprint) de los 12 hallazgos conocidos de Gitleaks sobre el historial (entrada de T31).
+# Obtenidas el 2026-09-20 con `gitleaks detect` v8.18.4 en modo git y .gitleaks.toml, sobre feat/idp-semana-2.
+# Formato: <commit>:<archivo>:<regla>:<línea>. Sin Secret ni Match. Todas apuntan al commit 053e15f (línea base).
+# El job `secrets` del CI no las produjo (D6: rango 053e15f^..9f04fec inexistente en el push inicial).
+053e15fb27b1aaf974c7c818108eee64628973e9:backend/Dockerfile:contrasena-en-variable-de-entorno:48
+053e15fb27b1aaf974c7c818108eee64628973e9:backend/Dockerfile:contrasena-en-variable-de-entorno:49
+053e15fb27b1aaf974c7c818108eee64628973e9:backend/Dockerfile:contrasena-en-variable-de-entorno:64
+053e15fb27b1aaf974c7c818108eee64628973e9:backend/internal/api/legacy_auth.go:aws-access-token:44
+053e15fb27b1aaf974c7c818108eee64628973e9:backend/internal/api/legacy_auth.go:slack-bot-token:46
+053e15fb27b1aaf974c7c818108eee64628973e9:deploy/docker-compose.yml:contrasena-en-variable-de-entorno:24
+053e15fb27b1aaf974c7c818108eee64628973e9:deploy/docker-compose.yml:contrasena-en-variable-de-entorno:42
+053e15fb27b1aaf974c7c818108eee64628973e9:deploy/docker-compose.yml:url-de-conexion-con-credenciales:102
+053e15fb27b1aaf974c7c818108eee64628973e9:deploy/docker-compose.yml:url-de-conexion-con-credenciales:103
+053e15fb27b1aaf974c7c818108eee64628973e9:deploy/docker-compose.yml:url-de-conexion-con-credenciales:133
+053e15fb27b1aaf974c7c818108eee64628973e9:deploy/docker-compose.yml:url-de-conexion-con-credenciales:134
+053e15fb27b1aaf974c7c818108eee64628973e9:deploy/docker-compose.yml:url-de-conexion-con-credenciales:82
+
+# ── FUERA de la línea base (2026-09-21): falsos positivos nuestros, ya en el historial publicado ──
+# APROBADAS por el usuario el 2026-09-21 (decisión Q20) para el .gitleaksignore de T31: son las únicas 2 huellas adicionales autorizadas.
+# Ya no aparecen en el árbol de trabajo (config.go renombrado y nota reformulada), pero el historial las conserva.
+4e8c6532a50c7766dd03d39b532af6d9e79648fc:backend/internal/config/config.go:contrasena-en-variable-de-entorno:106
+f987772528ced85c71b6ee55c4453d0f5370d513:odd/tasks/idp-semana-2.md:url-de-conexion-con-credenciales:1000

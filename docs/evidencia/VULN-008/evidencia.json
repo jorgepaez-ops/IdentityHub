@@ -1,0 +1,33 @@
+{
+  "vuln": "VULN-008",
+  "gate": [
+    "docker build (baseline-scan)",
+    "Trivy image sobre imágenes base (baseline-scan, run 35534898422)"
+  ],
+  "antes": {
+    "commit_linea_base": "053e15fb27b1aaf974c7c818108eee64628973e9",
+    "commit_main": null,
+    "workflow": "Escaneo de la línea base",
+    "run_id": "35476102444",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444",
+    "artefacto": "security/evidence/actions-35476102444/docker-build-api.txt",
+    "captura": "informe Desktop §3 VULN-008",
+    "hallazgos": [
+      "docker build de backend (target api) sobre debian:11-slim falla en apt-get install: 404 en bullseye-security (Debian 11 sin soporte); api y worker terminan con exit code 1",
+      "Trivy sobre debian:11-slim: 58 vulnerabilidades HIGH/CRITICAL; sobre golang:1.22-bullseye: 1625 (run 35534898422, 2026-09-20)"
+    ],
+    "observacion": "Evidencia principal: run 35476102444 (extracto en docker-build-api.txt). Segundo run 35534898422 (https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35534898422), resumen en security/evidence/actions-35534898422/README.md. Trivy sobre baseline/api no aplica: la imagen no se construye."
+  },
+  "remediacion": {
+    "tarea": "T27",
+    "commit": null,
+    "ficha": null
+  },
+  "despues": {
+    "commit": null,
+    "workflow": null,
+    "run_id": null,
+    "run_url": null,
+    "captura": null
+  }
+}

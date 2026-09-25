@@ -1,0 +1,23 @@
+# Construcción de la imagen api sobre el tag v0.0.0-vuln-baseline (run 35476102444, paso 'Construir las imágenes de la línea base').
+# Extracto de las líneas de error: apt-get no encuentra los paquetes de bullseye-security (Debian 11, fuera de soporte) y el paso
+# termina con exit code 100; como bash corre con -e, worker y web no se llegan a construir.
+#8 [builder 1/7] FROM docker.io/library/golang:1.22-bullseye@sha256:c89d51959c480f13e7830a33fa0174480227c8a027d0e18066e79a03cde174c4
+#10 [api 1/4] FROM docker.io/library/debian:11-slim@sha256:e5b6442dd2e9684cf5e87d8338b5968f3b348636fc0be6d7850a381e3731a2bd
+#12 Err:1 http://deb.debian.org/debian-security bullseye-security/main amd64 openssl amd64 1.1.1w-0+deb11u8
+#12   404  Not Found
+#12 Err:7 http://deb.debian.org/debian-security bullseye-security/main amd64 libnghttp2-14 amd64 1.43.0-1+deb11u3
+#12 Err:11 http://deb.debian.org/debian-security bullseye-security/main amd64 libcurl4 amd64 7.74.0-1.3+deb11u16
+#12 Err:12 http://deb.debian.org/debian-security bullseye-security/main amd64 curl amd64 7.74.0-1.3+deb11u16
+#12 E: Failed to fetch http://deb.debian.org/debian-security/pool/updates/main/o/openssl/openssl_1.1.1w-0%2bdeb11u8_amd64.deb  404  Not Found
+#12 E: Fetched 1462 kB in 0s (6838 kB/s)
+#12 Failed to fetch http://deb.debian.org/debian-security/pool/updates/main/n/nghttp2/libnghttp2-14_1.43.0-1%2bdeb11u3_amd64.deb  404  Not Found
+#12 E: Failed to fetch http://deb.debian.org/debian-security/pool/updates/main/c/curl/libcurl4_7.74.0-1.3%2bdeb11u16_amd64.deb  404  Not Found
+#12 E: Failed to fetch http://deb.debian.org/debian-security/pool/updates/main/c/curl/curl_7.74.0-1.3%2bdeb11u16_amd64.deb  404  Not Found
+#12 E: Unable to fetch some archives, maybe run apt-get update or try with --fix-missing?
+#12 ERROR: process "/bin/sh -c apt-get update && apt-get install -y ca-certificates curl" did not complete successfully: exit code: 100
+3.273   404  Not Found
+3.293 E: Failed to fetch http://deb.debian.org/debian-security/pool/updates/main/o/openssl/openssl_1.1.1w-0%2bdeb11u8_amd64.deb  404  Not Found
+3.293 Failed to fetch http://deb.debian.org/debian-security/pool/updates/main/n/nghttp2/libnghttp2-14_1.43.0-1%2bdeb11u3_amd64.deb  404  Not Found
+3.293 E: Failed to fetch http://deb.debian.org/debian-security/pool/updates/main/c/curl/libcurl4_7.74.0-1.3%2bdeb11u16_amd64.deb  404  Not Found
+3.293 E: Failed to fetch http://deb.debian.org/debian-security/pool/updates/main/c/curl/curl_7.74.0-1.3%2bdeb11u16_amd64.deb  404  Not Found
+ERROR: failed to build: failed to solve: process "/bin/sh -c apt-get update && apt-get install -y ca-certificates curl" did not complete successfully: exit code: 100

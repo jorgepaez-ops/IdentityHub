@@ -20,6 +20,7 @@ import (
 
 	"github.com/jorgepaez/identity-hub/internal/config"
 	"github.com/jorgepaez/identity-hub/internal/events"
+	"github.com/jorgepaez/identity-hub/internal/notify"
 	"github.com/jorgepaez/identity-hub/internal/observability"
 )
 
@@ -111,11 +112,18 @@ func (w *worker) alreadyProcessed(eventID string) bool {
 		}
 	}
 
-	if _, dup := w.seen[eventID]; dup {
-		return true
-	}
+	_, dup := w.seen[eventID]
+	return dup
+}
+
+// markDelivered registra el identificador solo tras una entrega exitosa. Si
+// se marcara antes de intentar entregar, un fallo transitorio de SMTP haría
+// que el reintento (Nack con requeue) se descartara como "duplicado" sin
+// haber enviado nunca el correo.
+func (w *worker) markDelivered(eventID string) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	w.seen[eventID] = time.Now()
-	return false
 }
 
 func (w *worker) handle(ctx context.Context, d amqp.Delivery) {
@@ -148,37 +156,35 @@ func (w *worker) handle(ctx context.Context, d amqp.Delivery) {
 		return
 	}
 
+	w.markDelivered(env.EventID.String())
 	log.Info("notificación entregada")
 	observability.EventsConsumed.WithLabelValues(env.EventType, "delivered").Inc()
 	_ = d.Ack(false)
 }
 
-// deliver arma y envía el correo. En la semana 2 se sustituye por plantillas
-// por tipo de evento; aquí basta con demostrar el recorrido completo
-// broker → worker → SMTP → Mailpit.
-func (w *worker) deliver(_ context.Context, env events.Envelope, body []byte) error {
-	var payload struct {
-		Data struct {
-			Email       string `json:"email"`
-			DisplayName string `json:"displayName"`
-		} `json:"data"`
+// deliver arma el correo específico del tipo de evento y lo envía por SMTP.
+// Nunca registra el cuerpo bruto porque algunos eventos llevan tokens en claro.
+func (w *worker) deliver(ctx context.Context, env events.Envelope, body []byte) error {
+	message, err := notify.Render(env.EventType, w.cfg.PublicBaseURL, body)
+	if err != nil {
+		return fmt.Errorf("renderizando la notificación: %w", err)
 	}
-	if err := json.Unmarshal(body, &payload); err != nil {
-		return fmt.Errorf("extrayendo el destinatario: %w", err)
+	// net/smtp no admite contexto, así que un SendMail en curso no se puede
+	// interrumpir; esto evita arrancar uno nuevo una vez iniciado el apagado.
+	if err := ctx.Err(); err != nil {
+		return err
 	}
-	if payload.Data.Email == "" {
-		return fmt.Errorf("el evento %s no trae destinatario", env.EventType)
-	}
-
-	msg := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: [Identity Hub] %s\r\n\r\n"+
-		"Hola %s:\r\n\r\nEvento: %s\r\nFecha: %s\r\n",
-		w.cfg.SMTPFrom, payload.Data.Email, env.EventType,
-		payload.Data.DisplayName, env.EventType, env.OccurredAt.Format(time.RFC3339))
 
 	addr := net.JoinHostPort(w.cfg.SMTPHost, fmt.Sprint(w.cfg.SMTPPort))
 	// Mailpit no exige autenticación ni TLS; en un entorno real aquí irían
 	// credenciales y STARTTLS.
-	return smtp.SendMail(addr, nil, w.cfg.SMTPFrom, []string{payload.Data.Email}, []byte(msg))
+	return smtp.SendMail(addr, nil, w.cfg.SMTPFrom, []string{message.To}, buildRawMessage(w.cfg.SMTPFrom, message))
+}
+
+// buildRawMessage arma las cabeceras RFC 5322 y el cuerpo que espera smtp.SendMail.
+func buildRawMessage(from string, message notify.Message) []byte {
+	return []byte(fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: [Identity Hub] %s\r\n\r\n%s",
+		from, message.To, message.Subject, message.Body))
 }
 
 func startMetricsServer(logger *slog.Logger, version string) *http.Server {

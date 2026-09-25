@@ -4,11 +4,13 @@
 # mismo nombre. Si `make scan` y el pipeline divergen, el pipeline deja de ser
 # una red de seguridad y pasa a ser una sorpresa.
 
-COMPOSE     := docker compose -f deploy/docker-compose.yml
+COMPOSE     := docker compose --env-file .env -f deploy/docker-compose.yml
 COMPOSE_OBS := $(COMPOSE) --profile observability
+SQLC_VERSION := v1.31.1
+SQLC         ?= sqlc
 
 .DEFAULT_GOAL := help
-.PHONY: help up down logs ps restart build test test-go test-front e2e lint fmt gen scan scan-secrets scan-deps scan-image scan-config migrate psql rabbit mail clean
+.PHONY: help up down logs ps restart build test test-go test-integration test-front e2e lint fmt gen scan scan-secrets scan-deps scan-image scan-config migrate psql rabbit mail clean
 
 help: ## Muestra esta ayuda
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -50,15 +52,19 @@ build: ## Construye las tres imágenes
 
 # ── Desarrollo ───────────────────────────────────────────────────────────
 gen: ## Regenera todo lo derivado de los specs (RNF-011)
+	cd backend && go generate ./internal/api
+	@test "$$($(SQLC) version)" = "$(SQLC_VERSION)" || \
+		(echo "sqlc $(SQLC_VERSION) is required" && exit 1)
+	$(SQLC) generate
+	cd frontend && npm run gen:api
 	python3 scripts/traceability.py
-	@echo "Pendiente para la semana 2: oapi-codegen y openapi-typescript."
 
 fmt: ## Formatea el código
 	cd backend && gofmt -w .
 
 lint: ## Lint y comprobación de tipos
 	cd backend && go vet ./...
-	cd backend && golangci-lint run --timeout=5m || echo "  (golangci-lint no instalado: brew install golangci-lint)"
+	@if command -v golangci-lint >/dev/null 2>&1; then cd backend && golangci-lint run --timeout=5m; else echo "  (golangci-lint no instalado: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2)"; fi
 	cd frontend && npm run lint
 
 test: test-go test-front ## Todas las pruebas
@@ -66,6 +72,9 @@ test: test-go test-front ## Todas las pruebas
 test-go: ## Pruebas de Go con detector de carreras
 	cd backend && go test -race -coverprofile=coverage.out -covermode=atomic ./...
 	cd backend && go tool cover -func=coverage.out | tail -1
+
+test-integration: ## Pruebas de integración con PostgreSQL temporal
+	cd backend && go test -race -tags=integration ./...
 
 test-front: ## Pruebas del frontend
 	cd frontend && npm run test

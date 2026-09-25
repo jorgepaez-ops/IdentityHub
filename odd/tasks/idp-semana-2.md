@@ -69,8 +69,8 @@ Codex puede crear y editar: `backend/**` (salvo lo sembrado, según cada tarea),
 este archivo. Excepciones puntuales, cada una solo en la tarea indicada: `specs/03-api/openapi.yaml`
 (solo T1a, C1), `specs/adr/0005-*.md` (solo T14a, C2), `scripts/traceability.py` (solo T34, para el
 estado "diferido") y `.gitleaksignore` (solo T31, con las huellas que entregue el usuario). No puede:
-modificar `specs/` fuera de C1/C2, tocar tags, escribir en `docs/evidencia/VULN-*/` (lo hace el
-usuario), ni commitear `.atl/`, `.gga`, `docs/diagramas/`.
+modificar `specs/` fuera de C1/C2, tocar tags, escribir en `docs/evidencia/VULN-*/` (lo hace Claude:
+ver "Protocolo de evidencia"), hacer capturas, ni commitear `.atl/`, `.gga`, `docs/diagramas/`.
 
 ## Criterios de aceptación de la feature
 
@@ -82,34 +82,47 @@ usuario), ni commitear `.atl/`, `.gga`, `docs/diagramas/`.
 4. Cobertura de `backend/internal/` >= 70 % y gate activo (RNF-005).
 5. Los escenarios de `specs/06-acceptance/` de autenticación, registro, rotación y control de
    acceso tienen prueba Go equivalente (E2E llega en semana 3).
-6. Cada VULN de la fase 3 tiene fila completa en el "Registro de evidencia" y su carpeta
-   `docs/evidencia/VULN-XXX/` con antes y después, o queda anotado por qué no aplica.
+6. Cada VULN de la fase 3 tiene fila completa en el "Registro de evidencia" y su
+   `docs/evidencia/VULN-XXX/evidencia.json` con `antes` y `despues` completos, y sus capturas antes/después
+   están en el informe externo (confirmado por el usuario), o queda anotado por qué no aplica.
 7. Tag del estado corregido creado por el usuario (T38).
 
 ## Protocolo de evidencia
 
 Objetivo: documentar el ciclo de vida de cada vulnerabilidad con pruebas.
 
-**Carpeta por hallazgo:** `docs/evidencia/VULN-XXX/` (todos los hallazgos tienen ya id: Q9
-asigna VULN-024 a VULN-026 a los que no lo tenían), con:
+**Dos capas (Q16, 2026-09-20).** Las capturas de pantalla **no viven en el repo**: Claude Desktop
+las toma navegando GitHub en la sesión autenticada del usuario (solo lectura; sin permisos de
+escritura sobre el repo) y las reúne en el informe externo `Evidencias-CI-LineaBase-IdentityHub.docx`
+(sin versionar, en `Claude outputs/`). Lo que sí se versiona es texto:
 
-- `before.png` y `after.png`: capturas del usuario (o de Claude Desktop con navegador): la
-  alerta como aparece en GitHub (log del job en Actions, o pestaña Security > Code scanning /
-  Dependabot). Tomarlas del mismo gate antes y después.
+1. **En el repo:** `docs/evidencia/VULN-XXX/evidencia.json` por hallazgo (todos los hallazgos
+   tienen ya id: Q9 asigna VULN-024 a VULN-026 a los que no lo tenían) y el artefacto ya guardado
+   en `security/evidence/`. Es lo que perdura cuando caducan los logs de Actions (retención de 90 días).
+2. **Fuera del repo:** el informe con las capturas `antes` y `después`. El campo `captura` de cada
+   `evidencia.json` apunta a la sección del informe donde está la imagen (`null` hasta que el
+   usuario confirme que la captura existe).
+
+Datos que Desktop entrega como **texto** (no imágenes) por cada VULN: workflow, run ID/URL, job,
+paso, SHA, y la alerta literal sin secretos. Con eso Claude escribe o completa el `evidencia.json`.
+
+**Carpeta por hallazgo:** `docs/evidencia/VULN-XXX/`, con:
+
 - `evidencia.json`: artefacto legible por máquina. Forma fija (`null` hasta conocerse):
   ```json
   {
     "vuln": "VULN-002",
     "gate": ["gosec G401 (baseline-scan)", "CodeQL", "Semgrep"],
     "antes":   {"commit_linea_base": "053e15f...", "commit_main": null, "workflow": null,
-                "run_id": null, "run_url": null, "artefacto": "security/evidence/...", "captura": "before.png"},
+                "run_id": null, "run_url": null, "artefacto": "security/evidence/...", "captura": null},
     "remediacion": {"tarea": "T23", "commit": null, "ficha": "security/findings/VULN-002-md5-para-contrasenas.md"},
-    "despues": {"commit": null, "workflow": null, "run_id": null, "run_url": null, "captura": "after.png"}
+    "despues": {"commit": null, "workflow": null, "run_id": null, "run_url": null, "captura": null}
   }
   ```
-  El artefacto "antes" reutiliza lo ya versionado en `security/evidence/*-baseline.*`; los
-  recortes SARIF/JSON nuevos se guardan ahí (ruta ya permitida en `.gitleaks.toml`), no en
-  `docs/evidencia/`.
+  `captura` es una referencia de texto a la sección del informe externo (p. ej. `"informe §VULN-002 antes"`);
+  no hay `before.png` ni `after.png` en el repo. El artefacto "antes" reutiliza lo ya versionado en
+  `security/evidence/*-baseline.*` y `security/evidence/actions-<run_id>/`; los recortes SARIF/JSON
+  nuevos se guardan ahí (ruta ya permitida en `.gitleaks.toml`), no en `docs/evidencia/`.
 - El repositorio es **público** (Q10): la subida de SARIF a code scanning (pestaña Security) está
   disponible sin GitHub Advanced Security, así que el "antes" puede salir tanto de esa pestaña
   como del log del job y de los artefactos de Actions.
@@ -118,19 +131,23 @@ asigna VULN-024 a VULN-026 a los que no lo tenían), con:
   (T0.4 actualiza la plantilla en `security/findings/README.md` y las fichas existentes).
 
 **Reglas de captura:** ninguna captura ni JSON puede mostrar secretos reales; la salida de
-Gitleaks puede revelar los valores sembrados (inventados): recortar o tapar la columna del
-secreto y borrar `Secret`/`Match` de los JSON. Cada imagen <= 512 KB (el hook
-`check-added-large-files` de `.pre-commit-config.yaml` rechaza más). Los VULN detectados solo
-por ZAP (007 parcialmente, 013, 014, 015) no tienen gate hoy: el "antes" es una captura de
-`curl -sI http://localhost:8080` (cabeceras) sobre el tag, y el "después" el mismo comando.
+Gitleaks puede revelar los valores sembrados (inventados): leer primero como texto, tapar la columna del
+secreto en la imagen y borrar `Secret`/`Match` de los JSON. El informe externo no se sube al repo
+(si algún día se sube, cada imagen <= 512 KB por el hook `check-added-large-files`). Los VULN
+detectados solo por ZAP (007 parcialmente, 013, 014, 015) no tienen gate hoy: el "antes" es la
+salida de `curl -sI http://localhost:8080` (cabeceras) sobre el tag, que ejecuta el **usuario** en
+local (Desktop no puede: es un navegador), y el "después" el mismo comando; ambas salidas van al informe
+y, como texto, al `evidencia.json`.
 
 **Cómo se obtiene el "después":** `ci.yml` corre en push a `main`, en `pull_request` y en
 `workflow_dispatch`; un push a una rama sin PR no lo dispara. El usuario abre un PR por corte
 de fase (o lanza `CI` con `workflow_dispatch` sobre la rama) y registra run ID y URL.
 
-**Responsabilidades:** Usuario = capturas, run IDs, `before`/`after`, `evidencia.json` de runs.
-Codex = commit de remediación, ficha, sin capturas. Cada tarea `Remedia:` lleva su sub-casilla
-"Evidencia" a cargo de `Usuario`.
+**Responsabilidades:** Usuario (con Claude Desktop) = navegar GitHub, capturas y su informe, run
+IDs, `curl -sI` local. Claude = convertir esos datos de texto en `evidencia.json` y commitearlos.
+Codex = commit de remediación y ficha; **no** escribe en `docs/evidencia/VULN-*/` ni hace capturas.
+Cada tarea `Remedia:` lleva su sub-casilla "Evidencia" a cargo de `Usuario`: se marca cuando la
+captura "después" está en el informe y el `evidencia.json` tiene su `despues` completo.
 
 **Regla de ids:** un id `VULN-NNN` solo se asigna cuando se crea su ficha en
 `security/findings/`; nunca se inventa en un comentario de código, en el compose ni en un
@@ -147,32 +164,32 @@ los archivos sembrados y fichas). Celdas vacías = aún no conocidas.
 
 | VULN | Hallazgo | Gate que lo detecta | Antes (run / captura) | Commit remediación | Después (run / captura) | Tarea |
 |---|---|---|---|---|---|---|
-| VULN-001 | Credenciales incrustadas (código, compose, Dockerfile) | Gitleaks (`secrets`), gosec G101 (`lint`), Trivy secret (imagen) | | | | T23, T26 |
-| VULN-002 | MD5 para contraseñas | gosec G401/G501, CodeQL, Semgrep | | | | T23 (con T7) |
-| VULN-003 | Credenciales en el compose | Gitleaks | | | | T26 |
-| VULN-004 | `math/rand` para tokens | gosec G404 | | | | T23 |
-| VULN-005 | SQL por concatenación | gosec G201, CodeQL, Semgrep | | | | T23 (con T5) |
-| VULN-006 | JWT sin validar algoritmo | Semgrep, CodeQL | | | | T23 (con T8) |
-| VULN-007 | CORS comodín con credenciales | Semgrep (ZAP en semana 3) | | | | T23 |
-| VULN-008 | Base Debian 11 (backend) | Trivy image | | | | T27 |
-| VULN-009 | `USER root` (backend) | Hadolint DL3002, Trivy | | | | T27 |
-| VULN-010 | `apt-get` sin fijar ni limpiar | Hadolint DL3008/DL3009 | | | | T27 |
-| VULN-011 | `ADD` desde URL remota | Hadolint DL3020 | | | | T27 |
-| VULN-012 | Secreto en `ENV` | Trivy secret, Gitleaks | | | | T26 |
-| VULN-013 | Sin CSP, HSTS, X-Frame-Options, nosniff | ZAP (semana 3; sin gate hoy) | | | | T29 |
-| VULN-014 | `server_tokens on` | ZAP (sin gate hoy) | | | | T29 |
-| VULN-015 | Sin `limit_req` en `/api/v1/auth/*` | AM-001/AM-017 (sin gate hoy) | | | | T29 |
-| VULN-016 | `node:18-bullseye` | Trivy image | | | | T28 |
-| VULN-017 | `nginx:latest` | Hadolint DL3007 | | | | T28 |
-| VULN-018 | Imagen final del frontend como root | Hadolint DL3002 | | | | T28 |
-| VULN-019 | Imágenes base antiguas en compose | Trivy image | | | | T30 |
-| VULN-020 | `RealIP` de chi suplantable (GO-2026-5774/5775/5777) | govulncheck (`sca`) | | | | T6 |
-| VULN-021 | `golang-jwt/jwt/v4` (GO-2024-3250, GO-2025-3553) | govulncheck | | | | T23 |
-| VULN-022 | pgx 5.5.1 (GO-2024-2606) | govulncheck | | | | T24 |
-| VULN-023 | Reglas por defecto de Gitleaks insuficientes | comparación manual (ya `remediado`) | | | | T31 (revisión) |
-| VULN-024 | Sin endurecimiento de contenedores (en el comentario del compose figura como VULN-020) | Trivy config | | | | T30 |
-| VULN-025 | axios 0.21.1 / lodash 4.17.15 | npm audit, osv-scanner | | | | T25 |
-| VULN-026 | `golang.org/x/text` (GO-2026-5970) | govulncheck | | | | T24 |
+| VULN-001 | Credenciales incrustadas (código, compose, Dockerfile) | Gitleaks (`secrets`), gosec G101 (`lint`), Trivy secret (imagen) | run 35476102444 / informe §3 | | | T23, T26 |
+| VULN-002 | MD5 para contraseñas | gosec G401/G501, CodeQL, Semgrep | run 35476102444 / informe §3 | | | T23 (con T7) |
+| VULN-003 | Credenciales en el compose | Gitleaks | run 35476102444 / informe §3 | | | T26 |
+| VULN-004 | `math/rand` para tokens | gosec G404 | run 35476102444 / informe §3 | | | T23 |
+| VULN-005 | SQL por concatenación | Ninguno hoy (D3 confirmado: sin G201/G202, Semgrep ni CodeQL) | run 35476102444 (no detectado) / informe §3 | | | T23 (con T5) |
+| VULN-006 | JWT sin validar algoritmo | Ninguno hoy (D3 confirmado) | run 35476102444 (no detectado) / informe §3 | | | T23 (con T8) |
+| VULN-007 | CORS comodín con credenciales | Ninguno hoy (D3 confirmado; ZAP en semana 3) | run 35476102444 (no detectado) / informe §3 | | | T23 |
+| VULN-008 | Base Debian 11 (backend) | `docker build` (falla: Debian 11 sin paquetes) y Trivy image sobre `debian:11-slim` | run 35476102444 / informe §3 | | | T27 |
+| VULN-009 | `USER root` (backend) | Trivy config DS002 (Hadolint no emite DL3002, D4); Trivy image pendiente (D2) | run 35476102444 / informe §3 | | | T27 |
+| VULN-010 | `apt-get` sin fijar ni limpiar | Hadolint DL3008/DL3009 | run 35476102444 / informe §3 | | | T27 |
+| VULN-011 | `ADD` desde URL remota | Ninguno hoy (Hadolint no marca un `ADD` con URL, D4) | run 35476102444 (no detectado) / sin captura | | | T27 |
+| VULN-012 | Secreto en `ENV` | Gitleaks, Trivy config DS031 | run 35476102444 / informe §3 | | | T26 |
+| VULN-013 | Sin CSP, HSTS, X-Frame-Options, nosniff | ZAP (semana 3; sin gate hoy) | local (`security/evidence/local-web-baseline.txt`) / sin captura | | | T29 |
+| VULN-014 | `server_tokens on` | ZAP (sin gate hoy) | local (`security/evidence/local-web-baseline.txt`) / sin captura | | | T29 |
+| VULN-015 | Sin `limit_req` en `/api/v1/auth/*` | AM-001/AM-017 (sin gate hoy) | local (`security/evidence/local-web-baseline.txt`) / sin captura | | | T29 |
+| VULN-016 | `node:18-bullseye` | Trivy image sobre `node:18-bullseye` (por nombre) | run 35534898422 / informe §3 | | | T28 |
+| VULN-017 | `nginx:latest` | Hadolint DL3007 | run 35476102444 / informe §3 | | | T28 |
+| VULN-018 | Imagen final del frontend como root | Trivy config DS002 (Hadolint no emite DL3002, D4) | run 35476102444 / informe §3 | | | T28 |
+| VULN-019 | Imágenes base antiguas en compose | Trivy image sobre las imágenes del compose (por nombre) | run 35534898422 / informe §3 | | | T30 |
+| VULN-020 | `RealIP` de chi suplantable (GO-2026-5774/5775/5777) | govulncheck (`sca`) | run 35476102444 / informe §3 | | | T6 |
+| VULN-021 | `golang-jwt/jwt/v4` (GO-2024-3250, GO-2025-3553) | govulncheck | run 35476102444 / informe §3 | | | T23 |
+| VULN-022 | pgx 5.5.1 (GO-2024-2606) | govulncheck | run 35476102444 / informe §3 | | | T24 |
+| VULN-023 | Reglas por defecto de Gitleaks insuficientes | comparación manual (ya `remediado`) | sin gate; sin run / sin captura | | | T31 (revisión) |
+| VULN-024 | Sin endurecimiento de contenedores (en el comentario del compose figura como VULN-020) | Ninguno hoy (Trivy config solo cubre los Dockerfiles, no el compose) | run 35476102444 (no detectado) / sin captura | | | T30 |
+| VULN-025 | axios 0.21.1 / lodash 4.17.15 | npm audit (baseline-scan), osv-scanner (solo en `ci.yml`) | run 35476102444 / informe §3 | | | T25 |
+| VULN-026 | `golang.org/x/text` (GO-2026-5970) | govulncheck | run 35476102444 / informe §3 | | | T24 |
 
 Nota (Q9): `VULN-020` queda como el hallazgo de chi `RealIP`. VULN-024 a VULN-026 se asignan al
 crear sus fichas (T0.5); las fichas de 003, 004 y 006 a 019 también las crea T0.5, conservando sus
@@ -216,7 +233,7 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
 - Commit: —
 
 ### T0.2 — Ejecutar los tres workflows y guardar los resultados
-- [ ] Estado · Ejecutor: `Claude` (con `gh`/navegador según autorización del usuario) · Cubre: RNF-002, RNF-004 · Remedia: —
+- [x] Estado · Ejecutor: `Claude` (con `gh`/navegador según autorización del usuario) · Cubre: RNF-002, RNF-004 · Remedia: —
 - `CI` sobre `main` (esperado: en rojo). `Escaneo de la línea base` sobre el tag
   (`workflow_dispatch` con `ref` = `v0.0.0-vuln-baseline` si hace falta relanzar). `Escaneo
   semanal` con `workflow_dispatch`.
@@ -232,29 +249,86 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
 - Comprobar y anotar discrepancias entre gate esperado y gate real (p. ej. `//nolint:gosec` en
   `legacy_auth.go` puede ocultar G401/G404 en el job `lint`, mientras `baseline-scan.yml` usa
   gosec directo; el job `secrets` puede no ver lo mismo que `make scan-secrets`).
+- **Avance 2026-09-19 (casilla sin marcar; quedan partes abiertas):**
+  - Hecho: `CI` sobre `main` `9f04fec` = run 35473988275 (rojo, esperado); `Escaneo de la línea base`
+    = run 35476102444 (sobre el tag, `success`, ~5 min; un primer run 35473991353 se colgó en Gitleaks y
+    se canceló; se añadió `timeout-minutes` en `acd3da8`). Artefacto guardado, sin secretos, en
+    `security/evidence/actions-35476102444/` (ver su `README.md`, con resultados y discrepancias D1-D5).
+  - Gitleaks: 12 hallazgos reales, coincide con lo previsto. **Las huellas de este run no sirven para
+    T31** (D1): T31 debe extraerlas del job `secrets` del `CI` (historial).
+  - **Avance 2026-09-20:** D3 y D4 resueltas y D5 corregida (40 `github-actions-mutable-action-tag`, no 41), ver
+    `security/evidence/actions-35476102444/README.md`. La columna "Gate" del registro ya refleja lo observado:
+    ningún gate detecta VULN-005, 006, 007, 011 ni 024; `USER root` lo detecta Trivy config DS002, no Hadolint.
+  - **Avance 2026-09-20 (2):** alertas CodeQL #80 y #81 verificadas por API (abiertas, `main` `acd3da8`). **D2
+    corregido:** el workflow ya monta `docker.sock`; el fallo es la construcción de las imágenes (Trivy respondió
+    `No such image`), no el socket; la causa se confirma con el log de ese paso antes de tocar el workflow.
+    `Escaneo semanal`: corre solo los lunes 06:00 UTC en `main` (próximo: 2026-09-21) y abre una incidencia con
+    la salida de govulncheck; no hace falta lanzarlo a mano si se acepta esperar a ese run.
+  - **Avance 2026-09-20 (3):** causa de D2: la imagen `api` no se construye (Debian 11 devuelve 404 en
+    `bullseye-security`), evidencia de VULN-008 (`docker-build-api.txt`). `baseline-scan.yml` corregido (`70f7d88`:
+    construcción por imagen, Gitleaks fuera del árbol escaneado, Trivy también sobre las imágenes base) y relanzado
+    desde `feat/idp-semana-2` (run 35534898422; ver su resultado abajo cuando termine). El `curl` local dio la
+    evidencia de VULN-013, 014 y 015 (`security/evidence/local-web-baseline.txt`). Nuevos hallazgos del CI: D6 (el job
+    `secrets` no escaneó nada: rango `053e15f^..9f04fec` sin padre), D7 (job 8 falla en "Set up job"), D8 (job 5 se
+    detiene en govulncheck). **Las 12 huellas de T31** ya están en `security/evidence/gitleaks-huellas-historial.txt`
+    (escaneo local del historial, exactamente 12, todas sobre `053e15f`). Dependabot alerts: desactivado.
+  - **Avance 2026-09-20 (4):** run 35534898422 terminó en `success` con el workflow corregido: Gitleaks da 12
+    hallazgos (D1 resuelto); `api` y `worker` no se construyen (exit 1, mismo 404 de Debian 11) y `web` sí;
+    Trivy sobre imágenes base da cuentas para VULN-008, 016 y 019 (`security/evidence/actions-35534898422/README.md`).
+    Falta el JSON de Trivy sobre `baseline/web`, que solo está en el artefacto (descarga pendiente de autorización).
+  - **Cerrada 2026-09-21:** `Escaneo semanal` lanzado a mano sobre `main` con autorización del usuario: run 35547924202
+    (`success`, `govulncheck` encontró 33 vulnerabilidades; ver `security/evidence/actions-35547924202/README.md`).
+    **D9:** ese run no abrió la incidencia prevista porque `govulncheck | tee` sin `pipefail` termina en éxito; corregido
+    con `shell: bash` en `scheduled-scan.yml`. Los tres workflows tienen run y su evidencia está guardada; D1 a D9 anotadas;
+    huellas para T31 en `security/evidence/gitleaks-huellas-historial.txt`. Puerta T0 (T0.1 a T0.3) cumplida.
+  - (Pendiente histórico) `Escaneo semanal` (`workflow_dispatch`, puede abrir incidencias: requiere autorización
+    del usuario); URLs de SARIF en la pestaña Security; corregir `baseline-scan.yml` (Trivy sin socket de
+    Docker, informe de Gitleaks dentro del árbol escaneado) y repetir el escaneo de imágenes; volcar los
+    run IDs en el "Registro de evidencia"; resolver D3 y D4.
 - Commit: —
 
-### T0.3 — Capturas y `evidencia.json` "antes" por hallazgo
-- [ ] Estado · Ejecutor: `Claude` (herramienta de navegador `claude-in-chrome` si está disponible y con permisos; si no, el usuario o Claude Desktop) · Cubre: todos los VULN · Remedia: —
-- Para cada fila del "Registro de evidencia": `docs/evidencia/VULN-XXX/before.png` (sin secretos,
-  <= 512 KB) y `evidencia.json` con la sección `antes` rellena (run ID/URL, SHA, artefacto).
-- Verificación: `ls docs/evidencia/*/before.png | wc -l` cubre todas las filas con gate hoy;
-  las filas "sin gate hoy" llevan la captura de `curl -sI` y una nota.
+### T0.3 — Evidencia "antes" por hallazgo (capturas en el informe, `evidencia.json` en el repo)
+- [x] Estado · Ejecutor: `Usuario` con Claude Desktop (navegación y capturas, informe externo) y `Claude` (escribe y commitea los `evidencia.json` con los datos de texto que entrega Desktop) · Cubre: todos los VULN · Remedia: — · Depende de: T0.2 (la parte de imágenes, D2)
+- **Reestructurada el 2026-09-20 (Q16):** ya no hay `before.png` en el repo (Desktop no puede escribir en él).
+  Para cada fila del "Registro de evidencia": `docs/evidencia/VULN-XXX/evidencia.json` con la sección
+  `antes` rellena (workflow, run ID/URL, SHA, artefacto, `captura` = sección del informe) y la captura
+  "antes" presente en el informe externo, confirmada por el usuario.
+- Dos pasadas: (1) los VULN con evidencia ya disponible en los runs 35473988275 (`CI`) y 35476102444
+  (`baseline-scan`); (2) los que dependen de T0.2 pendiente: VULN-008, 016, 019 y la parte de Trivy de 009 y 018
+  (D2: sin datos de imágenes hasta corregir `baseline-scan.yml` y repetir el escaneo). Las discrepancias D3 y D4
+  se anotan como observadas (no aparece / no se detecta), nunca se inventa la alerta.
+- **Avance 2026-09-20 (casilla sin marcar):** pasada 1 hecha en `31211ca`: los 26 `evidencia.json` existen con
+  `antes` rellenado (o nulos con nota) a partir del run 35476102444; `captura` sigue en `null` hasta que el usuario
+  confirme cada captura en el informe. Faltan: la pasada 2 (VULN-008, 016, 019 y la parte de Trivy image de 009 y
+  018, tras corregir `baseline-scan.yml`), la salida local de `curl -sI` para VULN-013 a 015, el `antes` desde el
+  run de `CI` (osv-scanner de VULN-025, CodeQL) y las capturas en el informe.
+- **Avance 2026-09-20 (2, casilla sin marcar):** `curl` local hecho (VULN-013, 014, 015) y VULN-008 con el error de
+  construcción como "antes"; Desktop ya entregó las capturas de la pasada 1 (secciones del informe por VULN, pendientes
+  de que el usuario las confirme para rellenar `captura`). El "antes" del CI (VULN-025) queda como "no se ejecutó" (D8).
+  Falta la parte de Trivy image de VULN-008, 009, 016, 018 y 019 (run 35534898422) y confirmar las capturas.
+- Filas "sin gate hoy" (VULN-013, 014, 015): el usuario ejecuta `curl -sI http://localhost:8080` sobre el tag
+  y pega la salida (texto); no las toma Desktop.
+- **Cerrada 2026-09-20:** 26 de 26 `evidencia.json` válidos, todos con `antes.run_url` o una nota; 20 con captura en el informe; VULN-013, 014 y 015 con evidencia en texto (Q18); VULN-011, 024 sin gate; VULN-023 ya remediado; el historial sigue dando 12 hallazgos de Gitleaks, todos sobre `053e15f`.
+- Verificación: `ls docs/evidencia/*/evidencia.json | wc -l` = 26 (uno por fila del registro); cada uno con
+  `antes.run_url` o una nota que explique por qué no aplica; `python3 -m json.tool` valida cada archivo; sin
+  `Secret`/`Match` ni valores con forma de secreto (`make scan-secrets` no añade hallazgos).
 - Commit: —
 
 ### T0.4 — Plantilla de fichas y README de evidencia
-- [ ] Estado · Ejecutor: `Codex` · Cubre: ADR 0007 · Remedia: — · Solo docs
+- [x] Estado · Ejecutor: `Codex` · Cubre: ADR 0007 · Remedia: — · Solo docs
 - Añadir a la plantilla de `security/findings/README.md` las filas Evidencia antes, Commit de
   remediación, Evidencia después y Run de Actions (antes/después); replicarlas (vacías) en
   las 7 fichas existentes (`VULN-001`, `002`, `005`, `020`, `021`, `022`, `023`).
-- Crear `docs/evidencia/README.md` (convención, resumen del protocolo de arriba, reglas de captura).
+- Crear `docs/evidencia/README.md` (convención de dos capas de Q16: `evidencia.json` en el repo y capturas en
+  el informe externo; forma fija del JSON; reglas de captura; quién escribe qué). No mencionar `before.png` ni
+  `after.png` como archivos del repo.
 - Archivos: `security/findings/README.md`, `security/findings/VULN-*.md`, `docs/evidencia/README.md`.
 - Criterios: las fichas mantienen su formato; ningún dato inventado.
 - Verificación: `git diff --stat` solo toca esos archivos; `python3 scripts/traceability.py --check`.
-- Commit:
+- Commit: 54c3525
 
 ### T0.5 — Fichas faltantes de la línea base
-- [ ] Estado · Ejecutor: `Codex` · Cubre: ADR 0007 · Remedia: — · Solo docs · Depende de: T0.2
+- [x] Estado · Ejecutor: `Codex` · Cubre: ADR 0007 · Remedia: — · Solo docs · Depende de: T0.2
 - Crear `security/findings/VULN-NNN-<slug>.md` para los ids sembrados sin ficha: 003, 004 y 006 a
   019 (16 fichas; son los ids únicos que aparecen en los comentarios de `deploy/docker-compose.yml`,
   `backend/**` y `frontend/**`, y se **conservan tal cual**), más los tres ids nuevos de Q9:
@@ -271,14 +345,14 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
 - Verificación: `ls security/findings/VULN-*.md | wc -l` (26); `git diff --stat` no toca compose,
   Dockerfiles, `backend/` ni `frontend/`; gitleaks local (`make scan-secrets`) no añade hallazgos
   fuera de los ya conocidos (rutas de `security/findings/` están permitidas).
-- Commit:
+- Commit: 4b2d4f4
 
 ---
 
 ## Fase 1 — Contrato ejecutable (RNF-011)
 
 ### T1a — Enmendar OpenAPI: refresh token por cookie
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RNF-009, AM-015, RF-005, RF-007 · Remedia: — · Solo spec · Depende de: —
+- [x] Estado · Ejecutor: `Codex` · Cubre: RNF-009, AM-015, RF-005, RF-007 · Remedia: — · Solo spec · Depende de: —
 - **Autorización explícita:** el usuario autorizó esta enmienda el 2026-09-19 (respuesta a Q3:
   transporte del refresh token por cookie `HttpOnly; Secure; SameSite=Strict`, RNF-009/AM-015).
   Por eso Codex puede editar `specs/03-api/openapi.yaml` **solo en esta tarea** (C1 en "Cambios
@@ -307,10 +381,10 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
 - Verificación: `python3 -m openapi_spec_validator specs/03-api/openapi.yaml`;
   `python3 scripts/traceability.py --check` (si cambia la salida generada, regenerar y commitear);
   `git diff --stat` solo toca `specs/03-api/openapi.yaml` (y `specs/07-traceability.md` si cambia).
-- Commit:
+- Commit: d9117cb
 
 ### T1 — Generar `backend/internal/api/gen.go` con oapi-codegen
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RNF-011, ADR 0003 · Remedia: — · Depende de: T1a
+- [x] Estado · Ejecutor: `Codex` · Cubre: RNF-011, ADR 0003 · Remedia: — · Depende de: T1a
 - Fijar versión de oapi-codegen (registrar la exacta en el handoff), config en
   `backend/internal/api/oapi-codegen.yaml` (paquete `api`, tipos + servidor chi), salida
   `backend/internal/api/gen.go` desde `specs/03-api/openapi.yaml`.
@@ -327,10 +401,10 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
   anotarlo en "Preguntas nuevas"; no subirla sin aprobación.
 - Verificación: `cd backend && go build ./... && go vet ./... && go test -race -short ./...`;
   regenerar con el comando registrado y `git diff --exit-code backend/internal/api/gen.go`.
-- Commit:
+- Commit: df47361
 
 ### T2 — Gate real de deriva: `make gen`, `schema.d.ts` y `ci.yml`
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RNF-011 · Remedia: — · Depende de: T1
+- [x] Estado · Ejecutor: `Codex` · Cubre: RNF-011 · Remedia: — · Depende de: T1
 - `make gen` regenera `gen.go`, `frontend/src/api/schema.d.ts` (`npm run gen:api`) y la matriz.
 - `ci.yml`, job `spec-drift`: regenerar ambos y mantener `git diff --exit-code` (ya existe; el
   comentario del job pide justo esto). Solo endurecer.
@@ -339,12 +413,14 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
 - Criterios: tras `make gen` el árbol queda limpio; alterar `specs/03-api/openapi.yaml`
   (p. ej. cambiar un `operationId` en una copia local) y no regenerar hace fallar el paso de deriva.
 - Verificación: `make gen && git diff --exit-code`; `cd frontend && npm run lint && npm run typecheck && npm run test`; `python3 scripts/traceability.py --check`.
-- Commit:
+- Commit: f3d8a0e
 
 ### T3 — Revisión de la Fase 1
-- [ ] Estado · Ejecutor: `Claude (revisión)` · Cubre: T1a, T1, T2
+- [x] Estado · Ejecutor: `Claude (revisión)` · Cubre: T1a, T1, T2
 - Revisar los tres commits contra sus handoff; comprobar que el diff de T1a solo cambia lo
   autorizado en `openapi.yaml` (cookie, sin `refreshToken` en cuerpos) y que el gate de deriva falla de verdad.
+- **Revisión hecha 2026-09-20.** T1a: 22 operaciones con el mismo `operationId`, método, ruta y `x-requirement`; `TokenPair` sin `refreshToken`; `refreshSession` y `logout` sin cuerpo y con el parámetro de cookie; `Set-Cookie` en login, verifyMfa, refresh y logout; la única diferencia extra es el arreglo de tres descripciones YAML mal formadas (texto conservado). T1: ver su handoff; Claude repitió build, vet y tests, comprobó la regeneración y las rutas. T2: `make gen` idempotente (mismo checksum dos veces); sonda negativa: cambiar un `operationId` en el spec altera `gen.go` y `schema.d.ts` y `git diff --exit-code` sale con 1; se restauró sin residuos. Ajuste de Claude en T2: se quitó `cache: npm` del `setup-node` del job `spec-drift`, porque `package-lock.json` aún no existe y `setup-node` falla si falta.
+- **Defecto latente para T25:** el job 2 de `ci.yml` (frontend) usa el mismo `cache: npm` con `frontend/package-lock.json`; fallará hasta que T25 versione el lockfile (no se vio antes porque el job se cortaba en pasos anteriores). Al versionarlo, se puede reactivar la caché en `spec-drift`.
 - Commit: —
 
 ---
@@ -352,7 +428,7 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
 ## Fase 2 — Núcleo del IdP
 
 ### T4 — Infraestructura de pruebas de integración
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RNF-005, RNF-011 · Remedia: — · Depende de: T1
+- [x] Estado · Ejecutor: `Codex` · Cubre: RNF-005, RNF-011 · Remedia: — · Depende de: T1
 - Paquete de apoyo `backend/internal/testdb` (tag `integration`): lee `TEST_DATABASE_URL`, crea
   una base temporal, aplica `db/migrations/*.up.sql` en orden con pgx (sin nuevas dependencias
   de migración) y la borra al terminar; se omite con `t.Skip` si falta la variable.
@@ -364,10 +440,10 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
   credenciales de ese compose (puerto 5432 publicado); no copiarlas a ningún archivo versionado.
 - Archivos: `backend/internal/testdb/**`, `Makefile`, `.github/workflows/ci.yml`.
 - Verificación: `make test-integration` (con la base levantada); `cd backend && go test -race -short ./...` sigue verde sin base.
-- Commit:
+- Commit: 6954cba
 
 ### T5 — sqlc: configuración y consultas base
-- [ ] Estado · Ejecutor: `Codex` · Cubre: AM-006, RNF-011, VULN-005 (parcial, la retirada va en T23) · Remedia: — · Depende de: T4
+- [x] Estado · Ejecutor: `Codex` · Cubre: AM-006, RNF-011, VULN-005 (parcial, la retirada va en T23) · Remedia: — · Depende de: T4
 - `sqlc.yaml` (esquema `db/migrations`, consultas `db/queries/`, driver `pgx/v5`, paquete
   generado bajo `backend/internal/store/`); fijar versión de sqlc y registrarla. Tipos: `citext`
   como `string`, `inet` como `netip.Addr`, UUID de `google/uuid` (ajustar si la generación exige otra cosa).
@@ -378,10 +454,10 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
 - Criterios (integración): crear usuario con hash de forma Argon2id y leerlo por correo con
   distinta capitalización (citext); entrada `' OR '1'='1' --` llega como valor literal y no devuelve filas.
 - Verificación: `make gen && git diff --exit-code`; `make test-integration`; `make test-go`.
-- Commit:
+- Commit: d387fed
 
 ### T6 — IP de cliente confiable y chi >= v5.3.0
-- [ ] Estado · Ejecutor: `Codex` · Cubre: AM-001, AM-010, frontera T2 · Remedia: VULN-020 (chi) · Bloqueada por: T0.3
+- [x] Estado · Ejecutor: `Codex` · Cubre: AM-001, AM-010, frontera T2 · Remedia: VULN-020 (chi) · Bloqueada por: T0.3
 - Subir `github.com/go-chi/chi/v5` a >= v5.3.0 y retirar `middleware.RealIP` de `Server.Routes`.
 - Middleware propio `ClientIP`: por defecto usa `r.RemoteAddr`; solo si `RemoteAddr` está en la
   lista configurada `TRUSTED_PROXIES` (CIDR; opcional, vacío = ninguno; config validada) toma la
@@ -393,11 +469,11 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
   `TestRF011_LaIPDelAuditLogNoEsFalsificable`; XFF desde peer no confiable se ignora; desde
   proxy confiable se respeta; `govulncheck` ya no informa GO-2026-5774/5775/5777.
 - Verificación: `make test-go`; `cd backend && go run golang.org/x/vuln/cmd/govulncheck@latest ./...` (las otras alertas siguen hasta T23/T24); `make lint`.
-- Commit:
-- [ ] Evidencia (`Usuario`): `docs/evidencia/VULN-020/` chi: `after.png` tras run verde del job `sca` sin esos avisos.
+- Commit: 902a047
+- [ ] Evidencia (`Usuario`): VULN-020 chi: captura "después" en el informe tras run verde del job `sca` sin esos avisos, y datos de texto para el `despues` de `docs/evidencia/VULN-020/evidencia.json`.
 
 ### T7 — Argon2id
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RF-001, AM-001, AM-004, AM-017, invariante 1, ADR 0004 · Remedia: — (prepara VULN-002) · Depende de: T5
+- [x] Estado · Ejecutor: `Codex` · Cubre: RF-001, AM-001, AM-004, AM-017, invariante 1, ADR 0004 · Remedia: — (prepara VULN-002) · Depende de: T5
 - Paquete `backend/internal/auth/password`: `Hash`, `Verify` (tiempo constante), `NeedsRehash`,
   formato PHC (`$argon2id$v=19$m=...,t=...,p=...$sal$hash`) que cumple el `CHECK` existente;
   parámetros de ADR 0004 (64 MiB, 3 iteraciones, paralelismo 2, sal 16 B `crypto/rand`, clave 32 B) en `config`;
@@ -410,10 +486,10 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
   El manejo de la restricción `CHECK` no requiere migración: no hay usuarios previos ni filas MD5 (confirmarlo en el handoff).
 - Archivos: `backend/internal/auth/password/**`, `backend/internal/config/**`, `backend/go.mod`.
 - Verificación: `make test-go`; `make test-integration`; `make lint`.
-- Commit:
+- Commit: 4e8c653
 
 ### T8 — JWT Ed25519, JWKS y middleware de autenticación
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RF-004, AM-003, RNF-003 · Remedia: — (prepara VULN-006/021) · Depende de: T1
+- [x] Estado · Ejecutor: `Codex` · Cubre: RF-004, AM-003, RNF-003 · Remedia: — (prepara VULN-006/021) · Depende de: T1
 - Añadir `github.com/golang-jwt/jwt/v5` **junto a** v4 (v4 sigue hasta T23). Paquete
   `backend/internal/auth/token`: emisión (`iss`, `sub`, `aud`, `exp` a 15 min, `iat`, `jti`, `roles`, `kid`),
   validación con `WithValidMethods([]string{"EdDSA"})`, emisor y expiración obligatorios.
@@ -428,10 +504,10 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
   `TestRF004_VigenciaDe15Minutos`; `TestRNF003_FaltaClaveDeFirmaImpideElArranque`; la clave privada no aparece en logs (`config.Secret`).
 - Archivos: `backend/internal/auth/token/**`, `backend/internal/api/{jwks.go,auth_middleware.go}` (+ pruebas), `backend/internal/config/**`, `backend/go.mod`.
 - Verificación: `make test-go`; `make lint` (sin hallazgos nuevos de gosec).
-- Commit:
+- Commit: 5da3fcf
 
 ### T9 — Registro de auditoría: escritor y migración 000002
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RF-011, AM-010, AM-011, invariante 5 · Remedia: — · Depende de: T5, T6
+- [x] Estado · Ejecutor: `Codex` · Cubre: RF-011, AM-010, AM-011, invariante 5 · Remedia: — · Depende de: T5, T6
 - Servicio `audit.Record` (actor, acción, recurso, IP de `ClientIPFrom`, user-agent, metadata jsonb; sin
   contraseñas, tokens ni códigos). Acciones nombradas como en RF-011 y los `.feature`
   (`login_succeeded`, `login_failed`, `refresh_reuse_detected`, `user_disabled`, ...).
@@ -445,10 +521,10 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
   el trigger sigue bloqueando a un superusuario; la inserción funciona; el `down` revierte.
 - Archivos: `db/migrations/000002_*`, `backend/internal/audit/**`, `db/queries/audit.sql`, `backend/internal/store/**`.
 - Verificación: `make gen && git diff --exit-code`; `make test-integration`; `make test-go`.
-- Commit:
+- Commit: `bacd932`
 
 ### T10 — Registro de cuenta (RF-001)
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RF-001, RF-012, AM-004, ADR 0006 · Remedia: — · Depende de: T7, T9
+- [x] Estado · Ejecutor: `Codex` · Cubre: RF-001, RF-012, AM-004, ADR 0006 · Remedia: — · Depende de: T7, T9
 - Operación `register` (`POST /api/v1/auth/register`): valida (contraseña 12-128, correo <= 254,
   `displayName` 1-100; 400 problem+json con `errors[].field` = `password`), cuenta en
   `pending_verification`, hash Argon2id, evento `user.registered` con token de verificación de 32 B
@@ -460,19 +536,19 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
   `TestRF001_FalloDelBrokerRevierteYDevuelve503`; (integración) fila con prefijo `$argon2id$`.
 - Archivos: `backend/internal/auth/**`, `backend/internal/api/register.go` (+ pruebas), `db/queries/*.sql`, `backend/internal/events/**` (solo si falta un método de publicación).
 - Verificación: `make gen && git diff --exit-code`; `make test-go`; `make test-integration`; `make lint`.
-- Commit:
+- Commit: `43d2464`
 
 ### T11 — Verificación de correo (RF-002)
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RF-002, AM-016 · Remedia: — · Depende de: T10
+- [x] Estado · Ejecutor: `Codex` · Cubre: RF-002, AM-016 · Remedia: — · Depende de: T10
 - `verifyEmail` (`POST /api/v1/auth/verify-email`, cuerpo `{token}`): token de un solo uso, 24 h, hash SHA-256;
   204 y cuenta `active`; segundo uso o expirado -> 410; desconocido -> 410 o 400 (elegir y documentar sin filtrar información); evento `user.email_verified`; audit.
 - Criterios: `TestRF002_VerificarActivaLaCuenta`; `TestRF002_EnlaceDeUnSoloUso` (410); `TestRF002_TokenExpiradoDevuelve410`; el token nunca se registra en logs (RNF-012).
 - Archivos: `backend/internal/auth/**`, `backend/internal/api/verify_email.go` (+ pruebas), `db/queries/*.sql`.
 - Verificación: `make test-go`; `make test-integration`; `make lint`.
-- Commit:
+- Commit: `4ad6038`
 
 ### T12 — Worker: plantillas por tipo de evento
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RF-012, RF-002, RF-006, RF-017, AM-016, RNF-012 · Remedia: — · Depende de: T11
+- [x] Estado · Ejecutor: `Codex` · Cubre: RF-012, RF-002, RF-006, RF-017, AM-016, RNF-012 · Remedia: — · Depende de: T11
 - El `deliver` actual del worker es genérico (comentario "en la semana 2 se sustituye por
   plantillas"). Crear `backend/internal/notify` (función pura que devuelve asunto y cuerpo por
   `eventType`): `user.registered` incluye el enlace de verificación (`PUBLIC_BASE_URL`, opcional,
@@ -481,10 +557,10 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
 - Criterios: `TestRF012_PlantillaDeRegistroIncluyeElEnlaceDeVerificacion`; `TestRF012_LosAvisosDeSeguridadNoIncluyenSecretos`; el worker sigue sin loguear `d.Body`.
 - Archivos: `backend/internal/notify/**`, `backend/cmd/worker/main.go`, `backend/internal/config/**`.
 - Verificación: `make test-go`; `make lint`; humo manual en T21.
-- Commit:
+- Commit: `f1547a0`
 
 ### T13 — Inicio de sesión (RF-003)
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RF-003, RF-004, AM-004, RF-011 · Remedia: — · Depende de: T8, T9, T11
+- [x] Estado · Ejecutor: `Codex` · Cubre: RF-003, RF-004, AM-004, RF-011 · Remedia: — · Depende de: T8, T9, T11
 - `login`: solo `active` obtiene tokens (`pending_verification`, `locked`, `disabled` -> 401 genérico);
   usuario inexistente verifica contra el hash señuelo; respuesta `TokenPair` **sin** `refreshToken` en
   el cuerpo (`accessToken`, `tokenType: Bearer`, `expiresIn: 900`, según T1a); el refresh token opaco
@@ -505,10 +581,10 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
   (contraseña correcta + `mfa_enabled` -> error explícito, sin tokens ni cookie).
 - Archivos: `backend/internal/auth/**`, `backend/internal/api/login.go` (+ pruebas), `db/queries/*.sql`.
 - Verificación: `make test-go`; `make test-integration`; `make lint`.
-- Commit:
+- Commit: `8ab9409`
 
 ### T14a — Enmendar ADR 0005: retirar la ventana de gracia
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RF-006, AM-002, ADR 0005 · Remedia: — · Solo docs · Depende de: —
+- [x] Estado · Ejecutor: `Codex` · Cubre: RF-006, AM-002, ADR 0005 · Remedia: — · Solo docs · Depende de: —
 - **Autorización explícita:** el usuario decidió el 2026-09-19 (Q4) que **no** hay ventana de gracia.
   Por eso Codex puede editar `specs/adr/0005-refresh-tokens-rotativos-con-familia.md` **solo en esta
   tarea** (C2 en "Cambios de spec propuestos", aceptado). Ningún otro archivo de `specs/` se toca.
@@ -526,10 +602,10 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
 - Criterios: la ADR ya no describe la ventana de gracia como mecanismo vigente (solo como alternativa
   descartada) y documenta el riesgo residual y la mitigación; el resto de la ADR no cambia.
 - Verificación: `git diff --stat` solo toca esa ADR y este archivo; `python3 scripts/traceability.py --check`.
-- Commit:
+- Commit: 67de318
 
 ### T14 — Rotación de refresh y detección de reuso (RF-005, RF-006)
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RF-005, RF-006, AM-002, AM-015, invariante 3, ADR 0005 · Remedia: — · Depende de: T13, T14a
+- [x] Estado · Ejecutor: `Codex` · Cubre: RF-005, RF-006, AM-002, AM-015, invariante 3, ADR 0005 · Remedia: — · Depende de: T13, T14a
 - `refreshSession`: lee el refresh token de la **cookie** `refresh_token` (sin cookie -> 401; el cuerpo de la
   petición ya no lleva token, T1a); rota el token (anterior `rotated`, nuevo `active`, misma `family_id`, `parent_id`);
   el índice único `refresh_tokens_one_active_per_family` garantiza un solo activo; responde `accessToken` en el
@@ -546,10 +622,11 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
   al no haber ventana de gracia, se trata como reuso: la familia queda revocada; es el riesgo residual documentado, no un defecto).
 - Archivos: `backend/internal/auth/**`, `backend/internal/api/refresh.go` (+ pruebas), `db/queries/*.sql`.
 - Verificación: `make test-go`; `make test-integration`; `make lint`.
-- Commit:
+- Commit: 110867f
+- **Corrección (T16, 48597d3):** `Server.RefreshSession` quedó como stub `501` sin componer hasta T16; ver esa entrada y la nota de "Notas de handoff Codex" bajo T16 para el detalle completo. La lógica y las pruebas originales de esta tarea seguían siendo correctas; solo faltaba el cableado al router real.
 
 ### T15 — Cierre de sesión (RF-007)
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RF-007 · Remedia: — · Depende de: T14
+- [x] Estado · Ejecutor: `Codex` · Cubre: RF-007 · Remedia: — · Depende de: T14
 - `logout` (`POST /api/v1/auth/logout`, sin cuerpo; el token viene en la cookie `refresh_token`, T1a): revoca el token (204) y
   responde `Set-Cookie` de borrado (`refresh_token=; Max-Age=0` con el mismo `Path` y atributos `HttpOnly; Secure; SameSite=Strict`);
   refresh posterior con la cookie vieja -> 401; sin cookie o token desconocido -> 401; audit `logout`.
@@ -557,19 +634,20 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
   `TestRF007_LogoutSinCookieDevuelve401`; `TestRF007_RefreshTrasLogoutDevuelve401`.
 - Archivos: `backend/internal/auth/**`, `backend/internal/api/logout.go` (+ pruebas), `db/queries/*.sql`.
 - Verificación: `make test-go`; `make test-integration`.
-- Commit:
+- Commit: bf869b2
+- **Corrección (T16, 48597d3):** `Server.Logout` quedó como stub `501` sin componer hasta T16; ver esa entrada y la nota de "Notas de handoff Codex" bajo T16 para el detalle completo. La lógica y las pruebas originales de esta tarea seguían siendo correctas; solo faltaba el cableado al router real.
 
 ### T16 — Perfil propio (RF-008)
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RF-008 · Remedia: — · Depende de: T8, T13
+- [x] Estado · Ejecutor: `Codex` · Cubre: RF-008 · Remedia: — · Depende de: T8, T13
 - `getCurrentUser` y `updateCurrentUser` (solo `displayName`, 1-100): `RequireAuth`; sin token 401; nunca devuelve `password_hash`
   (invariante 1); esquema `User` del OpenAPI (incluye `roles` leídos de BD).
 - Criterios: `TestRF008_MeDevuelveElUsuarioAutenticado`; `TestRF008_SinTokenDevuelve401`; `TestRF008_ActualizaElNombre`; el JSON no contiene el hash.
 - Archivos: `backend/internal/api/me.go` (+ pruebas), `db/queries/*.sql`.
 - Verificación: `make test-go`; `make test-integration`.
-- Commit:
+- Commit: b9c3712
 
 ### T17 — RBAC (RF-009)
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RF-009, AM-007, AM-021 · Remedia: — · Depende de: T8, T13
+- [x] Estado · Ejecutor: `Codex` · Cubre: RF-009, AM-007, AM-021 · Remedia: — · Depende de: T8, T13
 - Middleware `RequireRole("admin")` en `/api/v1/admin/*`: roles leídos de la BD en cada petición (AM-007),
   no del claim; token con `roles` alterado -> 401 (firma inválida); `user` -> 403; suspendido/deshabilitado -> 401.
   Sin endpoint de auto-asignación de roles.
@@ -578,29 +656,29 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
   Cómo nace el primer admin: Q5 (decidido: alta manual por SQL en desarrollo, documentada; los tests crean admins directamente en BD).
 - Archivos: `backend/internal/api/rbac.go` (+ pruebas), `db/queries/*.sql`.
 - Verificación: `make test-go`; `make test-integration`; `make lint`.
-- Commit:
+- Commit: 4e26918
 
 ### T18 — Administración de usuarios (RF-010)
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RF-010, RF-011, AM-006, invariante 6 · Remedia: — · Depende de: T17
+- [x] Estado · Ejecutor: `Codex` · Cubre: RF-010, RF-011, AM-006, invariante 6 · Remedia: — · Depende de: T17
 - `listUsers` (`q` parametrizado con `LIKE` seguro, `status`, cursor, `limit` 1-100), `getUser`,
   `updateUser` (`status`, `roles`): un admin no puede deshabilitarse a sí mismo (400); nunca queda
   sin admin activo (mecanismo según Q6: comprobación en el servicio con transacción y bloqueo de fila, y trigger en migración nueva si es viable); audit `user_disabled` con el actor; `role_changed` al cambiar roles; un usuario deshabilitado no puede iniciar sesión ni renovar.
 - Criterios: `TestRF010_AdminDeshabilitaYElUsuarioNoEntra`; `TestRF010_AdminNoPuedeDeshabilitarseASiMismo` (400); `TestRF010_BusquedaNoEsInyectable` (`' OR '1'='1' --` como `q`); `TestRF010_NoSeDejaElSistemaSinAdmin`.
 - Archivos: `backend/internal/auth/**`, `backend/internal/api/admin_users.go` (+ pruebas), `db/queries/*.sql`, posible migración `000003_*` según Q6.
 - Verificación: `make gen && git diff --exit-code`; `make test-go`; `make test-integration`; `make lint`.
-- Commit:
+- Commit: ac3ea8e
 
 ### T19 — Consulta del registro de auditoría (RF-011)
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RF-011, AM-010 · Remedia: — · Depende de: T9, T17
+- [x] Estado · Ejecutor: `Codex` · Cubre: RF-011, AM-010 · Remedia: — · Depende de: T9, T17
 - `listAuditLog` (filtros `action`, `actorId`, `since`, `limit`, `cursor`; solo admin), paginación por `id`.
 - Criterios: `TestRF011_UnLoginFallidoCreaUnaFila`; `TestRF011_ListarRequiereAdmin` (403 para user);
   `TestRF011_FiltraPorAccionYActor`; `TestRF011_ElRolDeLaAplicacionNoPuedeModificarLaFila` (reutiliza el enfoque de T9 de extremo a extremo).
 - Archivos: `backend/internal/api/audit_log.go` (+ pruebas), `db/queries/audit.sql`.
 - Verificación: `make test-go`; `make test-integration`.
-- Commit:
+- Commit: 1ddbdd6
 
 ### T20 — Bloqueo por fuerza bruta (RF-017)
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RF-017, AM-001, VULN-020 (chi, frontera T2), estado `locked` · Remedia: — · Depende de: T13, T6, T12
+- [x] Estado · Ejecutor: `Codex` · Cubre: RF-017, AM-001, VULN-020 (chi, frontera T2), estado `locked` · Remedia: — · Depende de: T13, T6, T12
 - **Decisión Q1: bloqueo por CUENTA (RF-017) y además un límite por IP con el mismo mecanismo.**
   - Por cuenta: 5 intentos fallidos en 15 minutos bloquean la cuenta 15 minutos (`users.status`/`locked_until`
     según el modelo de dominio); 423 `Locked` problem+json; la contraseña correcta también falla mientras
@@ -627,10 +705,10 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
   distintas de `X-Forwarded-For` se cuentan por separado).
 - Archivos: `backend/internal/auth/**`, `backend/internal/api/login.go` (+ pruebas), `db/queries/*.sql`, posible migración `000003_*`/`000004_*`.
 - Verificación: `make test-go`; `make test-integration`; `make lint`.
-- Commit:
+- Commit: 37c17a5, bd5a702
 
 ### T21 — Composición, configuración y humo con el stack
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RNF-001, RNF-003, RF-001 a RF-011 · Remedia: — · Depende de: T10 a T20
+- [x] Estado · Ejecutor: `Codex` · Cubre: RNF-001, RNF-003, RF-001 a RF-011 · Remedia: — · Depende de: T10 a T20
 - Cablear todo en `backend/cmd/api/main.go` (servicios, repositorios sqlc, publicador, `ClientIP`, `RequireAuth`, RBAC) y montar el
   handler generado. Añadir al compose **solo líneas nuevas** (sin tocar valores sembrados): variables
   nuevas de la API con sustitución obligatoria desde `.env` (`${VAR:?mensaje}`), `TRUSTED_PROXIES` y una subred fija de la red por defecto (Q13).
@@ -642,10 +720,10 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
   admin 403/200, 6 fallos -> 423 por cuenta y ráfaga de fallos desde una IP -> 423 por IP. Pegar los `curl` y códigos observados en el handoff.
 - Criterios: `make up` levanta 6 contenedores sanos; `/.well-known/jwks.json` responde a través de Nginx; la API no arranca sin la clave de firma.
 - Verificación: `make up && make ps`; `make test`; `make lint`; `make down`.
-- Commit:
+- Commit: ba0ce22 (+ c6d468f, hallazgo crítico de verificación)
 
 ### T22 — Revisión de la Fase 2
-- [ ] Estado · Ejecutor: `Claude (revisión)` · Cubre: T4 a T21
+- [x] Estado · Ejecutor: `Claude (revisión)` · Cubre: T4 a T21
 - Revisar commits y handoff; ejecutar `make test-integration` y el humo; auditar los criterios de
   `AGENTS.md`, "Seguridad del núcleo IdP".
 - Commit: —
@@ -655,7 +733,8 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
 ## Fase 3 — Remediación de la línea base (todas `Remedia:`; bloqueadas por T0.3)
 
 Cada tarea de esta fase: el `Commit:` es el commit de remediación; después Codex actualiza la
-ficha (T36). Cada `Evidencia` la completa el `Usuario` tras el run verde del gate.
+ficha (T36). Cada `Evidencia` la completa el `Usuario` tras el run verde del gate: captura "después"
+en el informe externo (Desktop) y datos de texto para el `despues` del `evidencia.json` (lo escribe Claude).
 
 ### T23 — Retirar `legacy_auth.go` y su ruta
 - [ ] Estado · Ejecutor: `Codex` · Cubre: AM-003, AM-006, AM-012, RF-004 · Remedia: VULN-001 (código), VULN-002, VULN-004, VULN-005, VULN-006, VULN-007, VULN-021 · Bloqueada por: T0.3, T22
@@ -745,11 +824,18 @@ ficha (T36). Cada `Evidencia` la completa el `Usuario` tras el run verde del gat
 ### T31 — Gitleaks frente al historial: `.gitleaksignore` por huella exacta
 - [ ] Estado · Ejecutor: `Codex` (decisión ya tomada por el `Usuario`, Q8) · Cubre: RNF-003, AM-012 · Remedia: relacionada con VULN-023 · Bloqueada por: T26 y por la lista de huellas que entrega el `Usuario` desde el run de Gitleaks de T0.2
 - El job `secrets` usa `fetch-depth: 0`: los secretos sembrados permanecerán en el historial aunque T23/T26 los retiren, así que el gate no
-  pasará solo. **Decisión del usuario (2026-09-19): opción (a)**, `.gitleaksignore` en la raíz con **huella exacta**, limitado a los **12 hallazgos conocidos de la línea base**. Las opciones (b) allowlist por commit y (c) reescribir historial quedan **descartadas** ((c) también por el ADR 0007: el historial es la evidencia). Esta decisión es la aprobación explícita del usuario para esta excepción concreta; no autoriza ninguna otra.
-- Entrada: el usuario entrega a Codex la lista de las 12 huellas (`Fingerprint`, formato `commit:archivo:regla:línea`, sin `Secret` ni `Match`) tomadas del run de T0.2. Si la lista no llega, la tarea sigue bloqueada; si no son exactamente 12 o alguna no corresponde a un VULN, detenerse y anotarlo en "Preguntas nuevas".
+  pasará solo. **Decisión del usuario (2026-09-19): opción (a)**, `.gitleaksignore` en la raíz con **huella exacta**, limitado a los **12 hallazgos conocidos de la línea base y a las 2 huellas de la decisión Q20 (14 en total)**. Las opciones (b) allowlist por commit y (c) reescribir historial quedan **descartadas** ((c) también por el ADR 0007: el historial es la evidencia). Esta decisión es la aprobación explícita del usuario para esta excepción concreta; no autoriza ninguna otra.
+- **Q20 · APROBADA por el usuario (2026-09-21).** Al escanear el historial publicado hay **14** huellas y no 12: las 12 de la línea
+  base más 2 falsos positivos nuestros, en commits ya subidos (T7, `4e8c653`: la regla de contraseñas leyó el literal de estructura
+  `Password: PasswordConfig{` de `config.go`; T4, `f987772`: una nota de handoff citaba un patrón de URL con credenciales). Ya no
+  están en el árbol de trabajo, pero el job `secrets` escanea el rango de commits del PR y las ve. **Decisión: opción (a)**, se
+  añaden esas 2 huellas al `.gitleaksignore` con su justificación ("falso positivo en código propio, sin secreto"); la opción (b)
+  (reescribir la rama) queda descartada. Esta aprobación es explícita para esas 2 huellas concretas y no autoriza ninguna otra.
+  Las 14 huellas están en `security/evidence/gitleaks-huellas-historial.txt` (las 2 nuevas, en su sección final).
+- Entrada: el usuario entrega a Codex la lista de las 14 huellas (12 de la línea base y las 2 de Q20; ver `security/evidence/gitleaks-huellas-historial.txt`) (`Fingerprint`, formato `commit:archivo:regla:línea`, sin `Secret` ni `Match`) tomadas del run de T0.2. Si la lista no llega, la tarea sigue bloqueada; si no son exactamente 12 o alguna no corresponde a un VULN, detenerse y anotarlo en "Preguntas nuevas".
 - Crear `.gitleaksignore`: una línea por huella, cada una precedida por un comentario con su `VULN-NNN` y una justificación breve ("secreto sembrado de la línea base, ADR 0007; se conserva como evidencia del antes"). Sin comodines, sin rutas ni patrones, sin huellas adicionales; no tocar `.gitleaks.toml`.
-- Criterios: `secrets` en verde; exactamente 12 huellas, cada una con su VULN y justificación; un secreto nuevo de prueba (añadido en local y descartado, nunca commiteado) sigue siendo detectado; VULN-023 sigue `remediado` (12 de 12 con `.gitleaks.toml`).
-- Verificación: `make scan-secrets` y run de `CI` job `secrets`; `grep -c '^[^#[:space:]]' .gitleaksignore` = 12.
+- Criterios: `secrets` en verde; exactamente 14 huellas: las 12 de la línea base con su VULN y justificación, y las 2 de Q20 con la justificación "falso positivo en código propio"; un secreto nuevo de prueba (añadido en local y descartado, nunca commiteado) sigue siendo detectado; VULN-023 sigue `remediado` (12 de 12 con `.gitleaks.toml`).
+- Verificación: `make scan-secrets` y run de `CI` job `secrets`; `grep -c '^[^#[:space:]]' .gitleaksignore` = 14.
 - Commit:
 - Evidencia (`Usuario`):  - [ ] VULN-023 (antes/después de la política acordada)
 
@@ -786,10 +872,13 @@ ficha (T36). Cada `Evidencia` la completa el `Usuario` tras el run verde del gat
 - Commit:
 
 ### T35 — CI en verde y evidencia "después"
-- [ ] Estado · Ejecutor: `Usuario` · Cubre: todos los VULN de la Fase 3
+- [ ] Estado · Ejecutor: `Usuario` con Claude Desktop (PR, run, capturas en el informe) y `Claude` (completa los `evidencia.json`) · Cubre: todos los VULN de la Fase 3
 - Abrir PR (o `workflow_dispatch`) con la rama; `CI` en verde. Registrar run ID/URL "después" en
-  el "Registro de evidencia" y en cada `evidencia.json`; `after.png` por carpeta (sin secretos, <= 512 KB).
-- Verificación: `ls docs/evidencia/*/after.png`; Actions muestra `CI` en verde sobre el SHA final.
+  el "Registro de evidencia" y, como texto, en cada `evidencia.json` (`despues`, lo completa Claude con los
+  datos que entrega Desktop); las capturas "después" van al informe externo (sin secretos). Prompt de Desktop
+  para esta captura: el "prompt después" que Claude entrega al usuario al cerrar la Fase 3.
+- Verificación: `python3 -m json.tool` valida los 26 `evidencia.json` y ninguno deja `despues.run_url` en `null`
+  sin nota; Actions muestra `CI` en verde sobre el SHA final; el usuario confirma las capturas en el informe.
 - Commit: —
 
 ### T36 — Fichas actualizadas
@@ -815,31 +904,50 @@ ficha (T36). Cada `Evidencia` la completa el `Usuario` tras el run verde del gat
 
 | Fase | Tareas | Hechas |
 |---|---|---|
-| 0 — Línea base y evidencia "antes" | T0.1 a T0.5 (5) | 0 |
-| 1 — Contrato ejecutable | T1a, T1 a T3 (4) | 0 |
-| 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 0 |
+| 0 — Línea base y evidencia "antes" | T0.1 a T0.5 (5) | 5 (T0.1 a T0.5) |
+| 1 — Contrato ejecutable | T1a, T1 a T3 (4) | 4 (T1a, T1, T2, T3) |
+| 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 20 (T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T14a, T15, T16, T17, T18, T19, T20, T21, T22) |
 | 3 — Remediación | T23 a T32 (10) | 0 |
 | 4 — Cierre | T33 a T38 (6) | 0 |
-| **Total** | **45** | **0** |
+| **Total** | **45** | **29** |
 
 Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, cookie) y `T14a`
 (enmienda ADR 0005, sin ventana de gracia). Los ids existentes no cambian.
 
 ## Evidencia de verificación
 
-(Vacío. Codex añade aquí, por tarea, `<comando>: <resultado observado>` cuando cierre cada una;
+(Codex añade aquí, por tarea, `<comando>: <resultado observado>` cuando cierre cada una;
 las líneas de RED/GREEN van en el handoff.)
+
+- T17 · RED (Codex): faltaban `RequireRole` y sus pruebas. GREEN (Codex): `RequireRole` releé estado y roles de BD en cada petición (nunca del claim del token, AM-007); compuesto de verdad con `RequireAuth(s.tokens)(RequireRole(s.currentUsers, "admin")(...))` alrededor de los 4 métodos admin de `Server` (siguen `notImplemented` por dentro, T18/T19 los completan), aplicando la lección de T14/T15 anotada en `CLAUDE.md`. 5 pruebas: recorrido de las 4 rutas admin reales contra `server.Routes()` con rol `user` en BD (403, pese a un claim de token con `roles: admin`); middleware directo con rol `admin` en BD (200); las 3 variantes de cuenta no activa (`locked`/`disabled`/`pending_verification`, 401); un JWT firmado con otra clave nunca llega a `RequireRole` (0 llamadas al repositorio, confirmado con contadores en el stub); y un cambio de rol en BD entre dos peticiones con el mismo token revoca el acceso en la segunda sin esperar expiración (confirma que `ListRolesForUser` se llama de nuevo, sin caché). No necesitó tocar `db/queries/*.sql`: reutiliza `GetUserByID`/`ListRolesForUser`, ya existentes desde T16. `make test-go`, `go vet -tags=integration ./...`, `python3 scripts/traceability.py --check`: PASS (Claude los repitió). `golangci-lint` local (instalado esta sesión): solo los 3 hallazgos sembrados de `legacy_auth.go`, sin hallazgos nuevos; `gen.go` sin drift. Cobertura de `internal/api` subió de 43.7 % a 62.7 %.
+- T16 · RED (Codex): faltaba `Store.UpdateDisplayName` y el paquete de perfil. GREEN (Codex): `getCurrentUser`/`updateCurrentUser` compuestos directamente en `*Server` (igual que `Login`/`Register`/`VerifyEmail`, a diferencia del patrón desconectado que T14/T15 habían dejado); `make lint` y `go vet -tags=integration ./...` en verde; `gen.go` conservó `v2.5.1`. Claude encontró dos cosas al revisar: (1) `Store.UpdateDisplayName` usaba SQL parametrizada directa contra el pool en vez de la consulta sqlc que Codex sí había añadido a `db/queries/users.sql` pero nunca generó (`sqlc generate` no se había corrido); Claude regeneró y reescribió el método para usar `generated.Queries.UpdateDisplayName`, consistente con el resto del paquete. (2) Al revisar `server.go` para componer T16, confirmó que `Server.RefreshSession` y `Server.Logout` (T14, T15) seguían siendo stubs `501` sin conectar al router real — ver la entrada siguiente. `make test-go`, `make lint`, `python3 scripts/traceability.py --check`: PASS. Levantó Postgres local y corrió `go test -race -tags=integration ./...` completo (con la corrección de T14/T15 ya aplicada): PASS.
+- **Corrección de composición T14/T15 (Claude, hallada al revisar T16) · 2026-09-25 · 48597d3**: `Server.RefreshSession` y `Server.Logout` seguían devolviendo `501 Not Implemented` a través del router real, pese a que T14 y T15 estaban cerradas y sus pruebas pasaban. Causa: T14/T15 construyeron `NewRefreshHandler`/`NewLogoutHandler` como `http.Handler` independientes, probados de forma aislada con `httptest`, pero nunca cableados a `*Server` — a diferencia de T10 (`Register`), T11 (`VerifyEmail`) y T13 (`Login`), que implementan su método de `ServerInterface` directamente en `*Server` y por eso sí quedaron compuestos desde su propio commit. Claude asumió incorrectamente en el handoff de T14/T15 que esa composición era de T21 ("igual que T13"), sin verificar que T13 en realidad ya lo hacía. Un segundo problema, más sutil, apareció al corregir esto: el router generado por oapi-codegen extrae la cookie `refresh_token` **antes** de llamar al método de `Server` (para eso existe `RefreshSessionParams`/`LogoutParams`); si falta, invoca su `ErrorHandlerFunc` por defecto (400 genérico) sin llegar nunca al handler — así que ni siquiera reescribir `Server.RefreshSession`/`Logout` alcanzaba para el caso "sin cookie", exigido como 401 por RF-005/RF-007. Se agregó `handleBindingError` en `Routes()` (usa `HandlerWithOptions` en vez de `HandlerFromMux`) que mapea ese fallo de binding específico del parámetro `refresh_token` al mismo 401 con cookie borrada que un token inválido o reusado. `refresh_test.go`/`logout_test.go` se reescribieron para probar contra `server.Routes().ServeHTTP(...)` (como ya hacía T16), no contra los constructores aislados eliminados — así es como se confirmó que la versión anterior pasaba sus propias pruebas mientras el router real devolvía 501/400. Verificación: `make test-go`, `make lint`, `go vet -tags=integration ./...`, `python3 scripts/traceability.py --check`: PASS; `go test -race -tags=integration ./...` completo contra PostgreSQL real: PASS (incluidas las pruebas de integración de T14 y T15, sin cambios en su lógica de servicio). No se fabricó evidencia RED formal para el caso "sin cookie -> 400 en vez de 401": se verificó leyendo el código generado (`ChiServerOptions{}.ErrorHandlerFunc` por defecto en `gen.go`) en vez de revertir y re-ejecutar, documentado aquí explícitamente por transparencia.
+- T15 · RED (Codex): faltaba el paquete `logout` (falla de build antes de crearlo). GREEN (Codex): handler y servicio compilaron, pasaron sus pruebas aisladas, `make lint` y `go vet -tags=integration ./...` en verde; `gen.go` conservó `oapi-codegen v2.5.1` (Codex ya sabía del problema de T14 y verificó). Claude encontró que el paquete `backend/internal/auth/logout` no tenía ninguna prueba propia sin la etiqueta `integration` — solo lo ejercían el stub del handler HTTP y la prueba de integración contra Postgres real, así que `make test-go` corría ese paquete con 0 % de cobertura pese a que la tarea exige verificarlo con ese comando; escribió `logout_test.go` (patrón `repositoryStub`, igual que `refresh_test.go` de T14): revoca y audita en éxito, `pgx.ErrNoRows` mapea a `ErrInvalidRefreshToken` en token desconocido, sin token también. `make test-go`, `make lint`, `python3 scripts/traceability.py --check`: PASS (Claude los repitió). Levantó Postgres local y corrió `go test -race -tags=integration ./...` completo: PASS, incluida `TestRF007_RefreshTrasLogoutDevuelve401` (logout revoca, el refresh posterior con la misma cookie devuelve `ErrInvalidRefreshToken`, exactamente un audit `logout`).
+- T14 · RED (Codex, primer intento): `undefined: refresh.Writer`/símbolos faltantes. GREEN parcial (Codex, primer intento): servicio y handler compilaban y pasaban en aislado, pero Codex se detuvo sin cerrar la tarea (interpretó la lista "Archivos" de la propia tarea, que no mencionaba `backend/internal/store`, como una restricción real) y dejó la prueba de carrera contra un harness en memoria, no PostgreSQL. Claude aclaró el alcance (el paquete `store` sí estaba autorizado, igual que en T13) y reanudó el mismo hilo de Codex. RED/GREEN (Codex, segundo intento): añadió `store/refresh.go` (mismo patrón que `store/login.go`, con `generated.New(tx)` y una única consulta `RotateRefreshToken` con CTEs y `FOR UPDATE`), corrigió el handler para usar `requestClientIP(r)` en vez de `RemoteAddr` (bug real que Claude encontró al revisar el diff, T6), y reemplazó el harness en memoria por `TestRF006_DosRenovacionesConcurrentesUnaGana` contra PostgreSQL real vía `testdb.New`/`store.NewWithPool`; dejó la prueba compilando sin poder correrla en su sandbox (`go vet -tags=integration ./...` limpio) y así lo reportó. `make gen`: Codex usó un binario de oapi-codegen cacheado sin el ldflag de versión y `gen.go` quedó con el comentario "(devel)" en vez de "v2.5.1"; Claude lo regeneró con el binario correcto (`~/go/bin/oapi-codegen`) y quedó sin diff. `make test-go`, `make lint`, `go vet -tags=integration ./...`: PASS (Claude los repitió). Levantó Postgres local (`docker compose up -d db`) y corrió `TestRF006_DosRenovacionesConcurrentesUnaGana` real: PASS (12–13 s), 0 tokens activos y 1 audit `refresh_reuse_detected` tras la carrera; `go test -race -tags=integration ./...` completo: PASS. `python3 scripts/traceability.py --check`: matriz al día. Ver también "Ajuste de Claude" abajo por dos hallazgos adicionales de revisión (token inexistente, fallo de publicación) confirmados por el hook GGA antes del primer intento de commit.
+- T13 · GREEN (Codex): 8 pruebas nuevas de `TestRF003_*`/`TestAM004_*` en verde (servicio, API y las dos de AM-004, luego renombradas por Claude); `make test-go`: PASS; `make lint`: solo los 3 hallazgos sembrados de `legacy_auth.go`. `gofmt -l` (Claude): limpio. `make gen` repetido: sin diff adicional. Claude encontró que las 2 pruebas de AM-004 se llamaban `TestAM004_...` (no `TestRF003_...`), un patrón que `scripts/traceability.py` no cuenta (`func Test(RF|RNF)NNN_...`); las renombró a `TestRF003_AM004...`. También encontró que T13 no traía ninguna prueba de integración pese a que su propia "Verificación" exige `make test-integration`; Claude escribió `login_integration_test.go` (paquete externo `login_test` para evitar un ciclo de imports con `store`) y confirmó contra PostgreSQL real: el refresh token se guarda como SHA-256, `last_login_at` se actualiza y queda el audit `login_succeeded`. `python3 scripts/traceability.py --check`: matriz al día (RF-003 pasa de "parcial" a "completo", 10 pruebas).
+- T12 · GREEN (Codex): `TestRF012_PlantillaDeRegistroIncluyeElEnlaceDeVerificacion`, `TestRF012_LosAvisosDeSeguridadNoIncluyenSecretos` y `TestRF012_PublicBaseURLTieneValorPorDefectoYAdmiteOverride` en verde; `make test-go`: PASS; `make lint`: solo los 3 hallazgos sembrados de `legacy_auth.go`. `gofmt -l` (Claude): limpio tras formatear. `make gen` repetido por Claude: sin diff adicional. El hook GGA (pre-commit) bloqueó el commit 3 veces seguidas antes de pasar a la cuarta: (1) `deliver` ignoraba `ctx` (regla "context.Context propagado"); (2) cero pruebas para `cmd/worker` (paquete sin `_test.go` desde la semana 1); (3) un bug real de idempotencia preexistente (ver "Ajuste de Claude" abajo) más una demanda de cobertura para `TRUSTED_PROXIES`/`ARGON2_CONCURRENCY` (de T6/T7, fuera de alcance de T12, rechazada por decisión del usuario). `python3 scripts/traceability.py --check`: matriz al día (RF-012 pasa de 6 a 8 pruebas).
+- T11 · GREEN (Codex): `TestRF002_*` de servicio, API e integración en verde; `make test-go` y `make test-integration`: PASS; `make lint`: solo los 3 hallazgos sembrados de `legacy_auth.go`. `gofmt -l`: limpio (Claude). `make gen` repetido por Claude: sin diff adicional. Integración contra PostgreSQL 14 local (Claude): suite completa PASS, incluida `TestRF002_VerificarConsumeTokenYActivaCuenta` (verifica dos veces el mismo token: activa y luego 410). Claude añadió y corrió una prueba manual no commiteada (`zz_manual_expiry_check_test.go`, borrada después) para confirmar contra PostgreSQL real que un token ya vencido (`expires_at` en el pasado) se rechaza con `ErrTokenInvalid` y la cuenta queda en `pending_verification`: PASS. `python3 scripts/traceability.py --check`: matriz al día (RF-002 pasa de "parcial" a "completo", 9 pruebas; RNF-012 sube a 3).
+- T10 · RED (Codex): faltaban los tipos de servicio/transacción de registro. GREEN (Codex): pruebas RF-001 de API y de servicio en verde; `make gen`: PASS; `make test-go` y `make test-integration`: PASS (revalidados por Claude); `make lint`: solo los 3 hallazgos sembrados de `legacy_auth.go`, sin hallazgos nuevos. `gofmt -l`: limpio. `make gen` repetido por Claude: sin diff adicional (determinista). Integración contra PostgreSQL 14 local (Claude): suite completa PASS, incluida `TestRF001_RegistroPersisteHashArgon2id`. Claude añadió y corrió una prueba manual no commiteada (`zz_manual_dup_check_test.go`, borrada después) para confirmar contra PostgreSQL real que un `UNIQUE` violado en `users.email` se traduce en `ErrEmailExists` a través de `errors.As`/`SQLState()` sobre el error envuelto: PASS. `python3 scripts/traceability.py --check`: matriz al día (RF-001 pasa de 6 a 15 pruebas). El hook GGA marcó como punto a revisar si AM-004 exige código idéntico a 201; se confirmó contra `specs/06-acceptance/registro-y-verificacion.feature:29-35` que el escenario Gherkin concreto exige 409 sin la palabra "existe" y ≤50 ms de diferencia (no un código idéntico), que es lo implementado.
+- T9 · RED (Codex): `undefined: Record`, `Event`, `LoginFailed` (`FAIL .../internal/audit [build failed]`). GREEN unitario (Codex): `ok .../internal/audit 1.622s`. `gofmt -l` marcó `audit.go` y `audit_integration_test.go` (alineación de constantes y línea en blanco final); Claude corrigió con `gofmt -w`, sin cambios de comportamiento. Integración contra PostgreSQL 14 local (Claude, Codex no llega a la BD): primera corrida de `TestRF011_IdentityAppNoTieneUpdateNiDeleteSobreAuditLog` FAIL (el superusuario pasaba sin error porque los triggers seguían deshabilitados hasta el `t.Cleanup` final); Claude reordenó la prueba para reactivarlos antes de la comprobación del superusuario y quedó en verde. `make test-integration` completo: PASS. `down 1` con `migrate/migrate` confirma que `identity_app` desaparece de `pg_roles`; `up` lo reaplica sin diff. `python3 scripts/traceability.py --check`: matriz al día (RF-011 pasa de 1 a 3 pruebas). `make test-go` (`-race -short`): PASS, cobertura total 30.0%. `golangci-lint` sigue sin instalar (solo avisa, como documenta el Makefile).
+- T1a · `python3 -m openapi_spec_validator specs/03-api/openapi.yaml`: OK; `python3 scripts/traceability.py --check`: matriz al día.
+- T0.5 · `ls security/findings/VULN-*.md | wc -l` = 26 (una por id, VULN-001 a VULN-026); AM-NNN citadas comprobadas contra `specs/05-security/threat-model.md`; severidades comprobadas contra `gosec.json` y `trivy-config.json`; sin patrones de secreto; `git diff --stat` vacío para compose, Dockerfiles, `backend/` y `frontend/`.
+- T14a · `git diff --stat`: solo `specs/adr/0005-refresh-tokens-rotativos-con-familia.md` (+17 −6); la ventana de gracia solo aparece como decisión descartada y alternativa rechazada; `python3 scripts/traceability.py --check`: matriz al día.
+- T8 · `go build`, `go vet` (con y sin `integration`) y `go test -race -short ./...` en verde; `TestRF004_*` (token, JWKS, algoritmo alterado, sin sujeto o firmado por otra clave) y `TestRNF003_*` (falta la clave, no se revela) PASS; `git diff backend/go.mod`: solo `jwt/v5 v5.3.1`; `gen.go` y `legacy_auth.go` sin diff; trazabilidad regenerada y al día.
+- T7 · `go build`, `go vet` (con y sin `integration`) y `go test -race -short ./...` en verde; `go test -race ./internal/auth/password/...` PASS (unas 20 s por los hashes de 64 MiB); integración contra PostgreSQL 14 local, dos veces: `TestRF001_UsersAceptaArgon2idYRechazaMD5` PASS y sin bases sobrantes; `git diff backend/go.mod`: solo `x/crypto` de indirecta a directa.
+- T5 · `make gen` dos veces: mismo checksum de todo lo generado (`gen.go`, `schema.d.ts`, matriz y código de sqlc); `backend/go.mod` sin diff; `go build`, `go vet` (con y sin `integration`) y `go test -race -short ./...` en verde; integración contra PostgreSQL 14 local, dos veces: `TestRNF011_ConsultasBaseSqlcUsanParametros` y `TestRNF011_MigracionesSeAplicanSobreBaseVacia` PASS y sin bases sobrantes.
+- T4 · `make test-integration` y `go test -race -tags=integration ./internal/testdb/...` dos veces contra PostgreSQL 14 local: PASS y sin bases temporales sobrantes; sin `TEST_DATABASE_URL`: SKIP; `go vet` con y sin la etiqueta, `go test -race -short ./...`, trazabilidad y YAML: en verde; Gitleaks sobre `ci.yml` y `Makefile`: 0 hallazgos.
+- T2 · `make gen` dos veces: mismo checksum de `gen.go`, `schema.d.ts` y la matriz; `npm run lint`, `typecheck` y `test` (2/2) en verde; `go build`, `go vet` y `go test -race -short ./...` en verde; sonda negativa del gate: `git diff --exit-code` = 1.
+- T1 · `cd backend && go build ./... && go vet ./... && go test -race -short ./...`: OK; `go generate ./internal/api` + `git diff --exit-code backend/internal/api/gen.go`: sin diff; `go mod verify`: all modules verified; `python3 scripts/traceability.py --check`: matriz al día (RNF-011 pasa a parcial).
+- T0.4 · `git diff --stat`: 8 archivos de `security/findings/` (4 líneas cada uno) y `docs/evidencia/README.md` nuevo; `git diff --check`: sin errores; `python3 scripts/traceability.py --check`: matriz al día.
 
 ## Siguiente paso
 
-1. `Usuario`, antes de nada: la **comprobación previa al push** de T0.1 (confirmar que ninguna
-   credencial sembrada en `deploy/docker-compose.yml`, el código legacy del backend, los `ENV` del
-   Dockerfile o `.env.example` es real o está reutilizada; el repo es público). Después, commitear
-   `AGENTS.md` y `odd/`, y hacer T0.1 a T0.3 (repo `git@github.com:jorgepaez-ops/IdentityHub.git`,
-   push de `main` y del tag, workflows, capturas "antes", y la lista de las 12 huellas de Gitleaks para T31).
-2. `Codex` puede empezar por **T1a** (enmienda OpenAPI a cookie) y la Fase 1 **solo cuando el usuario haya
-   commiteado estos documentos**; T14a y las tareas de Fase 2 no `Remedia:` siguen el orden del archivo.
-   T0.4 (solo docs) también puede hacerse antes; T0.5 tras T0.2.
+1. T0.1 está hecha. Quedan T0.2 (escaneo semanal, corregir `baseline-scan.yml`, repetir imágenes, D3/D4,
+   huellas para T31) y T0.3 reestructurada (Q16): el usuario toma las capturas "antes" con Claude Desktop
+   (primera pasada con el prompt "antes"), y Claude escribe los `evidencia.json` con los datos que entregue.
+2. `Codex` ya hizo **T1a**. Siguiente en orden para Codex: **T0.4** (solo docs), ahora con la convención de
+   dos capas de Q16; T0.5 tras T0.2; luego T1 y la Fase 1. Las tareas de Fase 2 no `Remedia:` siguen el
+   orden del archivo.
 3. Todas las tareas `Remedia:` (Fase 3) siguen **bloqueadas por T0.3**.
 
 ## Cambios de spec propuestos
@@ -870,6 +978,13 @@ Todas resueltas por el usuario el 2026-09-19 (las que no traen cambio se aceptar
 - **Q14 · Alcance.** Decisión: RF-013, RF-014, RF-015, RF-016, RF-018 y RF-019 fuera de esta feature y al backlog de semana 3; se muestran como "diferido" (no olvidados) en la matriz de trazabilidad y T13 rechaza con un error claro las cuentas con MFA activado, fecha 2026-09-19, afecta a: T13, T34.
 - **Q15 · Página del enlace de verificación.** Decisión: la plantilla emite `/verify-email?token=...`; en esta feature se verifica con `curl`; la página del SPA se hace en semana 3, fecha 2026-09-19, afecta a: T12, T21.
 
+- **Q16 · Dónde vive la evidencia (2026-09-20).** Decisión: Claude Desktop no escribe en el repo (errores de permisos) y genera por su cuenta el informe `.docx` con capturas reales tomadas navegando GitHub. Por eso las capturas dejan de ser `before.png`/`after.png` versionados: en el repo queda solo `docs/evidencia/VULN-XXX/evidencia.json` (texto, lo escribe Claude a partir de los datos que entrega Desktop) y el informe externo lleva las imágenes; `captura` referencia su sección. T0.3, T0.4, T35, el criterio 6, el protocolo y `AGENTS.md` se ajustan; las tareas de código no cambian. Costo aceptado: las imágenes no quedan en el repo público; lo que perdura cuando caducan los logs es el JSON y `security/evidence/`. Fecha 2026-09-20, afecta a: T0.3, T0.4, T35, T36, criterio 6.
+
+- **Q19 · Subida a Go 1.25 (2026-09-21).** Decisión del usuario (amplía Q11): la directiva `go` de `backend/go.mod` y `GO_VERSION` del CI y del escaneo semanal pasan de 1.22 a **1.25**, de una sola vez. Motivos: chi >= v5.3.0 (corrige GO-2026-5775 y 5777) exige `go 1.23`; los 26 avisos de la biblioteca estándar se corrigen entre Go 1.23.8 y 1.25.13; el job 5 del CI (`govulncheck`) solo puede ponerse en verde con un Go >= 1.25.13; y lo más probable es que T24 también lo pida. `baseline-scan.yml` se queda en 1.22 porque analiza el tag de la línea base. Efecto colateral: `golangci-lint` v1 (compilado con Go 1.22) no analiza código que apunte a Go 1.25, así que el CI usa v2.13.2 con la configuración migrada. Afecta a: T6, T24, T27, CI.
+- **Q17 · Dependabot (2026-09-20).** Decisión: no se activa Dependabot por ahora (ni alertas ni actualizaciones). La evidencia de dependencias (VULN-020, 021, 022, 025, 026) sale de govulncheck y npm audit; el escaneo semanal cubre la revisión continua. CodeQL no cubre dependencias, solo código. Se puede reconsiderar `dependabot.yml` tras remediar (semana 3). Afecta a: T0.3.
+
+- **Q18 · Evidencia de VULN-013, 014 y 015 (2026-09-20).** Decisión: se acepta la salida en texto de `security/evidence/local-web-baseline.txt` (curl -sI y ráfaga sobre la imagen `web` del tag, con fecha y método) en lugar de una captura de pantalla. La misma regla se usa para el "después" (T35): la salida del mismo comando. Afecta a: T0.3, T35.
+
 ### Preguntas nuevas (Codex)
 
 (Ninguna. Codex anota aquí cualquier ambigüedad nueva y detiene esa tarea; no hay nada abierto hoy.)
@@ -886,3 +1001,155 @@ Formato por tarea (3 a 5 líneas):
 ```
 
 (Sin entradas todavía.)
+
+### T1a · 2026-09-19 · d9117cb
+- Qué cambió: `TokenPair` ya no publica `refreshToken`; refresh/logout usan la cookie `refresh_token`, con `Set-Cookie` documentado en login, MFA, refresh y logout.
+- Comandos y resultado observado: RED: la aserción de contrato falló porque `RefreshRequest` seguía definido; GREEN: la aserción pasó y confirmó 22 pares `operationId`/`x-requirement` intactos; el validador OpenAPI devolvió OK y trazabilidad quedó al día.
+- Dudas abiertas: ninguna. Se corrigieron tres descripciones YAML preexistentes con comas sin comillas para que el contrato pasara la validación obligatoria sin cambiar su texto.
+
+### T0.4 · 2026-09-20 · 54c3525
+- Qué cambió: la plantilla de `security/findings/README.md` y las 7 fichas existentes (VULN-001, 002, 005, 020, 021, 022, 023) llevan las filas vacías Evidencia antes, Commit de remediación, Evidencia después y Run de Actions; `docs/evidencia/README.md` documenta la convención de dos capas (Q16).
+- Comandos y resultado observado: solo docs, sin RED/GREEN. `git diff --check`: sin errores; `python3 scripts/traceability.py --check`: matriz al día; `git diff --stat`: solo los 8 archivos de fichas y el README nuevo, sin datos inventados ni carpetas `VULN-*` ni `evidencia.json`.
+- Dudas abiertas: ninguna. Codex dejó los cambios sin commitear porque su sandbox no puede crear `.git/index.lock`; Claude revisó el diff y creó ambos commits. Para las próximas tareas con commits hay que dar a Codex escritura en `.git` o seguir cerrando desde Claude.
+
+### T1 · 2026-09-20 · df47361
+- Qué cambió: `gen.go` generado con oapi-codegen **v2.5.1** y `github.com/oapi-codegen/runtime` **v1.1.2** (configuración en `oapi-codegen.yaml`, regenerable con `go generate ./internal/api`); `Server` implementa las 22 operaciones y las pendientes responden 501 `application/problem+json`; `/healthz` y `/readyz` salen ahora del router generado; `legacy_auth.go` y `/api/v1/auth/legacy-login` intactos.
+- Comandos y resultado observado: RED: `undefined: ServerInterface` y `undefined: TokenPair` (Codex, antes de generar). GREEN: `TestRNF011_GeneratedServerContract`; `go build`, `go vet` y `go test -race -short ./...` en verde (Claude los repitió). Regeneración byte a byte idéntica. Comprobación temporal de rutas (no commiteada): legacy-login, healthz, readyz, metrics, register y jwks registradas (32 rutas).
+- Dependencias: `go.mod` conserva `go 1.22`, chi 5.0.11, jwt v4, pgx 5.5.1 y x/text 0.14.0. Cambios: `+runtime v1.1.2`, `+go-jsonmerge/v2 v2.0.0 // indirect` y `x/crypto` indirecto de 0.9.0 a 0.17.0 (no lo cubre ningún VULN). No se usa oapi-codegen v2.8.0: exige runtime >= 1.3, que sube la directiva a `go 1.24` y actualiza x/text (rompe Q11 y borra la evidencia de VULN-026).
+- Dudas abiertas: ninguna. `go mod tidy -diff` quitaría `testify` indirecto, que ya estaba en la línea base: se deja. `golangci-lint` no está instalado localmente. Codex no pudo commitear (sandbox sin escritura en `.git`); Claude hizo ambos commits.
+
+### T2 · 2026-09-20 · f3d8a0e
+- Qué cambió: `make gen` regenera `gen.go` (oapi-codegen v2.5.1), `frontend/src/api/schema.d.ts` (openapi-typescript 6.7.6) y la matriz de trazabilidad; el job `spec-drift` regenera lo mismo y falla con cualquier diff o archivo sin seguimiento (`git diff --exit-code` y `git status --porcelain`). `schema.d.ts` generado (786 líneas, sin `refreshToken`).
+- Comandos y resultado observado: RED: `make gen` solo corría la trazabilidad y `schema.d.ts` no existía. GREEN: `make gen` de punta a punta y sin diff en la segunda ejecución; frontend lint, typecheck y tests en verde; backend build, vet y tests con `-race` en verde. Claude repitió todo y añadió la sonda negativa.
+- Dudas abiertas: ninguna. Ajuste de Claude: sin `cache: npm` en el `setup-node` de `spec-drift` (falta el lockfile, ver T3). Node 18 en CI (`NODE_VERSION`), Node 24 en local. Codex no pudo restaurar con `git checkout` (sandbox sin `.git`) y restauró desde una copia; sin restos.
+
+### T4 · 2026-09-20 · 6954cba
+- Qué cambió: paquete `backend/internal/testdb` (etiqueta `integration`): `testdb.New(t)` crea una base temporal con nombre aleatorio (`crypto/rand`) a partir de `TEST_DATABASE_URL`, aplica las migraciones `*.up.sql` con pgx y la borra al terminar; se omite si falta la variable. `make test-integration`. Job `6b · Pruebas de integración` en `ci.yml` con PostgreSQL **16.15** fijado por digest (`postgres:16-bookworm@sha256:efedf359…`), contraseña de servicio efímera derivada de `github.run_id`. Prueba `TestRNF011_MigracionesSeAplicanSobreBaseVacia` (tablas esperadas, un MD5 viola `users_password_hash_is_argon2id` con código 23514, un hash `$argon2id$` entra).
+- Comandos y resultado observado: RED (Codex): faltaba el paquete auxiliar. GREEN (Claude, con la base real, dos veces): PASS y `pg_database` sin bases temporales. Sin variable: SKIP. Todo lo demás en verde. El sandbox de Codex no llega a `localhost:5432` (`operation not permitted`): no dio GREEN de integración y lo dejó dicho; Claude lo ejecutó.
+- Ajuste de Claude: el pool que devuelve `testdb.New` usaba el protocolo simple de pgx en todas las consultas; ahora solo las migraciones (varias sentencias por archivo) lo usan, y el resto queda en el protocolo extendido, igual que producción y que el código de sqlc de T5.
+- Dudas abiertas: ninguna. El job del CI arma la URL con `format()` para que Gitleaks no marque un literal de URL de conexión con usuario y clave; no se amplió ninguna lista de excepciones. Codex ejecutó `gentle-ai codegraph init` y creó `.codegraph/` (sin versionar, fuera de la tarea): no se commitea.
+
+### T5 · 2026-09-20 · d387fed
+- Qué cambió: `sqlc.yaml` (sqlc **v1.31.1**, solo las migraciones `*.up.sql`, pgx/v5; `citext` a `string`, `inet` a `netip.Addr`, `uuid` a `google/uuid`); consultas parametrizadas `CreateUser`, `GetUserByEmail`, `GetUserByID` e `InsertAuditEvent` en `db/queries/`; código generado en `backend/internal/store/internal/sqlc` (paquete `internal`: las capas superiores no pueden importarlo); adaptador manual en `store.go` con tipos propios (`User`, `AuditEvent`, `CreateUserParams`, `InsertAuditEventParams`), `NewWithPool` y errores envueltos con `%w`; `make gen` ejecuta `sqlc generate` y comprueba la versión; el job `spec-drift` instala sqlc con `GOTOOLCHAIN=go1.26.2` (su `go.mod` exige Go 1.26) y regenera.
+- Comandos y resultado observado: RED (Codex): el adaptador no existía. GREEN (Claude, con la base real, dos veces): `TestRNF011_ConsultasBaseSqlcUsanParametros` PASS (correo con distinta capitalización por `citext`, `' OR '1'='1' --` como valor literal devuelve `pgx.ErrNoRows`, ida y vuelta de `InsertAuditEvent`); `make gen` idempotente; `go.mod` sin diff. El sandbox de Codex no llega a PostgreSQL: solo compiló las pruebas de integración.
+- Ajuste de Claude: el hook de revisión previo al commit rechazó el primer intento porque el adaptador devolvía los errores de sqlc sin contexto y con la estructura a medio llenar; ahora envuelve con `%w` y devuelve el valor cero. `errors.Is(err, pgx.ErrNoRows)` sigue funcionando (lo comprueba la prueba).
+- Dudas abiertas: ninguna. `backend/internal/store/store.go` (archivo de la línea base) recibió el adaptador y sus tipos: las llamadas a `pgxpool.NewWithConfig` y `Ping` que citan las trazas de VULN-022 pasaron de las líneas 36 y 57 a la 85 y la 92; el "antes" quedó registrado con las líneas originales en el run del tag. sqlc v1.28.0 no compila en este macOS por cgo, por eso se fijó v1.31.1. T5 tardó unos 28 minutos (Codex iteró sobre `sqlc.yaml` y el adaptador).
+
+### T7 · 2026-09-20 · 4e8c653
+- Qué cambió: paquete `backend/internal/auth/password` con `Hash`, `Verify` (comparación en tiempo constante con `subtle`), `NeedsRehash`, `VerifyDecoy` (hash señuelo generado una vez) y un semáforo que acota la concurrencia; formato PHC `$argon2id$v=19$m=65536,t=3,p=2$…`; contraseña vacía o de más de 128 caracteres rechazada con error tipado (`InvalidPasswordError`). Configuración nueva: `ARGON2_MEMORY_KIB` (65536), `ARGON2_ITERATIONS` (3), `ARGON2_PARALLELISM` (2) y `ARGON2_CONCURRENCY` (4), validadas en `config.Load` con su patrón de acumulación de errores. `golang.org/x/crypto` sigue en **v0.17.0** y solo pasa de indirecta a directa.
+- Comandos y resultado observado: RED (Codex): `undefined: Configure`, `undefined: config.PasswordConfig`, `undefined: Hash`, `undefined: NeedsRehash` y `FAIL [build failed]`. GREEN: pruebas unitarias en verde; integración con la base real (Claude), dos veces: PASS.
+- Concurrencia por defecto **4**: cada verificación usa 64 MiB, así que acota Argon2id a unos 256 MiB simultáneos sin serializar todos los inicios de sesión. No hace falta migración: no hay usuarios previos ni filas MD5.
+- Ajuste de Claude: la prueba de integración de Codex no podía pasar (el sandbox no llega a la base y no la ejecutó): sus `INSERT` omitían `display_name` (`NOT NULL`), y el rechazo del MD5 habría fallado por esa columna (23502) antes de llegar a la restricción (23514). Se añadió `display_name`, se usa `errors.As` y se comprueba también el nombre `users_password_hash_is_argon2id`.
+- Dudas abiertas / pendientes de otras tareas (observaciones del hook de revisión, no bloqueantes): (1) `Hash` y `Verify` bloquean en el semáforo sin `context.Context`: una petición cancelada seguirá en cola; se plantea al integrarlos en el inicio de sesión (T13). (2) El hash señuelo usa los parámetros de la primera llamada: `Configure` debe ejecutarse antes de la primera petición. (3) Posibles avisos gosec G115 por las conversiones `uint32`/`uint8` de la configuración: los límites se validan antes, pero el linter del CI (golangci-lint v1.59) puede no verlo; `golangci-lint` no está instalado en local, se revisará en el primer run de CI. `x/crypto` no se sube: subirlo actualiza de rebote `x/text` (0.14.0 a 0.21.0), así que queda para T24.
+
+### T8 · 2026-09-20 · 5da3fcf
+- Qué cambió: paquete `backend/internal/auth/token` (`golang-jwt/jwt/v5` **v5.3.1**, junto a v4 que sigue hasta T23): tokens EdDSA de 15 minutos con `iss`, `sub`, `aud`, `exp`, `iat`, `jti`, `roles` y `kid` (primeros 16 caracteres hexadecimales del SHA-256 de la clave pública); validación solo EdDSA, con `kid`, emisor, audiencia, sujeto y caducidad obligatorios y reloj inyectable. `GET /.well-known/jwks.json` (`jwks.go`, OKP Ed25519, `x` en base64url) y middleware `RequireAuth` (`auth_middleware.go`, 401 `problem+json` sin decir el motivo). Configuración: `JWT_SIGNING_KEY` obligatoria (semilla Ed25519 de 32 bytes en base64, `config.Secret`, sin valor por defecto: sin ella la API no arranca, RNF-003), `JWT_ISSUER` (`http://localhost:8080`) y `JWT_AUDIENCE` (`identity-hub`). `Server.SetTokenService` inyecta el servicio: la firma de `NewServer` no cambia; sin servicio, JWKS responde 503 y `RequireAuth` 401.
+- Comandos y resultado observado: RED (Codex): faltaban `token.New` y la validación de `JWT_SIGNING_KEY`. GREEN: suite completa y pruebas de T8 en verde (Claude las repitió).
+- Ajustes de Claude: (1) la prueba de confusión de algoritmo de Codex firmaba los tokens falsos **sin `kid`**, así que se habrían rechazado por "clave desconocida" aunque no existiera la restricción de algoritmo; ahora llevan el `kid` y todas las claims correctas (solo cambia el algoritmo) y hay un control positivo con un token EdDSA válido. (2) `Validate` exigía todo menos el sujeto: ahora rechaza un token sin `sub`. (3) Nueva prueba `TestRF004_RechazaTokenSinSujetoOFirmadoPorOtraClave` (sin sujeto, y firmado por otra clave con el `kid` correcto). (4) Se regeneró `specs/07-traceability.md`, que Codex dejó desactualizada. Nota: en `jwt/v5` los tokens `none` y HS256 con la clave pública también fallarían por tipo de clave; la restricción de algoritmo es defensa en profundidad y la prueba fija el resultado observable.
+- Dudas abiertas / para T13 y T21: `config.Config.AccessTTL` (`JWT_ACCESS_TTL`, ya estaba en la línea base) no se usa: el servicio fija los 15 minutos de RF-004; al cablear en T21 conviene retirar esa variable o validarla a 15 minutos. `RequireAuth` reconoce el esquema `Bearer` con esa capitalización exacta. T21 debe decodificar `JWT_SIGNING_KEY`, crear el servicio y llamar a `SetTokenService`. Clave de desarrollo: `openssl rand -base64 32` en un `.env` git-ignorado; jamás en el repositorio.
+
+### T14a · 2026-09-20 · 67de318
+- Qué cambió: la ADR 0005 (enmienda C2, decisión Q4) pasa a decir que **no hay ventana de gracia**: contradice el escenario de reuso inmediato y devolver el mismo par exigiría guardar el token en claro (la ADR solo guarda su SHA-256); se acepta el riesgo residual (dos pestañas que renuevan a la vez pueden provocar un falso positivo y cerrar la sesión) y la mitigación queda para el frontend de la semana 3 (un único refrescador compartido entre pestañas, con Web Locks API o `BroadcastChannel`). La línea de estado registra "Enmienda C2 · 2026-09-19".
+- Comandos y resultado observado: solo documentación, sin RED/GREEN. Claude revisó el diff línea por línea: solo cambia esa ADR y el resto del texto no se toca.
+- Dudas abiertas: ninguna.
+
+### T0.5 · 2026-09-21 · 4b2d4f4
+- Qué cambió: 19 fichas nuevas en `security/findings/` (VULN-003, 004, 006 a 019, 024, 025 y 026), con las 7 existentes suman las 26. Cada una lleva la severidad del propio escáner (o "no informada por ningún escáner" donde ningún gate lo detecta: 006, 007, 011 y 024), los gates de su `evidencia.json`, `AM-NNN` reales del modelo de amenazas, la ruta de la evidencia y la URL del run "antes". VULN-024 documenta que el comentario del compose la llama VULN-020 (id de chi) y que se corrige en T30. No se toca compose, Dockerfiles, `backend/` ni `frontend/`.
+- Comandos y resultado observado: solo documentación, sin RED/GREEN. Claude revisó las 19 con un script (AM existentes, ruta y URL coherentes con el JSON, estado `abierto`, campos de remediación vacíos, sin patrones de secreto) y comprobó las severidades contra `gosec.json` (G404 HIGH, G101 HIGH) y `trivy-config.json` (DS002 y DS029 HIGH, DS031 CRITICAL).
+- Ajuste de Claude: VULN-024 arrastraba una frase interna del proceso ("Desktop los había asignado a este VULN por error"); se reescribió con lo que hace `trivy config` (solo analiza Dockerfiles).
+- Dudas abiertas: los hallazgos sin id (CodeQL #81, `amqp091-go`, alertas de Semgrep de las acciones y de `default.conf`, alertas de los diagramas, avisos de la biblioteca estándar) siguen sin ficha: un id solo se asigna al crear su ficha y la decisión de abrirlas queda pendiente (ver la bitácora).
+
+### T6 · 2026-09-21 · 902a047
+- Qué cambió: se retira `middleware.RealIP` y se añade `ClientIP` (`backend/internal/api/clientip.go`): la IP del cliente es el par del socket, y solo si ese par está en `TRUSTED_PROXIES` se lee `X-Forwarded-For` y se toma la dirección **más a la derecha que no sea de confianza**; una cabecera ausente, mal formada o de origen no confiable se ignora entera. `ClientIPFrom(ctx)` la expone para auditoría y bloqueo. `TRUSTED_PROXIES` (CIDR separados por comas, opcional, vacío = ninguno) se valida al arrancar y acumula errores como el resto de `config.Load`. `Server.SetTrustedProxies` la inyecta (la firma de `NewServer` no cambia; T21 la cablea en `main.go`). chi **v5.0.11 a v5.3.2** y directiva `go` **1.22 a 1.25** (Q19).
+- Comandos y resultado observado: RED (Codex): `undefined: ClientIP` y `undefined: ClientIPFrom`. GREEN: `go build`, `go vet` (con y sin `integration`), `go test -race -short ./...` y la integración completa contra PostgreSQL local, todo en verde (Claude las repitió). `git diff backend/go.mod`: solo la frase del comentario, la directiva y chi. **`govulncheck` (Claude, con Go 1.27.1): GO-2026-5775 y GO-2026-5777 ya no aparecen y los 26 avisos de la biblioteca estándar tampoco**; quedan 7: `jwt/v4` x2 (T23), `pgx` x3 y `x/text` (T24) y `amqp091-go` GO-2026-6372 (sin ficha). Aparecen dos de `pgx` que el "antes" no listaba (GO-2026-5004, corregido en v5.9.2, y GO-2024-2567, en v5.5.2): T24 debe subir `pgx` a la última estable.
+- Ajustes de Claude: (1) el CI y la configuración del linter se migraron a Go 1.25 y golangci-lint v2 (commit `fd24b09`); (2) `make lint` escondía los fallos con un `|| echo` y ahora solo avisa si falta el linter; (3) limpieza de los avisos propios del linter v2 sin `//nolint` (commit `a75cc36`): aserción de tipo comprobada, `%w` en ambos errores, conversiones de enteros acotadas (G115) y cuatro comentarios reformulados. Con el linter v2 sobre el árbol solo quedan 3 avisos, todos de la línea base sembrada (`legacy_auth.go`, hasta T23): G101 x2 y `nolintlint`.
+- Dudas abiertas: si todos los saltos de `X-Forwarded-For` son de confianza se devuelve la IP del par (seguro, pero todos los clientes detrás de ese proxy compartirían IP y límite); `Routes()` lee `trustedProxies` al construir, así que `SetTrustedProxies` debe llamarse antes (T21). Observaciones del hook sin ficha: `Readiness` devuelve `err.Error()` de cada dependencia en el cuerpo de `/readyz`, lo que puede exponer host, usuario o base de datos; y `tipo[:9]` en `events_test.go` puede entrar en pánico con tipos cortos. Para T35: `VULN-020` necesita su captura "después" tras un CI verde.
+
+### T9 · 2026-09-24 · bacd932
+- Qué cambió: `audit.Record` (`backend/internal/audit/audit.go`) escribe eventos con IP de `api.ClientIPFrom(ctx)`, user-agent y metadata jsonb, rechazando cualquier metadata cuya clave contenga `password`, `token`, `code` o `secret` (RNF-012). Migración `000002_identity_app_audit_permissions`: crea el rol `identity_app` (idempotente, sin contraseña) con el mínimo privilegio por tabla y `SELECT, INSERT` en `audit_log`, y `REVOKE UPDATE, DELETE` sobre esa tabla como defensa en profundidad encima del trigger de append-only de 000001 (no se toca el trigger).
+- Comandos y resultado observado: ver la entrada de T9 en "Evidencia de verificación" arriba (RED/GREEN, el bug de orden en la prueba de integración y su corrección, `test-integration`, `down`/`up` y trazabilidad).
+- Ajuste de Claude: reordenó `audit_integration_test.go` para reactivar los triggers `audit_log_no_update`/`audit_log_no_delete` inmediatamente después de la comprobación de permisos de `identity_app`, en vez de dejarlo solo en `t.Cleanup` (que corre al final del test, después de la aserción que necesita el trigger ya activo). Aplicó `gofmt -w` a los dos archivos que Codex dejó sin formatear.
+- Dudas abiertas: ninguna nueva. Codex no pudo commitear (`Unable to create '.git/index.lock': Operation not permitted`, sin proceso git en curso al revisar); Claude verificó el árbol y creó ambos commits, igual que en T0.4, T1, T2 y T4.
+
+### T10 · 2026-09-25 · 43d2464
+- Qué cambió: `backend/internal/auth/registration` (nuevo): `Service.Register` valida entrada, calcula el hash Argon2id **antes** de comprobar existencia del correo (mismo costo en ambas rutas, AM-004), genera un token de verificación de 32 B `crypto/rand` (SHA-256, 24 h), registra auditoría `user_registered` y publica `user.registered` con publisher confirms — todo dentro de una única transacción (`store.WithinRegistrationTransaction`, nuevo en `store.go`) que se revierte si el broker falla (ADR 0006, 503). `POST /api/v1/auth/register` (`backend/internal/api/register.go`) queda cableado: 201/400/409/503. Nueva consulta sqlc `CreateVerificationToken`.
+- Comandos y resultado observado: ver la entrada de T10 en "Evidencia de verificación" arriba.
+- Ajuste de Claude: ninguno al código; se limitó a verificar. Revisó los 8 archivos del diff línea por línea, confirmó que `writer.CreateUser` detecta la violación `UNIQUE` real de Postgres (código 23505) a través de `errors.As` sobre el error envuelto con `%w` — lo probó con una prueba manual temporal (no commiteada) que registró el mismo correo dos veces contra PostgreSQL real — y que el escenario Gherkin de AM-004 (409, sin la palabra "existe", ≤50 ms) es la fuente correcta, no la frase genérica de una sola línea del modelo de amenazas que el hook GGA citó como duda.
+- Dudas abiertas: ninguna. Codex volvió a bloquearse en `.git/index.lock` (mismo runtime de solo lectura que T9); Claude creó ambos commits.
+
+### T11 · 2026-09-25 · 4ad6038
+- Qué cambió: `backend/internal/auth/verification` (nuevo): `Service.Verify` calcula el hash SHA-256 del token recibido y delega en una única sentencia SQL (CTE `ConsumeEmailVerificationToken`) que marca el token usado y activa la cuenta atómicamente, solo si el hash coincide, no fue usado y no venció; el bloqueo de fila de Postgres hace que dos intentos concurrentes con el mismo token no puedan activarse ambos. Token desconocido, vencido o ya usado comparten un único `410 Gone` (AM-016, elegido y documentado en el propio handler: "deliberately share this response to avoid revealing which token state was observed"). Registra auditoría `email_verified` y publica `user.email_verified` con confirms, dentro de la misma transacción (`store.WithinEmailVerificationTransaction`, nuevo). `POST /api/v1/auth/verify-email` cableado: 204/400/410/503.
+- Comandos y resultado observado: ver la entrada de T11 en "Evidencia de verificación" arriba.
+- Ajuste de Claude: ninguno al código. Revisó los 7 archivos entregados más los 2 que el hook GGA no pudo ver (`db/queries/users.sql`, `users.sql.go`) para confirmar que el `WHERE used_at IS NULL AND expires_at > now()` de la CTE es correcto y no deja condiciones de carrera (el `UPDATE` re-evalúa su `WHERE` tras adquirir el lock de fila). Probó el caso de expiración contra PostgreSQL real con una prueba manual temporal (no commiteada), ya que la única prueba de integración de Codex solo cubría uso repetido, no vencimiento.
+- Dudas abiertas: ninguna. Mismo bloqueo de `.git/index.lock` que T9 y T10; Claude creó ambos commits.
+
+### T12 · 2026-09-25 · f1547a0
+- Qué cambió: `backend/internal/notify` (nuevo): `Render` es una función pura que arma asunto y cuerpo por `eventType` desde un struct allowlist (nunca desde el payload crudo), así que campos como `refreshToken`/`password` que vengan en el evento no llegan al correo aunque el emisor los incluya por error. `user.registered` incluye el enlace de verificación (`PUBLIC_BASE_URL`, nueva variable opcional en `config.go`, por defecto `http://localhost:8080`, ruta `/verify-email?token=...` según Q15); `security.refresh_reuse_detected` y `security.account_locked` llevan aviso de seguridad sin datos del evento. `backend/cmd/worker/main.go`: `deliver` delega en `notify.Render` en vez del payload genérico anterior.
+- Comandos y resultado observado: ver la entrada de T12 en "Evidencia de verificación" arriba.
+- Ajuste de Claude: (1) `deliver` ignoraba `ctx` (parámetro `_ context.Context`, ya así desde la semana 1); ahora lo propaga y aborta antes de arrancar un `smtp.SendMail` nuevo si ya empezó el apagado (`net/smtp` no admite contexto, así que uno en curso no se puede interrumpir). (2) Extrajo `buildRawMessage` y le agregó `TestRF012_ConstruyeElMensajeSMTPConAsuntoYCuerpoRenderizados` para que `cmd/worker` deje de tener cero pruebas. (3) Encontró y corrigió un bug real preexistente de la semana 1 (`053e15f`, ajeno a T12): `alreadyProcessed` marcaba el `eventID` como visto *antes* de intentar `deliver`, así que un solo fallo transitorio de SMTP hacía que el reintento (`Nack` con requeue) se descartara como "duplicado" sin haber enviado nunca el correo — lo confirmó con `TestRF012_FalloTransitorioReintentaSinPerderLaNotificacion` (RED con el código viejo, GREEN tras mover la marca a después de una entrega exitosa, vía el nuevo `markDelivered`).
+- Dudas abiertas: el hook GGA además pidió cobertura para `TRUSTED_PROXIES` (T6) y `ARGON2_CONCURRENCY` (T7) en `config_test.go`, alegando que el archivo "es parte de este cambio"; es deuda de tareas ya cerradas, ajena a T12. El usuario decidió no ampliar T12 para cubrirlo (commitear con `--no-verify` si volvía a bloquear tras el fix del bug real; no hizo falta, el commit pasó al cuarto intento). Queda pendiente decidir si se abre una tarea aparte para esa cobertura. Codex no pudo commitear (mismo bloqueo de `.git/index.lock`); Claude creó ambos commits.
+
+### T13 · 2026-09-25 · 8ab9409
+- Qué cambió: `backend/internal/auth/login` (nuevo): `Service.Login` solo emite tokens para cuentas `active`; correo inexistente verifica contra `password.VerifyDecoy` (AM-004); MFA se comprueba **después** de validar la contraseña, así que una cuenta con `mfa_enabled` y contraseña correcta se rechaza con 501 `application/problem+json` sin tokens ni cookie, mientras que password incorrecta o cuenta no activa comparten un 401 genérico. Éxito: `NeedsRehash` recalcula el hash si hace falta, refresh token opaco de 32 B `crypto/rand` guardado como SHA-256 con `family_id` nuevo, `last_login_at` y auditoría `login_succeeded`/`login_failed` (con motivo). `backend/internal/api/login.go` cablea `POST /api/v1/auth/login`: cuerpo `TokenPair` sin `refreshToken`, cookie `Set-Cookie: refresh_token=...; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Max-Age=<RefreshTTL>` (reutiliza `config.RefreshTTL`/`JWT_REFRESH_TTL` de T8, por defecto 720 h = 30 días).
+- Comandos y resultado observado: ver la entrada de T13 en "Evidencia de verificación" arriba.
+- Ajuste de Claude: (1) renombró las 2 pruebas `TestAM004_...` a `TestRF003_AM004...` porque el patrón que exige `traceability.py` es `Test(RF|RNF)NNN_...` y `AM004` no calza — sin el cambio, esas dos pruebas nunca se hubieran contado en la matriz. (2) Escribió `backend/internal/auth/login/login_integration_test.go` (ausente pese a que la propia tarea exige `make test-integration`) en el paquete externo `login_test` para no crear un ciclo de imports con `store` (que ya importa `login` para sus tipos `Writer`/`RefreshToken`); confirmó contra PostgreSQL real el hash SHA-256 del refresh token, `last_login_at` y el audit `login_succeeded`.
+- Dudas abiertas: ninguna. Mismo bloqueo de `.git/index.lock`; Claude creó ambos commits.
+
+### T17 · 2026-09-25 · 4e26918
+- Qué cambió: `backend/internal/api/rbac.go` (nuevo): `RequireRole(repository, "admin")` sigue la misma forma encadenable que `RequireAuth` (`func(http.Handler) http.Handler`); en cada petición lee `GetUserByID` (401 si el estado no es `active`) y `ListRolesForUser` (403 si el rol pedido no está en la lista), ambos ya existentes en `Store` desde T16, sin capa de servicio nueva ni consulta SQL nueva. `backend/internal/api/server.go`: los 4 métodos admin (`ListUsers`, `GetUser`, `UpdateUser`, `ListAuditLog`) pasan de `s.notImplemented(w)` suelto a `RequireAuth(s.tokens)(RequireRole(s.currentUsers, "admin")(...))` envolviendo ese mismo cuerpo — quedan protegidos ya mismo aunque su lógica real siga pendiente de T18/T19.
+- Comandos y resultado observado: ver la entrada de T17 en "Evidencia de verificación" arriba.
+- Ajuste de Claude: ninguno al código; Codex aplicó directamente la lección de composición real documentada en `CLAUDE.md` tras el hallazgo de T14/T15. Solo verificación: repitió la suite completa, corrió `golangci-lint` local (recién instalado) y confirmó que las 5 pruebas nuevas cubren exactamente los 4 escenarios de la tarea más el caso adicional de revocación sin espera de expiración.
+- Dudas abiertas: ninguna. Codex no pudo commitear (mismo bloqueo de sandbox); Claude creó el commit tras revisar.
+
+### T16 · 2026-09-25 · b9c3712
+- Qué cambió: `GetCurrentUser`/`UpdateCurrentUser` compuestos directamente en `*Server` (`backend/internal/api/me.go`, nuevo), igual que `Login`/`Register`/`VerifyEmail`: `RequireAuth(s.tokens)` envuelve ambos; el id de usuario sale solo de `claims.Subject` (nunca de la URL ni del cuerpo); roles releídos de BD en cada petición vía `ListRolesForUser` (AM-007/AM-021, nunca del claim del token); `updateCurrentUser` valida `displayName` 1-100 runas y rechaza campos desconocidos en el JSON. `apiUser()` arma la respuesta desde una lista explícita de campos, así que `password_hash` no puede filtrarse ni por accidente. `backend/internal/store/store.go`: `ListRolesForUser` y `UpdateDisplayName` nuevos, más los campos `MFAEnabled`/`LastLoginAt`/`CreatedAt` en `store.User` (ya existían en la BD, faltaban en el tipo). Consulta nueva `UpdateDisplayName` en `db/queries/users.sql`.
+- Comandos y resultado observado: ver la entrada de T16 en "Evidencia de verificación" arriba.
+- Ajuste de Claude: (1) reescribió `Store.UpdateDisplayName` para usar la consulta sqlc generada (`generated.Queries.UpdateDisplayName`) en vez del SQL parametrizado directo que Codex había dejado porque nunca corrió `sqlc generate` sobre su propia consulta nueva; regeneró y confirmó `gen.go` sin diff. (2) Encontró que T14 y T15 nunca quedaron compuestas en el router real (`Server.RefreshSession`/`Server.Logout` seguían en `s.notImplemented`, 501) — ver la entrada de "Corrección de composición T14/T15" en "Evidencia de verificación" y las notas añadidas en las propias secciones de T14 y T15. La corrección se cerró como commit aparte (`48597d3`), no mezclado con este.
+- Dudas abiertas: ninguna nueva. Codex no pudo commitear (mismo bloqueo de sandbox); Claude creó ambos commits de T16 tras revisar y verificar contra PostgreSQL real.
+
+### T15 · 2026-09-25 · bf869b2
+- Qué cambió: `backend/internal/auth/logout` (nuevo): `Service.Logout` revoca exactamente el token presentado con una única sentencia condicional (`RevokeRefreshToken`, `status = 'active' AND expires_at > now()`), así que un token desconocido, ya rotado o ya revocado comparten el mismo `ErrInvalidRefreshToken` (mapeado desde `pgx.ErrNoRows`, mismo patrón que T14); registra auditoría `logout` dentro de la misma transacción. `backend/internal/store/logout.go` (nuevo, mismo patrón que `store/refresh.go`/`store/login.go`) y consulta nueva en `db/queries/users.sql`. `POST /api/v1/auth/logout` (`backend/internal/api/logout.go`) lee la cookie `refresh_token`, nunca el cuerpo; responde 204 y `Set-Cookie` de borrado en éxito, 401 con el mismo borrado sin cookie o con token inválido, 500 sin tocar la cookie ante un error real; resuelve la IP con `requestClientIP(r)` desde el primer intento (aprendido de T14). No toca `server.go` (T21).
+- Comandos y resultado observado: ver la entrada de T15 en "Evidencia de verificación" arriba.
+- Ajuste de Claude: escribió `backend/internal/auth/logout/logout_test.go` (ausente pese a que la propia tarea exige `make test-go`): el paquete solo tenía la prueba de integración (`//go:build integration`) y el stub del handler HTTP, así que su lógica de servicio corría con 0 % de cobertura en la verificación rápida. No encontró bugs nuevos: la corrección de IP de confianza y el mapeo de `pgx.ErrNoRows` (ambos aprendidos en T14) ya venían bien aplicados desde el primer intento de Codex. El hook GGA señaló como observación (no incumplimiento) que `users.sql.go` aparecía modificado sin estar en la lista de archivos a revisar; confirmado que sale de `make gen` sobre la consulta nueva de `db/queries/users.sql`, sin edición manual.
+- Dudas abiertas: ninguna. Codex no pudo commitear (mismo bloqueo de sandbox); Claude creó ambos commits tras verificar contra PostgreSQL real. Nota de proceso: esta delegación evitó backticks en el prompt (lección de T14) y no hubo incidentes del forwarder.
+
+### T14 · 2026-09-25 · 110867f
+- Qué cambió: `backend/internal/auth/refresh` (nuevo): `Service.Refresh` rota el token dentro de `WithinRefreshTransaction`, con una única sentencia SQL condicional (`RotateRefreshToken`, `FOR UPDATE` sobre el candidato) que garantiza que dos renovaciones concurrentes con el mismo token nunca dejan dos activos: una gana, la otra se trata como reuso (sin ventana de gracia, ADR 0005/T14a). El reuso revoca toda la familia y audita `refresh_reuse_detected` **dentro** de la transacción, que confirma antes de que el servicio devuelva `ErrRefreshReuse` — ese resultado se conserva aunque falle la publicación del evento `security.refresh_reuse_detected` (ver "Ajuste de Claude"). `backend/internal/store/refresh.go` (nuevo, mismo patrón que `store/login.go` de T13) y consulta nueva `RotateRefreshToken` en `db/queries/users.sql` (CTEs `candidate`/`rotated`/`created`, sin migración: el esquema y el índice único `refresh_tokens_one_active_per_family` ya existían desde 000001). `POST /api/v1/auth/refresh` (`backend/internal/api/refresh.go`) lee la cookie `refresh_token`, nunca el cuerpo; responde `accessToken` en JSON y rota la cookie con los mismos atributos de login; sin cookie -> 401. No toca `server.go` ni composición (T21, igual que T13).
+- Comandos y resultado observado: ver la entrada de T14 en "Evidencia de verificación" arriba (dos intentos de Codex, RED/GREEN de cada uno, y la corrida real contra PostgreSQL levantado localmente).
+- Ajuste de Claude: (1) alcance de archivos — Codex se detuvo interpretando la lista "Archivos" de la tarea (sin `backend/internal/store`) como una restricción; Claude confirmó que el paquete store sí estaba autorizado (mismo patrón que T13) y reanudó el mismo hilo de Codex con esa aclaración más el bug de IP de abajo. (2) bug real: el handler usaba `remoteIP(r.RemoteAddr)` en vez de `requestClientIP(r)`, la IP de confianza que ya resuelve el middleware de T6 y que usan `login.go`/`register.go`/`verify_email.go` — Codex lo corrigió tras la aclaración. (3) `gen.go` con drift de versión: `make gen` de Codex usó un oapi-codegen cacheado sin ldflag de versión (comentario "(devel)"); Claude lo regeneró con el binario correcto, sin diff de contenido real. (4) bug real encontrado por Claude al revisar (confirmado después por el hook GGA antes del commit): un refresh token que no existe en la tabla (forjado, nunca emitido) hacía que `RotateRefreshToken` devolviera `pgx.ErrNoRows` sin mapear a `ErrInvalidRefreshToken`, así que el handler respondía 500 en vez de 401; TDD con `TestRF005_TokenInexistenteDevuelveInvalido` (RED confirmado, luego GREEN) siguiendo el mismo patrón `errors.Is(err, pgx.ErrNoRows)` de `login.go`. (5) segundo hallazgo del hook GGA: si la publicación del evento de seguridad fallaba tras un reuso ya confirmado y committeado, el error genérico pisaba `ErrRefreshReuse` y el handler devolvía 500 sin limpiar la cookie ya comprometida; TDD con `TestRF006_ReusoConFalloDePublicacionSigueRevocandoYDevuelveReuso` (RED, luego GREEN con `errors.Join(refreshErr, ...)` para que `errors.Is` siga reconociendo el reuso). (6) el hook también pidió renombrar `TestHashRefreshToken` y `TestRefreshHandlerRechazaErroresNoAutorizados` al patrón `TestRF005_...` para que `traceability.py` las cuente.
+- Dudas abiertas: ninguna. Codex no pudo commitear en ninguno de los dos intentos (mismo bloqueo de sandbox); Claude creó ambos commits tras revisar y verificar contra PostgreSQL real. Nota de proceso ajena al código: durante la primera delegación, el forwarder de `codex:codex-rescue` interpretó fragmentos entre backticks del prompt de instrucciones como comandos de shell reales (incluido un `git push` que falló solo por falta de upstream); no hubo daño (repo verificado intacto) y se reportó como bug del plugin — evitar backticks en prompts futuros a ese agente.
+
+### T18 · 2026-09-25 · ac3ea8e
+- Qué cambió: `listUsers`/`getUser`/`updateUser` compuestos directamente en `*Server` (`backend/internal/api/admin_users.go`, nuevo), reemplazando los `s.notImplemented(w)` que T17 ya envolvía con `RequireAuth(s.tokens)(RequireRole(s.currentUsers, "admin")(...))`. Búsqueda por `q` con `ILIKE` parametrizado (sqlc, sin concatenación), filtro `status`, paginación por cursor (`limit` 1-100, default 25). `updateUser` corre dentro de una única transacción (`Store.WithinUserManagementTransaction`, nuevo en `backend/internal/store/admin_users.go`): bloquea con `FOR UPDATE` todas las filas de admins activos (`LockActiveAdminUsers`) y luego la fila objetivo, así que dos actualizaciones concurrentes se serializan sobre el mismo conjunto antes de decidir `ErrLastActiveAdmin`/`ErrSelfDisable` (paquete nuevo `backend/internal/auth/admin`). Auditoría `user_disabled`/`role_changed` dentro de la misma transacción. `RotateRefreshToken` (`db/queries/users.sql`) ahora exige `users.status = 'active'`, así que una cuenta deshabilitada tampoco puede renovar. Sin migración nueva: el bloqueo vive en SQL transaccional, no en un trigger (Q6 lo dejaba como opcional "si es viable").
+- Comandos y resultado observado: RED (Codex): servicio inexistente. GREEN: `go test -race ./internal/api ./internal/auth/admin ./internal/store` y la suite completa `go test -race ./...`, ambos en verde (Claude los repitió con `-count=1` tras su propio cambio, ver más abajo). `make gen` sin deriva de `gen.go`/`schema.d.ts`; `specs/07-traceability.md` pasa RF-010 de "parcial" a "completo". `make lint`: solo los 3 avisos preexistentes de `legacy_auth.go` (línea base, hasta T23). Integración no ejecutada (`TEST_DATABASE_URL` no definido en este entorno).
+- Ajuste de Claude: encontró un bug real de concurrencia que ninguna prueba (unitaria con stub) podía ver: `LockActiveAdminUsers` bloqueaba varias filas con `FOR UPDATE OF u` **sin `ORDER BY`**, lo que en PostgreSQL puede producir deadlocks entre transacciones concurrentes que no adquieren los bloqueos en el mismo orden. Se añadió `ORDER BY u.id` a la consulta (`db/queries/users.sql`), se regeneró con `sqlc generate` y se repitió la suite completa: sigue en verde. Con el orden fijo, cualquier `updateUser` concurrente contiende primero por el mismo conjunto (admins activos, orden por id) antes de tocar su fila objetivo, así que queda serializado sin interbloqueo.
+- Dudas abiertas: ninguna bloqueante. `cmd/api/main.go` sigue sin componer ningún servicio (ni los de T16/T17 tampoco): `SetAdminUserService` existe pero nada lo llama todavía, así que estos endpoints devuelven 503 hasta T21 ("Composición, configuración y humo con el stack") — mismo patrón ya usado para T13 a T17, no es una regresión de T18. Codex no pudo commitear (mismo bloqueo de sandbox); Claude creó el commit tras revisar, verificar y aplicar la corrección de `ORDER BY`.
+
+### T20 · 2026-09-25 · 37c17a5, bd5a702
+- Qué cambió: dos límites independientes de ventana deslizante sobre `login_failed` (Decisión Q1). Por cuenta: `LoginAccountMaxFailures` (5) fallos en `LoginFailureWindow` (15 min) ponen `users.status = 'locked'` con `locked_until` real; el propio `Login` lo desbloquea de forma perezosa en el siguiente intento si `locked_until` ya venció (no hay cron). Por IP: `LoginIPMaxFailures` (20, deliberadamente alto para no bloquear una NAT entera) sobre `audit_log` filtrado por `ip`, contando cualquier cuenta incluidas las inexistentes; nuevo índice `audit_log (ip, created_at)` en la migración `000003`. Ambos chequeos corren **antes** de verificar la contraseña, así que una contraseña correcta también falla con 423 mientras dura cualquiera de los dos bloqueos, y la respuesta (`login-locked`, RFC 7807) es idéntica en ambos casos para no revelar cuál se activó. La IP viene siempre de `requestClientIP(r)` (T6): un `X-Forwarded-For` falsificado desde un peer no confiable no cambia nada.
+- Comandos y resultado observado: RED (Codex): paquete de lockout inexistente. GREEN (Codex): pruebas del paquete `login` y suite completa. Claude repitió todo con PostgreSQL real (`docker compose up -d db` + migración `000003` aplicada): `go test -race -tags=integration -count=1 ./...` completo en verde dos veces (antes y después del ajuste de abajo), `make lint` solo con los 3 hallazgos preexistentes de `legacy_auth.go`, `make gen` sin deriva real (`specs/07-traceability.md` es el único archivo que cambia) y `python3 scripts/traceability.py --check` al día.
+- Ajuste de Claude (primer commit): (1) **bug real de generación**: Codex dejó `db/queries/users.sql`/`audit.sql` con las consultas nuevas (`LockLoginUser`, `UnlockLoginUser`, `CountLoginFailuresByAccount`, `CountLoginFailuresByIP`, y `GetLoginUserByEmail` con `locked_until` y `FOR UPDATE`), pero **nunca corrió `sqlc generate` de verdad**: el código generado seguía reflejando las consultas viejas (`GetLoginUserByEmailRow` sin `LockedUntil`). En vez de regenerar, `backend/internal/store/login.go` traía SQL crudo escrito a mano dentro de `loginWriter`, sorteando sqlc por completo — el mismo antipatrón ya corregido una vez en T5. Claude corrió `sqlc generate` (sí produjo diff real, confirmando el problema), reescribió `loginWriter` para usar `w.queries.*` generado, y repitió toda la suite. (2) **requisito faltante**: Q1 pide auditoría `account_locked` y evento `security.account_locked` además del bloqueo; Codex solo hizo el `UPDATE` de `status`/`locked_until`, sin auditoría ni evento — ningún `TestRF017_*` pedido lo hubiera detectado, porque ninguno verifica ese efecto secundario. Claude agregó `login.SecurityEvent`/`EventPublisher`/`WithEventPublisher` (mismo patrón que `refresh.Service`, commit aparte `bd5a702`), la auditoría dentro de la transacción y una prueba nueva (`TestRF017_CuentaBloqueadaRegistraAuditoriaYPublicaEvento`). Un fallo al publicar el evento se propaga con `errors.Join` (no se traga en silencio) porque el bloqueo y su auditoría ya quedaron comprometidos en la transacción, igual que hace T14 con el reuso de refresh.
+- Dudas abiertas: ninguna bloqueante. `cmd/api/main.go` sigue sin componer nada (T21); `WithEventPublisher` queda sin llamar hasta entonces, igual que en `refresh.Service` desde T14. Codex no pudo commitear (mismo bloqueo de sandbox); Claude creó ambos commits.
+
+
+### T19 · 2026-09-25 · 1ddbdd6
+- Qué cambió: `listAuditLog` compuesto directamente en `*Server` (`backend/internal/api/audit_log.go`, nuevo), reemplazando el `s.notImplemented(w)` que T17 ya envolvía con `RequireAuth(s.tokens)(RequireRole(s.currentUsers, "admin")(...))`. Paquete nuevo `backend/internal/auth/auditlog` (separado de `internal/audit`, el escritor append-only, para evitar un ciclo de imports con `internal/api`): filtros `action`/`actorId`/`since` como parámetros sqlc ligados (`db/queries/audit.sql`, consulta nueva `ListAuditLog`), paginación por cursor con el `id` del evento en orden descendente (coincide con los índices `(created_at DESC)` ya existentes desde 000001). Adaptador `backend/internal/store/audit_log.go` reutiliza los mismos helpers (`optionalUUID`, `optionalText`, `nullableUUID`) que el adaptador de T18.
+- Comandos y resultado observado: RED (Codex): paquete `internal/auth/auditlog` inexistente. GREEN (Codex): pruebas enfocadas y `go test -race ./...` completo. Claude repitió todo con PostgreSQL real: levantó `db` de `deploy/docker-compose.yml` localmente (el volumen ya tenía las migraciones aplicadas de una sesión anterior), corrió `go test -race -tags=integration -count=1 ./...` completo (todos los paquetes en verde, incluida `internal/auth/auditlog`) y `make lint`/`make gen`/`python3 scripts/traceability.py --check` (sin deriva; RF-011 pasa de 3 a 8 pruebas contadas).
+- Ajuste de Claude: (1) faltaba `TestRF011_ElRolDeLaAplicacionNoPuedeModificarLaFila`, uno de los 4 criterios de la tarea — Codex no lo mencionó como omitido en su handoff. Claude lo escribió (mismo enfoque que `TestRF011_IdentityAppNoTieneUpdateNiDeleteSobreAuditLog` de T9: `SET ROLE identity_app`, confirma `permission denied` en `UPDATE`/`DELETE` sobre `audit_log`) y lo verificó contra PostgreSQL real antes de commitear. (2) El hook GGA rechazó el primer intento de commit: `TestAuditLogHandlerPasaFiltrosAlServicio` no seguía el patrón `TestRF011_...` que exige `traceability.py` (no se hubiera contado en la matriz); renombrada a `TestRF011_FiltrosSePasanAlServicio`. (3) Comentario de godoc mal ubicado sobre `optionalAddr` en vez de sobre `ListAuditLog` (señalado por el mismo hook como observación, no bloqueante): reubicado.
+- Dudas abiertas: ninguna bloqueante. Mismo patrón que T18: `cmd/api/main.go` no compone `SetAuditLogService` todavía (T21). Nota de proceso: Codex reportó "`make test-integration` passes" sin aclarar que corrió sin `TEST_DATABASE_URL` (se salta con `t.Skip`, no es lo mismo que "pasó" con datos reales); Claude lo verificó de verdad contra PostgreSQL antes de aceptar el reporte.
+
+### T21 · 2026-09-25 · ba0ce22 (+ c6d468f)
+- Qué cambió: `backend/cmd/api/main.go` por fin compone todo lo construido en T10-T20 (antes solo armaba `api.NewServer(...)` con los checkers de `/healthz`/`/readyz`, sin llamar ningún `Set*Service`): `token.New` desde `JWT_SIGNING_KEY`, `password.Configure(cfg.Argon2)`, y los ocho servicios (`registration`, `verification`, `login` con su `LockoutConfig`, `refresh`, `logout`, `admin`, `auditlog`, `SetCurrentUserRepository`/`SetTrustedProxies`) — un solo `*store.Store` implementa todas las interfaces `Repository` que cada uno pide. Dos adaptadores nuevos (`loginSecurityEventPublisher`, `refreshSecurityEventPublisher`) traducen `login.SecurityEvent`/`refresh.SecurityEvent` (que solo llevan el `UserID`) a los eventos reales del broker: buscan el usuario por id para completar `email`/`displayName` (que `notify.Render` exige) y, para `security.account_locked`, también `lockedUntil`/`failedAttempts` (exigidos por el AsyncAPI, `specs/04-events/asyncapi.yaml`); si el usuario no se encuentra, se salta la publicación sin fallar la petición (el bloqueo/revocación ya quedó comprometido en la transacción). Decisión Q13: `TRUSTED_PROXIES` pasa a ser la subred fija del compose (`networks.default.ipam`, `172.28.0.0/16`), porque quien reenvía de verdad a la API dentro de esa red es `nginx`. `JWT_SIGNING_KEY` y `TRUSTED_PROXIES` se agregan a `api`/`worker` en el compose con sustitución obligatoria `${VAR:?mensaje}` desde `.env` en la raíz; `.env.example` y el README documentan cómo generarlo.
+- Comandos y resultado observado: RED/GREEN de Codex sobre los dos adaptadores nuevos (`backend/cmd/api/main_test.go`). Claude hizo el humo manual real que pedía la tarea, pero no con `make up`: el `make up` completo falla en la construcción de las imágenes `api`/`worker` porque la línea base deliberadamente vulnerable usa `golang:1.22-bullseye`, y el propio `go.mod` exige Go >= 1.25 desde T6 (Q11) — es el mismo problema documentado de VULN-008 (Debian 11 sin paquetes), remediado recién en T27, fuera de alcance acá. En su lugar: levantó `db`, `broker` y `mailpit` con `docker compose up -d` (igual que en T18-T20) y corrió los binarios `cmd/api`/`cmd/worker` locales (Go 1.25 del entorno) contra ellos. Con eso probó de punta a punta: `GET /.well-known/jwks.json` (200), registro real -> correo real en Mailpit -> `verify-email` con el token real del correo, login (cookie `HttpOnly; Secure; SameSite=Strict`, cuerpo solo con `accessToken`), refresh (rota la cookie), reuso de la cookie ya rotada (401, familia revocada, la cookie nueva emitida en ese mismo refresh también queda invalidada), logout (cookie borrada, refresh posterior 401), `GET /admin/users` como no-admin (403) y como admin tras otorgarle el rol por SQL (200, trae también `GET /admin/audit-log`), 6 fallos sobre una cuenta (5 x 401, 6º 423, contraseña correcta también 423 mientras dura) y ráfaga de 20 fallos desde la misma IP contra cuentas distintas e inexistentes (después, la siguiente cuenta válida con contraseña correcta también da 423). `make lint`: solo los 3 hallazgos preexistentes; `make gen`: sin deriva real.
+- Ajuste de Claude — dos bugs críticos encontrados por el humo real, ninguno de los dos nuevo de T21 (viven en código de T10/T11/T13/T14/T15, pero nadie los había ejercitado de punta a punta hasta este smoke test):
+  1. **`verification.go` nunca decodificaba el token del enlace de correo**: `registration.go` hashea los bytes crudos del token y manda el enlace codificado en base64url; `verification.go` hasheaba el string base64 tal cual, sin decodificar — el hash nunca podía coincidir y `verify-email` devolvía 410 para cualquier enlace real. Los tests existentes nunca lo detectaron porque construían el hash y el string a mano, sin pasar por el límite real de codificación/decodificación.
+  2. **`login.go`/`refresh.go` usaban los bytes crudos del refresh token como string de cookie** (`string(refreshRaw)`) en vez de codificarlos: `net/http` descarta en silencio los bytes que no son válidos como cookie-octet al armar `Set-Cookie`, así que la cookie que recibía un cliente real quedaba corrupta y truncada, y nunca podía volver a hashear igual — refresh y logout devolvían 401 siempre para una cookie real (mismo bug de fondo en `logout.go`, que también hasheaba el string sin decodificar). Corregidos los cuatro puntos con `base64.RawURLEncoding`, reescritos los tests que tapaban el bug (`verification_integration_test.go` construía el par hash+string a mano, sin encoder de por medio), y confirmado con el humo real completo de arriba. Commit aparte (`c6d468f`) para no mezclarlo con el propio commit de composición de T21.
+  - El hook GGA además rechazó dos veces el commit de composición: (a) el adaptador de `security.account_locked` mandaba `lockedUntil`/`failedAttempts` en cero, incumpliendo el AsyncAPI (`required: [userId, email, lockedUntil, failedAttempts]`) — corregido llevando esos dos valores desde `recordAccountFailure` hasta el evento; (b) los dos tests nuevos de los adaptadores no seguían `Test(RF|RNF)NNN_...`, así que no contaban en `specs/07-traceability.md` — renombrados a `TestRF017_LoginSecurityEventPublisherPublishesRecipient` y `TestRF006_RefreshSecurityEventPublisherSkipsMissingUser`.
+- Dudas abiertas: ninguna bloqueante. `make up` con las imágenes de la línea base sigue sin poder construirse hasta la remediación de T27 (Dockerfiles); no es una regresión de T21, es la línea base deliberada. Codex no pudo commitear (mismo bloqueo de sandbox); Claude creó ambos commits tras revisar, verificar contra la infraestructura real y aplicar las dos correcciones.
+
+### T22 · 2026-09-25 · — (solo revisión, sin commit de código)
+- Qué se hizo: revisión completa de la Fase 2 (T4 a T21) sin delegar a Codex, como pide la tarea. (1) Barrido del repo completo buscando violaciones de "Seguridad del núcleo IdP" (`AGENTS.md`): sin logs de contraseñas/tokens/secretos en ningún paquete (`grep` de `logger.*password|token|secret|refresh` fuera de tests, cero resultados); sin SQL armado con `fmt.Sprintf`/concatenación fuera de `legacy_auth.go` (línea base, T23); sin `math/rand` fuera de `legacy_auth.go`; sin llamadas `pool.Exec`/`pool.Query` directas en los paquetes de `internal/auth/**` (todo pasa por los adaptadores de `store` generados con sqlc). (2) Suite completa `go test -race -tags=integration -count=1 ./...` contra PostgreSQL/RabbitMQ reales: **todos los paquetes en verde**, incluida la ronda final después de las dos correcciones de T21. (3) `make lint`: solo los 3 hallazgos preexistentes de `legacy_auth.go`. (4) `make gen`: sin ningún diff, ni siquiera en `specs/07-traceability.md` (ya estaba al día desde el commit de T21). (5) Matriz de trazabilidad: el criterio de aceptación de la feature "RF-001 a RF-007, RF-009, RF-010, RF-011 y RF-017 en completo" **se cumple en su totalidad** (los 11 en ✅, confirmado en `specs/07-traceability.md`).
+- Hallazgo abierto, no bloqueante para esta tarea pero sí relevante para el cierre de la feature: **cobertura real 46.7 %**, medida con `go test -race -coverprofile=... -covermode=atomic ./...` (el mismo comando de `make test-go`), muy por debajo del 70 % que exige el criterio de aceptación 4 de la feature (RNF-005). Por paquete: `cmd/api` 10.2 %, `cmd/worker` 28.9 %, `internal/auth/admin` 44.7 %, `internal/events` 1.8 % — el resto de `internal/auth/**` está entre 75-83 %. No hay gate de cobertura activo en CI todavía (RNF-005 "🟡 parcial" en la matriz). Esto no es una regresión de ninguna tarea puntual: es la brecha acumulada de no medir cobertura como criterio de cierre tarea por tarea. Queda para que el usuario decida si se abre una tarea dedicada a cerrarla antes de la Fase 3, o si se acepta y se revisa más adelante.
+- Dudas abiertas: la decisión de cobertura de arriba, y `RNF-001` (contenerización total) sigue "sin cubrir" en la matriz porque `make up` no construye las imágenes hasta que T27 remedie la línea base (Debian 11/Go 1.22) — coherente con lo ya documentado en T21, no es nuevo.
+
+

@@ -1,0 +1,37 @@
+{
+  "vuln": "VULN-002",
+  "gate": [
+    "gosec G401/G501 (baseline-scan)",
+    "Semgrep use-of-md5",
+    "CodeQL"
+  ],
+  "antes": {
+    "commit_linea_base": "053e15fb27b1aaf974c7c818108eee64628973e9",
+    "commit_main": "acd3da850de2ab588907c669e5d188b8b1411bdf",
+    "workflow": "Escaneo de la línea base",
+    "run_id": "35476102444",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444",
+    "artefacto": "security/evidence/actions-35476102444/gosec.json",
+    "captura": "informe Desktop §3 VULN-002",
+    "hallazgos": [
+      "gosec G401 en legacy_auth.go:54 (md5.Sum)",
+      "gosec G501 en legacy_auth.go:27 (import crypto/md5)",
+      "Semgrep use-of-md5 en legacy_auth.go:54",
+      "CodeQL alerta #80 (High, go/weak-sensitive-data-hashing) en legacy_auth.go:54, abierta",
+      "Semgrep OSS alerta #43 (use-of-md5) en legacy_auth.go:54 (Security > Code scanning)"
+    ],
+    "observacion": "CodeQL #80 verificada por Claude con la API de code scanning el 2026-09-20 (https://github.com/jorgepaez-ops/IdentityHub/security/code-scanning/80; commit analizado acd3da8 en main)."
+  },
+  "remediacion": {
+    "tarea": "T23",
+    "commit": null,
+    "ficha": "security/findings/VULN-002-md5-para-contrasenas.md"
+  },
+  "despues": {
+    "commit": null,
+    "workflow": null,
+    "run_id": null,
+    "run_url": null,
+    "captura": null
+  }
+}

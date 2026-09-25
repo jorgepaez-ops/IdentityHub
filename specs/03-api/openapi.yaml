@@ -18,6 +18,16 @@ info:
 
     Cada operación declara `x-requirement` con el identificador del requisito que
     implementa (ver specs/01-requirements.md).
+
+    El refresh token viaja exclusivamente en la cookie `refresh_token`, con
+    `HttpOnly`, `Secure`, `SameSite=Strict` y `Path=/api/v1/auth`. Las operaciones
+    de refresh y logout exigen esa cookie y usan `POST`; la renovación devuelve JSON
+    y logout confirma con `204`. El resto de la API usa exclusivamente
+    `Authorization: Bearer`, nunca cookies, por lo que no queda expuesta a CSRF.
+
+    La API se entrega al frontend a través de Nginx y comparte origen, por lo que no
+    habilita CORS. Si fuera necesario en el futuro, `Access-Control-Allow-Credentials`
+    solo podrá usarse con un origen explícito, nunca con `*`.
   license:
     name: Apache-2.0
     url: https://www.apache.org/licenses/LICENSE-2.0
@@ -153,6 +163,10 @@ paths:
       responses:
         '200':
           description: Sesión iniciada
+          headers:
+            Set-Cookie:
+              description: 'refresh_token=<opaco>; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Max-Age=<vigencia del refresh>'
+              schema: { type: string }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/TokenPair' }
@@ -185,6 +199,10 @@ paths:
       responses:
         '200':
           description: Sesión iniciada
+          headers:
+            Set-Cookie:
+              description: 'refresh_token=<opaco>; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Max-Age=<vigencia del refresh>'
+              schema: { type: string }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/TokenPair' }
@@ -202,14 +220,19 @@ paths:
         revoca la familia de sesiones completa (RF-006).
       x-requirement: RF-005
       security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/RefreshRequest' }
+      parameters:
+        - name: refresh_token
+          in: cookie
+          required: true
+          description: Refresh token opaco de la sesión actual.
+          schema: { type: string }
       responses:
         '200':
           description: Par de tokens renovado
+          headers:
+            Set-Cookie:
+              description: 'refresh_token=<opaco>; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Max-Age=<vigencia del refresh>'
+              schema: { type: string }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/TokenPair' }
@@ -222,13 +245,19 @@ paths:
       summary: Revocar el refresh token de la sesión actual
       x-requirement: RF-007
       security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/RefreshRequest' }
+      parameters:
+        - name: refresh_token
+          in: cookie
+          required: true
+          description: Refresh token opaco de la sesión actual.
+          schema: { type: string }
       responses:
-        '204': { description: Sesión cerrada }
+        '204':
+          description: Sesión cerrada
+          headers:
+            Set-Cookie:
+              description: 'refresh_token=; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Max-Age=0'
+              schema: { type: string }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
   /api/v1/auth/password-reset/request:
@@ -245,7 +274,7 @@ paths:
           application/json:
             schema: { $ref: '#/components/schemas/EmailRequest' }
       responses:
-        '202': { description: Si la cuenta existe, se envió el correo }
+        '202': { description: 'Si la cuenta existe, se envió el correo' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
 
   /api/v1/auth/password-reset/confirm:
@@ -657,18 +686,17 @@ components:
 
     TokenPair:
       type: object
-      required: [accessToken, refreshToken, tokenType, expiresIn]
+      required: [accessToken, tokenType, expiresIn]
       properties:
         accessToken:  { type: string, description: JWT Ed25519 }
-        refreshToken: { type: string, description: Token opaco de 32 bytes en base64url }
         tokenType:    { type: string, enum: [Bearer] }
-        expiresIn:    { type: integer, description: Segundos de vigencia del access token, example: 900 }
+        expiresIn:    { type: integer, description: 'Segundos de vigencia del access token', example: 900 }
 
     MfaChallenge:
       type: object
       required: [mfaToken, expiresIn]
       properties:
-        mfaToken:  { type: string, description: Token de un solo uso, vigente 5 minutos }
+        mfaToken:  { type: string, description: 'Token de un solo uso, vigente 5 minutos' }
         expiresIn: { type: integer, example: 300 }
 
     MfaVerifyRequest:
@@ -700,12 +728,6 @@ components:
       required: [password]
       properties:
         password: { type: string, format: password }
-
-    RefreshRequest:
-      type: object
-      required: [refreshToken]
-      properties:
-        refreshToken: { type: string }
 
     TokenRequest:
       type: object

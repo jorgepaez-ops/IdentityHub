@@ -87,7 +87,7 @@ func TestRNF012_SecretNoSeRevelaAlFormatearla(t *testing.T) {
 
 	comprobaciones := map[string]string{
 		"%v con String()":  fmt.Sprintf("%v", s),
-		"%s con String()":  fmt.Sprintf("%s", s),
+		"%s con String()":  fmt.Sprint(s),
 		"%q":               fmt.Sprintf("%q", s),
 		"%#v con GoString": fmt.Sprintf("%#v", s),
 		"dentro de struct": fmt.Sprintf("%+v", struct{ URL Secret }{s}),
@@ -117,5 +117,107 @@ func TestRNF012_SecretNoSeRevelaAlFormatearla(t *testing.T) {
 	// Y aun así el valor sigue siendo utilizable donde hace falta de verdad.
 	if s.Reveal() != valor {
 		t.Errorf("Reveal() = %q; se esperaba %q", s.Reveal(), valor)
+	}
+}
+
+func TestRNF003_FaltaClaveDeFirmaImpideElArranque(t *testing.T) {
+	t.Setenv("DATABASE_URL", "")
+	t.Setenv("RABBITMQ_URL", "")
+	t.Setenv("JWT_SIGNING_KEY", "")
+	_, err := Load()
+	if err == nil || !strings.Contains(err.Error(), "JWT_SIGNING_KEY") || !strings.Contains(err.Error(), "DATABASE_URL") || !strings.Contains(err.Error(), "RABBITMQ_URL") {
+		t.Fatalf("Load did not accumulate mandatory configuration errors: %v", err)
+	}
+
+	t.Setenv("DATABASE_URL", "postgres://x")
+	t.Setenv("RABBITMQ_URL", "amqp://x")
+	t.Setenv("JWT_SIGNING_KEY", "not-base64")
+	_, err = Load()
+	if err == nil || !strings.Contains(err.Error(), "JWT_SIGNING_KEY") {
+		t.Fatalf("Load malformed JWT_SIGNING_KEY error = %v", err)
+	}
+}
+
+func TestRNF003_ClaveDeFirmaNoSeRevelaEnConfig(t *testing.T) {
+	const encodedSeed = "MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE="
+	t.Setenv("DATABASE_URL", "postgres://x")
+	t.Setenv("RABBITMQ_URL", "amqp://x")
+	t.Setenv("JWT_SIGNING_KEY", encodedSeed)
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if output := fmt.Sprintf("%+v", cfg); strings.Contains(output, encodedSeed) {
+		t.Fatalf("formatted config leaked signing key: %s", output)
+	}
+}
+
+func TestRF012_PublicBaseURLTieneValorPorDefectoYAdmiteOverride(t *testing.T) {
+	const seed = "MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE="
+	t.Setenv("DATABASE_URL", "postgres://x")
+	t.Setenv("RABBITMQ_URL", "amqp://x")
+	t.Setenv("JWT_SIGNING_KEY", seed)
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load default: %v", err)
+	}
+	if cfg.PublicBaseURL != "http://localhost:8080" {
+		t.Errorf("default PublicBaseURL = %q", cfg.PublicBaseURL)
+	}
+
+	t.Setenv("PUBLIC_BASE_URL", "https://identity.example")
+	cfg, err = Load()
+	if err != nil {
+		t.Fatalf("Load override: %v", err)
+	}
+	if cfg.PublicBaseURL != "https://identity.example" {
+		t.Errorf("override PublicBaseURL = %q", cfg.PublicBaseURL)
+	}
+}
+
+func TestRF017_ConfiguraLimitesDeFuerzaBruta(t *testing.T) {
+	const seed = "MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE="
+	t.Setenv("DATABASE_URL", "postgres://x")
+	t.Setenv("RABBITMQ_URL", "amqp://x")
+	t.Setenv("JWT_SIGNING_KEY", seed)
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load defaults: %v", err)
+	}
+	if cfg.LoginAccountMaxFailures != 5 || cfg.LoginIPMaxFailures != 20 || cfg.LoginFailureWindow.String() != "15m0s" || cfg.LoginLockoutDuration.String() != "15m0s" {
+		t.Fatalf("default lockout config = %+v", cfg)
+	}
+	t.Setenv("LOGIN_ACCOUNT_MAX_FAILURES", "7")
+	t.Setenv("LOGIN_IP_MAX_FAILURES", "25")
+	t.Setenv("LOGIN_FAILURE_WINDOW", "10m")
+	t.Setenv("LOGIN_LOCKOUT_DURATION", "30m")
+	cfg, err = Load()
+	if err != nil {
+		t.Fatalf("Load overrides: %v", err)
+	}
+	if cfg.LoginAccountMaxFailures != 7 || cfg.LoginIPMaxFailures != 25 || cfg.LoginFailureWindow.String() != "10m0s" || cfg.LoginLockoutDuration.String() != "30m0s" {
+		t.Fatalf("override lockout config = %+v", cfg)
+	}
+}
+
+func TestRF017_RechazaLimitesDeFuerzaBrutaNoPositivos(t *testing.T) {
+	const seed = "MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE="
+	t.Setenv("DATABASE_URL", "postgres://x")
+	t.Setenv("RABBITMQ_URL", "amqp://x")
+	t.Setenv("JWT_SIGNING_KEY", seed)
+	t.Setenv("LOGIN_ACCOUNT_MAX_FAILURES", "0")
+	t.Setenv("LOGIN_IP_MAX_FAILURES", "-1")
+	t.Setenv("LOGIN_FAILURE_WINDOW", "0s")
+	t.Setenv("LOGIN_LOCKOUT_DURATION", "0s")
+	_, err := Load()
+	if err == nil {
+		t.Fatal("Load accepted unsafe brute-force limits")
+	}
+	for _, key := range []string{"LOGIN_ACCOUNT_MAX_FAILURES", "LOGIN_IP_MAX_FAILURES", "LOGIN_FAILURE_WINDOW", "LOGIN_LOCKOUT_DURATION"} {
+		if !strings.Contains(err.Error(), key) {
+			t.Errorf("Load error did not name %s: %v", key, err)
+		}
 	}
 }

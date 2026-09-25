@@ -10,28 +10,28 @@ declaración de buenas intenciones.
 
 | Requisito | Título | Pri | Operaciones de la API | Escenarios | Pruebas Go | E2E | Estado |
 |---|---|---|---|---|---|---|---|
-| **RF-001** | Registro de cuenta | P0 | `register` | 3 | — | — | 🟡 parcial |
-| **RF-002** | Verificación de correo | P0 | `verifyEmail` | 2 | — | — | 🟡 parcial |
-| **RF-003** | Inicio de sesión | P0 | `login` | 3 | — | — | 🟡 parcial |
-| **RF-004** | Emisión y validación de JWT | P0 | `getJwks` | 2 | — | — | 🟡 parcial |
-| **RF-005** | Renovación de sesión | P0 | `refreshSession` | 1 | — | — | 🟡 parcial |
-| **RF-006** | Detección de reuso de refresh token | P0 | — | 1 | — | — | 🟡 parcial |
-| **RF-007** | Cierre de sesión | P0 | `logout` | 1 | — | — | 🟡 parcial |
-| **RF-008** | Perfil propio | P0 | `getCurrentUser`, `updateCurrentUser` | — | — | — | 🔴 sin cubrir |
-| **RF-009** | Control de acceso por roles | P0 | — | 2 | — | — | 🟡 parcial |
-| **RF-010** | Administración de usuarios | P0 | `listUsers`, `getUser`, `updateUser` | 2 | — | — | 🟡 parcial |
-| **RF-011** | Registro de auditoría | P0 | `listAuditLog` | 1 | — | — | 🟡 parcial |
-| **RF-012** | Notificaciones asíncronas | P0 | — | — | 3 | — | 🟡 parcial |
+| **RF-001** | Registro de cuenta | P0 | `register` | 3 | 15 | — | ✅ completo |
+| **RF-002** | Verificación de correo | P0 | `verifyEmail` | 2 | 9 | — | ✅ completo |
+| **RF-003** | Inicio de sesión | P0 | `login` | 3 | 10 | — | ✅ completo |
+| **RF-004** | Emisión y validación de JWT | P0 | `getJwks` | 2 | 7 | — | ✅ completo |
+| **RF-005** | Renovación de sesión | P0 | `refreshSession` | 1 | 7 | — | ✅ completo |
+| **RF-006** | Detección de reuso de refresh token | P0 | — | 1 | 5 | — | ✅ completo |
+| **RF-007** | Cierre de sesión | P0 | `logout` | 1 | 8 | — | ✅ completo |
+| **RF-008** | Perfil propio | P0 | `getCurrentUser`, `updateCurrentUser` | — | 5 | — | 🟡 parcial |
+| **RF-009** | Control de acceso por roles | P0 | — | 2 | 5 | — | ✅ completo |
+| **RF-010** | Administración de usuarios | P0 | `listUsers`, `getUser`, `updateUser` | 2 | 4 | — | ✅ completo |
+| **RF-011** | Registro de auditoría | P0 | `listAuditLog` | 1 | 9 | — | ✅ completo |
+| **RF-012** | Notificaciones asíncronas | P0 | — | — | 8 | — | 🟡 parcial |
 | **RF-013** | Alta de segundo factor (TOTP) | P1 | `enrollMfa`, `activateMfa`, `disableMfa` | 1 | — | — | 🟡 parcial |
 | **RF-014** | Inicio de sesión con segundo factor | P1 | `verifyMfa` | 1 | — | — | 🟡 parcial |
 | **RF-015** | Restablecimiento de contraseña | P1 | `requestPasswordReset`, `confirmPasswordReset` | — | — | — | 🔴 sin cubrir |
 | **RF-016** | Sesiones activas | P1 | `listSessions`, `revokeSession` | 1 | — | — | 🟡 parcial |
-| **RF-017** | Bloqueo por fuerza bruta | P1 | — | 1 | — | — | 🟡 parcial |
+| **RF-017** | Bloqueo por fuerza bruta | P1 | — | 1 | 12 | — | ✅ completo |
 | **RF-018** | Claves de servicio | P2 | — | — | — | — | 🔴 sin cubrir |
 | **RF-019** | Exportación del audit log | P2 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-001** | Contenerización total | P0 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-002** | Pipeline de ciclo completo | P0 | — | — | — | — | 🔴 sin cubrir |
-| **RNF-003** | Cero secretos en el repositorio | P0 | — | — | 2 | — | 🟡 parcial |
+| **RNF-003** | Cero secretos en el repositorio | P0 | — | — | 4 | — | 🟡 parcial |
 | **RNF-004** | Imágenes sin vulnerabilidades corregibles | P0 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-005** | Cobertura de pruebas ≥ 70 % | P0 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-006** | Procedencia verificable | P0 | — | — | — | — | 🔴 sin cubrir |
@@ -39,10 +39,10 @@ declaración de buenas intenciones.
 | **RNF-008** | Contenedores endurecidos | P0 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-009** | Cabeceras de seguridad | P0 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-010** | Latencia | P1 | — | — | — | — | 🔴 sin cubrir |
-| **RNF-011** | Los specs son la fuente de verdad | P0 | — | — | — | — | 🔴 sin cubrir |
-| **RNF-012** | Logs sin datos sensibles | P0 | — | — | 2 | — | 🟡 parcial |
+| **RNF-011** | Los specs son la fuente de verdad | P0 | — | — | 3 | — | 🟡 parcial |
+| **RNF-012** | Logs sin datos sensibles | P0 | — | — | 3 | — | 🟡 parcial |
 
-**Resumen:** 31 requisitos · 0 completos · 17 parciales · 14 sin cubrir.
+**Resumen:** 31 requisitos · 11 completos · 8 parciales · 12 sin cubrir.
 
 Leyenda de estado: *completo* = verificado por al menos dos de las tres
 columnas de prueba · *parcial* = una sola · *sin cubrir* = ninguna.

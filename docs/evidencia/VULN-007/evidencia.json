@@ -1,0 +1,26 @@
+{
+  "vuln": "VULN-007",
+  "gate": [],
+  "antes": {
+    "commit_linea_base": "053e15fb27b1aaf974c7c818108eee64628973e9",
+    "commit_main": null,
+    "workflow": "Escaneo de la línea base",
+    "run_id": "35476102444",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444",
+    "artefacto": "security/evidence/actions-35476102444/semgrep.json",
+    "captura": "informe Desktop §3 VULN-005/006/007 (no aparecen)",
+    "observacion": "Ningún gate lo detecta hoy (D3 confirmado); ZAP llega en la semana 3."
+  },
+  "remediacion": {
+    "tarea": "T23",
+    "commit": null,
+    "ficha": null
+  },
+  "despues": {
+    "commit": null,
+    "workflow": null,
+    "run_id": null,
+    "run_url": null,
+    "captura": null
+  }
+}

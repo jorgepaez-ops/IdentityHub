@@ -1,0 +1,394 @@
+=== Symbol Results ===
+
+Vulnerability #1: GO-2026-6372
+    Potential Memory Exhaustion/Protocol Violation via Broker-Controlled
+    Oversized Payload in github.com/rabbitmq/amqp091-go
+  More info: https://pkg.go.dev/vuln/GO-2026-6372
+  Module: github.com/rabbitmq/amqp091-go
+    Found in: github.com/rabbitmq/amqp091-go@v1.9.0
+    Fixed in: github.com/rabbitmq/amqp091-go@v1.13.0
+    Example traces found:
+      #1: internal/events/broker.go:129:22: events.Broker.Close calls amqp091.Channel.Close
+      #2: internal/events/broker.go:35:22: events.Connect calls amqp091.Channel.Confirm
+      #3: cmd/worker/main.go:58:45: worker.run calls amqp091.Channel.Consume
+      #4: internal/events/broker.go:50:37: events.Broker.declareTopology calls amqp091.Channel.ExchangeDeclare
+      #5: internal/events/broker.go:94:65: events.Broker.Publish calls amqp091.Channel.PublishWithDeferredConfirmWithContext
+      #6: cmd/worker/main.go:54:32: worker.run calls amqp091.Channel.Qos
+      #7: internal/events/broker.go:73:32: events.Broker.declareTopology calls amqp091.Channel.QueueBind
+      #8: internal/events/broker.go:57:37: events.Broker.declareTopology calls amqp091.Channel.QueueDeclare
+      #9: internal/events/broker.go:27:25: events.Connect calls amqp091.Connection.Channel
+      #10: internal/events/broker.go:132:19: events.Broker.Close calls amqp091.Connection.Close
+      #11: internal/events/broker.go:121:37: events.Broker.Ping calls amqp091.Connection.IsClosed
+      #12: internal/events/broker.go:106:32: events.Broker.Publish calls amqp091.DeferredConfirmation.WaitContext
+      #13: cmd/worker/main.go:136:12: worker.worker.handle calls amqp091.Delivery.Ack
+      #14: cmd/worker/main.go:147:13: worker.worker.handle calls amqp091.Delivery.Nack
+      #15: cmd/worker/main.go:127:15: worker.worker.handle calls amqp091.Delivery.Reject
+      #16: internal/events/broker.go:22:24: events.Connect calls amqp091.Dial
+      #17: internal/api/health.go:43:67: api.Server.Readiness calls amqp091.Error.Error
+      #18: internal/events/broker.go:9:2: events.init calls amqp091.init
+      #19: internal/store/store.go:60:39: store.Store.Close calls pgxpool.Pool.Close, which eventually calls amqp091.shutdown
+      #20: internal/store/store.go:60:39: store.Store.Close calls pgxpool.Pool.Close, which eventually calls amqp091.shutdown
+
+Vulnerability #2: GO-2026-6090
+    Limit handshake messages we are willing to accept post-handshake in
+    crypto/tls
+  More info: https://pkg.go.dev/vuln/GO-2026-6090
+  Standard library
+    Found in: crypto/tls@go1.22.12
+    Fixed in: crypto/tls@go1.25.13
+    Example traces found:
+      #1: internal/events/broker.go:22:24: events.Connect calls amqp091.Dial, which eventually calls tls.Conn.Handshake
+      #2: cmd/api/main.go:68:31: api.run calls http.Server.ListenAndServe, which eventually calls tls.Conn.HandshakeContext
+      #3: internal/events/events.go:47:23: events.NewEnvelope calls uuid.New, which eventually calls tls.Conn.Read
+      #4: cmd/worker/main.go:28:14: worker.main calls fmt.Fprintf, which eventually calls tls.Conn.Write
+
+Vulnerability #3: GO-2026-6089
+    Apply ReadHeaderTimeout when doing unencrypted HTTP/2 check in net/http
+  More info: https://pkg.go.dev/vuln/GO-2026-6089
+  Standard library
+    Found in: net/http@go1.22.12
+    Fixed in: net/http@go1.25.13
+    Example traces found:
+      #1: cmd/api/main.go:68:31: api.run calls http.Server.ListenAndServe
+
+Vulnerability #4: GO-2026-5972
+    Enforce maximum recursion depth in encoding/asn1
+  More info: https://pkg.go.dev/vuln/GO-2026-5972
+  Standard library
+    Found in: encoding/asn1@go1.22.12
+    Fixed in: encoding/asn1@go1.25.13
+    Example traces found:
+      #1: internal/events/broker.go:22:24: events.Connect calls amqp091.Dial, which eventually calls asn1.Unmarshal
+
+Vulnerability #5: GO-2026-5970
+    Infinite loop on invalid input in golang.org/x/text
+  More info: https://pkg.go.dev/vuln/GO-2026-5970
+  Module: golang.org/x/text
+    Found in: golang.org/x/text@v0.14.0
+    Fixed in: golang.org/x/text@v0.39.0
+    Example traces found:
+      #1: internal/store/store.go:36:36: store.New calls pgxpool.NewWithConfig, which eventually calls norm.Form.Properties
+      #2: internal/store/store.go:36:36: store.New calls pgxpool.NewWithConfig, which eventually calls norm.Form.Span
+      #3: internal/store/store.go:36:36: store.New calls pgxpool.NewWithConfig, which eventually calls norm.Form.Transform
+
+Vulnerability #6: GO-2026-5856
+    Invoking Encrypted Client Hello privacy leak in crypto/tls
+  More info: https://pkg.go.dev/vuln/GO-2026-5856
+  Standard library
+    Found in: crypto/tls@go1.22.12
+    Fixed in: crypto/tls@go1.25.12
+    Example traces found:
+      #1: internal/events/broker.go:22:24: events.Connect calls amqp091.Dial, which eventually calls tls.Conn.Handshake
+      #2: cmd/api/main.go:68:31: api.run calls http.Server.ListenAndServe, which eventually calls tls.Conn.HandshakeContext
+      #3: internal/events/events.go:47:23: events.NewEnvelope calls uuid.New, which eventually calls tls.Conn.Read
+      #4: cmd/worker/main.go:28:14: worker.main calls fmt.Fprintf, which eventually calls tls.Conn.Write
+
+Vulnerability #7: GO-2026-5777
+    Chi's RealIP Middleware allows IP spoofing via unvalidated X-Forwarded-For
+    header in github.com/go-chi/chi
+  More info: https://pkg.go.dev/vuln/GO-2026-5777
+  Module: github.com/go-chi/chi/v5
+    Found in: github.com/go-chi/chi/v5@v5.0.11
+    Fixed in: github.com/go-chi/chi/v5@v5.3.0
+    Example traces found:
+      #1: internal/api/server.go:45:7: api.Server.Routes calls chi.Mux.Get, which eventually calls middleware.RealIP
+
+Vulnerability #8: GO-2026-5775
+    Chi Middleware vulnerable to IP spoofing via X-Forwarded-For header in
+    github.com/go-chi/chi
+  More info: https://pkg.go.dev/vuln/GO-2026-5775
+  Module: github.com/go-chi/chi/v5
+    Found in: github.com/go-chi/chi/v5@v5.0.11
+    Fixed in: github.com/go-chi/chi/v5@v5.3.0
+    Example traces found:
+      #1: internal/api/server.go:45:7: api.Server.Routes calls chi.Mux.Get, which eventually calls middleware.RealIP
+
+Vulnerability #9: GO-2026-5039
+    Arbitrary inputs are included in errors without any escaping in
+    net/textproto
+  More info: https://pkg.go.dev/vuln/GO-2026-5039
+  Standard library
+    Found in: net/textproto@go1.22.12
+    Fixed in: net/textproto@go1.25.11
+    Example traces found:
+      #1: internal/api/health.go:43:67: api.Server.Readiness calls textproto.Error.Error
+      #2: cmd/api/main.go:68:31: api.run calls http.Server.ListenAndServe, which eventually calls textproto.Reader.ReadMIMEHeader
+      #3: cmd/worker/main.go:181:22: worker.worker.deliver calls smtp.SendMail, which eventually calls textproto.Reader.ReadResponse
+
+Vulnerability #10: GO-2026-5037
+    Inefficient candidate hostname parsing in crypto/x509
+  More info: https://pkg.go.dev/vuln/GO-2026-5037
+  Standard library
+    Found in: crypto/x509@go1.22.12
+    Fixed in: crypto/x509@go1.25.11
+    Example traces found:
+      #1: internal/events/broker.go:22:24: events.Connect calls amqp091.Dial, which eventually calls x509.Certificate.Verify
+      #2: internal/events/broker.go:22:24: events.Connect calls amqp091.Dial, which eventually calls x509.Certificate.VerifyHostname
+      #3: internal/api/health.go:43:67: api.Server.Readiness calls x509.HostnameError.Error
+
+Vulnerability #11: GO-2026-4971
+    Panic in Dial and LookupPort when handling NUL byte on Windows in net
+  More info: https://pkg.go.dev/vuln/GO-2026-4971
+  Standard library
+    Found in: net@go1.22.12
+    Fixed in: net@go1.25.10
+    Example traces found:
+      #1: cmd/worker/main.go:181:22: worker.worker.deliver calls smtp.SendMail, which eventually calls net.Dial
+      #2: internal/events/broker.go:22:24: events.Connect calls amqp091.Dial, which eventually calls net.DialTimeout
+      #3: internal/store/store.go:57:20: store.Store.Ping calls pgxpool.Pool.Ping, which eventually calls net.Dialer.DialContext
+      #4: cmd/api/main.go:68:31: api.run calls http.Server.ListenAndServe, which calls net.Listen
+      #5: internal/store/store.go:36:36: store.New calls pgxpool.NewWithConfig, which eventually calls net.Resolver.LookupHost
+
+Vulnerability #12: GO-2026-4947
+    Unexpected work during chain building in crypto/x509
+  More info: https://pkg.go.dev/vuln/GO-2026-4947
+  Standard library
+    Found in: crypto/x509@go1.22.12
+    Fixed in: crypto/x509@go1.25.9
+    Example traces found:
+      #1: internal/events/broker.go:22:24: events.Connect calls amqp091.Dial, which eventually calls x509.Certificate.Verify
+
+Vulnerability #13: GO-2026-4946
+    Inefficient policy validation in crypto/x509
+  More info: https://pkg.go.dev/vuln/GO-2026-4946
+  Standard library
+    Found in: crypto/x509@go1.22.12
+    Fixed in: crypto/x509@go1.25.9
+    Example traces found:
+      #1: internal/events/broker.go:22:24: events.Connect calls amqp091.Dial, which eventually calls x509.Certificate.Verify
+
+Vulnerability #14: GO-2026-4870
+    Unauthenticated TLS 1.3 KeyUpdate record can cause persistent connection
+    retention and DoS in crypto/tls
+  More info: https://pkg.go.dev/vuln/GO-2026-4870
+  Standard library
+    Found in: crypto/tls@go1.22.12
+    Fixed in: crypto/tls@go1.25.9
+    Example traces found:
+      #1: internal/events/broker.go:22:24: events.Connect calls amqp091.Dial, which eventually calls tls.Conn.Handshake
+      #2: cmd/api/main.go:68:31: api.run calls http.Server.ListenAndServe, which eventually calls tls.Conn.HandshakeContext
+      #3: internal/events/events.go:47:23: events.NewEnvelope calls uuid.New, which eventually calls tls.Conn.Read
+      #4: cmd/worker/main.go:28:14: worker.main calls fmt.Fprintf, which eventually calls tls.Conn.Write
+
+Vulnerability #15: GO-2026-4602
+    FileInfo can escape from a Root in os
+  More info: https://pkg.go.dev/vuln/GO-2026-4602
+  Standard library
+    Found in: os@go1.22.12
+    Fixed in: os@go1.25.8
+    Example traces found:
+      #1: internal/events/broker.go:22:24: events.Connect calls amqp091.Dial, which eventually calls os.ReadDir
+
+Vulnerability #16: GO-2026-4601
+    Incorrect parsing of IPv6 host literals in net/url
+  More info: https://pkg.go.dev/vuln/GO-2026-4601
+  Standard library
+    Found in: net/url@go1.22.12
+    Fixed in: net/url@go1.25.8
+    Example traces found:
+      #1: internal/api/health.go:43:67: api.Server.Readiness calls pgconn.parseConfigError.Error, which eventually calls url.Parse
+      #2: cmd/api/main.go:68:31: api.run calls http.Server.ListenAndServe, which eventually calls url.ParseRequestURI
+
+Vulnerability #17: GO-2026-4341
+    Memory exhaustion in query parameter parsing in net/url
+  More info: https://pkg.go.dev/vuln/GO-2026-4341
+  Standard library
+    Found in: net/url@go1.22.12
+    Fixed in: net/url@go1.24.12
+    Example traces found:
+      #1: cmd/api/main.go:68:31: api.run calls http.Server.ListenAndServe, which eventually calls url.ParseQuery
+      #2: internal/api/legacy_auth.go:109:22: api.Server.LegacyLogin calls url.URL.Query
+
+Vulnerability #18: GO-2026-4340
+    Handshake messages may be processed at the incorrect encryption level in
+    crypto/tls
+  More info: https://pkg.go.dev/vuln/GO-2026-4340
+  Standard library
+    Found in: crypto/tls@go1.22.12
+    Fixed in: crypto/tls@go1.24.12
+    Example traces found:
+      #1: internal/events/broker.go:22:24: events.Connect calls amqp091.Dial, which eventually calls tls.Conn.Handshake
+      #2: cmd/api/main.go:68:31: api.run calls http.Server.ListenAndServe, which eventually calls tls.Conn.HandshakeContext
+      #3: internal/events/events.go:47:23: events.NewEnvelope calls uuid.New, which eventually calls tls.Conn.Read
+      #4: cmd/worker/main.go:28:14: worker.main calls fmt.Fprintf, which eventually calls tls.Conn.Write
+
+Vulnerability #19: GO-2026-4337
+    Unexpected session resumption in crypto/tls
+  More info: https://pkg.go.dev/vuln/GO-2026-4337
+  Standard library
+    Found in: crypto/tls@go1.22.12
+    Fixed in: crypto/tls@go1.24.13
+    Example traces found:
+      #1: internal/events/broker.go:22:24: events.Connect calls amqp091.Dial, which eventually calls tls.Conn.Handshake
+      #2: cmd/api/main.go:68:31: api.run calls http.Server.ListenAndServe, which eventually calls tls.Conn.HandshakeContext
+      #3: internal/events/events.go:47:23: events.NewEnvelope calls uuid.New, which eventually calls tls.Conn.Read
+      #4: cmd/worker/main.go:28:14: worker.main calls fmt.Fprintf, which eventually calls tls.Conn.Write
+
+Vulnerability #20: GO-2025-4175
+    Improper application of excluded DNS name constraints when verifying
+    wildcard names in crypto/x509
+  More info: https://pkg.go.dev/vuln/GO-2025-4175
+  Standard library
+    Found in: crypto/x509@go1.22.12
+    Fixed in: crypto/x509@go1.24.11
+    Example traces found:
+      #1: internal/events/broker.go:22:24: events.Connect calls amqp091.Dial, which eventually calls x509.Certificate.Verify
+
+Vulnerability #21: GO-2025-4155
+    Excessive resource consumption when printing error string for host
+    certificate validation in crypto/x509
+  More info: https://pkg.go.dev/vuln/GO-2025-4155
+  Standard library
+    Found in: crypto/x509@go1.22.12
+    Fixed in: crypto/x509@go1.24.11
+    Example traces found:
+      #1: internal/events/broker.go:22:24: events.Connect calls amqp091.Dial, which eventually calls x509.Certificate.Verify
+      #2: internal/events/broker.go:22:24: events.Connect calls amqp091.Dial, which eventually calls x509.Certificate.VerifyHostname
+
+Vulnerability #22: GO-2025-4015
+    Excessive CPU consumption in Reader.ReadResponse in net/textproto
+  More info: https://pkg.go.dev/vuln/GO-2025-4015
+  Standard library
+    Found in: net/textproto@go1.22.12
+    Fixed in: net/textproto@go1.24.8
+    Example traces found:
+      #1: cmd/worker/main.go:181:22: worker.worker.deliver calls smtp.SendMail, which eventually calls textproto.Reader.ReadResponse
+
+Vulnerability #23: GO-2025-4013
+    Panic when validating certificates with DSA public keys in crypto/x509
+  More info: https://pkg.go.dev/vuln/GO-2025-4013
+  Standard library
+    Found in: crypto/x509@go1.22.12
+    Fixed in: crypto/x509@go1.24.8
+    Example traces found:
+      #1: internal/events/broker.go:22:24: events.Connect calls amqp091.Dial, which eventually calls x509.Certificate.Verify
+
+Vulnerability #24: GO-2025-4011
+    Parsing DER payload can cause memory exhaustion in encoding/asn1
+  More info: https://pkg.go.dev/vuln/GO-2025-4011
+  Standard library
+    Found in: encoding/asn1@go1.22.12
+    Fixed in: encoding/asn1@go1.24.8
+    Example traces found:
+      #1: internal/events/broker.go:22:24: events.Connect calls amqp091.Dial, which eventually calls asn1.Unmarshal
+
+Vulnerability #25: GO-2025-4010
+    Insufficient validation of bracketed IPv6 hostnames in net/url
+  More info: https://pkg.go.dev/vuln/GO-2025-4010
+  Standard library
+    Found in: net/url@go1.22.12
+    Fixed in: net/url@go1.24.8
+    Example traces found:
+      #1: internal/api/health.go:43:67: api.Server.Readiness calls pgconn.parseConfigError.Error, which eventually calls url.Parse
+      #2: cmd/api/main.go:68:31: api.run calls http.Server.ListenAndServe, which eventually calls url.ParseRequestURI
+
+Vulnerability #26: GO-2025-4009
+    Quadratic complexity when parsing some invalid inputs in encoding/pem
+  More info: https://pkg.go.dev/vuln/GO-2025-4009
+  Standard library
+    Found in: encoding/pem@go1.22.12
+    Fixed in: encoding/pem@go1.24.8
+    Example traces found:
+      #1: internal/events/broker.go:22:24: events.Connect calls amqp091.Dial, which eventually calls pem.Decode
+
+Vulnerability #27: GO-2025-4008
+    ALPN negotiation error contains attacker controlled information in
+    crypto/tls
+  More info: https://pkg.go.dev/vuln/GO-2025-4008
+  Standard library
+    Found in: crypto/tls@go1.22.12
+    Fixed in: crypto/tls@go1.24.8
+    Example traces found:
+      #1: internal/events/broker.go:22:24: events.Connect calls amqp091.Dial, which eventually calls tls.Conn.Handshake
+      #2: cmd/api/main.go:68:31: api.run calls http.Server.ListenAndServe, which eventually calls tls.Conn.HandshakeContext
+      #3: internal/events/events.go:47:23: events.NewEnvelope calls uuid.New, which eventually calls tls.Conn.Read
+      #4: cmd/worker/main.go:28:14: worker.main calls fmt.Fprintf, which eventually calls tls.Conn.Write
+
+Vulnerability #28: GO-2025-4007
+    Quadratic complexity when checking name constraints in crypto/x509
+  More info: https://pkg.go.dev/vuln/GO-2025-4007
+  Standard library
+    Found in: crypto/x509@go1.22.12
+    Fixed in: crypto/x509@go1.24.9
+    Example traces found:
+      #1: internal/events/broker.go:22:24: events.Connect calls amqp091.Dial, which eventually calls x509.CertPool.AppendCertsFromPEM
+      #2: internal/events/broker.go:22:24: events.Connect calls amqp091.Dial, which eventually calls x509.Certificate.Verify
+      #3: internal/store/store.go:22:33: store.New calls pgxpool.ParseConfig, which eventually calls x509.DecryptPEMBlock
+      #4: internal/store/store.go:60:39: store.Store.Close calls pgxpool.Pool.Close, which eventually calls x509.ParseCertificate
+      #5: internal/events/broker.go:22:24: events.Connect calls amqp091.Dial, which eventually calls x509.ParseECPrivateKey
+      #6: internal/events/broker.go:22:24: events.Connect calls amqp091.Dial, which eventually calls x509.ParsePKCS1PrivateKey
+      #7: internal/events/broker.go:22:24: events.Connect calls amqp091.Dial, which eventually calls x509.ParsePKCS8PrivateKey
+      #8: internal/events/broker.go:22:24: events.Connect calls amqp091.Dial, which eventually calls x509.SystemCertPool
+
+Vulnerability #29: GO-2025-3750
+    Inconsistent handling of O_CREATE|O_EXCL on Unix and Windows in os in
+    syscall
+  More info: https://pkg.go.dev/vuln/GO-2025-3750
+  Standard library
+    Found in: os@go1.22.12
+    Fixed in: os@go1.23.10
+    Platforms: windows
+    Example traces found:
+      #1: cmd/api/main.go:68:31: api.run calls http.Server.ListenAndServe, which eventually calls os.CreateTemp
+      #2: cmd/api/main.go:68:31: api.run calls http.Server.ListenAndServe, which eventually calls os.File.Readdirnames
+      #3: internal/observability/logging.go:6:2: observability.init calls os.init, which calls os.NewFile
+      #4: internal/api/server.go:14:2: api.init calls middleware.init, which eventually calls os.Open
+      #5: internal/events/broker.go:22:24: events.Connect calls amqp091.Dial, which eventually calls os.ReadDir
+      #6: internal/events/broker.go:22:24: events.Connect calls amqp091.Dial, which eventually calls os.ReadFile
+      #7: cmd/api/main.go:68:31: api.run calls http.Server.ListenAndServe, which eventually calls os.Remove
+      #8: internal/store/store.go:22:33: store.New calls pgxpool.ParseConfig, which eventually calls os.Stat
+      #9: internal/events/broker.go:22:24: events.Connect calls amqp091.Dial, which eventually calls syscall.Open
+
+Vulnerability #30: GO-2025-3563
+    Request smuggling due to acceptance of invalid chunked data in net/http
+  More info: https://pkg.go.dev/vuln/GO-2025-3563
+  Standard library
+    Found in: net/http/internal@go1.22.12
+    Fixed in: net/http/internal@go1.23.8
+    Example traces found:
+      #1: internal/events/events.go:47:23: events.NewEnvelope calls uuid.New, which eventually calls internal.chunkedReader.Read
+
+Vulnerability #31: GO-2025-3553
+    Excessive memory allocation during header parsing in
+    github.com/golang-jwt/jwt
+  More info: https://pkg.go.dev/vuln/GO-2025-3553
+  Module: github.com/golang-jwt/jwt/v4
+    Found in: github.com/golang-jwt/jwt/v4@v4.5.0
+    Fixed in: github.com/golang-jwt/jwt/v4@v4.5.2
+    Example traces found:
+      #1: internal/api/legacy_auth.go:84:18: api.legacyParseToken calls jwt.Parse, which eventually calls jwt.Parser.ParseUnverified
+
+Vulnerability #32: GO-2024-3250
+    Improper error handling in ParseWithClaims and bad documentation may cause
+    dangerous situations in github.com/golang-jwt/jwt
+  More info: https://pkg.go.dev/vuln/GO-2024-3250
+  Module: github.com/golang-jwt/jwt/v4
+    Found in: github.com/golang-jwt/jwt/v4@v4.5.0
+    Fixed in: github.com/golang-jwt/jwt/v4@v4.5.1
+    Example traces found:
+      #1: internal/api/legacy_auth.go:84:18: api.legacyParseToken calls jwt.Parse
+
+Vulnerability #33: GO-2024-2606
+    SQL injection in github.com/jackc/pgproto3 and github.com/jackc/pgx
+  More info: https://pkg.go.dev/vuln/GO-2024-2606
+  Module: github.com/jackc/pgx/v5
+    Found in: github.com/jackc/pgx/v5@v5.5.1
+    Fixed in: github.com/jackc/pgx/v5@v5.5.4
+    Example traces found:
+      #1: internal/store/store.go:36:36: store.New calls pgxpool.NewWithConfig, which eventually calls pgconn.ConnectConfig
+      #2: internal/store/store.go:57:20: store.Store.Ping calls pgxpool.Pool.Ping, which eventually calls pgconn.PgConn.Close
+      #3: internal/store/store.go:57:20: store.Store.Ping calls pgxpool.Pool.Ping, which eventually calls pgconn.PgConn.Ping
+      #4: internal/store/store.go:57:20: store.Store.Ping calls pgxpool.Pool.Ping, which eventually calls pgproto3.Frontend.Flush
+      #5: internal/store/store.go:57:20: store.Store.Ping calls pgxpool.Pool.Ping, which eventually calls pgproto3.Frontend.Send
+      #6: internal/store/store.go:36:36: store.New calls pgxpool.NewWithConfig, which eventually calls pgproto3.Frontend.SendBind
+      #7: internal/store/store.go:36:36: store.New calls pgxpool.NewWithConfig, which eventually calls pgproto3.Frontend.SendDescribe
+      #8: internal/store/store.go:36:36: store.New calls pgxpool.NewWithConfig, which eventually calls pgproto3.Frontend.SendExecute
+      #9: internal/store/store.go:36:36: store.New calls pgxpool.NewWithConfig, which eventually calls pgproto3.Frontend.SendParse
+      #10: internal/store/store.go:57:20: store.Store.Ping calls pgxpool.Pool.Ping, which eventually calls pgproto3.Frontend.SendQuery
+      #11: internal/store/store.go:36:36: store.New calls pgxpool.NewWithConfig, which eventually calls pgproto3.Frontend.SendSync
+
+Your code is affected by 33 vulnerabilities from 5 modules and the Go standard library.
+This scan also found 16 vulnerabilities in packages you import and 39
+vulnerabilities in modules you require, but your code doesn't appear to call
+these vulnerabilities.
+Use '-show verbose' for more details.

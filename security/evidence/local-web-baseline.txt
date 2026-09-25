@@ -1,0 +1,28 @@
+# Evidencia "antes" de VULN-013, VULN-014 y VULN-015 (ejecución local, 2026-09-20)
+
+Método: frontend/ y deploy/ son idénticos al tag v0.0.0-vuln-baseline (git diff vacío). La imagen `api`
+del tag no se puede construir hoy (ver actions-35476102444/docker-build-api.txt), así que se construyó solo
+el target `web` (`docker build --target web -t baseline-web:local frontend`) y se ejecutó con
+`--add-host api:127.0.0.1` para que Nginx resuelva el upstream. Sin API, las peticiones a /api/ devuelven 502.
+
+$ curl -sI http://localhost:8080/
+HTTP/1.1 200 OK
+Server: nginx/1.31.6
+Date: Sun, 20 Sep 2026 20:11:15 GMT
+Content-Type: text/html
+Content-Length: 397
+Last-Modified: Sat, 05 Sep 2026 18:09:30 GMT
+Connection: keep-alive
+ETag: "6a9c5ada-18d"
+Accept-Ranges: bytes
+
+Observaciones:
+- VULN-014: la cabecera Server expone la versión (nginx/1.31.6): server_tokens on.
+- VULN-013: la respuesta no trae Content-Security-Policy, Strict-Transport-Security, X-Content-Type-Options,
+  X-Frame-Options ni Referrer-Policy.
+
+$ for i in $(seq 1 30); do curl -s -o /dev/null -w '%{http_code}\n' -X POST http://localhost:8080/api/v1/auth/login -H 'Content-Type: application/json' -d '{}'; done | sort | uniq -c
+     30 502
+
+Observación (VULN-015): 30 peticiones seguidas al endpoint de autenticación, ninguna con 429: no hay limit_req.
+El 502 es porque no hay API detrás; con limit_req activo Nginx respondería 429 antes de intentar el proxy.

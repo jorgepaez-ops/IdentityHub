@@ -42,12 +42,16 @@ jobs:
       - run: mkdir -p evidence
 
       # ── Secretos ────────────────────────────────────────────────────────
+      # El informe se escribe FUERA del árbol escaneado: dentro de evidence/ Gitleaks
+      # se leía a sí mismo (16 de 28 hallazgos eran autorreferenciales, D1).
       - name: Gitleaks
         continue-on-error: true
         run: |
-          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.18.4 \
-            detect --source=/repo --report-format=json --report-path=/repo/evidence/gitleaks.json \
-            --no-git --verbose | tee evidence/gitleaks.txt
+          mkdir -p "$RUNNER_TEMP/gitleaks"
+          docker run --rm -v "$PWD:/repo:ro" -v "$RUNNER_TEMP/gitleaks:/out" zricethezav/gitleaks:v8.18.4 \
+            detect --source=/repo --report-format=json --report-path=/out/gitleaks.json \
+            --no-git --verbose | tee "$RUNNER_TEMP/gitleaks/gitleaks.txt"
+          cp "$RUNNER_TEMP/gitleaks/gitleaks.json" "$RUNNER_TEMP/gitleaks/gitleaks.txt" evidence/
 
       # ── Dependencias ────────────────────────────────────────────────────
       - uses: actions/setup-go@v5
@@ -100,18 +104,33 @@ jobs:
               2>&1 | tee -a evidence/hadolint.txt || true
           done
 
+      # Cada imagen se construye por separado y su resultado queda en el informe. Con
+      # `bash -e`, el primer fallo (apt-get sobre Debian 11, ya sin soporte) cortaba el
+      # paso y las demás imágenes no se llegaban a construir (D2).
       - name: Construir las imágenes de la línea base
         continue-on-error: true
         run: |
-          docker build -t baseline/api:scan    --target api    backend
-          docker build -t baseline/worker:scan --target worker backend
-          docker build -t baseline/web:scan    --target web    frontend
+          set +e
+          construir() {
+            echo "── baseline/$1 (target $2, contexto $3) ──" | tee -a evidence/docker-build.txt
+            docker build -t "baseline/$1:scan" --target "$2" "$3" > "$RUNNER_TEMP/build-$1.log" 2>&1
+            codigo=$?
+            tail -25 "$RUNNER_TEMP/build-$1.log" | tee -a evidence/docker-build.txt
+            echo "resultado: exit code $codigo" | tee -a evidence/docker-build.txt
+          }
+          construir api    api    backend
+          construir worker worker backend
+          construir web    web    frontend
 
       - name: Trivy sobre las imágenes
         continue-on-error: true
         run: |
           for img in api worker web; do
             echo "── baseline/$img ──" | tee -a evidence/trivy-images.txt
+            if ! docker image inspect "baseline/$img:scan" > /dev/null 2>&1; then
+              echo "sin imagen: la construcción falló (ver docker-build.txt)" | tee -a evidence/trivy-images.txt
+              continue
+            fi
             docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
               -v "$PWD/evidence:/out" aquasec/trivy:0.56.2 \
               image --severity HIGH,CRITICAL --format json \
@@ -119,6 +138,28 @@ jobs:
             docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
               aquasec/trivy:0.56.2 image --severity HIGH,CRITICAL \
               "baseline/$img:scan" 2>&1 | tail -20 | tee -a evidence/trivy-images.txt || true
+          done
+
+      # Las imágenes base se escanean por nombre (se descargan del registro): así hay
+      # evidencia de VULN-008, 016, 017/018 y 019 aunque la construcción de la línea base falle.
+      - name: Trivy sobre las imágenes base
+        continue-on-error: true
+        run: |
+          mkdir -p "$RUNNER_TEMP/trivy-cache"
+          imagenes="debian:11-slim golang:1.22-bullseye node:18-bullseye nginx:latest $(grep -E '^[[:space:]]+image:' deploy/docker-compose.yml | awk '{print $2}' | tr '\n' ' ')"
+          for img in $imagenes; do
+            nombre=$(echo "$img" | tr ':/' '__')
+            echo "── $img ──" | tee -a evidence/trivy-base-images.txt
+            docker run --rm -v "$RUNNER_TEMP/trivy-cache:/root/.cache/trivy" -v "$RUNNER_TEMP:/out" \
+              aquasec/trivy:0.56.2 image --scanners vuln --severity HIGH,CRITICAL --format json \
+              --output "/out/trivy-base-$nombre.json" "$img" 2>&1 | tail -3 | tee -a evidence/trivy-base-images.txt
+            if [ -s "$RUNNER_TEMP/trivy-base-$nombre.json" ]; then
+              jq -c '{imagen: "'"$img"'", os: .Metadata.OS, hallazgos: [.Results[]?.Vulnerabilities // [] | .[] | {id: .VulnerabilityID, paquete: .PkgName, instalado: .InstalledVersion, corregido: .FixedVersion, severidad: .Severity}]}' \
+                "$RUNNER_TEMP/trivy-base-$nombre.json" > "evidence/trivy-base-$nombre.json"
+              echo "hallazgos HIGH/CRITICAL: $(jq '.hallazgos | length' "evidence/trivy-base-$nombre.json")" | tee -a evidence/trivy-base-images.txt
+            else
+              echo "sin resultado para $img" | tee -a evidence/trivy-base-images.txt
+            fi
           done
 
       - name: Trivy config
@@ -130,11 +171,13 @@ jobs:
       # ── Resumen ─────────────────────────────────────────────────────────
       - name: Resumen de hallazgos
         if: always()
+        env:
+          SCANNED_REF: ${{ inputs.ref || github.ref_name }}
         run: |
           {
             echo "## Inventario de la línea base vulnerable"
             echo
-            echo "Referencia escaneada: \`${{ inputs.ref || github.ref_name }}\`"
+            echo "Referencia escaneada: \`$SCANNED_REF\`"
             echo
             echo "| Herramienta | Hallazgos |"
             echo "|---|---|"

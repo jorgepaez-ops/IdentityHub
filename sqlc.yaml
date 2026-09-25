@@ -1,0 +1,21 @@
+version: "2"
+sql:
+  - engine: postgresql
+    schema: db/migrations/*.up.sql
+    queries: db/queries
+    gen:
+      go:
+        package: sqlc
+        out: backend/internal/store/internal/sqlc
+        sql_package: pgx/v5
+        overrides:
+          - db_type: citext
+            go_type: string
+          - db_type: inet
+            go_type:
+              import: net/netip
+              type: Addr
+          - db_type: uuid
+            go_type:
+              import: github.com/google/uuid
+              type: UUID

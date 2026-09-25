@@ -8,6 +8,10 @@
 | **Componente** | `backend/internal/api/legacy_auth.go:66-68` |
 | **Amenaza** | AM-006 (manipulación) |
 | **Sembrada** | sí |
+| **Evidencia antes** | |
+| **Commit de remediación** | |
+| **Evidencia después** | |
+| **Run de Actions (antes/después)** | |
 
 ## Evidencia
 

@@ -1,0 +1,31 @@
+{
+  "vuln": "VULN-009",
+  "gate": [
+    "Trivy config DS002 (baseline-scan)"
+  ],
+  "antes": {
+    "commit_linea_base": "053e15fb27b1aaf974c7c818108eee64628973e9",
+    "commit_main": null,
+    "workflow": "Escaneo de la línea base",
+    "run_id": "35476102444",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444",
+    "artefacto": "security/evidence/actions-35476102444/trivy-config.json",
+    "captura": "informe Desktop §3 VULN-009/018",
+    "hallazgos": [
+      "Trivy config DS002 HIGH en backend/Dockerfile: Image user should not be 'root'"
+    ],
+    "observacion": "Hadolint no informa DL3002 (D4): no lo emite el Dockerfile con esta versión de la regla. La detección real es Trivy config DS002, visible en trivy-config.json. Falta la parte de Trivy image (D2)."
+  },
+  "remediacion": {
+    "tarea": "T27",
+    "commit": null,
+    "ficha": null
+  },
+  "despues": {
+    "commit": null,
+    "workflow": null,
+    "run_id": null,
+    "run_url": null,
+    "captura": null
+  }
+}

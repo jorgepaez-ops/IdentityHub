@@ -1,0 +1,26 @@
+{
+  "vuln": "VULN-024",
+  "gate": [],
+  "antes": {
+    "commit_linea_base": "053e15fb27b1aaf974c7c818108eee64628973e9",
+    "commit_main": null,
+    "workflow": "Escaneo de la línea base",
+    "run_id": "35476102444",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444",
+    "artefacto": "security/evidence/actions-35476102444/trivy-config.json",
+    "captura": null,
+    "observacion": "Ningún gate lo detecta hoy: los 6 hallazgos de Trivy config son de backend/Dockerfile y frontend/Dockerfile; ninguno corresponde a docker-compose.yml. Desktop los había asignado a este VULN por error."
+  },
+  "remediacion": {
+    "tarea": "T30",
+    "commit": null,
+    "ficha": null
+  },
+  "despues": {
+    "commit": null,
+    "workflow": null,
+    "run_id": null,
+    "run_url": null,
+    "captura": null
+  }
+}
