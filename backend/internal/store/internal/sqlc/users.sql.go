@@ -231,6 +231,84 @@ func (q *Queries) ListRolesForUser(ctx context.Context, userID uuid.UUID) ([]str
 	return items, nil
 }
 
+const revokeRefreshFamily = `-- name: RevokeRefreshFamily :one
+WITH revoked AS (
+    UPDATE refresh_tokens
+    SET status = 'revoked'
+    WHERE family_id = $1
+      AND status <> 'revoked'
+    RETURNING 1
+)
+SELECT count(*)::bigint FROM revoked
+`
+
+func (q *Queries) RevokeRefreshFamily(ctx context.Context, familyID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, revokeRefreshFamily, familyID)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const rotateRefreshToken = `-- name: RotateRefreshToken :one
+WITH candidate AS (
+    SELECT id, user_id, family_id, status, expires_at
+    FROM refresh_tokens
+    WHERE refresh_tokens.token_hash = $1
+    FOR UPDATE
+), rotated AS (
+    UPDATE refresh_tokens
+    SET status = 'rotated', last_used_at = now()
+    WHERE id = (SELECT id FROM candidate)
+      AND status = 'active'
+      AND expires_at > now()
+    RETURNING id
+), created AS (
+    INSERT INTO refresh_tokens (user_id, token_hash, family_id, parent_id, ip, user_agent, expires_at)
+    SELECT candidate.user_id, $2, candidate.family_id, candidate.id, $3, $4, $5
+    FROM candidate
+    JOIN rotated ON true
+    RETURNING id
+)
+SELECT candidate.user_id, candidate.family_id, candidate.id AS parent_id,
+       candidate.status, EXISTS (SELECT 1 FROM created) AS rotated
+FROM candidate
+`
+
+type RotateRefreshTokenParams struct {
+	TokenHash   []byte
+	TokenHash_2 []byte
+	Ip          *netip.Addr
+	UserAgent   pgtype.Text
+	ExpiresAt   pgtype.Timestamptz
+}
+
+type RotateRefreshTokenRow struct {
+	UserID   uuid.UUID
+	FamilyID uuid.UUID
+	ParentID uuid.UUID
+	Status   RefreshStatus
+	Rotated  bool
+}
+
+func (q *Queries) RotateRefreshToken(ctx context.Context, arg RotateRefreshTokenParams) (RotateRefreshTokenRow, error) {
+	row := q.db.QueryRow(ctx, rotateRefreshToken,
+		arg.TokenHash,
+		arg.TokenHash_2,
+		arg.Ip,
+		arg.UserAgent,
+		arg.ExpiresAt,
+	)
+	var i RotateRefreshTokenRow
+	err := row.Scan(
+		&i.UserID,
+		&i.FamilyID,
+		&i.ParentID,
+		&i.Status,
+		&i.Rotated,
+	)
+	return i, err
+}
+
 const updateLoginSuccess = `-- name: UpdateLoginSuccess :exec
 UPDATE users
 SET password_hash = $2,
