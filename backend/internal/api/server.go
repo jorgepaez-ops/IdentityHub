@@ -15,6 +15,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
+	"github.com/jorgepaez/identity-hub/internal/auth/login"
 	"github.com/jorgepaez/identity-hub/internal/auth/registration"
 	"github.com/jorgepaez/identity-hub/internal/auth/token"
 	"github.com/jorgepaez/identity-hub/internal/auth/verification"
@@ -26,6 +27,8 @@ type Server struct {
 	deps           map[string]Checker
 	tokens         *token.Service
 	registration   registration.Registrar
+	login          login.Authenticator
+	refreshTTL     time.Duration
 	verification   verification.Verifier
 	trustedProxies []netip.Prefix
 }
@@ -38,6 +41,12 @@ func (s *Server) SetTokenService(tokens *token.Service) { s.tokens = tokens }
 
 // SetRegistrationService is used by composition and focused handler tests.
 func (s *Server) SetRegistrationService(service registration.Registrar) { s.registration = service }
+
+// SetLoginService is used by composition and focused handler tests.
+func (s *Server) SetLoginService(service login.Authenticator, refreshTTL time.Duration) {
+	s.login = service
+	s.refreshTTL = refreshTTL
+}
 
 // SetEmailVerificationService is used by composition and focused handler tests.
 func (s *Server) SetEmailVerificationService(service verification.Verifier) { s.verification = service }
@@ -87,7 +96,6 @@ func (s *Server) GetUser(w http.ResponseWriter, r *http.Request, userID UserId) 
 func (s *Server) UpdateUser(w http.ResponseWriter, r *http.Request, userID UserId) {
 	s.notImplemented(w)
 }
-func (s *Server) Login(w http.ResponseWriter, r *http.Request) { s.notImplemented(w) }
 func (s *Server) Logout(w http.ResponseWriter, r *http.Request, params LogoutParams) {
 	s.notImplemented(w)
 }

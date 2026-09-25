@@ -7,6 +7,7 @@ package sqlc
 
 import (
 	"context"
+	"net/netip"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -47,6 +48,32 @@ func (q *Queries) ConsumeEmailVerificationToken(ctx context.Context, tokenHash [
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const createRefreshToken = `-- name: CreateRefreshToken :exec
+INSERT INTO refresh_tokens (user_id, token_hash, family_id, ip, user_agent, expires_at)
+VALUES ($1, $2, $3, $4, $5, $6)
+`
+
+type CreateRefreshTokenParams struct {
+	UserID    uuid.UUID
+	TokenHash []byte
+	FamilyID  uuid.UUID
+	Ip        *netip.Addr
+	UserAgent pgtype.Text
+	ExpiresAt pgtype.Timestamptz
+}
+
+func (q *Queries) CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) error {
+	_, err := q.db.Exec(ctx, createRefreshToken,
+		arg.UserID,
+		arg.TokenHash,
+		arg.FamilyID,
+		arg.Ip,
+		arg.UserAgent,
+		arg.ExpiresAt,
+	)
+	return err
 }
 
 const createUser = `-- name: CreateUser :one
@@ -95,6 +122,33 @@ type CreateVerificationTokenParams struct {
 func (q *Queries) CreateVerificationToken(ctx context.Context, arg CreateVerificationTokenParams) error {
 	_, err := q.db.Exec(ctx, createVerificationToken, arg.UserID, arg.TokenHash, arg.ExpiresAt)
 	return err
+}
+
+const getLoginUserByEmail = `-- name: GetLoginUserByEmail :one
+SELECT id, email, password_hash, status, mfa_enabled
+FROM users
+WHERE email = $1
+`
+
+type GetLoginUserByEmailRow struct {
+	ID           uuid.UUID
+	Email        string
+	PasswordHash string
+	Status       UserStatus
+	MfaEnabled   bool
+}
+
+func (q *Queries) GetLoginUserByEmail(ctx context.Context, email string) (GetLoginUserByEmailRow, error) {
+	row := q.db.QueryRow(ctx, getLoginUserByEmail, email)
+	var i GetLoginUserByEmailRow
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.PasswordHash,
+		&i.Status,
+		&i.MfaEnabled,
+	)
+	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
@@ -147,4 +201,49 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const listRolesForUser = `-- name: ListRolesForUser :many
+SELECT roles.name
+FROM user_roles
+JOIN roles ON roles.id = user_roles.role_id
+WHERE user_roles.user_id = $1
+ORDER BY roles.name
+`
+
+func (q *Queries) ListRolesForUser(ctx context.Context, userID uuid.UUID) ([]string, error) {
+	rows, err := q.db.Query(ctx, listRolesForUser, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		items = append(items, name)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updateLoginSuccess = `-- name: UpdateLoginSuccess :exec
+UPDATE users
+SET password_hash = $2,
+    last_login_at = now()
+WHERE id = $1
+`
+
+type UpdateLoginSuccessParams struct {
+	ID           uuid.UUID
+	PasswordHash string
+}
+
+func (q *Queries) UpdateLoginSuccess(ctx context.Context, arg UpdateLoginSuccessParams) error {
+	_, err := q.db.Exec(ctx, updateLoginSuccess, arg.ID, arg.PasswordHash)
+	return err
 }
