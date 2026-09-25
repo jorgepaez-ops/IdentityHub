@@ -129,6 +129,9 @@ docs/           arquitectura, runbook e informe de seguridad
 3. [`specs/adr/`](specs/adr/) — las decisiones y sus contrapartidas.
 4. [`specs/07-traceability.md`](specs/07-traceability.md) — qué está realmente
    verificado (generado, no escrito a mano).
+5. [`docs/guia-desarrollo.md`](docs/guia-desarrollo.md) — cómo correr el
+   backend fuera de Docker, qué hace `make gen` por dentro, comandos de
+   prueba de Go y configuración de GoLand.
 
 ## Estado
 
