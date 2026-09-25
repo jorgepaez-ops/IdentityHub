@@ -88,3 +88,11 @@ WITH revoked AS (
     RETURNING 1
 )
 SELECT count(*)::bigint FROM revoked;
+
+-- name: RevokeRefreshToken :one
+UPDATE refresh_tokens
+SET status = 'revoked', last_used_at = now()
+WHERE token_hash = $1
+  AND status = 'active'
+  AND expires_at > now()
+RETURNING user_id;

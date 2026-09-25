@@ -16,7 +16,7 @@ declaración de buenas intenciones.
 | **RF-004** | Emisión y validación de JWT | P0 | `getJwks` | 2 | 7 | — | ✅ completo |
 | **RF-005** | Renovación de sesión | P0 | `refreshSession` | 1 | 6 | — | ✅ completo |
 | **RF-006** | Detección de reuso de refresh token | P0 | — | 1 | 4 | — | ✅ completo |
-| **RF-007** | Cierre de sesión | P0 | `logout` | 1 | — | — | 🟡 parcial |
+| **RF-007** | Cierre de sesión | P0 | `logout` | 1 | 8 | — | ✅ completo |
 | **RF-008** | Perfil propio | P0 | `getCurrentUser`, `updateCurrentUser` | — | — | — | 🔴 sin cubrir |
 | **RF-009** | Control de acceso por roles | P0 | — | 2 | — | — | 🟡 parcial |
 | **RF-010** | Administración de usuarios | P0 | `listUsers`, `getUser`, `updateUser` | 2 | — | — | 🟡 parcial |
@@ -42,7 +42,7 @@ declaración de buenas intenciones.
 | **RNF-011** | Los specs son la fuente de verdad | P0 | — | — | 3 | — | 🟡 parcial |
 | **RNF-012** | Logs sin datos sensibles | P0 | — | — | 3 | — | 🟡 parcial |
 
-**Resumen:** 31 requisitos · 8 completos · 10 parciales · 13 sin cubrir.
+**Resumen:** 31 requisitos · 9 completos · 9 parciales · 13 sin cubrir.
 
 Leyenda de estado: *completo* = verificado por al menos dos de las tres
 columnas de prueba · *parcial* = una sola · *sin cubrir* = ninguna.

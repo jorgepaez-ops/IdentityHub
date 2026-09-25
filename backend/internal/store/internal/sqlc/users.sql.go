@@ -249,6 +249,22 @@ func (q *Queries) RevokeRefreshFamily(ctx context.Context, familyID uuid.UUID) (
 	return column_1, err
 }
 
+const revokeRefreshToken = `-- name: RevokeRefreshToken :one
+UPDATE refresh_tokens
+SET status = 'revoked', last_used_at = now()
+WHERE token_hash = $1
+  AND status = 'active'
+  AND expires_at > now()
+RETURNING user_id
+`
+
+func (q *Queries) RevokeRefreshToken(ctx context.Context, tokenHash []byte) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, revokeRefreshToken, tokenHash)
+	var user_id uuid.UUID
+	err := row.Scan(&user_id)
+	return user_id, err
+}
+
 const rotateRefreshToken = `-- name: RotateRefreshToken :one
 WITH candidate AS (
     SELECT id, user_id, family_id, status, expires_at
