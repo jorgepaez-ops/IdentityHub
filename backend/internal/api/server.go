@@ -16,6 +16,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
+	"github.com/jorgepaez/identity-hub/internal/auth/admin"
 	"github.com/jorgepaez/identity-hub/internal/auth/login"
 	"github.com/jorgepaez/identity-hub/internal/auth/logout"
 	"github.com/jorgepaez/identity-hub/internal/auth/refresh"
@@ -36,6 +37,7 @@ type Server struct {
 	currentUsers   currentUserRepository
 	refresh        refresh.Refresher
 	logout         logout.Revoker
+	adminUsers     admin.Manager
 	trustedProxies []netip.Prefix
 }
 
@@ -67,6 +69,9 @@ func (s *Server) SetRefreshService(service refresh.Refresher) { s.refresh = serv
 
 // SetLogoutService is used by composition and focused handler tests.
 func (s *Server) SetLogoutService(service logout.Revoker) { s.logout = service }
+
+// SetAdminUserService is used by composition and focused admin handler tests.
+func (s *Server) SetAdminUserService(service admin.Manager) { s.adminUsers = service }
 
 func (s *Server) SetTrustedProxies(prefixes []netip.Prefix) {
 	s.trustedProxies = append([]netip.Prefix(nil), prefixes...)
@@ -132,18 +137,18 @@ func (s *Server) ListAuditLog(w http.ResponseWriter, r *http.Request, params Lis
 	}))).ServeHTTP(w, r)
 }
 func (s *Server) ListUsers(w http.ResponseWriter, r *http.Request, params ListUsersParams) {
-	RequireAuth(s.tokens)(RequireRole(s.currentUsers, "admin")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		s.notImplemented(w)
+	RequireAuth(s.tokens)(RequireRole(s.currentUsers, "admin")(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		s.listUsers(w, request, params)
 	}))).ServeHTTP(w, r)
 }
 func (s *Server) GetUser(w http.ResponseWriter, r *http.Request, userID UserId) {
-	RequireAuth(s.tokens)(RequireRole(s.currentUsers, "admin")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		s.notImplemented(w)
+	RequireAuth(s.tokens)(RequireRole(s.currentUsers, "admin")(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		s.getUser(w, request, userID)
 	}))).ServeHTTP(w, r)
 }
 func (s *Server) UpdateUser(w http.ResponseWriter, r *http.Request, userID UserId) {
-	RequireAuth(s.tokens)(RequireRole(s.currentUsers, "admin")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		s.notImplemented(w)
+	RequireAuth(s.tokens)(RequireRole(s.currentUsers, "admin")(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		s.updateUser(w, request, userID)
 	}))).ServeHTTP(w, r)
 }
 func (s *Server) VerifyMfa(w http.ResponseWriter, r *http.Request)            { s.notImplemented(w) }

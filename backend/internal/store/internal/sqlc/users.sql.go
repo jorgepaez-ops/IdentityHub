@@ -13,6 +13,24 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const addUserRole = `-- name: AddUserRole :exec
+INSERT INTO user_roles (user_id, role_id, granted_by)
+SELECT $1, id, $3
+FROM roles
+WHERE name = $2
+`
+
+type AddUserRoleParams struct {
+	UserID    uuid.UUID
+	Name      string
+	GrantedBy pgtype.UUID
+}
+
+func (q *Queries) AddUserRole(ctx context.Context, arg AddUserRoleParams) error {
+	_, err := q.db.Exec(ctx, addUserRole, arg.UserID, arg.Name, arg.GrantedBy)
+	return err
+}
+
 const consumeEmailVerificationToken = `-- name: ConsumeEmailVerificationToken :one
 WITH consumed AS (
     UPDATE verification_tokens
@@ -124,6 +142,16 @@ func (q *Queries) CreateVerificationToken(ctx context.Context, arg CreateVerific
 	return err
 }
 
+const deleteUserRoles = `-- name: DeleteUserRoles :exec
+DELETE FROM user_roles
+WHERE user_id = $1
+`
+
+func (q *Queries) DeleteUserRoles(ctx context.Context, userID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteUserRoles, userID)
+	return err
+}
+
 const getLoginUserByEmail = `-- name: GetLoginUserByEmail :one
 SELECT id, email, password_hash, status, mfa_enabled
 FROM users
@@ -203,6 +231,90 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 	return i, err
 }
 
+const getUserByIDForUpdate = `-- name: GetUserByIDForUpdate :one
+SELECT id, email, password_hash, display_name, status, mfa_enabled, mfa_secret_enc, failed_login_count, locked_until, last_login_at, created_at, updated_at
+FROM users
+WHERE id = $1
+FOR UPDATE
+`
+
+func (q *Queries) GetUserByIDForUpdate(ctx context.Context, id uuid.UUID) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByIDForUpdate, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.PasswordHash,
+		&i.DisplayName,
+		&i.Status,
+		&i.MfaEnabled,
+		&i.MfaSecretEnc,
+		&i.FailedLoginCount,
+		&i.LockedUntil,
+		&i.LastLoginAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const listAdminUsers = `-- name: ListAdminUsers :many
+SELECT id, email, password_hash, display_name, status, mfa_enabled, mfa_secret_enc, failed_login_count, locked_until, last_login_at, created_at, updated_at
+FROM users
+WHERE ($1::text = ''
+       OR email::text ILIKE '%' || $1::text || '%'
+       OR display_name ILIKE '%' || $1::text || '%')
+  AND ($2::user_status IS NULL OR status = $2::user_status)
+  AND ($3::uuid IS NULL OR id > $3::uuid)
+ORDER BY id
+LIMIT $4::bigint
+`
+
+type ListAdminUsersParams struct {
+	Query      string
+	Status     NullUserStatus
+	Cursor     pgtype.UUID
+	LimitCount int64
+}
+
+func (q *Queries) ListAdminUsers(ctx context.Context, arg ListAdminUsersParams) ([]User, error) {
+	rows, err := q.db.Query(ctx, listAdminUsers,
+		arg.Query,
+		arg.Status,
+		arg.Cursor,
+		arg.LimitCount,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.Email,
+			&i.PasswordHash,
+			&i.DisplayName,
+			&i.Status,
+			&i.MfaEnabled,
+			&i.MfaSecretEnc,
+			&i.FailedLoginCount,
+			&i.LockedUntil,
+			&i.LastLoginAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listRolesForUser = `-- name: ListRolesForUser :many
 SELECT roles.name
 FROM user_roles
@@ -224,6 +336,36 @@ func (q *Queries) ListRolesForUser(ctx context.Context, userID uuid.UUID) ([]str
 			return nil, err
 		}
 		items = append(items, name)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const lockActiveAdminUsers = `-- name: LockActiveAdminUsers :many
+SELECT u.id
+FROM users u
+JOIN user_roles ur ON ur.user_id = u.id
+JOIN roles r ON r.id = ur.role_id
+WHERE u.status = 'active' AND r.name = 'admin'
+ORDER BY u.id
+FOR UPDATE OF u
+`
+
+func (q *Queries) LockActiveAdminUsers(ctx context.Context) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, lockActiveAdminUsers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -267,9 +409,11 @@ func (q *Queries) RevokeRefreshToken(ctx context.Context, tokenHash []byte) (uui
 
 const rotateRefreshToken = `-- name: RotateRefreshToken :one
 WITH candidate AS (
-    SELECT id, user_id, family_id, status, expires_at
+    SELECT refresh_tokens.id, refresh_tokens.user_id, refresh_tokens.family_id, refresh_tokens.status, refresh_tokens.expires_at
     FROM refresh_tokens
+    JOIN users ON users.id = refresh_tokens.user_id
     WHERE refresh_tokens.token_hash = $1
+      AND users.status = 'active'
     FOR UPDATE
 ), rotated AS (
     UPDATE refresh_tokens
@@ -321,6 +465,38 @@ func (q *Queries) RotateRefreshToken(ctx context.Context, arg RotateRefreshToken
 		&i.ParentID,
 		&i.Status,
 		&i.Rotated,
+	)
+	return i, err
+}
+
+const updateAdminUserStatus = `-- name: UpdateAdminUserStatus :one
+UPDATE users
+SET status = $2
+WHERE id = $1
+RETURNING id, email, password_hash, display_name, status, mfa_enabled, mfa_secret_enc, failed_login_count, locked_until, last_login_at, created_at, updated_at
+`
+
+type UpdateAdminUserStatusParams struct {
+	ID     uuid.UUID
+	Status UserStatus
+}
+
+func (q *Queries) UpdateAdminUserStatus(ctx context.Context, arg UpdateAdminUserStatusParams) (User, error) {
+	row := q.db.QueryRow(ctx, updateAdminUserStatus, arg.ID, arg.Status)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.PasswordHash,
+		&i.DisplayName,
+		&i.Status,
+		&i.MfaEnabled,
+		&i.MfaSecretEnc,
+		&i.FailedLoginCount,
+		&i.LockedUntil,
+		&i.LastLoginAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }

@@ -13,6 +13,48 @@ SELECT *
 FROM users
 WHERE id = $1;
 
+-- name: ListAdminUsers :many
+SELECT *
+FROM users
+WHERE (sqlc.arg(query)::text = ''
+       OR email::text ILIKE '%' || sqlc.arg(query)::text || '%'
+       OR display_name ILIKE '%' || sqlc.arg(query)::text || '%')
+  AND (sqlc.narg(status)::user_status IS NULL OR status = sqlc.narg(status)::user_status)
+  AND (sqlc.narg(cursor)::uuid IS NULL OR id > sqlc.narg(cursor)::uuid)
+ORDER BY id
+LIMIT sqlc.arg(limit_count)::bigint;
+
+-- name: GetUserByIDForUpdate :one
+SELECT *
+FROM users
+WHERE id = $1
+FOR UPDATE;
+
+-- name: LockActiveAdminUsers :many
+SELECT u.id
+FROM users u
+JOIN user_roles ur ON ur.user_id = u.id
+JOIN roles r ON r.id = ur.role_id
+WHERE u.status = 'active' AND r.name = 'admin'
+ORDER BY u.id
+FOR UPDATE OF u;
+
+-- name: UpdateAdminUserStatus :one
+UPDATE users
+SET status = $2
+WHERE id = $1
+RETURNING *;
+
+-- name: DeleteUserRoles :exec
+DELETE FROM user_roles
+WHERE user_id = $1;
+
+-- name: AddUserRole :exec
+INSERT INTO user_roles (user_id, role_id, granted_by)
+SELECT $1, id, $3
+FROM roles
+WHERE name = $2;
+
 -- name: CreateVerificationToken :exec
 INSERT INTO verification_tokens (user_id, token_hash, purpose, expires_at)
 VALUES ($1, $2, 'email_verification', $3);
@@ -57,9 +99,11 @@ VALUES ($1, $2, $3, $4, $5, $6);
 
 -- name: RotateRefreshToken :one
 WITH candidate AS (
-    SELECT id, user_id, family_id, status, expires_at
+    SELECT refresh_tokens.id, refresh_tokens.user_id, refresh_tokens.family_id, refresh_tokens.status, refresh_tokens.expires_at
     FROM refresh_tokens
+    JOIN users ON users.id = refresh_tokens.user_id
     WHERE refresh_tokens.token_hash = $1
+      AND users.status = 'active'
     FOR UPDATE
 ), rotated AS (
     UPDATE refresh_tokens

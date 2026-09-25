@@ -19,7 +19,7 @@ declaración de buenas intenciones.
 | **RF-007** | Cierre de sesión | P0 | `logout` | 1 | 8 | — | ✅ completo |
 | **RF-008** | Perfil propio | P0 | `getCurrentUser`, `updateCurrentUser` | — | 5 | — | 🟡 parcial |
 | **RF-009** | Control de acceso por roles | P0 | — | 2 | 5 | — | ✅ completo |
-| **RF-010** | Administración de usuarios | P0 | `listUsers`, `getUser`, `updateUser` | 2 | — | — | 🟡 parcial |
+| **RF-010** | Administración de usuarios | P0 | `listUsers`, `getUser`, `updateUser` | 2 | 4 | — | ✅ completo |
 | **RF-011** | Registro de auditoría | P0 | `listAuditLog` | 1 | 3 | — | ✅ completo |
 | **RF-012** | Notificaciones asíncronas | P0 | — | — | 8 | — | 🟡 parcial |
 | **RF-013** | Alta de segundo factor (TOTP) | P1 | `enrollMfa`, `activateMfa`, `disableMfa` | 1 | — | — | 🟡 parcial |
@@ -42,7 +42,7 @@ declaración de buenas intenciones.
 | **RNF-011** | Los specs son la fuente de verdad | P0 | — | — | 3 | — | 🟡 parcial |
 | **RNF-012** | Logs sin datos sensibles | P0 | — | — | 3 | — | 🟡 parcial |
 
-**Resumen:** 31 requisitos · 10 completos · 9 parciales · 12 sin cubrir.
+**Resumen:** 31 requisitos · 11 completos · 8 parciales · 12 sin cubrir.
 
 Leyenda de estado: *completo* = verificado por al menos dos de las tres
 columnas de prueba · *parcial* = una sola · *sin cubrir* = ninguna.
