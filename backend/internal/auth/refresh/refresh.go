@@ -77,6 +77,12 @@ type Repository interface {
 	WithinRefreshTransaction(context.Context, func(Writer) error) error
 }
 
+// Refresher is implemented by Service and used by the api package for
+// composition and focused handler tests, mirroring login.Authenticator.
+type Refresher interface {
+	Refresh(context.Context, Input) (Result, error)
+}
+
 type EventPublisher interface {
 	PublishSecurityEvent(context.Context, SecurityEvent) error
 }

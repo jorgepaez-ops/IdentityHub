@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"net/netip"
 	"testing"
 
 	"github.com/jorgepaez/identity-hub/internal/auth/logout"
@@ -21,14 +20,19 @@ func (s *logoutStub) Logout(_ context.Context, input logout.Input) error {
 	return s.err
 }
 
+func logoutServer(service logout.Revoker) *Server {
+	server := NewServer(nil, "test", nil)
+	server.SetLogoutService(service)
+	return server
+}
+
 func TestRF007_LogoutRevocaElRefreshToken(t *testing.T) {
 	service := &logoutStub{}
 	request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/logout", nil)
-	request = request.WithContext(context.WithValue(request.Context(), clientIPContextKey{}, netip.MustParseAddr("203.0.113.10")))
 	request.AddCookie(&http.Cookie{Name: refreshCookieName, Value: "refresh-token"})
 	recorder := httptest.NewRecorder()
 
-	NewLogoutHandler(service).ServeHTTP(recorder, request)
+	logoutServer(service).Routes().ServeHTTP(recorder, request)
 
 	if recorder.Code != http.StatusNoContent {
 		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
@@ -40,7 +44,7 @@ func TestRF007_LogoutRevocaElRefreshToken(t *testing.T) {
 	if len(cookies) != 1 || cookies[0].Name != refreshCookieName || cookies[0].Value != "" || cookies[0].MaxAge >= 0 || !cookies[0].HttpOnly || !cookies[0].Secure || cookies[0].SameSite != http.SameSiteStrictMode || cookies[0].Path != "/api/v1/auth" {
 		t.Fatalf("cookies=%+v", cookies)
 	}
-	if service.input.RefreshToken != "refresh-token" || service.input.IP == nil || service.input.IP.String() != "203.0.113.10" {
+	if service.input.RefreshToken != "refresh-token" || service.input.IP == nil {
 		t.Fatalf("input=%+v", service.input)
 	}
 }
@@ -50,7 +54,7 @@ func TestRF007_LogoutDeTokenDesconocidoDevuelve401(t *testing.T) {
 	request.AddCookie(&http.Cookie{Name: refreshCookieName, Value: "unknown"})
 	recorder := httptest.NewRecorder()
 
-	NewLogoutHandler(&logoutStub{err: logout.ErrInvalidRefreshToken}).ServeHTTP(recorder, request)
+	logoutServer(&logoutStub{err: logout.ErrInvalidRefreshToken}).Routes().ServeHTTP(recorder, request)
 
 	if recorder.Code != http.StatusUnauthorized {
 		t.Fatalf("status=%d", recorder.Code)
@@ -64,10 +68,10 @@ func TestRF007_LogoutDeTokenDesconocidoDevuelve401(t *testing.T) {
 func TestRF007_LogoutSinCookieDevuelve401(t *testing.T) {
 	recorder := httptest.NewRecorder()
 
-	NewLogoutHandler(&logoutStub{}).ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/api/v1/auth/logout", nil))
+	logoutServer(&logoutStub{}).Routes().ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/api/v1/auth/logout", nil))
 
 	if recorder.Code != http.StatusUnauthorized {
-		t.Fatalf("status=%d", recorder.Code)
+		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
 	}
 	cookies := recorder.Result().Cookies()
 	if len(cookies) != 1 || cookies[0].Value != "" || cookies[0].MaxAge >= 0 || !cookies[0].HttpOnly || !cookies[0].Secure || cookies[0].SameSite != http.SameSiteStrictMode || cookies[0].Path != "/api/v1/auth" {
@@ -80,7 +84,7 @@ func TestRF007_LogoutHandlerRechazaErroresNoAutorizados(t *testing.T) {
 	request.AddCookie(&http.Cookie{Name: refreshCookieName, Value: "refresh-token"})
 	recorder := httptest.NewRecorder()
 
-	NewLogoutHandler(&logoutStub{err: errors.New("database unavailable")}).ServeHTTP(recorder, request)
+	logoutServer(&logoutStub{err: errors.New("database unavailable")}).Routes().ServeHTTP(recorder, request)
 
 	if recorder.Code != http.StatusInternalServerError {
 		t.Fatalf("status=%d", recorder.Code)

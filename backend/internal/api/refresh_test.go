@@ -23,11 +23,21 @@ func (s *refreshStub) Refresh(_ context.Context, input refresh.Input) (refresh.R
 	return s.result, s.err
 }
 
+func refreshServer(service refresh.Refresher) *Server {
+	server := NewServer(nil, "test", nil)
+	server.SetRefreshService(service)
+	return server
+}
+
 func TestRF005_SinCookieDevuelve401(t *testing.T) {
 	recorder := httptest.NewRecorder()
-	NewRefreshHandler(&refreshStub{}).ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/api/v1/auth/refresh", nil))
+	refreshServer(&refreshStub{}).Routes().ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/api/v1/auth/refresh", nil))
 	if recorder.Code != http.StatusUnauthorized {
-		t.Fatalf("status=%d", recorder.Code)
+		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	cookies := recorder.Result().Cookies()
+	if len(cookies) != 1 || cookies[0].Value != "" || cookies[0].MaxAge >= 0 {
+		t.Fatalf("cookies=%+v, want the compromised cookie cleared even without one presented", cookies)
 	}
 }
 
@@ -36,9 +46,12 @@ func TestRF005_RenovarEmiteParDistintoEInvalidaElAnterior(t *testing.T) {
 	request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/refresh", nil)
 	request.AddCookie(&http.Cookie{Name: refreshCookieName, Value: "old-refresh"})
 	recorder := httptest.NewRecorder()
-	NewRefreshHandler(service).ServeHTTP(recorder, request)
+	refreshServer(service).Routes().ServeHTTP(recorder, request)
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	if service.input.RefreshToken != "old-refresh" {
+		t.Fatalf("input=%+v, want the cookie value bound by the generated router", service.input)
 	}
 	cookies := recorder.Result().Cookies()
 	if len(cookies) != 1 || cookies[0].Value == "old-refresh" || !cookies[0].HttpOnly || !cookies[0].Secure || cookies[0].SameSite != http.SameSiteStrictMode {
@@ -58,7 +71,7 @@ func TestRF006_ReusoDeTokenRotadoRevocaLaFamilia(t *testing.T) {
 	request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/refresh", nil)
 	request.AddCookie(&http.Cookie{Name: refreshCookieName, Value: "reused"})
 	recorder := httptest.NewRecorder()
-	NewRefreshHandler(service).ServeHTTP(recorder, request)
+	refreshServer(service).Routes().ServeHTTP(recorder, request)
 	if recorder.Code != http.StatusUnauthorized {
 		t.Fatalf("status=%d", recorder.Code)
 	}
@@ -69,10 +82,10 @@ func TestRF006_ReusoDeTokenRotadoRevocaLaFamilia(t *testing.T) {
 }
 
 func TestRF005_RefreshHandlerRechazaErroresNoAutorizados(t *testing.T) {
-	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/refresh", nil)
 	request.AddCookie(&http.Cookie{Name: refreshCookieName, Value: "bad"})
-	NewRefreshHandler(&refreshStub{err: errors.New("database")}).ServeHTTP(recorder, request)
+	recorder := httptest.NewRecorder()
+	refreshServer(&refreshStub{err: errors.New("database")}).Routes().ServeHTTP(recorder, request)
 	if recorder.Code != http.StatusInternalServerError {
 		t.Fatalf("status=%d", recorder.Code)
 	}

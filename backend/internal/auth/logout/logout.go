@@ -37,6 +37,12 @@ type Repository interface {
 	WithinLogoutTransaction(context.Context, func(Writer) error) error
 }
 
+// Revoker is implemented by Service and used by the api package for
+// composition and focused handler tests, mirroring login.Authenticator.
+type Revoker interface {
+	Logout(context.Context, Input) error
+}
+
 type Service struct{ repository Repository }
 
 func New(repository Repository) *Service { return &Service{repository: repository} }

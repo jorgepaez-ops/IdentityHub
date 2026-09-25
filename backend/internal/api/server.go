@@ -16,6 +16,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/jorgepaez/identity-hub/internal/auth/login"
+	"github.com/jorgepaez/identity-hub/internal/auth/logout"
+	"github.com/jorgepaez/identity-hub/internal/auth/refresh"
 	"github.com/jorgepaez/identity-hub/internal/auth/registration"
 	"github.com/jorgepaez/identity-hub/internal/auth/token"
 	"github.com/jorgepaez/identity-hub/internal/auth/verification"
@@ -30,6 +32,9 @@ type Server struct {
 	login          login.Authenticator
 	refreshTTL     time.Duration
 	verification   verification.Verifier
+	currentUsers   currentUserRepository
+	refresh        refresh.Refresher
+	logout         logout.Revoker
 	trustedProxies []netip.Prefix
 }
 
@@ -50,6 +55,17 @@ func (s *Server) SetLoginService(service login.Authenticator, refreshTTL time.Du
 
 // SetEmailVerificationService is used by composition and focused handler tests.
 func (s *Server) SetEmailVerificationService(service verification.Verifier) { s.verification = service }
+
+// SetCurrentUserRepository is used by composition and focused profile tests.
+func (s *Server) SetCurrentUserRepository(repository currentUserRepository) {
+	s.currentUsers = repository
+}
+
+// SetRefreshService is used by composition and focused handler tests.
+func (s *Server) SetRefreshService(service refresh.Refresher) { s.refresh = service }
+
+// SetLogoutService is used by composition and focused handler tests.
+func (s *Server) SetLogoutService(service logout.Revoker) { s.logout = service }
 
 func (s *Server) SetTrustedProxies(prefixes []netip.Prefix) {
 	s.trustedProxies = append([]netip.Prefix(nil), prefixes...)
@@ -83,7 +99,28 @@ func (s *Server) Routes() http.Handler {
 		r.Get("/auth/legacy-login", s.LegacyLogin)
 	})
 
-	return HandlerFromMux(s, r)
+	return HandlerWithOptions(s, ChiServerOptions{BaseRouter: r, ErrorHandlerFunc: s.handleBindingError})
+}
+
+// handleBindingError overrides oapi-codegen's default binding error response
+// (a plain 400) for the refresh_token cookie parameter: a missing or
+// malformed cookie on /auth/refresh and /auth/logout must behave exactly
+// like an invalid token (401, with the compromised cookie cleared), per
+// RF-005/RF-007, not surface as a generic bad request.
+func (s *Server) handleBindingError(w http.ResponseWriter, r *http.Request, err error) {
+	var paramName string
+	switch e := err.(type) {
+	case *RequiredParamError:
+		paramName = e.ParamName
+	case *InvalidParamFormatError:
+		paramName = e.ParamName
+	}
+	if paramName == refreshCookieName {
+		clearRefreshCookie(w)
+		writeUnauthorized(w)
+		return
+	}
+	http.Error(w, err.Error(), http.StatusBadRequest)
 }
 
 func (s *Server) ListAuditLog(w http.ResponseWriter, r *http.Request, params ListAuditLogParams) {
@@ -96,22 +133,14 @@ func (s *Server) GetUser(w http.ResponseWriter, r *http.Request, userID UserId) 
 func (s *Server) UpdateUser(w http.ResponseWriter, r *http.Request, userID UserId) {
 	s.notImplemented(w)
 }
-func (s *Server) Logout(w http.ResponseWriter, r *http.Request, params LogoutParams) {
-	s.notImplemented(w)
-}
 func (s *Server) VerifyMfa(w http.ResponseWriter, r *http.Request)            { s.notImplemented(w) }
 func (s *Server) ConfirmPasswordReset(w http.ResponseWriter, r *http.Request) { s.notImplemented(w) }
 func (s *Server) RequestPasswordReset(w http.ResponseWriter, r *http.Request) { s.notImplemented(w) }
-func (s *Server) RefreshSession(w http.ResponseWriter, r *http.Request, params RefreshSessionParams) {
-	s.notImplemented(w)
-}
 
-func (s *Server) GetCurrentUser(w http.ResponseWriter, r *http.Request)    { s.notImplemented(w) }
-func (s *Server) UpdateCurrentUser(w http.ResponseWriter, r *http.Request) { s.notImplemented(w) }
-func (s *Server) DisableMfa(w http.ResponseWriter, r *http.Request)        { s.notImplemented(w) }
-func (s *Server) ActivateMfa(w http.ResponseWriter, r *http.Request)       { s.notImplemented(w) }
-func (s *Server) EnrollMfa(w http.ResponseWriter, r *http.Request)         { s.notImplemented(w) }
-func (s *Server) ListSessions(w http.ResponseWriter, r *http.Request)      { s.notImplemented(w) }
+func (s *Server) DisableMfa(w http.ResponseWriter, r *http.Request)   { s.notImplemented(w) }
+func (s *Server) ActivateMfa(w http.ResponseWriter, r *http.Request)  { s.notImplemented(w) }
+func (s *Server) EnrollMfa(w http.ResponseWriter, r *http.Request)    { s.notImplemented(w) }
+func (s *Server) ListSessions(w http.ResponseWriter, r *http.Request) { s.notImplemented(w) }
 func (s *Server) RevokeSession(w http.ResponseWriter, r *http.Request, sessionID SessionId) {
 	s.notImplemented(w)
 }

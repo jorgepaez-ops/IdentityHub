@@ -1,45 +1,31 @@
 package api
 
 import (
-	"context"
 	"errors"
 	"net/http"
-	"time"
 
 	"github.com/jorgepaez/identity-hub/internal/auth/logout"
 )
 
-type LogoutService interface {
-	Logout(context.Context, logout.Input) error
-}
-
-// NewLogoutHandler returns the HTTP boundary for revoking one refresh token.
-func NewLogoutHandler(service LogoutService) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		cookie, err := r.Cookie(refreshCookieName)
-		if err != nil || cookie.Value == "" {
+// Logout revokes the refresh token presented in the refresh_token cookie. A
+// missing or malformed cookie never reaches this method: the generated
+// router rejects it earlier through handleBindingError, which maps it to the
+// same 401 response as an unknown or already revoked token below.
+func (s *Server) Logout(w http.ResponseWriter, r *http.Request, params LogoutParams) {
+	if s.logout == nil {
+		writeProblem(w, http.StatusServiceUnavailable, "logout-unavailable", "Service Unavailable", "Logout is temporarily unavailable.")
+		return
+	}
+	err := s.logout.Logout(r.Context(), logout.Input{RefreshToken: params.RefreshToken, IP: requestClientIP(r), UserAgent: optionalRequestUserAgent(r)})
+	if err != nil {
+		if errors.Is(err, logout.ErrInvalidRefreshToken) {
 			clearRefreshCookie(w)
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			writeUnauthorized(w)
 			return
 		}
-		err = service.Logout(r.Context(), logout.Input{RefreshToken: cookie.Value, IP: requestClientIP(r), UserAgent: optionalRequestUserAgent(r)})
-		if err != nil {
-			if errors.Is(err, logout.ErrInvalidRefreshToken) {
-				clearRefreshCookie(w)
-				http.Error(w, "unauthorized", http.StatusUnauthorized)
-				return
-			}
-			http.Error(w, "internal server error", http.StatusInternalServerError)
-			return
-		}
-		clearRefreshCookie(w)
-		w.WriteHeader(http.StatusNoContent)
-	})
-}
-
-func clearRefreshCookie(w http.ResponseWriter) {
-	cookie := refreshCookie("")
-	cookie.MaxAge = -1
-	cookie.Expires = time.Unix(1, 0)
-	http.SetCookie(w, cookie)
+		writeProblem(w, http.StatusInternalServerError, "logout-failed", "Internal Server Error", "Logout could not be completed.")
+		return
+	}
+	clearRefreshCookie(w)
+	w.WriteHeader(http.StatusNoContent)
 }
