@@ -2,16 +2,16 @@ module github.com/jorgepaez/identity-hub
 
 // ⚠️  LÍNEA BASE VULNERABLE — ver specs/adr/0007-linea-base-vulnerable-deliberada.md
 //
-// La directiva `go` se elevó a 1.25 en T6 (decisión Q11 enmendada), y
-// golang-jwt está fijado en la rama v4 con un CVE publicado. Es DELIBERADO:
-// existe para que `govulncheck` tenga algo real que informar en el job `sca`.
-// No actualizar sin leer el ADR y sin registrar la remediación en
-// security/findings/.
+// La directiva `go` se elevó a 1.25 en T6 (decisión Q11 enmendada). golang-jwt
+// v4 (VULN-021) se retiró en T23 junto con legacy_auth.go. pgx v5.5.1
+// (VULN-022) y golang.org/x/text v0.14.0 (VULN-026) siguen fijados a
+// propósito: es DELIBERADO, existe para que `govulncheck` tenga algo real que
+// informar en el job `sca` hasta que T24 los actualice. No actualizar sin leer
+// el ADR y sin registrar la remediación en security/findings/.
 go 1.25
 
 require (
 	github.com/go-chi/chi/v5 v5.3.2
-	github.com/golang-jwt/jwt/v4 v4.5.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.5.1
 	github.com/oapi-codegen/runtime v1.1.2
@@ -32,7 +32,6 @@ require (
 	github.com/prometheus/client_model v0.5.0 // indirect
 	github.com/prometheus/common v0.45.0 // indirect
 	github.com/prometheus/procfs v0.12.0 // indirect
-	github.com/stretchr/testify v1.8.4 // indirect
 	golang.org/x/crypto v0.17.0
 	golang.org/x/sync v0.5.0 // indirect
 	golang.org/x/sys v0.15.0 // indirect
