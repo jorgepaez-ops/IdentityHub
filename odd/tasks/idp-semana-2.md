@@ -659,14 +659,14 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
 - Commit: 4e26918
 
 ### T18 — Administración de usuarios (RF-010)
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RF-010, RF-011, AM-006, invariante 6 · Remedia: — · Depende de: T17
+- [x] Estado · Ejecutor: `Codex` · Cubre: RF-010, RF-011, AM-006, invariante 6 · Remedia: — · Depende de: T17
 - `listUsers` (`q` parametrizado con `LIKE` seguro, `status`, cursor, `limit` 1-100), `getUser`,
   `updateUser` (`status`, `roles`): un admin no puede deshabilitarse a sí mismo (400); nunca queda
   sin admin activo (mecanismo según Q6: comprobación en el servicio con transacción y bloqueo de fila, y trigger en migración nueva si es viable); audit `user_disabled` con el actor; `role_changed` al cambiar roles; un usuario deshabilitado no puede iniciar sesión ni renovar.
 - Criterios: `TestRF010_AdminDeshabilitaYElUsuarioNoEntra`; `TestRF010_AdminNoPuedeDeshabilitarseASiMismo` (400); `TestRF010_BusquedaNoEsInyectable` (`' OR '1'='1' --` como `q`); `TestRF010_NoSeDejaElSistemaSinAdmin`.
 - Archivos: `backend/internal/auth/**`, `backend/internal/api/admin_users.go` (+ pruebas), `db/queries/*.sql`, posible migración `000003_*` según Q6.
 - Verificación: `make gen && git diff --exit-code`; `make test-go`; `make test-integration`; `make lint`.
-- Commit:
+- Commit: ac3ea8e
 
 ### T19 — Consulta del registro de auditoría (RF-011)
 - [ ] Estado · Ejecutor: `Codex` · Cubre: RF-011, AM-010 · Remedia: — · Depende de: T9, T17
@@ -906,10 +906,10 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 |---|---|---|
 | 0 — Línea base y evidencia "antes" | T0.1 a T0.5 (5) | 5 (T0.1 a T0.5) |
 | 1 — Contrato ejecutable | T1a, T1 a T3 (4) | 4 (T1a, T1, T2, T3) |
-| 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 15 (T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T14a, T15, T16, T17) |
+| 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 16 (T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T14a, T15, T16, T17, T18) |
 | 3 — Remediación | T23 a T32 (10) | 0 |
 | 4 — Cierre | T33 a T38 (6) | 0 |
-| **Total** | **45** | **24** |
+| **Total** | **45** | **25** |
 
 Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, cookie) y `T14a`
 (enmienda ADR 0005, sin ventana de gracia). Los ids existentes no cambian.
@@ -1118,4 +1118,10 @@ Formato por tarea (3 a 5 líneas):
 - Comandos y resultado observado: ver la entrada de T14 en "Evidencia de verificación" arriba (dos intentos de Codex, RED/GREEN de cada uno, y la corrida real contra PostgreSQL levantado localmente).
 - Ajuste de Claude: (1) alcance de archivos — Codex se detuvo interpretando la lista "Archivos" de la tarea (sin `backend/internal/store`) como una restricción; Claude confirmó que el paquete store sí estaba autorizado (mismo patrón que T13) y reanudó el mismo hilo de Codex con esa aclaración más el bug de IP de abajo. (2) bug real: el handler usaba `remoteIP(r.RemoteAddr)` en vez de `requestClientIP(r)`, la IP de confianza que ya resuelve el middleware de T6 y que usan `login.go`/`register.go`/`verify_email.go` — Codex lo corrigió tras la aclaración. (3) `gen.go` con drift de versión: `make gen` de Codex usó un oapi-codegen cacheado sin ldflag de versión (comentario "(devel)"); Claude lo regeneró con el binario correcto, sin diff de contenido real. (4) bug real encontrado por Claude al revisar (confirmado después por el hook GGA antes del commit): un refresh token que no existe en la tabla (forjado, nunca emitido) hacía que `RotateRefreshToken` devolviera `pgx.ErrNoRows` sin mapear a `ErrInvalidRefreshToken`, así que el handler respondía 500 en vez de 401; TDD con `TestRF005_TokenInexistenteDevuelveInvalido` (RED confirmado, luego GREEN) siguiendo el mismo patrón `errors.Is(err, pgx.ErrNoRows)` de `login.go`. (5) segundo hallazgo del hook GGA: si la publicación del evento de seguridad fallaba tras un reuso ya confirmado y committeado, el error genérico pisaba `ErrRefreshReuse` y el handler devolvía 500 sin limpiar la cookie ya comprometida; TDD con `TestRF006_ReusoConFalloDePublicacionSigueRevocandoYDevuelveReuso` (RED, luego GREEN con `errors.Join(refreshErr, ...)` para que `errors.Is` siga reconociendo el reuso). (6) el hook también pidió renombrar `TestHashRefreshToken` y `TestRefreshHandlerRechazaErroresNoAutorizados` al patrón `TestRF005_...` para que `traceability.py` las cuente.
 - Dudas abiertas: ninguna. Codex no pudo commitear en ninguno de los dos intentos (mismo bloqueo de sandbox); Claude creó ambos commits tras revisar y verificar contra PostgreSQL real. Nota de proceso ajena al código: durante la primera delegación, el forwarder de `codex:codex-rescue` interpretó fragmentos entre backticks del prompt de instrucciones como comandos de shell reales (incluido un `git push` que falló solo por falta de upstream); no hubo daño (repo verificado intacto) y se reportó como bug del plugin — evitar backticks en prompts futuros a ese agente.
+
+### T18 · 2026-09-25 · ac3ea8e
+- Qué cambió: `listUsers`/`getUser`/`updateUser` compuestos directamente en `*Server` (`backend/internal/api/admin_users.go`, nuevo), reemplazando los `s.notImplemented(w)` que T17 ya envolvía con `RequireAuth(s.tokens)(RequireRole(s.currentUsers, "admin")(...))`. Búsqueda por `q` con `ILIKE` parametrizado (sqlc, sin concatenación), filtro `status`, paginación por cursor (`limit` 1-100, default 25). `updateUser` corre dentro de una única transacción (`Store.WithinUserManagementTransaction`, nuevo en `backend/internal/store/admin_users.go`): bloquea con `FOR UPDATE` todas las filas de admins activos (`LockActiveAdminUsers`) y luego la fila objetivo, así que dos actualizaciones concurrentes se serializan sobre el mismo conjunto antes de decidir `ErrLastActiveAdmin`/`ErrSelfDisable` (paquete nuevo `backend/internal/auth/admin`). Auditoría `user_disabled`/`role_changed` dentro de la misma transacción. `RotateRefreshToken` (`db/queries/users.sql`) ahora exige `users.status = 'active'`, así que una cuenta deshabilitada tampoco puede renovar. Sin migración nueva: el bloqueo vive en SQL transaccional, no en un trigger (Q6 lo dejaba como opcional "si es viable").
+- Comandos y resultado observado: RED (Codex): servicio inexistente. GREEN: `go test -race ./internal/api ./internal/auth/admin ./internal/store` y la suite completa `go test -race ./...`, ambos en verde (Claude los repitió con `-count=1` tras su propio cambio, ver más abajo). `make gen` sin deriva de `gen.go`/`schema.d.ts`; `specs/07-traceability.md` pasa RF-010 de "parcial" a "completo". `make lint`: solo los 3 avisos preexistentes de `legacy_auth.go` (línea base, hasta T23). Integración no ejecutada (`TEST_DATABASE_URL` no definido en este entorno).
+- Ajuste de Claude: encontró un bug real de concurrencia que ninguna prueba (unitaria con stub) podía ver: `LockActiveAdminUsers` bloqueaba varias filas con `FOR UPDATE OF u` **sin `ORDER BY`**, lo que en PostgreSQL puede producir deadlocks entre transacciones concurrentes que no adquieren los bloqueos en el mismo orden. Se añadió `ORDER BY u.id` a la consulta (`db/queries/users.sql`), se regeneró con `sqlc generate` y se repitió la suite completa: sigue en verde. Con el orden fijo, cualquier `updateUser` concurrente contiende primero por el mismo conjunto (admins activos, orden por id) antes de tocar su fila objetivo, así que queda serializado sin interbloqueo.
+- Dudas abiertas: ninguna bloqueante. `cmd/api/main.go` sigue sin componer ningún servicio (ni los de T16/T17 tampoco): `SetAdminUserService` existe pero nada lo llama todavía, así que estos endpoints devuelven 503 hasta T21 ("Composición, configuración y humo con el stack") — mismo patrón ya usado para T13 a T17, no es una regresión de T18. Codex no pudo commitear (mismo bloqueo de sandbox); Claude creó el commit tras revisar, verificar y aplicar la corrección de `ORDER BY`.
 
