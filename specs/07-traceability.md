@@ -26,7 +26,7 @@ declaración de buenas intenciones.
 | **RF-014** | Inicio de sesión con segundo factor | P1 | `verifyMfa` | 1 | — | — | 🟡 parcial |
 | **RF-015** | Restablecimiento de contraseña | P1 | `requestPasswordReset`, `confirmPasswordReset` | — | — | — | 🔴 sin cubrir |
 | **RF-016** | Sesiones activas | P1 | `listSessions`, `revokeSession` | 1 | — | — | 🟡 parcial |
-| **RF-017** | Bloqueo por fuerza bruta | P1 | — | 1 | 10 | — | ✅ completo |
+| **RF-017** | Bloqueo por fuerza bruta | P1 | — | 1 | 11 | — | ✅ completo |
 | **RF-018** | Claves de servicio | P2 | — | — | — | — | 🔴 sin cubrir |
 | **RF-019** | Exportación del audit log | P2 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-001** | Contenerización total | P0 | — | — | — | — | 🔴 sin cubrir |

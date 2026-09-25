@@ -79,6 +79,18 @@ type AuditEvent struct {
 	UserAgent   *string
 }
 
+// SecurityEvent is published to the broker for security-relevant occurrences
+// that also merit a notification, mirroring refresh.SecurityEvent.
+type SecurityEvent struct {
+	Type   string
+	UserID uuid.UUID
+	IP     *netip.Addr
+}
+
+type EventPublisher interface {
+	PublishSecurityEvent(context.Context, SecurityEvent) error
+}
+
 type Writer interface {
 	GetLoginUserByEmail(context.Context, string) (User, error)
 	CountLoginFailuresByAccount(context.Context, uuid.UUID, time.Time) (int64, error)
@@ -104,7 +116,15 @@ type Service struct {
 	tokens     *token.Service
 	refreshTTL time.Duration
 	lockout    LockoutConfig
+	publisher  EventPublisher
 	now        func() time.Time
+}
+
+// WithEventPublisher wires the broker publisher used to notify
+// security.account_locked, mirroring refresh.Service.WithEventPublisher.
+func (s *Service) WithEventPublisher(publisher EventPublisher) *Service {
+	s.publisher = publisher
+	return s
 }
 
 // LockoutConfig controls the independent account and IP sliding-window limits.
@@ -141,6 +161,7 @@ func (s *Service) Login(ctx context.Context, input Input) (Result, error) {
 	}
 	var result Result
 	var authenticationErr error
+	var lockEvent *SecurityEvent
 	err := s.repository.WithinLoginTransaction(ctx, func(writer Writer) error {
 		now := s.now()
 		if input.IP != nil {
@@ -185,15 +206,23 @@ func (s *Service) Login(ctx context.Context, input Input) (Result, error) {
 			return fmt.Errorf("verify password: %w", err)
 		}
 		if !valid || user.Status != StatusActive {
-			if err := s.recordAccountFailure(ctx, writer, user, input, "invalid_credentials", now); err != nil {
+			locked, err := s.recordAccountFailure(ctx, writer, user, input, "invalid_credentials", now)
+			if err != nil {
 				return err
+			}
+			if locked {
+				lockEvent = &SecurityEvent{Type: "security.account_locked", UserID: user.ID, IP: input.IP}
 			}
 			authenticationErr = ErrInvalidCredentials
 			return nil
 		}
 		if user.MFAEnabled {
-			if err := s.recordAccountFailure(ctx, writer, user, input, "mfa_not_supported", now); err != nil {
+			locked, err := s.recordAccountFailure(ctx, writer, user, input, "mfa_not_supported", now)
+			if err != nil {
 				return err
+			}
+			if locked {
+				lockEvent = &SecurityEvent{Type: "security.account_locked", UserID: user.ID, IP: input.IP}
 			}
 			authenticationErr = ErrMFAUnavailable
 			return nil
@@ -234,29 +263,45 @@ func (s *Service) Login(ctx context.Context, input Input) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
+	if lockEvent != nil && s.publisher != nil {
+		if err := s.publisher.PublishSecurityEvent(ctx, *lockEvent); err != nil {
+			// The lock is already committed and audited inside the transaction
+			// above; a notification failure must not be silently dropped, so it
+			// surfaces the same way refresh.Service does for reuse detection.
+			return Result{}, errors.Join(authenticationErr, fmt.Errorf("publish account locked event: %w", err))
+		}
+	}
 	if authenticationErr != nil {
 		return Result{}, authenticationErr
 	}
 	return result, nil
 }
 
-func (s *Service) recordAccountFailure(ctx context.Context, writer Writer, user User, input Input, reason string, now time.Time) error {
+// recordAccountFailure records the failed attempt and, once it reaches the
+// threshold, locks the account and audits account_locked in the same
+// transaction. It reports whether the account was just locked, so the caller
+// can publish security.account_locked after the transaction commits.
+func (s *Service) recordAccountFailure(ctx context.Context, writer Writer, user User, input Input, reason string, now time.Time) (bool, error) {
 	if err := s.recordFailure(ctx, writer, &user.ID, input, reason); err != nil {
-		return err
+		return false, err
 	}
 	if user.Status != StatusActive {
-		return nil
+		return false, nil
 	}
 	failures, err := writer.CountLoginFailuresByAccount(ctx, user.ID, now.Add(-s.lockout.FailureWindow))
 	if err != nil {
-		return fmt.Errorf("count login failures by account: %w", err)
+		return false, fmt.Errorf("count login failures by account: %w", err)
 	}
-	if failures >= int64(s.lockout.AccountMaxFailures) {
-		if err := writer.LockLoginUser(ctx, user.ID, now.Add(s.lockout.LockoutDuration)); err != nil {
-			return fmt.Errorf("lock login user: %w", err)
-		}
+	if failures < int64(s.lockout.AccountMaxFailures) {
+		return false, nil
 	}
-	return nil
+	if err := writer.LockLoginUser(ctx, user.ID, now.Add(s.lockout.LockoutDuration)); err != nil {
+		return false, fmt.Errorf("lock login user: %w", err)
+	}
+	if err := writer.InsertAuditEvent(ctx, AuditEvent{ActorUserID: &user.ID, Action: "account_locked", Reason: reason, IP: input.IP, UserAgent: input.UserAgent}); err != nil {
+		return false, fmt.Errorf("record account locked audit: %w", err)
+	}
+	return true, nil
 }
 
 func (c LockoutConfig) valid() bool {

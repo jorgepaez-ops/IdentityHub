@@ -85,6 +85,13 @@ func newLockoutService(t *testing.T, repository Repository, policy LockoutConfig
 	return New(repository, signer, time.Hour, policy)
 }
 
+type stubSecurityEventPublisher struct{ events []SecurityEvent }
+
+func (p *stubSecurityEventPublisher) PublishSecurityEvent(_ context.Context, event SecurityEvent) error {
+	p.events = append(p.events, event)
+	return nil
+}
+
 func activeUser(t *testing.T, email string) User {
 	t.Helper()
 	hash, err := password.Hash("correct horse battery")
@@ -145,5 +152,35 @@ func TestRF017_LimitePorIPBloqueaTrasElUmbral(t *testing.T) {
 	otherIP := netip.MustParseAddr("198.51.100.11")
 	if _, err := service.Login(context.Background(), Input{Email: first.Email, Password: "correct horse battery", IP: &otherIP}); err != nil {
 		t.Fatalf("different IP login error = %v", err)
+	}
+}
+
+func TestRF017_CuentaBloqueadaRegistraAuditoriaYPublicaEvento(t *testing.T) {
+	now := time.Date(2026, time.September, 25, 12, 0, 0, 0, time.UTC)
+	user := activeUser(t, "ada@example.com")
+	repository := &lockoutRepository{users: map[string]User{user.Email: user}}
+	service := newLockoutService(t, repository, LockoutConfig{AccountMaxFailures: 1, IPMaxFailures: 20, FailureWindow: 15 * time.Minute, LockoutDuration: 15 * time.Minute})
+	service.now = func() time.Time { return now }
+	publisher := &stubSecurityEventPublisher{}
+	service.WithEventPublisher(publisher)
+
+	if _, err := service.Login(context.Background(), Input{Email: user.Email, Password: "wrong password"}); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("failed login error = %v", err)
+	}
+
+	var lockedAudits int
+	for _, audit := range repository.audits {
+		if audit.Action == "account_locked" {
+			lockedAudits++
+			if audit.ActorUserID == nil || *audit.ActorUserID != user.ID {
+				t.Fatalf("account_locked audit actor = %v, want %v", audit.ActorUserID, user.ID)
+			}
+		}
+	}
+	if lockedAudits != 1 {
+		t.Fatalf("account_locked audits = %d, want 1", lockedAudits)
+	}
+	if len(publisher.events) != 1 || publisher.events[0].Type != "security.account_locked" || publisher.events[0].UserID != user.ID {
+		t.Fatalf("published events = %+v", publisher.events)
 	}
 }
