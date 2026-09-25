@@ -560,7 +560,7 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
 - Commit: `f1547a0`
 
 ### T13 — Inicio de sesión (RF-003)
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RF-003, RF-004, AM-004, RF-011 · Remedia: — · Depende de: T8, T9, T11
+- [x] Estado · Ejecutor: `Codex` · Cubre: RF-003, RF-004, AM-004, RF-011 · Remedia: — · Depende de: T8, T9, T11
 - `login`: solo `active` obtiene tokens (`pending_verification`, `locked`, `disabled` -> 401 genérico);
   usuario inexistente verifica contra el hash señuelo; respuesta `TokenPair` **sin** `refreshToken` en
   el cuerpo (`accessToken`, `tokenType: Bearer`, `expiresIn: 900`, según T1a); el refresh token opaco
@@ -581,7 +581,7 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
   (contraseña correcta + `mfa_enabled` -> error explícito, sin tokens ni cookie).
 - Archivos: `backend/internal/auth/**`, `backend/internal/api/login.go` (+ pruebas), `db/queries/*.sql`.
 - Verificación: `make test-go`; `make test-integration`; `make lint`.
-- Commit:
+- Commit: `8ab9409`
 
 ### T14a — Enmendar ADR 0005: retirar la ventana de gracia
 - [x] Estado · Ejecutor: `Codex` · Cubre: RF-006, AM-002, ADR 0005 · Remedia: — · Solo docs · Depende de: —
@@ -904,10 +904,10 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 |---|---|---|
 | 0 — Línea base y evidencia "antes" | T0.1 a T0.5 (5) | 5 (T0.1 a T0.5) |
 | 1 — Contrato ejecutable | T1a, T1 a T3 (4) | 4 (T1a, T1, T2, T3) |
-| 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 10 (T4, T5, T6, T7, T8, T9, T10, T11, T12, T14a) |
+| 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 11 (T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14a) |
 | 3 — Remediación | T23 a T32 (10) | 0 |
 | 4 — Cierre | T33 a T38 (6) | 0 |
-| **Total** | **45** | **19** |
+| **Total** | **45** | **20** |
 
 Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, cookie) y `T14a`
 (enmienda ADR 0005, sin ventana de gracia). Los ids existentes no cambian.
@@ -917,6 +917,7 @@ Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, coo
 (Codex añade aquí, por tarea, `<comando>: <resultado observado>` cuando cierre cada una;
 las líneas de RED/GREEN van en el handoff.)
 
+- T13 · GREEN (Codex): 8 pruebas nuevas de `TestRF003_*`/`TestAM004_*` en verde (servicio, API y las dos de AM-004, luego renombradas por Claude); `make test-go`: PASS; `make lint`: solo los 3 hallazgos sembrados de `legacy_auth.go`. `gofmt -l` (Claude): limpio. `make gen` repetido: sin diff adicional. Claude encontró que las 2 pruebas de AM-004 se llamaban `TestAM004_...` (no `TestRF003_...`), un patrón que `scripts/traceability.py` no cuenta (`func Test(RF|RNF)NNN_...`); las renombró a `TestRF003_AM004...`. También encontró que T13 no traía ninguna prueba de integración pese a que su propia "Verificación" exige `make test-integration`; Claude escribió `login_integration_test.go` (paquete externo `login_test` para evitar un ciclo de imports con `store`) y confirmó contra PostgreSQL real: el refresh token se guarda como SHA-256, `last_login_at` se actualiza y queda el audit `login_succeeded`. `python3 scripts/traceability.py --check`: matriz al día (RF-003 pasa de "parcial" a "completo", 10 pruebas).
 - T12 · GREEN (Codex): `TestRF012_PlantillaDeRegistroIncluyeElEnlaceDeVerificacion`, `TestRF012_LosAvisosDeSeguridadNoIncluyenSecretos` y `TestRF012_PublicBaseURLTieneValorPorDefectoYAdmiteOverride` en verde; `make test-go`: PASS; `make lint`: solo los 3 hallazgos sembrados de `legacy_auth.go`. `gofmt -l` (Claude): limpio tras formatear. `make gen` repetido por Claude: sin diff adicional. El hook GGA (pre-commit) bloqueó el commit 3 veces seguidas antes de pasar a la cuarta: (1) `deliver` ignoraba `ctx` (regla "context.Context propagado"); (2) cero pruebas para `cmd/worker` (paquete sin `_test.go` desde la semana 1); (3) un bug real de idempotencia preexistente (ver "Ajuste de Claude" abajo) más una demanda de cobertura para `TRUSTED_PROXIES`/`ARGON2_CONCURRENCY` (de T6/T7, fuera de alcance de T12, rechazada por decisión del usuario). `python3 scripts/traceability.py --check`: matriz al día (RF-012 pasa de 6 a 8 pruebas).
 - T11 · GREEN (Codex): `TestRF002_*` de servicio, API e integración en verde; `make test-go` y `make test-integration`: PASS; `make lint`: solo los 3 hallazgos sembrados de `legacy_auth.go`. `gofmt -l`: limpio (Claude). `make gen` repetido por Claude: sin diff adicional. Integración contra PostgreSQL 14 local (Claude): suite completa PASS, incluida `TestRF002_VerificarConsumeTokenYActivaCuenta` (verifica dos veces el mismo token: activa y luego 410). Claude añadió y corrió una prueba manual no commiteada (`zz_manual_expiry_check_test.go`, borrada después) para confirmar contra PostgreSQL real que un token ya vencido (`expires_at` en el pasado) se rechaza con `ErrTokenInvalid` y la cuenta queda en `pending_verification`: PASS. `python3 scripts/traceability.py --check`: matriz al día (RF-002 pasa de "parcial" a "completo", 9 pruebas; RNF-012 sube a 3).
 - T10 · RED (Codex): faltaban los tipos de servicio/transacción de registro. GREEN (Codex): pruebas RF-001 de API y de servicio en verde; `make gen`: PASS; `make test-go` y `make test-integration`: PASS (revalidados por Claude); `make lint`: solo los 3 hallazgos sembrados de `legacy_auth.go`, sin hallazgos nuevos. `gofmt -l`: limpio. `make gen` repetido por Claude: sin diff adicional (determinista). Integración contra PostgreSQL 14 local (Claude): suite completa PASS, incluida `TestRF001_RegistroPersisteHashArgon2id`. Claude añadió y corrió una prueba manual no commiteada (`zz_manual_dup_check_test.go`, borrada después) para confirmar contra PostgreSQL real que un `UNIQUE` violado en `users.email` se traduce en `ErrEmailExists` a través de `errors.As`/`SQLState()` sobre el error envuelto: PASS. `python3 scripts/traceability.py --check`: matriz al día (RF-001 pasa de 6 a 15 pruebas). El hook GGA marcó como punto a revisar si AM-004 exige código idéntico a 201; se confirmó contra `specs/06-acceptance/registro-y-verificacion.feature:29-35` que el escenario Gherkin concreto exige 409 sin la palabra "existe" y ≤50 ms de diferencia (no un código idéntico), que es lo implementado.
@@ -1080,4 +1081,10 @@ Formato por tarea (3 a 5 líneas):
 - Comandos y resultado observado: ver la entrada de T12 en "Evidencia de verificación" arriba.
 - Ajuste de Claude: (1) `deliver` ignoraba `ctx` (parámetro `_ context.Context`, ya así desde la semana 1); ahora lo propaga y aborta antes de arrancar un `smtp.SendMail` nuevo si ya empezó el apagado (`net/smtp` no admite contexto, así que uno en curso no se puede interrumpir). (2) Extrajo `buildRawMessage` y le agregó `TestRF012_ConstruyeElMensajeSMTPConAsuntoYCuerpoRenderizados` para que `cmd/worker` deje de tener cero pruebas. (3) Encontró y corrigió un bug real preexistente de la semana 1 (`053e15f`, ajeno a T12): `alreadyProcessed` marcaba el `eventID` como visto *antes* de intentar `deliver`, así que un solo fallo transitorio de SMTP hacía que el reintento (`Nack` con requeue) se descartara como "duplicado" sin haber enviado nunca el correo — lo confirmó con `TestRF012_FalloTransitorioReintentaSinPerderLaNotificacion` (RED con el código viejo, GREEN tras mover la marca a después de una entrega exitosa, vía el nuevo `markDelivered`).
 - Dudas abiertas: el hook GGA además pidió cobertura para `TRUSTED_PROXIES` (T6) y `ARGON2_CONCURRENCY` (T7) en `config_test.go`, alegando que el archivo "es parte de este cambio"; es deuda de tareas ya cerradas, ajena a T12. El usuario decidió no ampliar T12 para cubrirlo (commitear con `--no-verify` si volvía a bloquear tras el fix del bug real; no hizo falta, el commit pasó al cuarto intento). Queda pendiente decidir si se abre una tarea aparte para esa cobertura. Codex no pudo commitear (mismo bloqueo de `.git/index.lock`); Claude creó ambos commits.
+
+### T13 · 2026-09-25 · 8ab9409
+- Qué cambió: `backend/internal/auth/login` (nuevo): `Service.Login` solo emite tokens para cuentas `active`; correo inexistente verifica contra `password.VerifyDecoy` (AM-004); MFA se comprueba **después** de validar la contraseña, así que una cuenta con `mfa_enabled` y contraseña correcta se rechaza con 501 `application/problem+json` sin tokens ni cookie, mientras que password incorrecta o cuenta no activa comparten un 401 genérico. Éxito: `NeedsRehash` recalcula el hash si hace falta, refresh token opaco de 32 B `crypto/rand` guardado como SHA-256 con `family_id` nuevo, `last_login_at` y auditoría `login_succeeded`/`login_failed` (con motivo). `backend/internal/api/login.go` cablea `POST /api/v1/auth/login`: cuerpo `TokenPair` sin `refreshToken`, cookie `Set-Cookie: refresh_token=...; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Max-Age=<RefreshTTL>` (reutiliza `config.RefreshTTL`/`JWT_REFRESH_TTL` de T8, por defecto 720 h = 30 días).
+- Comandos y resultado observado: ver la entrada de T13 en "Evidencia de verificación" arriba.
+- Ajuste de Claude: (1) renombró las 2 pruebas `TestAM004_...` a `TestRF003_AM004...` porque el patrón que exige `traceability.py` es `Test(RF|RNF)NNN_...` y `AM004` no calza — sin el cambio, esas dos pruebas nunca se hubieran contado en la matriz. (2) Escribió `backend/internal/auth/login/login_integration_test.go` (ausente pese a que la propia tarea exige `make test-integration`) en el paquete externo `login_test` para no crear un ciclo de imports con `store` (que ya importa `login` para sus tipos `Writer`/`RefreshToken`); confirmó contra PostgreSQL real el hash SHA-256 del refresh token, `last_login_at` y el audit `login_succeeded`.
+- Dudas abiertas: ninguna. Mismo bloqueo de `.git/index.lock`; Claude creó ambos commits.
 
