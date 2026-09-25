@@ -180,7 +180,9 @@ func TestRF017_CuentaBloqueadaRegistraAuditoriaYPublicaEvento(t *testing.T) {
 	if lockedAudits != 1 {
 		t.Fatalf("account_locked audits = %d, want 1", lockedAudits)
 	}
-	if len(publisher.events) != 1 || publisher.events[0].Type != "security.account_locked" || publisher.events[0].UserID != user.ID {
-		t.Fatalf("published events = %+v", publisher.events)
+	wantLockedUntil := now.Add(15 * time.Minute)
+	if len(publisher.events) != 1 || publisher.events[0].Type != "security.account_locked" || publisher.events[0].UserID != user.ID ||
+		!publisher.events[0].LockedUntil.Equal(wantLockedUntil) || publisher.events[0].FailedAttempts != 1 {
+		t.Fatalf("published events = %+v, want lockedUntil=%v failedAttempts=1", publisher.events, wantLockedUntil)
 	}
 }

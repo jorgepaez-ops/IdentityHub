@@ -14,8 +14,8 @@ declaración de buenas intenciones.
 | **RF-002** | Verificación de correo | P0 | `verifyEmail` | 2 | 9 | — | ✅ completo |
 | **RF-003** | Inicio de sesión | P0 | `login` | 3 | 10 | — | ✅ completo |
 | **RF-004** | Emisión y validación de JWT | P0 | `getJwks` | 2 | 7 | — | ✅ completo |
-| **RF-005** | Renovación de sesión | P0 | `refreshSession` | 1 | 6 | — | ✅ completo |
-| **RF-006** | Detección de reuso de refresh token | P0 | — | 1 | 4 | — | ✅ completo |
+| **RF-005** | Renovación de sesión | P0 | `refreshSession` | 1 | 7 | — | ✅ completo |
+| **RF-006** | Detección de reuso de refresh token | P0 | — | 1 | 5 | — | ✅ completo |
 | **RF-007** | Cierre de sesión | P0 | `logout` | 1 | 8 | — | ✅ completo |
 | **RF-008** | Perfil propio | P0 | `getCurrentUser`, `updateCurrentUser` | — | 5 | — | 🟡 parcial |
 | **RF-009** | Control de acceso por roles | P0 | — | 2 | 5 | — | ✅ completo |
@@ -26,7 +26,7 @@ declaración de buenas intenciones.
 | **RF-014** | Inicio de sesión con segundo factor | P1 | `verifyMfa` | 1 | — | — | 🟡 parcial |
 | **RF-015** | Restablecimiento de contraseña | P1 | `requestPasswordReset`, `confirmPasswordReset` | — | — | — | 🔴 sin cubrir |
 | **RF-016** | Sesiones activas | P1 | `listSessions`, `revokeSession` | 1 | — | — | 🟡 parcial |
-| **RF-017** | Bloqueo por fuerza bruta | P1 | — | 1 | 11 | — | ✅ completo |
+| **RF-017** | Bloqueo por fuerza bruta | P1 | — | 1 | 12 | — | ✅ completo |
 | **RF-018** | Claves de servicio | P2 | — | — | — | — | 🔴 sin cubrir |
 | **RF-019** | Exportación del audit log | P2 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-001** | Contenerización total | P0 | — | — | — | — | 🔴 sin cubrir |

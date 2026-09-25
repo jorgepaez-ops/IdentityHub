@@ -4,7 +4,7 @@
 # mismo nombre. Si `make scan` y el pipeline divergen, el pipeline deja de ser
 # una red de seguridad y pasa a ser una sorpresa.
 
-COMPOSE     := docker compose -f deploy/docker-compose.yml
+COMPOSE     := docker compose --env-file .env -f deploy/docker-compose.yml
 COMPOSE_OBS := $(COMPOSE) --profile observability
 SQLC_VERSION := v1.31.1
 SQLC         ?= sqlc

@@ -74,6 +74,8 @@ Requisitos: solo Docker.
 
 ```bash
 git clone <repo> && cd ProyectoFinalMateria
+cp .env.example .env
+# Rellena los secretos de .env; genera JWT_SIGNING_KEY con: openssl rand -base64 32
 make up
 ```
 

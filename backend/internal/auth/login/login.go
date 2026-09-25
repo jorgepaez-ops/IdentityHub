@@ -83,9 +83,11 @@ type AuditEvent struct {
 // SecurityEvent is published to the broker for security-relevant occurrences
 // that also merit a notification, mirroring refresh.SecurityEvent.
 type SecurityEvent struct {
-	Type   string
-	UserID uuid.UUID
-	IP     *netip.Addr
+	Type           string
+	UserID         uuid.UUID
+	IP             *netip.Addr
+	LockedUntil    time.Time
+	FailedAttempts int
 }
 
 type EventPublisher interface {
@@ -207,23 +209,23 @@ func (s *Service) Login(ctx context.Context, input Input) (Result, error) {
 			return fmt.Errorf("verify password: %w", err)
 		}
 		if !valid || user.Status != StatusActive {
-			locked, err := s.recordAccountFailure(ctx, writer, user, input, "invalid_credentials", now)
+			lock, err := s.recordAccountFailure(ctx, writer, user, input, "invalid_credentials", now)
 			if err != nil {
 				return err
 			}
-			if locked {
-				lockEvent = &SecurityEvent{Type: "security.account_locked", UserID: user.ID, IP: input.IP}
+			if lock.locked {
+				lockEvent = &SecurityEvent{Type: "security.account_locked", UserID: user.ID, IP: input.IP, LockedUntil: lock.lockedUntil, FailedAttempts: lock.failedAttempts}
 			}
 			authenticationErr = ErrInvalidCredentials
 			return nil
 		}
 		if user.MFAEnabled {
-			locked, err := s.recordAccountFailure(ctx, writer, user, input, "mfa_not_supported", now)
+			lock, err := s.recordAccountFailure(ctx, writer, user, input, "mfa_not_supported", now)
 			if err != nil {
 				return err
 			}
-			if locked {
-				lockEvent = &SecurityEvent{Type: "security.account_locked", UserID: user.ID, IP: input.IP}
+			if lock.locked {
+				lockEvent = &SecurityEvent{Type: "security.account_locked", UserID: user.ID, IP: input.IP, LockedUntil: lock.lockedUntil, FailedAttempts: lock.failedAttempts}
 			}
 			authenticationErr = ErrMFAUnavailable
 			return nil
@@ -278,31 +280,42 @@ func (s *Service) Login(ctx context.Context, input Input) (Result, error) {
 	return result, nil
 }
 
+// lockResult carries the details security.account_locked needs, so the
+// caller can publish an event that actually matches the AsyncAPI contract
+// (specs/04-events/asyncapi.yaml requires lockedUntil and failedAttempts)
+// instead of placeholder zero values.
+type lockResult struct {
+	locked         bool
+	lockedUntil    time.Time
+	failedAttempts int
+}
+
 // recordAccountFailure records the failed attempt and, once it reaches the
 // threshold, locks the account and audits account_locked in the same
 // transaction. It reports whether the account was just locked, so the caller
 // can publish security.account_locked after the transaction commits.
-func (s *Service) recordAccountFailure(ctx context.Context, writer Writer, user User, input Input, reason string, now time.Time) (bool, error) {
+func (s *Service) recordAccountFailure(ctx context.Context, writer Writer, user User, input Input, reason string, now time.Time) (lockResult, error) {
 	if err := s.recordFailure(ctx, writer, &user.ID, input, reason); err != nil {
-		return false, err
+		return lockResult{}, err
 	}
 	if user.Status != StatusActive {
-		return false, nil
+		return lockResult{}, nil
 	}
 	failures, err := writer.CountLoginFailuresByAccount(ctx, user.ID, now.Add(-s.lockout.FailureWindow))
 	if err != nil {
-		return false, fmt.Errorf("count login failures by account: %w", err)
+		return lockResult{}, fmt.Errorf("count login failures by account: %w", err)
 	}
 	if failures < int64(s.lockout.AccountMaxFailures) {
-		return false, nil
+		return lockResult{}, nil
 	}
-	if err := writer.LockLoginUser(ctx, user.ID, now.Add(s.lockout.LockoutDuration)); err != nil {
-		return false, fmt.Errorf("lock login user: %w", err)
+	lockedUntil := now.Add(s.lockout.LockoutDuration)
+	if err := writer.LockLoginUser(ctx, user.ID, lockedUntil); err != nil {
+		return lockResult{}, fmt.Errorf("lock login user: %w", err)
 	}
 	if err := writer.InsertAuditEvent(ctx, AuditEvent{ActorUserID: &user.ID, Action: "account_locked", Reason: reason, IP: input.IP, UserAgent: input.UserAgent}); err != nil {
-		return false, fmt.Errorf("record account locked audit: %w", err)
+		return lockResult{}, fmt.Errorf("record account locked audit: %w", err)
 	}
-	return true, nil
+	return lockResult{locked: true, lockedUntil: lockedUntil, failedAttempts: int(failures)}, nil
 }
 
 func (c LockoutConfig) valid() bool {

@@ -3,15 +3,29 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
+	"net/netip"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jorgepaez/identity-hub/internal/api"
+	"github.com/jorgepaez/identity-hub/internal/auth/admin"
+	"github.com/jorgepaez/identity-hub/internal/auth/auditlog"
+	"github.com/jorgepaez/identity-hub/internal/auth/login"
+	"github.com/jorgepaez/identity-hub/internal/auth/logout"
+	"github.com/jorgepaez/identity-hub/internal/auth/password"
+	"github.com/jorgepaez/identity-hub/internal/auth/refresh"
+	"github.com/jorgepaez/identity-hub/internal/auth/registration"
+	"github.com/jorgepaez/identity-hub/internal/auth/token"
+	"github.com/jorgepaez/identity-hub/internal/auth/verification"
 	"github.com/jorgepaez/identity-hub/internal/config"
 	"github.com/jorgepaez/identity-hub/internal/events"
 	"github.com/jorgepaez/identity-hub/internal/observability"
@@ -51,12 +65,44 @@ func run() error {
 	defer broker.Close()
 	logger.Info("conectado al broker y topología declarada")
 
+	seed, err := base64.StdEncoding.DecodeString(cfg.JWTSigningKey.Reveal())
+	if err != nil {
+		return fmt.Errorf("decode JWT signing key: %w", err)
+	}
+	tokens, err := token.New(seed, cfg.JWTIssuer, cfg.JWTAudience, time.Now)
+	if err != nil {
+		return fmt.Errorf("create token service: %w", err)
+	}
+	password.Configure(cfg.Argon2)
+
+	registrationService := registration.New(db, broker, passwordHasher{}, rand.Reader, time.Now)
+	verificationService := verification.New(db, broker)
+	loginService := login.New(db, tokens, cfg.RefreshTTL, login.LockoutConfig{
+		AccountMaxFailures: cfg.LoginAccountMaxFailures,
+		IPMaxFailures:      cfg.LoginIPMaxFailures,
+		FailureWindow:      cfg.LoginFailureWindow,
+		LockoutDuration:    cfg.LoginLockoutDuration,
+	}).WithEventPublisher(loginSecurityEventPublisher{users: db, publisher: broker, logger: logger})
+	refreshService := refresh.New(db, tokens, cfg.RefreshTTL).WithEventPublisher(refreshSecurityEventPublisher{users: db, publisher: broker, logger: logger})
+
+	server := api.NewServer(logger, cfg.Version, map[string]api.Checker{
+		"database": db,
+		"broker":   brokerChecker{broker},
+	})
+	server.SetTokenService(tokens)
+	server.SetRegistrationService(registrationService)
+	server.SetLoginService(loginService, cfg.RefreshTTL)
+	server.SetEmailVerificationService(verificationService)
+	server.SetRefreshService(refreshService)
+	server.SetLogoutService(logout.New(db))
+	server.SetAdminUserService(admin.New(db))
+	server.SetAuditLogService(auditlog.New(db))
+	server.SetCurrentUserRepository(db)
+	server.SetTrustedProxies(cfg.TrustedProxies)
+
 	srv := &http.Server{
-		Addr: fmt.Sprintf(":%d", cfg.Port),
-		Handler: api.NewServer(logger, cfg.Version, map[string]api.Checker{
-			"database": db,
-			"broker":   brokerChecker{broker},
-		}).Routes(),
+		Addr:              fmt.Sprintf(":%d", cfg.Port),
+		Handler:           server.Routes(),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,
@@ -90,3 +136,107 @@ func run() error {
 type brokerChecker struct{ b *events.Broker }
 
 func (c brokerChecker) Ping(_ context.Context) error { return c.b.Ping() }
+
+type passwordHasher struct{}
+
+func (passwordHasher) Hash(value string) (string, error) { return password.Hash(value) }
+
+type userLookup interface {
+	GetUserByID(context.Context, uuid.UUID) (store.User, error)
+}
+
+type eventPublisher interface {
+	Publish(context.Context, string, any) error
+}
+
+// loginSecurityEventPublisher enriches committed lockout events with the recipient
+// data required by the notification worker. A missing user is non-fatal because the
+// lockout transaction has already committed.
+type loginSecurityEventPublisher struct {
+	users     userLookup
+	publisher eventPublisher
+	logger    *slog.Logger
+}
+
+func (p loginSecurityEventPublisher) PublishSecurityEvent(ctx context.Context, event login.SecurityEvent) error {
+	user, ok := p.lookupUser(ctx, event.UserID, event.Type)
+	if !ok {
+		return nil
+	}
+	message := accountLockedNotification{Envelope: events.NewEnvelope(events.TypeAccountLocked, api.TraceIDFrom(ctx))}
+	message.Data.UserID = event.UserID
+	message.Data.Email = user.Email
+	message.Data.DisplayName = user.DisplayName
+	message.Data.LockedUntil = event.LockedUntil
+	message.Data.FailedAttempts = event.FailedAttempts
+	message.Data.IP = addressString(event.IP)
+	return p.publisher.Publish(ctx, events.TypeAccountLocked, message)
+}
+
+func (p loginSecurityEventPublisher) lookupUser(ctx context.Context, userID uuid.UUID, eventType string) (store.User, bool) {
+	user, err := p.users.GetUserByID(ctx, userID)
+	if err != nil {
+		if p.logger != nil {
+			p.logger.Warn("security event skipped because recipient could not be loaded", "event_type", eventType, "user_id", userID, "error", err)
+		}
+		return store.User{}, false
+	}
+	return user, true
+}
+
+// refreshSecurityEventPublisher is deliberately separate from the login adapter:
+// the two services expose different SecurityEvent types despite sharing delivery.
+type refreshSecurityEventPublisher struct {
+	users     userLookup
+	publisher eventPublisher
+	logger    *slog.Logger
+}
+
+func (p refreshSecurityEventPublisher) PublishSecurityEvent(ctx context.Context, event refresh.SecurityEvent) error {
+	user, err := p.users.GetUserByID(ctx, event.UserID)
+	if err != nil {
+		if p.logger != nil {
+			p.logger.Warn("security event skipped because recipient could not be loaded", "event_type", event.Type, "user_id", event.UserID, "error", err)
+		}
+		return nil
+	}
+	message := refreshReuseNotification{Envelope: events.NewEnvelope(events.TypeRefreshReuseDetected, api.TraceIDFrom(ctx))}
+	message.Data.UserID = event.UserID
+	message.Data.Email = user.Email
+	message.Data.DisplayName = user.DisplayName
+	message.Data.FamilyID = event.FamilyID
+	message.Data.RevokedCount = int(event.RevokedCount)
+	message.Data.IP = addressString(event.IP)
+	return p.publisher.Publish(ctx, events.TypeRefreshReuseDetected, message)
+}
+
+type accountLockedNotification struct {
+	events.Envelope
+	Data struct {
+		UserID         uuid.UUID `json:"userId"`
+		Email          string    `json:"email"`
+		DisplayName    string    `json:"displayName"`
+		LockedUntil    time.Time `json:"lockedUntil"`
+		FailedAttempts int       `json:"failedAttempts"`
+		IP             string    `json:"ip"`
+	} `json:"data"`
+}
+
+type refreshReuseNotification struct {
+	events.Envelope
+	Data struct {
+		UserID       uuid.UUID `json:"userId"`
+		Email        string    `json:"email"`
+		DisplayName  string    `json:"displayName"`
+		FamilyID     uuid.UUID `json:"familyId"`
+		RevokedCount int       `json:"revokedCount"`
+		IP           string    `json:"ip"`
+	} `json:"data"`
+}
+
+func addressString(address *netip.Addr) string {
+	if address == nil {
+		return ""
+	}
+	return address.String()
+}
