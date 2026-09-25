@@ -3,13 +3,13 @@
 | | |
 |---|---|
 | **Severidad** | HIGH |
-| **Estado** | abierto |
+| **Estado** | remediado |
 | **Detectado por** | gosec G404 (baseline-scan) · Semgrep math-random-used |
 | **Componente** | `backend/internal/api/legacy_auth.go:30,66` |
 | **Amenaza** | AM-002 (robo de refresh token y uso paralelo) |
 | **Sembrada** | sí |
 | **Evidencia antes** | `docs/evidencia/VULN-004/evidencia.json` |
-| **Commit de remediación** | |
+| **Commit de remediación** | `51a7a4f` (T23) |
 | **Evidencia después** | |
 | **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / — |
 

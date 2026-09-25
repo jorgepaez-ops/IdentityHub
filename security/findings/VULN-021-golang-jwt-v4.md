@@ -3,14 +3,14 @@
 | | |
 |---|---|
 | **Severidad** | MEDIUM |
-| **Estado** | abierto |
+| **Estado** | remediado |
 | **Detectado por** | govulncheck · job `sca` |
 | **Componente** | `github.com/golang-jwt/jwt/v4@v4.5.0` |
 | **Avisos** | GO-2024-3250 (corregido en v4.5.1) · GO-2025-3553 (corregido en v4.5.2) |
 | **Amenaza** | AM-003 (suplantación), AM-017 (denegación de servicio) |
 | **Sembrada** | sí |
 | **Evidencia antes** | |
-| **Commit de remediación** | |
+| **Commit de remediación** | `51a7a4f` (T23) |
 | **Evidencia después** | |
 | **Run de Actions (antes/después)** | |
 

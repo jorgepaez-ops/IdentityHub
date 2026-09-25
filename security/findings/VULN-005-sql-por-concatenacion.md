@@ -3,13 +3,13 @@
 | | |
 |---|---|
 | **Severidad** | CRITICAL |
-| **Estado** | abierto |
+| **Estado** | remediado |
 | **Detectado por** | gosec G201 · CodeQL `go/sql-injection` · Semgrep |
 | **Componente** | `backend/internal/api/legacy_auth.go:66-68` |
 | **Amenaza** | AM-006 (manipulación) |
 | **Sembrada** | sí |
 | **Evidencia antes** | |
-| **Commit de remediación** | |
+| **Commit de remediación** | `51a7a4f` (T23) |
 | **Evidencia después** | |
 | **Run de Actions (antes/después)** | |
 

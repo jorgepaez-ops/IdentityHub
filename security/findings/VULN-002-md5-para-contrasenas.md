@@ -3,13 +3,13 @@
 | | |
 |---|---|
 | **Severidad** | CRITICAL |
-| **Estado** | abierto |
+| **Estado** | remediado |
 | **Detectado por** | gosec G401/G501 · job `lint` · CodeQL · Semgrep |
 | **Componente** | `backend/internal/api/legacy_auth.go:52-55` |
 | **Amenaza** | AM-001 (suplantación por fuerza bruta) |
 | **Sembrada** | sí |
 | **Evidencia antes** | |
-| **Commit de remediación** | |
+| **Commit de remediación** | `51a7a4f` (T23) |
 | **Evidencia después** | |
 | **Run de Actions (antes/después)** | |
 
