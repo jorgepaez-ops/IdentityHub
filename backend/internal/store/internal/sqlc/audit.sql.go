@@ -68,3 +68,58 @@ func (q *Queries) InsertAuditEvent(ctx context.Context, arg InsertAuditEventPara
 	)
 	return i, err
 }
+
+const listAuditLog = `-- name: ListAuditLog :many
+SELECT id, actor_user_id, action, resource_type, resource_id, ip, user_agent, metadata, created_at
+FROM audit_log
+WHERE ($1::text IS NULL OR action = $1::text)
+  AND ($2::uuid IS NULL OR actor_user_id = $2::uuid)
+  AND ($3::timestamptz IS NULL OR created_at >= $3::timestamptz)
+  AND ($4::bigint IS NULL OR id < $4::bigint)
+ORDER BY id DESC
+LIMIT $5
+`
+
+type ListAuditLogParams struct {
+	Action      pgtype.Text
+	ActorUserID pgtype.UUID
+	Since       pgtype.Timestamptz
+	CursorID    pgtype.Int8
+	LimitCount  int32
+}
+
+func (q *Queries) ListAuditLog(ctx context.Context, arg ListAuditLogParams) ([]AuditLog, error) {
+	rows, err := q.db.Query(ctx, listAuditLog,
+		arg.Action,
+		arg.ActorUserID,
+		arg.Since,
+		arg.CursorID,
+		arg.LimitCount,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AuditLog
+	for rows.Next() {
+		var i AuditLog
+		if err := rows.Scan(
+			&i.ID,
+			&i.ActorUserID,
+			&i.Action,
+			&i.ResourceType,
+			&i.ResourceID,
+			&i.Ip,
+			&i.UserAgent,
+			&i.Metadata,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

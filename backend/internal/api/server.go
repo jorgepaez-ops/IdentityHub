@@ -17,6 +17,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/jorgepaez/identity-hub/internal/auth/admin"
+	"github.com/jorgepaez/identity-hub/internal/auth/auditlog"
 	"github.com/jorgepaez/identity-hub/internal/auth/login"
 	"github.com/jorgepaez/identity-hub/internal/auth/logout"
 	"github.com/jorgepaez/identity-hub/internal/auth/refresh"
@@ -38,6 +39,7 @@ type Server struct {
 	refresh        refresh.Refresher
 	logout         logout.Revoker
 	adminUsers     admin.Manager
+	auditLog       auditlog.Reader
 	trustedProxies []netip.Prefix
 }
 
@@ -72,6 +74,9 @@ func (s *Server) SetLogoutService(service logout.Revoker) { s.logout = service }
 
 // SetAdminUserService is used by composition and focused admin handler tests.
 func (s *Server) SetAdminUserService(service admin.Manager) { s.adminUsers = service }
+
+// SetAuditLogService is used by composition and focused audit-log handler tests.
+func (s *Server) SetAuditLogService(service auditlog.Reader) { s.auditLog = service }
 
 func (s *Server) SetTrustedProxies(prefixes []netip.Prefix) {
 	s.trustedProxies = append([]netip.Prefix(nil), prefixes...)
@@ -132,8 +137,8 @@ func (s *Server) handleBindingError(w http.ResponseWriter, r *http.Request, err 
 }
 
 func (s *Server) ListAuditLog(w http.ResponseWriter, r *http.Request, params ListAuditLogParams) {
-	RequireAuth(s.tokens)(RequireRole(s.currentUsers, "admin")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		s.notImplemented(w)
+	RequireAuth(s.tokens)(RequireRole(s.currentUsers, "admin")(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		s.listAuditLog(w, request, params)
 	}))).ServeHTTP(w, r)
 }
 func (s *Server) ListUsers(w http.ResponseWriter, r *http.Request, params ListUsersParams) {
