@@ -723,7 +723,7 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
 - Commit: ba0ce22 (+ c6d468f, hallazgo crítico de verificación)
 
 ### T22 — Revisión de la Fase 2
-- [ ] Estado · Ejecutor: `Claude (revisión)` · Cubre: T4 a T21
+- [x] Estado · Ejecutor: `Claude (revisión)` · Cubre: T4 a T21
 - Revisar commits y handoff; ejecutar `make test-integration` y el humo; auditar los criterios de
   `AGENTS.md`, "Seguridad del núcleo IdP".
 - Commit: —
@@ -906,10 +906,10 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 |---|---|---|
 | 0 — Línea base y evidencia "antes" | T0.1 a T0.5 (5) | 5 (T0.1 a T0.5) |
 | 1 — Contrato ejecutable | T1a, T1 a T3 (4) | 4 (T1a, T1, T2, T3) |
-| 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 19 (T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T14a, T15, T16, T17, T18, T19, T20, T21) |
+| 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 20 (T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T14a, T15, T16, T17, T18, T19, T20, T21, T22) |
 | 3 — Remediación | T23 a T32 (10) | 0 |
 | 4 — Cierre | T33 a T38 (6) | 0 |
-| **Total** | **45** | **28** |
+| **Total** | **45** | **29** |
 
 Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, cookie) y `T14a`
 (enmienda ADR 0005, sin ventana de gracia). Los ids existentes no cambian.
@@ -1146,4 +1146,10 @@ Formato por tarea (3 a 5 líneas):
   2. **`login.go`/`refresh.go` usaban los bytes crudos del refresh token como string de cookie** (`string(refreshRaw)`) en vez de codificarlos: `net/http` descarta en silencio los bytes que no son válidos como cookie-octet al armar `Set-Cookie`, así que la cookie que recibía un cliente real quedaba corrupta y truncada, y nunca podía volver a hashear igual — refresh y logout devolvían 401 siempre para una cookie real (mismo bug de fondo en `logout.go`, que también hasheaba el string sin decodificar). Corregidos los cuatro puntos con `base64.RawURLEncoding`, reescritos los tests que tapaban el bug (`verification_integration_test.go` construía el par hash+string a mano, sin encoder de por medio), y confirmado con el humo real completo de arriba. Commit aparte (`c6d468f`) para no mezclarlo con el propio commit de composición de T21.
   - El hook GGA además rechazó dos veces el commit de composición: (a) el adaptador de `security.account_locked` mandaba `lockedUntil`/`failedAttempts` en cero, incumpliendo el AsyncAPI (`required: [userId, email, lockedUntil, failedAttempts]`) — corregido llevando esos dos valores desde `recordAccountFailure` hasta el evento; (b) los dos tests nuevos de los adaptadores no seguían `Test(RF|RNF)NNN_...`, así que no contaban en `specs/07-traceability.md` — renombrados a `TestRF017_LoginSecurityEventPublisherPublishesRecipient` y `TestRF006_RefreshSecurityEventPublisherSkipsMissingUser`.
 - Dudas abiertas: ninguna bloqueante. `make up` con las imágenes de la línea base sigue sin poder construirse hasta la remediación de T27 (Dockerfiles); no es una regresión de T21, es la línea base deliberada. Codex no pudo commitear (mismo bloqueo de sandbox); Claude creó ambos commits tras revisar, verificar contra la infraestructura real y aplicar las dos correcciones.
+
+### T22 · 2026-09-25 · — (solo revisión, sin commit de código)
+- Qué se hizo: revisión completa de la Fase 2 (T4 a T21) sin delegar a Codex, como pide la tarea. (1) Barrido del repo completo buscando violaciones de "Seguridad del núcleo IdP" (`AGENTS.md`): sin logs de contraseñas/tokens/secretos en ningún paquete (`grep` de `logger.*password|token|secret|refresh` fuera de tests, cero resultados); sin SQL armado con `fmt.Sprintf`/concatenación fuera de `legacy_auth.go` (línea base, T23); sin `math/rand` fuera de `legacy_auth.go`; sin llamadas `pool.Exec`/`pool.Query` directas en los paquetes de `internal/auth/**` (todo pasa por los adaptadores de `store` generados con sqlc). (2) Suite completa `go test -race -tags=integration -count=1 ./...` contra PostgreSQL/RabbitMQ reales: **todos los paquetes en verde**, incluida la ronda final después de las dos correcciones de T21. (3) `make lint`: solo los 3 hallazgos preexistentes de `legacy_auth.go`. (4) `make gen`: sin ningún diff, ni siquiera en `specs/07-traceability.md` (ya estaba al día desde el commit de T21). (5) Matriz de trazabilidad: el criterio de aceptación de la feature "RF-001 a RF-007, RF-009, RF-010, RF-011 y RF-017 en completo" **se cumple en su totalidad** (los 11 en ✅, confirmado en `specs/07-traceability.md`).
+- Hallazgo abierto, no bloqueante para esta tarea pero sí relevante para el cierre de la feature: **cobertura real 46.7 %**, medida con `go test -race -coverprofile=... -covermode=atomic ./...` (el mismo comando de `make test-go`), muy por debajo del 70 % que exige el criterio de aceptación 4 de la feature (RNF-005). Por paquete: `cmd/api` 10.2 %, `cmd/worker` 28.9 %, `internal/auth/admin` 44.7 %, `internal/events` 1.8 % — el resto de `internal/auth/**` está entre 75-83 %. No hay gate de cobertura activo en CI todavía (RNF-005 "🟡 parcial" en la matriz). Esto no es una regresión de ninguna tarea puntual: es la brecha acumulada de no medir cobertura como criterio de cierre tarea por tarea. Queda para que el usuario decida si se abre una tarea dedicada a cerrarla antes de la Fase 3, o si se acepta y se revisa más adelante.
+- Dudas abiertas: la decisión de cobertura de arriba, y `RNF-001` (contenerización total) sigue "sin cubrir" en la matriz porque `make up` no construye las imágenes hasta que T27 remedie la línea base (Debian 11/Go 1.22) — coherente con lo ya documentado en T21, no es nuevo.
+
 
