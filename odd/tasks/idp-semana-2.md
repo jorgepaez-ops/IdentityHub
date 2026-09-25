@@ -669,13 +669,13 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
 - Commit: ac3ea8e
 
 ### T19 — Consulta del registro de auditoría (RF-011)
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RF-011, AM-010 · Remedia: — · Depende de: T9, T17
+- [x] Estado · Ejecutor: `Codex` · Cubre: RF-011, AM-010 · Remedia: — · Depende de: T9, T17
 - `listAuditLog` (filtros `action`, `actorId`, `since`, `limit`, `cursor`; solo admin), paginación por `id`.
 - Criterios: `TestRF011_UnLoginFallidoCreaUnaFila`; `TestRF011_ListarRequiereAdmin` (403 para user);
   `TestRF011_FiltraPorAccionYActor`; `TestRF011_ElRolDeLaAplicacionNoPuedeModificarLaFila` (reutiliza el enfoque de T9 de extremo a extremo).
 - Archivos: `backend/internal/api/audit_log.go` (+ pruebas), `db/queries/audit.sql`.
 - Verificación: `make test-go`; `make test-integration`.
-- Commit:
+- Commit: 1ddbdd6
 
 ### T20 — Bloqueo por fuerza bruta (RF-017)
 - [ ] Estado · Ejecutor: `Codex` · Cubre: RF-017, AM-001, VULN-020 (chi, frontera T2), estado `locked` · Remedia: — · Depende de: T13, T6, T12
@@ -906,10 +906,10 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 |---|---|---|
 | 0 — Línea base y evidencia "antes" | T0.1 a T0.5 (5) | 5 (T0.1 a T0.5) |
 | 1 — Contrato ejecutable | T1a, T1 a T3 (4) | 4 (T1a, T1, T2, T3) |
-| 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 16 (T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T14a, T15, T16, T17, T18) |
+| 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 17 (T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T14a, T15, T16, T17, T18, T19) |
 | 3 — Remediación | T23 a T32 (10) | 0 |
 | 4 — Cierre | T33 a T38 (6) | 0 |
-| **Total** | **45** | **25** |
+| **Total** | **45** | **26** |
 
 Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, cookie) y `T14a`
 (enmienda ADR 0005, sin ventana de gracia). Los ids existentes no cambian.
@@ -1124,4 +1124,10 @@ Formato por tarea (3 a 5 líneas):
 - Comandos y resultado observado: RED (Codex): servicio inexistente. GREEN: `go test -race ./internal/api ./internal/auth/admin ./internal/store` y la suite completa `go test -race ./...`, ambos en verde (Claude los repitió con `-count=1` tras su propio cambio, ver más abajo). `make gen` sin deriva de `gen.go`/`schema.d.ts`; `specs/07-traceability.md` pasa RF-010 de "parcial" a "completo". `make lint`: solo los 3 avisos preexistentes de `legacy_auth.go` (línea base, hasta T23). Integración no ejecutada (`TEST_DATABASE_URL` no definido en este entorno).
 - Ajuste de Claude: encontró un bug real de concurrencia que ninguna prueba (unitaria con stub) podía ver: `LockActiveAdminUsers` bloqueaba varias filas con `FOR UPDATE OF u` **sin `ORDER BY`**, lo que en PostgreSQL puede producir deadlocks entre transacciones concurrentes que no adquieren los bloqueos en el mismo orden. Se añadió `ORDER BY u.id` a la consulta (`db/queries/users.sql`), se regeneró con `sqlc generate` y se repitió la suite completa: sigue en verde. Con el orden fijo, cualquier `updateUser` concurrente contiende primero por el mismo conjunto (admins activos, orden por id) antes de tocar su fila objetivo, así que queda serializado sin interbloqueo.
 - Dudas abiertas: ninguna bloqueante. `cmd/api/main.go` sigue sin componer ningún servicio (ni los de T16/T17 tampoco): `SetAdminUserService` existe pero nada lo llama todavía, así que estos endpoints devuelven 503 hasta T21 ("Composición, configuración y humo con el stack") — mismo patrón ya usado para T13 a T17, no es una regresión de T18. Codex no pudo commitear (mismo bloqueo de sandbox); Claude creó el commit tras revisar, verificar y aplicar la corrección de `ORDER BY`.
+
+### T19 · 2026-09-25 · 1ddbdd6
+- Qué cambió: `listAuditLog` compuesto directamente en `*Server` (`backend/internal/api/audit_log.go`, nuevo), reemplazando el `s.notImplemented(w)` que T17 ya envolvía con `RequireAuth(s.tokens)(RequireRole(s.currentUsers, "admin")(...))`. Paquete nuevo `backend/internal/auth/auditlog` (separado de `internal/audit`, el escritor append-only, para evitar un ciclo de imports con `internal/api`): filtros `action`/`actorId`/`since` como parámetros sqlc ligados (`db/queries/audit.sql`, consulta nueva `ListAuditLog`), paginación por cursor con el `id` del evento en orden descendente (coincide con los índices `(created_at DESC)` ya existentes desde 000001). Adaptador `backend/internal/store/audit_log.go` reutiliza los mismos helpers (`optionalUUID`, `optionalText`, `nullableUUID`) que el adaptador de T18.
+- Comandos y resultado observado: RED (Codex): paquete `internal/auth/auditlog` inexistente. GREEN (Codex): pruebas enfocadas y `go test -race ./...` completo. Claude repitió todo con PostgreSQL real: levantó `db` de `deploy/docker-compose.yml` localmente (el volumen ya tenía las migraciones aplicadas de una sesión anterior), corrió `go test -race -tags=integration -count=1 ./...` completo (todos los paquetes en verde, incluida `internal/auth/auditlog`) y `make lint`/`make gen`/`python3 scripts/traceability.py --check` (sin deriva; RF-011 pasa de 3 a 8 pruebas contadas).
+- Ajuste de Claude: (1) faltaba `TestRF011_ElRolDeLaAplicacionNoPuedeModificarLaFila`, uno de los 4 criterios de la tarea — Codex no lo mencionó como omitido en su handoff. Claude lo escribió (mismo enfoque que `TestRF011_IdentityAppNoTieneUpdateNiDeleteSobreAuditLog` de T9: `SET ROLE identity_app`, confirma `permission denied` en `UPDATE`/`DELETE` sobre `audit_log`) y lo verificó contra PostgreSQL real antes de commitear. (2) El hook GGA rechazó el primer intento de commit: `TestAuditLogHandlerPasaFiltrosAlServicio` no seguía el patrón `TestRF011_...` que exige `traceability.py` (no se hubiera contado en la matriz); renombrada a `TestRF011_FiltrosSePasanAlServicio`. (3) Comentario de godoc mal ubicado sobre `optionalAddr` en vez de sobre `ListAuditLog` (señalado por el mismo hook como observación, no bloqueante): reubicado.
+- Dudas abiertas: ninguna bloqueante. Mismo patrón que T18: `cmd/api/main.go` no compone `SetAuditLogService` todavía (T21). Nota de proceso: Codex reportó "`make test-integration` passes" sin aclarar que corrió sin `TEST_DATABASE_URL` (se salta con `t.Skip`, no es lo mismo que "pasó" con datos reales); Claude lo verificó de verdad contra PostgreSQL antes de aceptar el reporte.
 
