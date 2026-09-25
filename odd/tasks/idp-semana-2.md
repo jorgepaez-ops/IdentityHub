@@ -524,7 +524,7 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
 - Commit: `bacd932`
 
 ### T10 — Registro de cuenta (RF-001)
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RF-001, RF-012, AM-004, ADR 0006 · Remedia: — · Depende de: T7, T9
+- [x] Estado · Ejecutor: `Codex` · Cubre: RF-001, RF-012, AM-004, ADR 0006 · Remedia: — · Depende de: T7, T9
 - Operación `register` (`POST /api/v1/auth/register`): valida (contraseña 12-128, correo <= 254,
   `displayName` 1-100; 400 problem+json con `errors[].field` = `password`), cuenta en
   `pending_verification`, hash Argon2id, evento `user.registered` con token de verificación de 32 B
@@ -536,7 +536,7 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
   `TestRF001_FalloDelBrokerRevierteYDevuelve503`; (integración) fila con prefijo `$argon2id$`.
 - Archivos: `backend/internal/auth/**`, `backend/internal/api/register.go` (+ pruebas), `db/queries/*.sql`, `backend/internal/events/**` (solo si falta un método de publicación).
 - Verificación: `make gen && git diff --exit-code`; `make test-go`; `make test-integration`; `make lint`.
-- Commit:
+- Commit: `43d2464`
 
 ### T11 — Verificación de correo (RF-002)
 - [ ] Estado · Ejecutor: `Codex` · Cubre: RF-002, AM-016 · Remedia: — · Depende de: T10
@@ -904,10 +904,10 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 |---|---|---|
 | 0 — Línea base y evidencia "antes" | T0.1 a T0.5 (5) | 5 (T0.1 a T0.5) |
 | 1 — Contrato ejecutable | T1a, T1 a T3 (4) | 4 (T1a, T1, T2, T3) |
-| 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 7 (T4, T5, T6, T7, T8, T9, T14a) |
+| 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 8 (T4, T5, T6, T7, T8, T9, T10, T14a) |
 | 3 — Remediación | T23 a T32 (10) | 0 |
 | 4 — Cierre | T33 a T38 (6) | 0 |
-| **Total** | **45** | **16** |
+| **Total** | **45** | **17** |
 
 Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, cookie) y `T14a`
 (enmienda ADR 0005, sin ventana de gracia). Los ids existentes no cambian.
@@ -917,6 +917,7 @@ Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, coo
 (Codex añade aquí, por tarea, `<comando>: <resultado observado>` cuando cierre cada una;
 las líneas de RED/GREEN van en el handoff.)
 
+- T10 · RED (Codex): faltaban los tipos de servicio/transacción de registro. GREEN (Codex): pruebas RF-001 de API y de servicio en verde; `make gen`: PASS; `make test-go` y `make test-integration`: PASS (revalidados por Claude); `make lint`: solo los 3 hallazgos sembrados de `legacy_auth.go`, sin hallazgos nuevos. `gofmt -l`: limpio. `make gen` repetido por Claude: sin diff adicional (determinista). Integración contra PostgreSQL 14 local (Claude): suite completa PASS, incluida `TestRF001_RegistroPersisteHashArgon2id`. Claude añadió y corrió una prueba manual no commiteada (`zz_manual_dup_check_test.go`, borrada después) para confirmar contra PostgreSQL real que un `UNIQUE` violado en `users.email` se traduce en `ErrEmailExists` a través de `errors.As`/`SQLState()` sobre el error envuelto: PASS. `python3 scripts/traceability.py --check`: matriz al día (RF-001 pasa de 6 a 15 pruebas). El hook GGA marcó como punto a revisar si AM-004 exige código idéntico a 201; se confirmó contra `specs/06-acceptance/registro-y-verificacion.feature:29-35` que el escenario Gherkin concreto exige 409 sin la palabra "existe" y ≤50 ms de diferencia (no un código idéntico), que es lo implementado.
 - T9 · RED (Codex): `undefined: Record`, `Event`, `LoginFailed` (`FAIL .../internal/audit [build failed]`). GREEN unitario (Codex): `ok .../internal/audit 1.622s`. `gofmt -l` marcó `audit.go` y `audit_integration_test.go` (alineación de constantes y línea en blanco final); Claude corrigió con `gofmt -w`, sin cambios de comportamiento. Integración contra PostgreSQL 14 local (Claude, Codex no llega a la BD): primera corrida de `TestRF011_IdentityAppNoTieneUpdateNiDeleteSobreAuditLog` FAIL (el superusuario pasaba sin error porque los triggers seguían deshabilitados hasta el `t.Cleanup` final); Claude reordenó la prueba para reactivarlos antes de la comprobación del superusuario y quedó en verde. `make test-integration` completo: PASS. `down 1` con `migrate/migrate` confirma que `identity_app` desaparece de `pg_roles`; `up` lo reaplica sin diff. `python3 scripts/traceability.py --check`: matriz al día (RF-011 pasa de 1 a 3 pruebas). `make test-go` (`-race -short`): PASS, cobertura total 30.0%. `golangci-lint` sigue sin instalar (solo avisa, como documenta el Makefile).
 - T1a · `python3 -m openapi_spec_validator specs/03-api/openapi.yaml`: OK; `python3 scripts/traceability.py --check`: matriz al día.
 - T0.5 · `ls security/findings/VULN-*.md | wc -l` = 26 (una por id, VULN-001 a VULN-026); AM-NNN citadas comprobadas contra `specs/05-security/threat-model.md`; severidades comprobadas contra `gosec.json` y `trivy-config.json`; sin patrones de secreto; `git diff --stat` vacío para compose, Dockerfiles, `backend/` y `frontend/`.
@@ -1059,4 +1060,10 @@ Formato por tarea (3 a 5 líneas):
 - Comandos y resultado observado: ver la entrada de T9 en "Evidencia de verificación" arriba (RED/GREEN, el bug de orden en la prueba de integración y su corrección, `test-integration`, `down`/`up` y trazabilidad).
 - Ajuste de Claude: reordenó `audit_integration_test.go` para reactivar los triggers `audit_log_no_update`/`audit_log_no_delete` inmediatamente después de la comprobación de permisos de `identity_app`, en vez de dejarlo solo en `t.Cleanup` (que corre al final del test, después de la aserción que necesita el trigger ya activo). Aplicó `gofmt -w` a los dos archivos que Codex dejó sin formatear.
 - Dudas abiertas: ninguna nueva. Codex no pudo commitear (`Unable to create '.git/index.lock': Operation not permitted`, sin proceso git en curso al revisar); Claude verificó el árbol y creó ambos commits, igual que en T0.4, T1, T2 y T4.
+
+### T10 · 2026-09-25 · 43d2464
+- Qué cambió: `backend/internal/auth/registration` (nuevo): `Service.Register` valida entrada, calcula el hash Argon2id **antes** de comprobar existencia del correo (mismo costo en ambas rutas, AM-004), genera un token de verificación de 32 B `crypto/rand` (SHA-256, 24 h), registra auditoría `user_registered` y publica `user.registered` con publisher confirms — todo dentro de una única transacción (`store.WithinRegistrationTransaction`, nuevo en `store.go`) que se revierte si el broker falla (ADR 0006, 503). `POST /api/v1/auth/register` (`backend/internal/api/register.go`) queda cableado: 201/400/409/503. Nueva consulta sqlc `CreateVerificationToken`.
+- Comandos y resultado observado: ver la entrada de T10 en "Evidencia de verificación" arriba.
+- Ajuste de Claude: ninguno al código; se limitó a verificar. Revisó los 8 archivos del diff línea por línea, confirmó que `writer.CreateUser` detecta la violación `UNIQUE` real de Postgres (código 23505) a través de `errors.As` sobre el error envuelto con `%w` — lo probó con una prueba manual temporal (no commiteada) que registró el mismo correo dos veces contra PostgreSQL real — y que el escenario Gherkin de AM-004 (409, sin la palabra "existe", ≤50 ms) es la fuente correcta, no la frase genérica de una sola línea del modelo de amenazas que el hook GGA citó como duda.
+- Dudas abiertas: ninguna. Codex volvió a bloquearse en `.git/index.lock` (mismo runtime de solo lectura que T9); Claude creó ambos commits.
 
