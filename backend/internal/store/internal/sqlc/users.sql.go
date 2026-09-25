@@ -12,6 +12,43 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const consumeEmailVerificationToken = `-- name: ConsumeEmailVerificationToken :one
+WITH consumed AS (
+    UPDATE verification_tokens
+    SET used_at = now()
+    WHERE token_hash = $1
+      AND purpose = 'email_verification'
+      AND used_at IS NULL
+      AND expires_at > now()
+    RETURNING user_id
+)
+UPDATE users
+SET status = 'active', updated_at = now()
+WHERE id = (SELECT user_id FROM consumed)
+  AND status = 'pending_verification'
+RETURNING id, email, password_hash, display_name, status, mfa_enabled, mfa_secret_enc, failed_login_count, locked_until, last_login_at, created_at, updated_at
+`
+
+func (q *Queries) ConsumeEmailVerificationToken(ctx context.Context, tokenHash []byte) (User, error) {
+	row := q.db.QueryRow(ctx, consumeEmailVerificationToken, tokenHash)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.PasswordHash,
+		&i.DisplayName,
+		&i.Status,
+		&i.MfaEnabled,
+		&i.MfaSecretEnc,
+		&i.FailedLoginCount,
+		&i.LockedUntil,
+		&i.LastLoginAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (email, password_hash, display_name)
 VALUES ($1, $2, $3)

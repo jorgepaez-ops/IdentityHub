@@ -17,6 +17,7 @@ import (
 
 	"github.com/jorgepaez/identity-hub/internal/auth/registration"
 	"github.com/jorgepaez/identity-hub/internal/auth/token"
+	"github.com/jorgepaez/identity-hub/internal/auth/verification"
 )
 
 type Server struct {
@@ -25,6 +26,7 @@ type Server struct {
 	deps           map[string]Checker
 	tokens         *token.Service
 	registration   registration.Registrar
+	verification   verification.Verifier
 	trustedProxies []netip.Prefix
 }
 
@@ -36,6 +38,9 @@ func (s *Server) SetTokenService(tokens *token.Service) { s.tokens = tokens }
 
 // SetRegistrationService is used by composition and focused handler tests.
 func (s *Server) SetRegistrationService(service registration.Registrar) { s.registration = service }
+
+// SetEmailVerificationService is used by composition and focused handler tests.
+func (s *Server) SetEmailVerificationService(service verification.Verifier) { s.verification = service }
 
 func (s *Server) SetTrustedProxies(prefixes []netip.Prefix) {
 	s.trustedProxies = append([]netip.Prefix(nil), prefixes...)
@@ -93,7 +98,6 @@ func (s *Server) RefreshSession(w http.ResponseWriter, r *http.Request, params R
 	s.notImplemented(w)
 }
 
-func (s *Server) VerifyEmail(w http.ResponseWriter, r *http.Request)       { s.notImplemented(w) }
 func (s *Server) GetCurrentUser(w http.ResponseWriter, r *http.Request)    { s.notImplemented(w) }
 func (s *Server) UpdateCurrentUser(w http.ResponseWriter, r *http.Request) { s.notImplemented(w) }
 func (s *Server) DisableMfa(w http.ResponseWriter, r *http.Request)        { s.notImplemented(w) }

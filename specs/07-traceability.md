@@ -11,7 +11,7 @@ declaración de buenas intenciones.
 | Requisito | Título | Pri | Operaciones de la API | Escenarios | Pruebas Go | E2E | Estado |
 |---|---|---|---|---|---|---|---|
 | **RF-001** | Registro de cuenta | P0 | `register` | 3 | 15 | — | ✅ completo |
-| **RF-002** | Verificación de correo | P0 | `verifyEmail` | 2 | — | — | 🟡 parcial |
+| **RF-002** | Verificación de correo | P0 | `verifyEmail` | 2 | 9 | — | ✅ completo |
 | **RF-003** | Inicio de sesión | P0 | `login` | 3 | — | — | 🟡 parcial |
 | **RF-004** | Emisión y validación de JWT | P0 | `getJwks` | 2 | 7 | — | ✅ completo |
 | **RF-005** | Renovación de sesión | P0 | `refreshSession` | 1 | — | — | 🟡 parcial |
@@ -40,9 +40,9 @@ declaración de buenas intenciones.
 | **RNF-009** | Cabeceras de seguridad | P0 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-010** | Latencia | P1 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-011** | Los specs son la fuente de verdad | P0 | — | — | 3 | — | 🟡 parcial |
-| **RNF-012** | Logs sin datos sensibles | P0 | — | — | 2 | — | 🟡 parcial |
+| **RNF-012** | Logs sin datos sensibles | P0 | — | — | 3 | — | 🟡 parcial |
 
-**Resumen:** 31 requisitos · 4 completos · 14 parciales · 13 sin cubrir.
+**Resumen:** 31 requisitos · 5 completos · 13 parciales · 13 sin cubrir.
 
 Leyenda de estado: *completo* = verificado por al menos dos de las tres
 columnas de prueba · *parcial* = una sola · *sin cubrir* = ninguna.

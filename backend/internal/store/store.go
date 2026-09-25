@@ -244,6 +244,32 @@ type RegistrationWriter interface {
 	InsertAuditEvent(context.Context, InsertAuditEventParams) (AuditEvent, error)
 }
 
+// EmailVerificationWriter groups the writes that must succeed atomically when
+// a one-time email-verification token is consumed.
+type EmailVerificationWriter interface {
+	ConsumeEmailVerificationToken(context.Context, []byte) (User, error)
+	InsertAuditEvent(context.Context, InsertAuditEventParams) (AuditEvent, error)
+}
+
+// WithinEmailVerificationTransaction consumes a verification token, activates
+// its account, and records the audit event in a single PostgreSQL transaction.
+func (s *Store) WithinEmailVerificationTransaction(ctx context.Context, fn func(EmailVerificationWriter) error) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin email verification transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	writer := &emailVerificationWriter{queries: generated.New(tx)}
+	if err := fn(writer); err != nil {
+		return err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit email verification transaction: %w", err)
+	}
+	return nil
+}
+
 // WithinRegistrationTransaction runs registration writes in one PostgreSQL
 // transaction. A publisher-confirm failure returned by fn rolls it back.
 func (s *Store) WithinRegistrationTransaction(ctx context.Context, fn func(RegistrationWriter) error) error {
@@ -264,6 +290,24 @@ func (s *Store) WithinRegistrationTransaction(ctx context.Context, fn func(Regis
 }
 
 type registrationWriter struct{ queries *generated.Queries }
+
+type emailVerificationWriter struct{ queries *generated.Queries }
+
+func (w *emailVerificationWriter) ConsumeEmailVerificationToken(ctx context.Context, tokenHash []byte) (User, error) {
+	user, err := w.queries.ConsumeEmailVerificationToken(ctx, tokenHash)
+	if err != nil {
+		return User{}, fmt.Errorf("consume email verification token: %w", err)
+	}
+	return userFromGenerated(user), nil
+}
+
+func (w *emailVerificationWriter) InsertAuditEvent(ctx context.Context, params InsertAuditEventParams) (AuditEvent, error) {
+	event, err := w.queries.InsertAuditEvent(ctx, generated.InsertAuditEventParams{ActorUserID: nullableUUID(params.ActorUserID), Action: params.Action, ResourceType: nullableText(params.ResourceType), ResourceID: nullableText(params.ResourceID), Ip: copyAddr(params.IP), UserAgent: nullableText(params.UserAgent), Metadata: params.Metadata})
+	if err != nil {
+		return AuditEvent{}, fmt.Errorf("insert audit event: %w", err)
+	}
+	return auditEventFromGenerated(event), nil
+}
 
 func (w *registrationWriter) CreateUser(ctx context.Context, params CreateUserParams) (User, error) {
 	user, err := w.queries.CreateUser(ctx, generated.CreateUserParams{Email: params.Email, PasswordHash: params.PasswordHash, DisplayName: params.DisplayName})
