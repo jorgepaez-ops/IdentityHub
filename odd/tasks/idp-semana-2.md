@@ -1055,9 +1055,9 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 | 0 — Línea base y evidencia "antes" | T0.1 a T0.5 (5) | 5 (T0.1 a T0.5) |
 | 1 — Contrato ejecutable | T1a, T1 a T3 (4) | 4 (T1a, T1, T2, T3) |
 | 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 20 (T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T14a, T15, T16, T17, T18, T19, T20, T21, T22) |
-| 3 — Remediación | T23 a T32 (10) | 1 (T23) |
+| 3 — Remediación | T23 a T32 (10) | 9 (T23 a T31) |
 | 4 — Cierre | T33 a T38 (6) | 0 |
-| **Total** | **45** | **30** |
+| **Total** | **45** | **38** |
 
 Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, cookie) y `T14a`
 (enmienda ADR 0005, sin ventana de gracia). Los ids existentes no cambian.
