@@ -122,7 +122,7 @@ func TestRNF005_ChannelDevuelveNilSinCanalAsignado(t *testing.T) {
 // Connect debe envolver el error de conexión, no perderlo ni entrar en pánico,
 // cuando el broker es inalcanzable.
 func TestRNF005_ConnectEnvuelveElErrorDeConexion(t *testing.T) {
-	_, err := Connect("amqp://guest:guest@127.0.0.1:1/")
+	_, err := Connect("amqp://127.0.0.1:1/")
 	if err == nil {
 		t.Fatal("Connect() = nil error; se esperaba un fallo de conexión contra un puerto inalcanzable")
 	}
