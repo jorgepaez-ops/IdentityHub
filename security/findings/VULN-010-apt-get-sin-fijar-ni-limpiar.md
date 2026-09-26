@@ -10,8 +10,8 @@
 | **Sembrada** | sí |
 | **Evidencia antes** | `docs/evidencia/VULN-010/evidencia.json` |
 | **Commit de remediación** | `a0c64d6` (T27) |
-| **Evidencia después** | |
-| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / — |
+| **Evidencia después** | `docs/evidencia/VULN-010/evidencia.json` (hadolint local, T27: limpio; `ci.yml` no corre Hadolint, confirmado por Desktop) |
+| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / — (sin gate de Hadolint en `ci.yml`; espera a `baseline-scan.yml` en T38) |
 
 ## Evidencia
 

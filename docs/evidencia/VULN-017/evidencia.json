@@ -17,14 +17,18 @@
   },
   "remediacion": {
     "tarea": "T28",
-    "commit": null,
-    "ficha": null
+    "commit": "8f3d461",
+    "ficha": "security/findings/VULN-017-nginx-latest.md"
   },
   "despues": {
-    "commit": null,
+    "commit": "a2b57e2",
     "workflow": null,
     "run_id": null,
     "run_url": null,
-    "captura": null
+    "captura": null,
+    "hallazgos": [
+      "hadolint sobre frontend/Dockerfile (local, T28, vía make scan-config): sin salida (limpio); nginx:latest ya no está, imagen fijada por digest real (nginxinc/nginx-unprivileged@sha256:...)"
+    ],
+    "observacion": "Mismo caso que VULN-010: el \"antes\" venía de baseline-scan.yml; ci.yml no tiene ningún step de Hadolint (confirmado por Desktop, job 108452162149). Evidencia local ya verificada en T28 hasta que corra baseline-scan.yml sobre un tag nuevo."
   }
 }

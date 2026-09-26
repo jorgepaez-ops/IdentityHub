@@ -10,8 +10,8 @@
 | **Sembrada** | sí |
 | **Evidencia antes** | `docs/evidencia/VULN-009/evidencia.json` |
 | **Commit de remediación** | `a0c64d6` (T27) |
-| **Evidencia después** | |
-| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / — |
+| **Evidencia después** | `docs/evidencia/VULN-009/evidencia.json` (job "8", Trivy config: 0 misconfiguraciones) |
+| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36259385478 |
 
 ## Evidencia
 

@@ -10,8 +10,8 @@
 | **Sembrada** | sí |
 | **Evidencia antes** | `docs/evidencia/VULN-026/evidencia.json` |
 | **Commit de remediación** | `001a489` (T24) |
-| **Evidencia después** | |
-| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / — |
+| **Evidencia después** | `docs/evidencia/VULN-026/evidencia.json` (job "5", govulncheck: "No vulnerabilities found") |
+| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36259385478 |
 
 ## Evidencia
 

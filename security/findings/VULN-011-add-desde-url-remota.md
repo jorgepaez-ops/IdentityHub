@@ -10,8 +10,8 @@
 | **Sembrada** | sí |
 | **Evidencia antes** | `docs/evidencia/VULN-011/evidencia.json` |
 | **Commit de remediación** | `a0c64d6` (T27) |
-| **Evidencia después** | |
-| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / — |
+| **Evidencia después** | `docs/evidencia/VULN-011/evidencia.json` (diff del commit: `ADD` eliminado por completo) |
+| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / — (sin gate ni antes ni después) |
 
 ## Evidencia
 

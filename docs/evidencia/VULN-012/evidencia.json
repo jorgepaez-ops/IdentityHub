@@ -20,14 +20,19 @@
   },
   "remediacion": {
     "tarea": "T26",
-    "commit": null,
-    "ficha": null
+    "commit": "afab4e9",
+    "ficha": "security/findings/VULN-012-secreto-en-env.md"
   },
   "despues": {
-    "commit": null,
-    "workflow": null,
-    "run_id": null,
-    "run_url": null,
-    "captura": null
+    "commit": "a2b57e2",
+    "workflow": "CI",
+    "run_id": "36259385478",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36259385478",
+    "captura": null,
+    "hallazgos": [
+      "Job \"3 · Secretos en el historial\": \"no leaks found\"",
+      "Job \"8 · Configuración de contenedores\": Trivy config, backend/Dockerfile con 0 misconfiguraciones (cubre DS031)"
+    ],
+    "observacion": "Los ENV con secretos se eliminaron por completo del Dockerfile en T27; ya no hay nada que Gitleaks ni Trivy config puedan marcar ahí."
   }
 }

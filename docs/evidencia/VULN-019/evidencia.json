@@ -18,14 +18,20 @@
   },
   "remediacion": {
     "tarea": "T30",
-    "commit": null,
-    "ficha": null
+    "commit": "824be7d (parcial: solo postgres/rabbitmq)",
+    "ficha": "security/findings/VULN-019-imagenes-base-antiguas-compose.md"
   },
   "despues": {
-    "commit": null,
+    "commit": "a2b57e2",
     "workflow": null,
     "run_id": null,
     "run_url": null,
-    "captura": null
+    "captura": null,
+    "hallazgos": [
+      "Trivy image (local, T30) sobre rabbitmq:4-management: Total 0 (HIGH: 0, CRITICAL: 0)",
+      "Trivy image (local, T30) sobre postgres:16-bookworm: 0 en el sistema operativo; 1 HIGH en gosu (binario empaquetado por la imagen oficial, fuera de nuestro control) y 1 en un certificado de relleno de Debian",
+      "axllent/mailpit, migrate/migrate y las 4 imágenes de observabilidad siguen sin actualizar, fuera de alcance de T30"
+    ],
+    "observacion": "baseline-scan.yml (el workflow que escanea estas imágenes por nombre) solo corre sobre el tag v0.0.0-vuln-baseline, no sobre ramas ni PRs — no hay \"después\" de CI posible hasta que T38 cree el tag endurecido. Evidencia local ya verificada en T30."
   }
 }

@@ -13,14 +13,18 @@
   },
   "remediacion": {
     "tarea": "T30",
-    "commit": null,
-    "ficha": null
+    "commit": "824be7d",
+    "ficha": "security/findings/VULN-024-sin-endurecimiento-contenedores-compose.md"
   },
   "despues": {
-    "commit": null,
+    "commit": "a2b57e2",
     "workflow": null,
     "run_id": null,
     "run_url": null,
-    "captura": null
+    "captura": null,
+    "hallazgos": [
+      "docker inspect (local, T30) en identity-hub-api-1, identity-hub-worker-1 e identity-hub-web-1: ReadonlyRootfs=true CapDrop=[ALL] SecurityOpt=[no-new-privileges:true] en los tres"
+    ],
+    "observacion": "Sigue sin gate que lo detecte (Trivy config no cubre docker-compose.yml). Verificado además con un ciclo real registro → verificación → login → worker → Mailpit funcionando bajo esa configuración endurecida."
   }
 }

@@ -10,8 +10,8 @@
 | **Sembrada** | sí |
 | **Evidencia antes** | `docs/evidencia/VULN-016/evidencia.json` |
 | **Commit de remediación** | `8f3d461` (T28) |
-| **Evidencia después** | |
-| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35534898422 / — |
+| **Evidencia después** | `docs/evidencia/VULN-016/evidencia.json` (job "9-10" web, Trivy image: 0 vulnerabilidades) |
+| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35534898422 / https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36259385478 |
 
 ## Evidencia
 

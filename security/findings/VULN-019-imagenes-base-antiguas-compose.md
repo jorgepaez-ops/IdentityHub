@@ -10,8 +10,8 @@
 | **Sembrada** | sí |
 | **Evidencia antes** | `docs/evidencia/VULN-019/evidencia.json` |
 | **Commit de remediación** | `824be7d` (T30, solo `postgres` y `rabbitmq`; el resto sigue abierto) |
-| **Evidencia después** | |
-| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35534898422 / — |
+| **Evidencia después** | `docs/evidencia/VULN-019/evidencia.json` (Trivy image local: `rabbitmq:4-management` 0; `postgres:16-bookworm` 0 en SO, parcial) |
+| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35534898422 / — (`baseline-scan.yml` solo corre sobre el tag; espera a T38) |
 
 ## Evidencia
 

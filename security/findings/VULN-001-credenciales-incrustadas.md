@@ -10,8 +10,8 @@
 | **Sembrada** | sí |
 | **Evidencia antes** | |
 | **Commit de remediación** | `51a7a4f` (T23, `legacy_auth.go`); `afab4e9` (T26, `docker-compose.yml` y `Dockerfile`) — los tres componentes cierran |
-| **Evidencia después** | |
-| **Run de Actions (antes/después)** | |
+| **Evidencia después** | `docs/evidencia/VULN-001/evidencia.json` (job "3 · Secretos en el historial": "no leaks found") |
+| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36259385478 |
 
 ## Evidencia
 

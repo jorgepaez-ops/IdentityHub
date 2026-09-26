@@ -10,8 +10,8 @@
 | **Sembrada** | sí |
 | **Evidencia antes** | `docs/evidencia/VULN-024/evidencia.json` |
 | **Commit de remediación** | `824be7d` (T30) |
-| **Evidencia después** | |
-| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / — |
+| **Evidencia después** | `docs/evidencia/VULN-024/evidencia.json` (`docker inspect` local: `ReadonlyRootfs=true CapDrop=[ALL] SecurityOpt=[no-new-privileges:true]`) |
+| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / — (sin gate ni antes ni después) |
 
 ## Evidencia
 
