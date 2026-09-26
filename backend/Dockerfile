@@ -7,7 +7,6 @@
 # ║    VULN-009  USER root en la imagen final         → Hadolint DL3002, Trivy║
 # ║    VULN-010  apt-get sin fijar versión ni limpiar → Hadolint DL3008/DL3009║
 # ║    VULN-011  ADD desde una URL remota             → Hadolint DL3020       ║
-# ║    VULN-012  secreto en una instrucción ENV       → Trivy secret, Gitleaks║
 # ║                                                                          ║
 # ║  La versión remediada (semana 3) usa distroless, usuario no-root, imagen  ║
 # ║  base fijada por digest y ningún secreto en tiempo de construcción.       ║
@@ -43,11 +42,6 @@ FROM debian:11-slim AS api
 # el contenido puede cambiar entre construcciones.
 ADD https://raw.githubusercontent.com/golang/go/master/LICENSE /licenses/go-LICENSE
 
-# VULN-012 — Secreto incrustado en la imagen. ENV persiste en el manifiesto:
-# cualquiera con acceso a la imagen lo lee con `docker history`.
-ENV DB_PASSWORD=postgres_admin_2024
-ENV API_SIGNING_KEY=clave-de-firma-super-secreta-2024
-
 RUN apt-get update && apt-get install -y ca-certificates curl
 
 COPY --from=builder /out/api /usr/local/bin/api
@@ -60,8 +54,6 @@ ENTRYPOINT ["/usr/local/bin/api"]
 
 # ── Imagen final del worker ───────────────────────────────────────────────
 FROM debian:11-slim AS worker
-
-ENV DB_PASSWORD=postgres_admin_2024
 
 RUN apt-get update && apt-get install -y ca-certificates
 

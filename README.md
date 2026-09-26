@@ -75,17 +75,23 @@ Requisitos: solo Docker.
 ```bash
 git clone <repo> && cd ProyectoFinalMateria
 cp .env.example .env
-# Rellena los secretos de .env; genera JWT_SIGNING_KEY con: openssl rand -base64 32
+# Rellena todas las variables requeridas de .env; genera JWT_SIGNING_KEY e
+# IDENTITY_APP_PASSWORD con: openssl rand -base64 32
 make up
 ```
+
+`IDENTITY_APP_PASSWORD` se asigna al rol `identity_app` (mínimo privilegio, creado en T9) por un
+script en `deploy/postgres-init/` que Postgres corre solo la primera vez, con el volumen vacío. Si
+ya tenías un volumen de `db` de antes de esta variable, hace falta recrearlo una vez:
+`docker compose -f deploy/docker-compose.yml down -v && make up`.
 
 | Servicio | URL | Credenciales |
 |---|---|---|
 | Aplicación | http://localhost:8080 | — |
 | API | http://localhost:8081/healthz | — |
-| RabbitMQ | http://localhost:15672 | `identity` / `rabbit_admin_2024` |
+| RabbitMQ | http://localhost:15672 | Configured through `.env` |
 | Mailpit | http://localhost:8025 | — |
-| Grafana | http://localhost:3000 (con `make up-obs`) | `admin` / `admin` |
+| Grafana | http://localhost:3000 (con `make up-obs`) | Configured through `.env` |
 
 `make help` lista todo lo disponible.
 
