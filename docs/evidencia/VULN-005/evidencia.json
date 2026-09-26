@@ -13,7 +13,7 @@
   },
   "remediacion": {
     "tarea": "T23",
-    "commit": null,
+    "commit": "51a7a4f",
     "ficha": "security/findings/VULN-005-sql-por-concatenacion.md"
   },
   "despues": {

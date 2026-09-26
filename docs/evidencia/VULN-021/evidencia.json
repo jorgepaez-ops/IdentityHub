@@ -18,7 +18,7 @@
   },
   "remediacion": {
     "tarea": "T23",
-    "commit": null,
+    "commit": "51a7a4f",
     "ficha": "security/findings/VULN-021-golang-jwt-v4.md"
   },
   "despues": {

@@ -19,8 +19,8 @@
   },
   "remediacion": {
     "tarea": "T23",
-    "commit": null,
-    "ficha": null
+    "commit": "51a7a4f",
+    "ficha": "security/findings/VULN-004-math-rand-para-tokens.md"
   },
   "despues": {
     "commit": null,

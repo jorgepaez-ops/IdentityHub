@@ -24,7 +24,7 @@
   },
   "remediacion": {
     "tarea": "T23",
-    "commit": null,
+    "commit": "51a7a4f",
     "ficha": "security/findings/VULN-002-md5-para-contrasenas.md"
   },
   "despues": {
