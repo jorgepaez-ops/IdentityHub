@@ -3,6 +3,7 @@ package events
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 )
@@ -110,7 +111,7 @@ func TestRNF005_CloseNoEntraEnPanicoConBrokerVacio(t *testing.T) {
 
 // Channel expone el canal AMQP subyacente tal cual, sin envolverlo: lo usa
 // cmd/worker para registrar el consumidor.
-func TestRNF005_ChannelDevuelveElCanalAsignado(t *testing.T) {
+func TestRNF005_ChannelDevuelveNilSinCanalAsignado(t *testing.T) {
 	b := &Broker{}
 
 	if got := b.Channel(); got != nil {
@@ -124,6 +125,10 @@ func TestRNF005_ConnectEnvuelveElErrorDeConexion(t *testing.T) {
 	_, err := Connect("amqp://guest:guest@127.0.0.1:1/")
 	if err == nil {
 		t.Fatal("Connect() = nil error; se esperaba un fallo de conexión contra un puerto inalcanzable")
+	}
+	const prefijo = "no se pudo conectar al broker: "
+	if !strings.HasPrefix(err.Error(), prefijo) {
+		t.Errorf("error = %q; se esperaba que empezara con %q (Connect debe envolver el error, no perderlo)", err.Error(), prefijo)
 	}
 }
 
