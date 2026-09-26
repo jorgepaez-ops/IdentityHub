@@ -1039,7 +1039,7 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
   concurrente entre paquetes en `testdb.New`).
 
 ### T34 — Regenerar la matriz de trazabilidad
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RNF-011, todos los RF · Remedia: — · Depende de: T33
+- [x] Estado · Ejecutor: `Codex` · Cubre: RNF-011, todos los RF · Remedia: — · Depende de: T33
 - **Diferidos (Q14):** RF-013, RF-014, RF-015, RF-016, RF-018 y RF-019 van al backlog de semana 3: deben
   aparecer como **diferido** (no olvidados) en la matriz. Como `scripts/traceability.py` hoy solo conoce
   completo/parcial/sin cubrir, esta tarea lo extiende de forma mínima (excepción autorizada en "Alcance autorizado"):
@@ -1051,7 +1051,9 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 - Criterios: objetivo mínimo del criterio 3 de la feature; el resumen deja de decir "0 completos"; los seis
   requisitos aparecen como "diferido" y el resumen los cuenta aparte; el resto no cambia de estado por esta tarea.
 - Verificación: `python3 scripts/traceability.py --check`; `grep -c 'diferido' specs/07-traceability.md`; `make test-go`.
-- Commit:
+- Commit: `45c0dc4`. Resumen: 31 requisitos · 11 completos · 7 parciales · 7 sin cubrir · 6 diferidos
+  (antes: 11 · 9 · 11 · 0). Los 11 RF del criterio 3 en "completo"; sin regresiones. `--check` en verde,
+  `grep -c diferido` = 8 (6 filas + resumen + leyenda). No hicieron falta pruebas Go nuevas.
 
 ### T34a — Dependencias de build/frontend desactualizadas (VULN-027)
 - [x] Estado · Ejecutor: `Claude` (`npm install` necesita red, ver regla en `CLAUDE.md`) · Cubre: AM-009 · Remedia: VULN-027 (vite/esbuild, minimatch/@typescript-eslint, react-router-dom, openapi-typescript/undici) · Bloquea a: T35
@@ -1122,7 +1124,7 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 | 1 — Contrato ejecutable | T1a, T1 a T3 (4) | 4 (T1a, T1, T2, T3) |
 | 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 20 (T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T14a, T15, T16, T17, T18, T19, T20, T21, T22) |
 | 3 — Remediación | T23 a T32 (10) | 10 (T23 a T32) |
-| 4 — Cierre | T33 a T38 y T34a (7) | 2 (T33, T34a) |
+| 4 — Cierre | T33 a T38 y T34a (7) | 3 (T33, T34, T34a) |
 | **Total** | **46** | **40** |
 
 Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, cookie) y `T14a`

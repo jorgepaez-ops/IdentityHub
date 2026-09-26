@@ -45,6 +45,25 @@ volver a acordarse.
   mano y el job `secrets` de CI (que sí corre en cada push/PR). No asumir que el pre-commit de
   gitleaks protege nada hasta que alguien corra `pre-commit install` y se verifique.
 
+## Engram: sesiones colgadas
+
+- **Causa principal: cada tarea delegada a Codex abre su propia sesión en Engram** (el ID es el
+  `threadId` del job, formato `01a0…`) y no la cierra al terminar. Verificado en T34. Además, cada
+  consola que se cierra sin `mem_session_end` (límite de uso, terminal cerrada, `/clear`) deja también
+  su sesión "activa". Con varias activas, todo `mem_save` sin `session_id` falla con
+  "multiple active runtime sessions" (fail-closed a propósito). El 2026-09-26 había 12 y hubo que
+  cerrar 11 a mano.
+- **Al terminar cada job de Codex** (éxito o bloqueo): leer su `threadId` en
+  `codex-companion.mjs status <job> --json` y cerrarlo con `mem_session_end`. Nunca antes de que el job
+  termine.
+- **Al cerrar cada sesión de trabajo** (o al ver que se acerca el límite de uso): `mem_session_summary`
+  y luego `mem_session_end` con el ID de la sesión actual.
+- **Al arrancar una sesión:** correr `mem_doctor`. Si reporta `ambiguous_active_runtime_sessions`,
+  confirmar con el usuario que solo hay una consola abierta y cerrar con `mem_session_end` todos los
+  IDs listados menos el de la sesión actual.
+- Si un guardado falla por esto a mitad de sesión, reintentar pasando `session_id` explícito (el de la
+  sesión actual); nunca dejar de guardar ni adivinar otra sesión.
+
 ## Reparto de modelos (decisión del usuario, 2026-09-26)
 
 - **Opus 5.5 (sesión principal): auditar, orquestar y revisar.** No implementa tareas que un agente
