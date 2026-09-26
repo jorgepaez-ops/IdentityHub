@@ -112,7 +112,9 @@ services:
     ports:
       - "8081:8081"
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8081/healthz"]
+      # La imagen distroless (T27) no tiene shell ni curl: el binario se
+      # autosondea con su propio subcomando "healthcheck".
+      test: ["CMD", "/usr/local/bin/api", "healthcheck"]
       interval: 10s
       timeout: 3s
       retries: 5
