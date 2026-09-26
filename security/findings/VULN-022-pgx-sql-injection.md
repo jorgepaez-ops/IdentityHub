@@ -3,14 +3,14 @@
 | | |
 |---|---|
 | **Severidad** | HIGH |
-| **Estado** | abierto |
+| **Estado** | remediado |
 | **Detectado por** | govulncheck · job `sca` |
 | **Componente** | `github.com/jackc/pgx/v5@v5.5.1` → corregido en `v5.5.4` |
 | **Aviso** | GO-2024-2606 |
 | **Amenaza** | AM-006 (manipulación) |
 | **Sembrada** | parcialmente — la versión antigua sí; este aviso concreto, no |
-| **Evidencia antes** | |
-| **Commit de remediación** | |
+| **Evidencia antes** | `docs/evidencia/VULN-022/evidencia.json` |
+| **Commit de remediación** | `001a489` (T24) |
 | **Evidencia después** | |
 | **Run de Actions (antes/después)** | |
 

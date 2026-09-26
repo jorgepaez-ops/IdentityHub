@@ -750,14 +750,24 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
   - [ ] VULN-001 (parcial, falta `docker-compose.yml`/`Dockerfile`)  - [x] VULN-002  - [x] VULN-004  - [x] VULN-005  - [x] VULN-006  - [x] VULN-007  - [x] VULN-021
 
 ### T24 — Dependencias Go: pgx y `golang.org/x/text`
-- [ ] Estado · Ejecutor: `Codex` · Cubre: AM-006, AM-009, RNF-004 · Remedia: VULN-022 (pgx >= 5.5.4, mejor la última estable), VULN-026 (x/text GO-2026-5970 -> v0.39.0 o superior) · Bloqueada por: T0.3
+- [x] Estado · Ejecutor: `Claude` (Codex quedó bloqueado por DNS del sandbox: no resolvía `proxy.golang.org`, sin tocar ningún archivo) · Cubre: AM-006, AM-009, RNF-004 · Remedia: VULN-022 (pgx >= 5.5.4, mejor la última estable), VULN-026 (x/text GO-2026-5970 -> v0.39.0 o superior) · Bloqueada por: T0.3
 - Subir pgx y x/text, `go mod tidy`; revisar el resto de avisos de `govulncheck`. Si esto obliga a subir la
   directiva `go` o `GO_VERSION` (ci.yml, baseline-scan.yml, scheduled-scan.yml usan 1.22), detenerse y
   preguntar (decisión Q11: anotarlo en "Preguntas nuevas"); no subirla sin aprobación. Retirar el comentario de línea base de `go.mod` solo al cerrar sus VULN.
 - Archivos: `backend/go.mod`, `backend/go.sum`.
 - Criterios: `govulncheck ./...` sin avisos alcanzables; `TestRF012_*` y el resto siguen verdes.
 - Verificación: `make test-go`; `make test-integration`; `cd backend && go run golang.org/x/vuln/cmd/govulncheck@latest ./...`.
-- Commit:
+- **Hecho 2026-09-26.** `pgx` v5.5.1 -> v5.11.0; `golang.org/x/text` v0.14.0 -> v0.41.0 (no v0.42.0:
+  esa versión sube la directiva `go` a 1.26.0, fuera de alcance de esta tarea — Q11 **no se activó**
+  porque `go.mod` ya declaraba `go 1.25` desde T6, y v0.41.0 sigue siendo compatible con 1.25.0).
+  `go mod tidy` sin cambios adicionales; comentario de línea base de `go.mod` actualizado para reflejar
+  el cierre de VULN-022 y VULN-026 (VULN-021 ya estaba anotado desde T23).
+  `make test-go`, `make test-integration`, `make lint` y `python3 scripts/traceability.py --check`
+  en verde. `govulncheck ./...` ya no reporta GO-2024-2606 ni GO-2026-5970 como alcanzables; sigue
+  reportando GO-2026-6372 (`github.com/rabbitmq/amqp091-go` v1.9.0, corregido en v1.13.0) como
+  alcanzable — **fuera de alcance de T24**, sin VULN asignado todavía; anotado aquí para que se le
+  asigne ficha en una tarea futura.
+- Commit: 001a489
 - Evidencia (`Usuario`):  - [ ] VULN-022  - [ ] VULN-026 (x/text)
 
 ### T25 — Dependencias del frontend
@@ -1164,4 +1174,10 @@ Formato por tarea (3 a 5 líneas):
 - Desktop capturó el "después" contra ese run y lo volcó a `docs/evidencia/VULN-{002,004,005,006,007,021}/evidencia.json` (campo `despues`) y a las fichas correspondientes: VULN-002/004 por el paso `golangci-lint` ("0 issues."); VULN-021 por el paso de `govulncheck` (GO-2025-3553/GO-2024-3250 ausentes); VULN-005/006/007 (sin gate propio) por el diff del commit `51a7a4f` (`legacy_auth.go` borrado entero, "-131,+0").
 - **Discrepancia #6 (Desktop, informe externo)**: las alertas de Security > Code scanning #42, #43 y #81 (Semgrep math-random-used, Semgrep use-of-md5, CodeQL go/log-injection) siguen "Open · On branch main" pese a que el código que las causa ya no existe en `feat/idp-semana-2`. Causa confirmada por Desktop: GitHub referencia el estado de una alerta contra `main` (rama por defecto), no contra la rama donde se hizo el commit, y esta rama todavía no está mergeada — no es un fallo del cierre (Desktop verificó que la alerta #4 sí aparece "closed as fixed" cuando su fix llegó a `main`). Se cerrarán solas en el próximo corte de fase que mergee `feat/idp-semana-2`.
 - Dudas abiertas: ninguna. Falta decidir cuándo hacer el próximo corte de fase/PR de la Fase 3 (para que las 3 alertas de Code scanning se cierren solas al llegar a `main`); no es urgente, T23 ya quedó cerrada con su evidencia completa salvo VULN-001 (parcial, a propósito).
+
+### T24 · 2026-09-26 · 001a489
+- Qué cambió: Codex intentó primero (bloqueado por DNS del sandbox: `lookup proxy.golang.org: no such host`, sin tocar ningún archivo). Claude lo tomó directo: `github.com/jackc/pgx/v5` v5.5.1 -> v5.11.0 y `golang.org/x/text` v0.14.0 -> v0.41.0 en `backend/go.mod`/`go.sum` (`go get` + `go mod tidy`). Se evitó a propósito `x/text` v0.42.0 (la última): exige `go 1.26.0`, que `go get` intentó subir automáticamente en un primer intento — se revirtió con `git checkout` y se repitió el `go get` fijando v0.41.0, que sigue satisfaciendo el mínimo del hallazgo (>= v0.39.0) sin tocar la directiva `go` (Q11 nunca llegó a activarse: `go.mod` ya declaraba `go 1.25` desde T6). Comentario de cabecera de `go.mod` reescrito para reflejar que VULN-022 y VULN-026 ya no están fijados a propósito.
+- Comandos y resultado observado: baseline `go test -race ./...` en verde antes de tocar nada. Tras el upgrade: `go build ./...` limpio; `make test-go` y `make test-integration` (contra PostgreSQL/RabbitMQ reales) en verde; `make lint` (`go vet` + `golangci-lint` v2.13.2 + `eslint`) sin hallazgos; `python3 scripts/traceability.py --check`: matriz al día. `govulncheck ./...`: ya no reporta `GO-2024-2606` (pgx) ni `GO-2026-5970` (x/text) como alcanzables.
+- Hallazgo nuevo, fuera de alcance de T24: `govulncheck` reporta `GO-2026-6372` (`github.com/rabbitmq/amqp091-go` v1.9.0, corregido en v1.13.0) como alcanzable — no tiene VULN-NNN asignado todavía (no se inventa aquí, ver "Regla de ids"); queda para que el usuario decida en qué tarea se le crea ficha.
+- Dudas abiertas: ninguna bloqueante. Fichas `security/findings/VULN-022-*.md` y `VULN-026-*.md` actualizadas a `remediado` con el commit `001a489`; las casillas de "Evidencia (Usuario)" siguen sin marcar hasta que el usuario confirme la captura "después" contra un run verde de CI (mismo protocolo de T23).
 
