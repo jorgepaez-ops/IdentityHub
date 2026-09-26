@@ -13,7 +13,7 @@ declaración de buenas intenciones.
 | **RF-001** | Registro de cuenta | P0 | `register` | 3 | 15 | — | ✅ completo |
 | **RF-002** | Verificación de correo | P0 | `verifyEmail` | 2 | 9 | — | ✅ completo |
 | **RF-003** | Inicio de sesión | P0 | `login` | 3 | 10 | — | ✅ completo |
-| **RF-004** | Emisión y validación de JWT | P0 | `getJwks` | 2 | 7 | — | ✅ completo |
+| **RF-004** | Emisión y validación de JWT | P0 | `getJwks` | 2 | 8 | — | ✅ completo |
 | **RF-005** | Renovación de sesión | P0 | `refreshSession` | 1 | 7 | — | ✅ completo |
 | **RF-006** | Detección de reuso de refresh token | P0 | — | 1 | 5 | — | ✅ completo |
 | **RF-007** | Cierre de sesión | P0 | `logout` | 1 | 8 | — | ✅ completo |
