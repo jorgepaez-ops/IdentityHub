@@ -771,12 +771,28 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 - Evidencia (`Usuario`):  - [ ] VULN-022  - [ ] VULN-026 (x/text)
 
 ### T25 — Dependencias del frontend
-- [ ] Estado · Ejecutor: `Codex` · Cubre: AM-009, RNF-004 · Remedia: VULN-025 (axios 0.21.1, lodash 4.17.15) · Bloqueada por: T0.3
+- [x] Estado · Ejecutor: `Claude` (red saliente necesaria para `npm install`; por la regla nueva de esta feature, no se delegó a Codex — ver CLAUDE.md) · Cubre: AM-009, RNF-004 · Remedia: VULN-025 (axios 0.21.1, lodash 4.17.15) · Bloqueada por: T0.3
 - Actualizar o retirar axios y lodash (verificar si `src/` los usa: `client.ts` usa `fetch`); versionar
   `frontend/package-lock.json` (hoy no está commiteado); retirar el aviso de línea base del `package.json` al cerrar.
 - Criterios: `npm audit --audit-level=high` sin hallazgos; lint, tipos y tests verdes.
 - Verificación: `cd frontend && npm install && npm audit --audit-level=high && npm run lint && npm run typecheck && npm run test && npm run build`.
-- Commit:
+- **Hecho 2026-09-26.** `grep -rln "axios|lodash" frontend/src` no devolvió nada (`client.ts` ya usa
+  `fetch`): se **retiraron por completo** `axios`, `lodash` y `@types/lodash` de `package.json` en vez
+  de actualizarlos, y se regeneró `package-lock.json` con `npm install` (ya estaba versionado desde el
+  ajuste de T23). Comentario de línea base del `package.json` retirado.
+  `npm run lint`, `npm run typecheck`, `npm run test` y `npm run build` en verde.
+  **Criterio de aceptación no cumplido tal como está escrito:** `npm audit --audit-level=high` sigue
+  saliendo en rojo (exit 1) — pero ya no por axios/lodash (confirmado: `git diff` del lockfile solo
+  muestra las 37 líneas de baja de esos tres paquetes, ninguna versión de otro paquete cambió). Los 15
+  hallazgos que quedan (5 moderate, 8 high, 2 critical) ya estaban en el lockfile commiteado en T23
+  (`55404f3`), sin relación con VULN-025: `esbuild`/`vite`/`vitest`/`@vitest/coverage-v8` (GHSA-67mh-4wv8-2f99,
+  vía `vite <=6.4.2`), `minimatch` (3 ReDoS, vía `@typescript-eslint/parser` 6.16.0-7.5.0), `react-router`/
+  `react-router-dom` (open redirect + deserialización, 6.0.0-7.17.0) y `undici` (12 avisos, vía
+  `openapi-typescript` 5.1.1-6.7.6). Ninguno tiene ficha ni VULN-NNN asignado todavía (no se inventa
+  aquí); las tres primeras familias exigen subir mayor de versión con cambios incompatibles
+  (`vite@8`, `@typescript-eslint/parser@8.70.1`, `react-router-dom@7.18.4`), fuera de alcance de T25.
+  Queda para que el usuario decida en qué tarea futura se documentan y remedian.
+- Commit: 534f13e
 - Evidencia (`Usuario`):  - [ ] VULN-025 (axios/lodash)
 
 ### T26 — Secretos fuera del compose y de los `ENV`
@@ -1180,4 +1196,9 @@ Formato por tarea (3 a 5 líneas):
 - Comandos y resultado observado: baseline `go test -race ./...` en verde antes de tocar nada. Tras el upgrade: `go build ./...` limpio; `make test-go` y `make test-integration` (contra PostgreSQL/RabbitMQ reales) en verde; `make lint` (`go vet` + `golangci-lint` v2.13.2 + `eslint`) sin hallazgos; `python3 scripts/traceability.py --check`: matriz al día. `govulncheck ./...`: ya no reporta `GO-2024-2606` (pgx) ni `GO-2026-5970` (x/text) como alcanzables.
 - Hallazgo nuevo, fuera de alcance de T24: `govulncheck` reporta `GO-2026-6372` (`github.com/rabbitmq/amqp091-go` v1.9.0, corregido en v1.13.0) como alcanzable — no tiene VULN-NNN asignado todavía (no se inventa aquí, ver "Regla de ids"); queda para que el usuario decida en qué tarea se le crea ficha.
 - Dudas abiertas: ninguna bloqueante. Fichas `security/findings/VULN-022-*.md` y `VULN-026-*.md` actualizadas a `remediado` con el commit `001a489`; las casillas de "Evidencia (Usuario)" siguen sin marcar hasta que el usuario confirme la captura "después" contra un run verde de CI (mismo protocolo de T23).
+
+### T25 · 2026-09-26 · 534f13e
+- Qué cambió: tomada directo por Claude (necesita `npm install` con red saliente, que Codex no tiene — ver regla nueva en `CLAUDE.md`). `axios` y `lodash` (y `@types/lodash`) retirados de `frontend/package.json` en vez de actualizados: ninguno se importa en `frontend/src` (`client.ts` ya usa `fetch`). `package-lock.json` regenerado con `npm install`; comentario de línea base retirado de `package.json`.
+- Comandos y resultado observado: `npm run lint`, `npm run typecheck`, `npm run test` y `npm run build` en verde. `npm audit --audit-level=high` sigue en rojo (exit 1) pero ya no por axios/lodash — `git diff` del lockfile confirma que ninguna otra versión cambió (solo 37 líneas de baja de los tres paquetes retirados).
+- Dudas abiertas: el criterio de aceptación literal de T25 ("`npm audit --audit-level=high` sin hallazgos") no se cumple: quedan 15 hallazgos preexistentes desde T23 (`55404f3`), ajenos a VULN-025 — `esbuild`/`vite`/`vitest` (GHSA-67mh-4wv8-2f99), `minimatch` vía `@typescript-eslint/parser` (3 ReDoS), `react-router`/`react-router-dom` (open redirect) y `undici` vía `openapi-typescript` (12 avisos). Todos exigen mayores de versión incompatibles; ninguno tiene ficha ni VULN-NNN asignado. Queda para que el usuario decida en qué tarea se documentan y remedian.
 
