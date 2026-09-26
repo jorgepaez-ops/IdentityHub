@@ -17,10 +17,11 @@
     "ficha": "security/findings/VULN-007-cors-comodin-con-credenciales.md"
   },
   "despues": {
-    "commit": null,
+    "commit": "51a7a4f",
     "workflow": null,
     "run_id": null,
-    "run_url": null,
-    "captura": null
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/commit/51a7a4f86e41f6ef17fe6e39ef4337cbd11402be",
+    "captura": "informe Desktop §3 VULN-005/006/007",
+    "observacion": "Sin gate propio (ZAP llega en semana 3): evidencia por diff del commit (legacy_auth.go borrado entero, incluidas las dos líneas de CORS comodín)."
   }
 }

@@ -8,10 +8,10 @@
 | **Componente** | `backend/internal/api/legacy_auth.go:52-55` |
 | **Amenaza** | AM-001 (suplantación por fuerza bruta) |
 | **Sembrada** | sí |
-| **Evidencia antes** | |
+| **Evidencia antes** | `docs/evidencia/VULN-002/evidencia.json` |
 | **Commit de remediación** | `51a7a4f` (T23) |
-| **Evidencia después** | |
-| **Run de Actions (antes/después)** | |
+| **Evidencia después** | `docs/evidencia/VULN-002/evidencia.json` (golangci-lint: "0 issues."; Code scanning #43 sigue "Open" en `main`, ver Discrepancia #6 del informe) |
+| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36208104969 |
 
 ## Evidencia
 

@@ -10,8 +10,8 @@
 | **Sembrada** | sí |
 | **Evidencia antes** | `docs/evidencia/VULN-006/evidencia.json` |
 | **Commit de remediación** | `51a7a4f` (T23) |
-| **Evidencia después** | |
-| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / — |
+| **Evidencia después** | `docs/evidencia/VULN-006/evidencia.json` (sin gate propio; evidencia por diff del commit; de paso, alerta CodeQL #81 go/log-injection sigue "Open" en `main`, Discrepancia #6) |
+| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / — (evidencia por commit, no por run) |
 
 ## Evidencia
 
