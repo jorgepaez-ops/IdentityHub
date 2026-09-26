@@ -880,7 +880,7 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 - Evidencia (`Usuario`):  - [ ] VULN-016  - [ ] VULN-017  - [ ] VULN-018
 
 ### T29 — Nginx: cabeceras, `server_tokens` y `limit_req`
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RNF-009, AM-001, AM-015, AM-017, frontera T2 · Remedia: VULN-013, VULN-014, VULN-015 · Bloqueada por: T0.3, T28
+- [x] Estado · Ejecutor: `Claude` (verificación con `make up` real; mismo criterio que T27/T28) · Cubre: RNF-009, AM-001, AM-015, AM-017, frontera T2 · Remedia: VULN-013, VULN-014, VULN-015 · Bloqueada por: T0.3, T28
 - `frontend/nginx/default.conf`: las cinco cabeceras de RNF-009 con `always` (CSP sin `unsafe-inline`, HSTS,
   `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`), `server_tokens off`, `limit_req` sobre
   `/api/v1/auth/`, y `X-Forwarded-For $remote_addr` (sobrescribe la cabecera del cliente, complementa T6). La CSP debe permitir el SPA de Vite ya construido.
@@ -888,7 +888,26 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 - Criterios: `curl -sI http://localhost:8080/` muestra las cabeceras y no `nginx/x.y.z`; ráfaga de peticiones a `/api/v1/auth/login` recibe 429 (el OpenAPI ya declara `429`); la SPA sigue cargando;
   el `Set-Cookie` de `/api/v1/auth/login` llega intacto a través de Nginx.
 - Verificación: `make up`; `curl -sI http://localhost:8080/`; ráfaga con `for i in $(seq 1 30); do curl -s -o /dev/null -w '%{http_code}\n' -X POST http://localhost:8080/api/v1/auth/login -H 'Content-Type: application/json' -d '{}'; done`.
-- Commit:
+- **Hecho 2026-09-26.** Las cinco cabeceras de RNF-009 con `always` (CSP sin `unsafe-inline`, HSTS,
+  `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`); `server_tokens off`;
+  `limit_req_zone` (5r/s) más una `location /api/v1/auth/` nueva (más específica que `/api/`, nginx
+  la prefiere por prefijo más largo) con `limit_req zone=auth burst=5 nodelay` y `limit_req_status
+  429` (el default de nginx es 503; el contrato OpenAPI ya declara 429). `X-Forwarded-For` pasó de
+  `$proxy_add_x_forwarded_for` (anexa, permite que el cliente se autodeclare un salto previo) a
+  `$remote_addr` (lo sobrescribe) en ambas locations de proxy, complementando `TRUSTED_PROXIES` de T6.
+- Comandos y resultado observado: `curl -sI http://localhost:8080/` contra el stack real: las cinco
+  cabeceras presentes, `Server: nginx` sin versión, la SPA y sus `assets/` siguen sirviéndose
+  (`200`). Ráfaga real de 30 `POST` a `/api/v1/auth/login`: los primeros pasan (a la API, que
+  responde `500` porque el body `{}` no es válido — ver "Dudas abiertas"), el resto vuelve `429`
+  hasta que el balde se vacía. Ciclo completo real registro → verificación (token sacado de
+  Mailpit) → login a través de Nginx: `200`, con `Set-Cookie: refresh_token=...; Path=/api/v1/auth;
+  Max-Age=2592000; HttpOnly; Secure; SameSite=Strict` intacto, byte a byte igual al que pone
+  `login.go` — Nginx no lo toca. `make test` en verde (sin cambios de Go, no aplica TDD aquí).
+- Dudas abiertas: hallazgo nuevo, fuera de alcance de T29 — la API responde `500` (no `400`) a
+  `POST /api/v1/auth/login` con body `{}` (JSON válido, campos ausentes). Nginx no tiene nada que
+  ver; es el handler de login. No se toca aquí (T29 es solo Nginx); anotado para que se decida en
+  qué tarea se corrige la validación de entrada.
+- Commit: 18dea33
 - Evidencia (`Usuario`):  - [ ] VULN-013  - [ ] VULN-014  - [ ] VULN-015 (`curl -sI` antes/después; sin gate hoy)
 
 ### T30 — Compose: imágenes base y endurecimiento
@@ -1273,4 +1292,9 @@ Formato por tarea (3 a 5 líneas):
 - Qué cambió: tomada directo por Claude (mismo motivo que T27). `frontend/Dockerfile`: builder `node:24-bookworm` y final `nginxinc/nginx-unprivileged:stable`, ambos por digest real. `USER 101` explícito (la base ya lo trae por defecto, pero Trivy config no lo resuelve si la base es solo un digest). `frontend/nginx/default.conf` no necesitó cambios: ya escuchaba en 8080, que es donde `nginx-unprivileged` espera.
 - Comandos y resultado observado: `npm run build` en verde. `make scan-config`: sin hallazgos en `backend/Dockerfile` ni `frontend/Dockerfile` (los dos Dockerfiles del proyecto quedan limpios). `make scan-image` sobre `identity-hub-web`: `Total: 0 (HIGH: 0, CRITICAL: 0)`. `docker inspect` confirma uid `101`. `make up` + `curl -sI http://localhost:8080/`: `200 OK`, SPA servida. `make test` en verde.
 - Dudas abiertas: ninguna.
+
+### T29 · 2026-09-26 · 18dea33
+- Qué cambió: tomada directo por Claude (verificación con `make up` real). `frontend/nginx/default.conf`: las cinco cabeceras RNF-009 con `always`, `server_tokens off`, `limit_req_zone` + `location /api/v1/auth/` (más específica que `/api/`) con `limit_req zone=auth burst=5 nodelay` y `limit_req_status 429` (nginx responde 503 por defecto; el contrato ya declara 429). `X-Forwarded-For` de `$proxy_add_x_forwarded_for` a `$remote_addr` en ambas locations de proxy (complementa `TRUSTED_PROXIES`, T6).
+- Comandos y resultado observado: `curl -sI http://localhost:8080/` contra el stack real: cinco cabeceras, `Server: nginx` sin versión, SPA y `assets/` sirviendo `200`. Ráfaga real de 30 `POST` a `/api/v1/auth/login`: `429` tras vaciarse el balde. Ciclo real registro → verificación (token de Mailpit) → login por Nginx: `200` con el `Set-Cookie` de `refresh_token` (Path/HttpOnly/Secure/SameSite) intacto. `make test` en verde.
+- Dudas abiertas: hallazgo nuevo fuera de alcance — `POST /api/v1/auth/login` con `{}` devuelve `500`, no `400`; es el handler de login (`login.go`, caso `default`), no Nginx. No se toca aquí; anotado para que se decida en qué tarea se corrige.
 
