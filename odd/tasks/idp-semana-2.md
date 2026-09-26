@@ -977,6 +977,11 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
   se preguntó al usuario. **Autorizado (2026-09-26): sí, las 10.** Pasada 2: se añadieron con su
   justificación (misma política de huella exacta); `.gitleaksignore` queda en 24 líneas de huella.
   `make scan-secrets`: `no leaks found` (117 commits escaneados).
+  **Pasada 3, ya con el PR abierto (2026-09-26):** el job `secrets` del CI marcó 2 hallazgos más,
+  recursivos — este mismo `.gitleaksignore` y el archivo de tareas citaron literalmente, entre
+  comillas, el patrón exacto que dispara la regla al explicar los falsos positivos de arriba, y eso
+  volvió a activarla. Añadidas con la misma política (`fe7a32e`); `.gitleaksignore` queda en 26
+  líneas de huella. Verificado en local antes de subir: `no leaks found` (122 commits).
   **Hallazgo real de infraestructura, fuera de alcance de T31 (no se toca `.gitleaks.toml` ni los
   hooks aquí):** al verificar que "un secreto nuevo sigue siendo detectado", se descubrió que el
   hook de pre-commit de gitleaks declarado en `.pre-commit-config.yaml` **no está instalado** —
