@@ -1006,7 +1006,7 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
      fichas.
   Ningún otro estado de ficha estaba mal: 25 de 26 en `remediado`, VULN-019 correctamente en
   `en remediación` (parcial, autorizado por el propio texto de T30).
-- Commit:
+- Commit: 6441b6e
 
 ---
 
@@ -1071,9 +1071,9 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 | 0 — Línea base y evidencia "antes" | T0.1 a T0.5 (5) | 5 (T0.1 a T0.5) |
 | 1 — Contrato ejecutable | T1a, T1 a T3 (4) | 4 (T1a, T1, T2, T3) |
 | 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 20 (T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T14a, T15, T16, T17, T18, T19, T20, T21, T22) |
-| 3 — Remediación | T23 a T32 (10) | 9 (T23 a T31) |
+| 3 — Remediación | T23 a T32 (10) | 10 (T23 a T32) |
 | 4 — Cierre | T33 a T38 (6) | 0 |
-| **Total** | **45** | **38** |
+| **Total** | **45** | **39** |
 
 Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, cookie) y `T14a`
 (enmienda ADR 0005, sin ventana de gracia). Los ids existentes no cambian.
@@ -1370,4 +1370,9 @@ Formato por tarea (3 a 5 líneas):
 - Qué cambió: tomada directo por Claude (verificación con `make scan-secrets`, mismo motivo que T27-T30). `.gitleaksignore` con 24 huellas exactas: las 14 ya conocidas (12 de línea base + 2 de Q20) más 10 nuevas encontradas al verificar — 6 falsos positivos de la sintaxis `${VAR:?...}` que T21/T26 metieron en el compose, 3 de asignaciones de struct Go, y 1 (docs/guia-desarrollo.md) con el valor inventado de la línea base copiado en un ejemplo de comando, nunca catalogado.
 - Comandos y resultado observado: primera pasada con las 14 huellas conocidas dejó `make scan-secrets` en rojo (10 nuevas); se detuvo la tarea y se preguntó al usuario por la ampliación de alcance (Q8/Q20 no la autorizaban). Autorizado, se añadieron las 10 con su justificación. `make scan-secrets`: `no leaks found` (117 commits). `make test` en verde.
 - Dudas abiertas: ninguna sobre T31 en sí. Hallazgo de infraestructura fuera de su alcance: el hook de pre-commit de gitleaks (`.pre-commit-config.yaml`) no está instalado — solo corre `gga run`. Se confirmó con un commit de prueba (secreto con forma de clave AWS) que pasó sin bloquearse; se deshizo de inmediato con `git reset --hard` sin llegar a subirse. Anotado en `CLAUDE.md`; no se toca `.gitleaks.toml` ni los hooks aquí, es decisión de otra tarea.
+
+### T32 · 2026-09-26 · 6441b6e
+- Qué cambió: revisión de T23 a T31 contra sus fichas y el "Registro de evidencia". `git log --oneline 51a7a4f..HEAD` sobre `ci.yml`, `baseline-scan.yml` y `.gitleaks.toml`: vacío, ningún gate se tocó; `.trivyignore` no existe. Dos gaps de documentación (no de código) corregidos: VULN-020 (chi RealIP) estaba "abierto" en su ficha pese a cerrarse en T6 (`902a047`) — confirmado con `govulncheck` que ya no aparece; y la columna "Commit remediación" del registro estaba vacía en las 26 filas, se completó desde las fichas.
+- Comandos y resultado observado: revisión manual archivo por archivo (26 fichas, 3 workflows/config). `python3 scripts/traceability.py --check`: al día.
+- Dudas abiertas: ninguna. Fase 3 completa (10/10): corte de fase, PR pendiente de confirmación del usuario (estrategia `ask-on-risk`, "Alcance autorizado" del archivo de tareas).
 
