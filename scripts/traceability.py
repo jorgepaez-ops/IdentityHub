@@ -27,6 +27,17 @@ OUT = ROOT / "specs" / "07-traceability.md"
 RF_HEADING = re.compile(r"^### (R[FN]-\d{3}) — (.+?) · (P\d)$", re.M)
 RF_TAG = re.compile(r"\b((?:RNF|RF)-\d{3})\b")
 
+# Decisión Q14: estos requisitos pertenecen al backlog de semana 3. Se muestran
+# para mantenerlos visibles, pero no se evalúan como parte de esta feature.
+DEFERRED = {
+    "RF-013": "Backlog de semana 3 por decisión Q14.",
+    "RF-014": "Backlog de semana 3 por decisión Q14.",
+    "RF-015": "Backlog de semana 3 por decisión Q14.",
+    "RF-016": "Backlog de semana 3 por decisión Q14.",
+    "RF-018": "Backlog de semana 3 por decisión Q14.",
+    "RF-019": "Backlog de semana 3 por decisión Q14.",
+}
+
 
 def load_requirements() -> dict[str, tuple[str, str]]:
     text = (ROOT / "specs" / "01-requirements.md").read_text(encoding="utf-8")
@@ -104,7 +115,7 @@ def render() -> str:
         "|---|---|---|---|---|---|---|---|",
     ]
 
-    counts = {"completo": 0, "parcial": 0, "sin cubrir": 0}
+    counts = {"completo": 0, "parcial": 0, "sin cubrir": 0, "diferido": 0}
     for rid in sorted(reqs):
         title, prio = reqs[rid]
         o = ", ".join(f"`{x}`" for x in ops.get(rid, [])) or "—"
@@ -112,8 +123,12 @@ def render() -> str:
         g = str(len(go_by_req.get(rid, []))) if go_by_req.get(rid) else "—"
         e = str(len(e2e_by_req.get(rid, []))) if e2e_by_req.get(rid) else "—"
         covered = sum(x != "—" for x in (s, g, e))
-        state = "✅ completo" if covered >= 2 else ("🟡 parcial" if covered == 1 else "🔴 sin cubrir")
-        counts["completo" if covered >= 2 else ("parcial" if covered == 1 else "sin cubrir")] += 1
+        if rid in DEFERRED:
+            state = "⏳ diferido (semana 3)"
+            counts["diferido"] += 1
+        else:
+            state = "✅ completo" if covered >= 2 else ("🟡 parcial" if covered == 1 else "🔴 sin cubrir")
+            counts["completo" if covered >= 2 else ("parcial" if covered == 1 else "sin cubrir")] += 1
         lines.append(f"| **{rid}** | {title} | {prio} | {o} | {s} | {g} | {e} | {state} |")
 
     total = sum(counts.values())
@@ -121,10 +136,11 @@ def render() -> str:
         "",
         f"**Resumen:** {total} requisitos · "
         f"{counts['completo']} completos · {counts['parcial']} parciales · "
-        f"{counts['sin cubrir']} sin cubrir.",
+        f"{counts['sin cubrir']} sin cubrir · {counts['diferido']} diferidos (semana 3).",
         "",
         "Leyenda de estado: *completo* = verificado por al menos dos de las tres",
-        "columnas de prueba · *parcial* = una sola · *sin cubrir* = ninguna.",
+        "columnas de prueba · *parcial* = una sola · *sin cubrir* = ninguna · "
+        "*diferido (semana 3)* = backlog de semana 3 por decisión Q14.",
         "",
         "## Escenarios de aceptación por requisito",
         "",
