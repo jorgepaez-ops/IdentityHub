@@ -3,13 +3,13 @@
 | | |
 |---|---|
 | **Severidad** | no informada por el escáner |
-| **Estado** | abierto |
+| **Estado** | remediado |
 | **Detectado por** | Gitleaks (baseline-scan) |
 | **Componente** | `deploy/docker-compose.yml:24,42,82,102-103,133-134` |
 | **Amenaza** | AM-012 (secretos en el repositorio o en la imagen) |
 | **Sembrada** | sí |
 | **Evidencia antes** | `docs/evidencia/VULN-003/evidencia.json` |
-| **Commit de remediación** | |
+| **Commit de remediación** | `afab4e9` (T26) |
 | **Evidencia después** | |
 | **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / — |
 

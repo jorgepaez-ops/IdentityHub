@@ -796,14 +796,37 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 - Evidencia (`Usuario`):  - [ ] VULN-025 (axios/lodash)
 
 ### T26 — Secretos fuera del compose y de los `ENV`
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RNF-003, AM-012 · Remedia: VULN-003, VULN-012, VULN-001 (compose/Dockerfile) · Bloqueada por: T0.3, T21
+- [x] Estado · Ejecutor: `Codex` (compose/Dockerfile, hasta que su sandbox dio "permission denied" contra el socket de Docker al verificar) + `Claude` (rol `identity_app`, Q21, y el resto de la verificación) · Cubre: RNF-003, AM-012 · Remedia: VULN-003, VULN-012, VULN-001 (compose/Dockerfile) · Bloqueada por: T0.3, T21
 - `deploy/docker-compose.yml`: todas las credenciales por `${VAR:?...}` desde `.env` (Postgres, RabbitMQ,
   DSN, migrate); `DATABASE_URL` de la API con el rol `identity_app` (T9; Q7: aquí se le asigna la credencial desde `.env`); `.env.example` sin valores.
   No renombrar aquí el comentario `VULN-020` del compose (eso es T30).
   `backend/Dockerfile`: eliminar los `ENV` con secretos (`DB_PASSWORD`, `API_SIGNING_KEY`). `README.md`/`Makefile` actualizados si mencionan credenciales.
 - Criterios: `make up` falla con mensaje claro si falta una variable; con `.env` local arranca; `make scan-secrets` sin hallazgos en el árbol de trabajo (el historial: T31).
 - Verificación: `make up && make ps`; `make scan-secrets`; `make test`.
-- Commit:
+- **Hecho 2026-09-26.** Codex dejó el compose/Dockerfile bien encaminados pero se detuvo con razón (Q21,
+  renumerada de su "Q20" que colisionaba con la Q20 ya usada): `identity_app` es `NOLOGIN` desde T9, sin
+  contraseña, y usar `POSTGRES_USER` como `DATABASE_URL` lo habría vuelto superusuario. El usuario decidió
+  la opción "script en `docker-entrypoint-initdb.d`": nuevo `deploy/postgres-init/01-identity-app-role.sh`
+  (montado solo en el servicio `db`), que da `LOGIN`/contraseña a `identity_app` desde `IDENTITY_APP_PASSWORD`
+  la primera vez que el volumen está vacío; si ya existe un volumen viejo hay que recrearlo una vez
+  (`docker compose down -v`, documentado en el README).
+  El acceso de Claude a `.env`/`.env.example` está bloqueado por reglas `deny` globales del usuario
+  (`Read`/`Edit` sobre `.env.*`, y hasta `cat`/`git diff` por Bash) — el usuario mismo corrió con `!` los
+  comandos para escribir `.env.example` y `.env` (contraseñas con `openssl rand -base64 32`).
+- Comandos y resultado observado: sin `.env`, `docker compose ps` falla nombrando cada variable que falta
+  (`DATABASE_URL`, `IDENTITY_APP_PASSWORD`, `POSTGRES_USER`, etc.) — RED real del criterio. Con `.env`
+  poblado y el volumen recreado: `db` queda `healthy`, el log confirma que corrió
+  `01-identity-app-role.sh`, `migrate` aplica las 3 migraciones sin error, y una conexión directa como
+  `identity_app` (`psql`, sin imprimir la contraseña) confirma login correcto y `SELECT` sobre `users`.
+  `make scan-secrets`: 20 hallazgos, los mismos de siempre, todos en el commit de línea base `053e15f`
+  (gitleaks escanea historial, no árbol de trabajo; nada nuevo del árbol actual). `make test` (Go +
+  frontend) en verde. `python3 scripts/traceability.py --check`: al día.
+  **`make up && make ps` con el stack completo (api/worker/web) falla**, pero no por T26: `backend/Dockerfile`
+  sigue en `golang:1.22-bullseye` mientras `go.mod` exige `go >= 1.25.0` desde T6 — nadie había corrido
+  `make up --build` en esta rama desde entonces. T27 ya lo tiene en su alcance ("builder con versión de
+  Go acorde"); se verificó T26 arrancando solo `db`, `broker`, `mailpit` y `migrate` (sin construir
+  api/worker/web), suficiente para probar el mecanismo de secretos que sí es de esta tarea.
+- Commit: afab4e9
 - Evidencia (`Usuario`):  - [ ] VULN-003  - [ ] VULN-012  - [ ] VULN-001 (Gitleaks/Trivy secret)
 
 ### T27 — Dockerfile del backend
@@ -1013,7 +1036,8 @@ Todas resueltas por el usuario el 2026-09-19 (las que no traen cambio se aceptar
 
 ### Preguntas nuevas (Codex)
 
-(Ninguna. Codex anota aquí cualquier ambigüedad nueva y detiene esa tarea; no hay nada abierto hoy.)
+- **Q21 · Credencial de `identity_app` para T26 (2026-09-26).** (Codex la etiquetó "Q20" por error — ese número ya está usado, ver arriba; renumerada por Claude.) T9 creó `identity_app NOLOGIN` y su migración no recibe ni provisiona una contraseña. T26 exige que `DATABASE_URL` use ese rol con una credencial desde `.env`, pero los archivos autorizados para T26 no incluyen una migración nueva ni un mecanismo de inicialización seguro para asignarla; usar `POSTGRES_USER=identity_app` lo convertiría en el superusuario inicial y rompería el mínimo privilegio. Se requiere que el usuario autorice el mecanismo y el alcance para provisionar el rol con `LOGIN` y una contraseña desde `.env`; T26 queda detenida.
+
 
 ## Notas de handoff Codex
 
@@ -1201,4 +1225,9 @@ Formato por tarea (3 a 5 líneas):
 - Qué cambió: tomada directo por Claude (necesita `npm install` con red saliente, que Codex no tiene — ver regla nueva en `CLAUDE.md`). `axios` y `lodash` (y `@types/lodash`) retirados de `frontend/package.json` en vez de actualizados: ninguno se importa en `frontend/src` (`client.ts` ya usa `fetch`). `package-lock.json` regenerado con `npm install`; comentario de línea base retirado de `package.json`.
 - Comandos y resultado observado: `npm run lint`, `npm run typecheck`, `npm run test` y `npm run build` en verde. `npm audit --audit-level=high` sigue en rojo (exit 1) pero ya no por axios/lodash — `git diff` del lockfile confirma que ninguna otra versión cambió (solo 37 líneas de baja de los tres paquetes retirados).
 - Dudas abiertas: el criterio de aceptación literal de T25 ("`npm audit --audit-level=high` sin hallazgos") no se cumple: quedan 15 hallazgos preexistentes desde T23 (`55404f3`), ajenos a VULN-025 — `esbuild`/`vite`/`vitest` (GHSA-67mh-4wv8-2f99), `minimatch` vía `@typescript-eslint/parser` (3 ReDoS), `react-router`/`react-router-dom` (open redirect) y `undici` vía `openapi-typescript` (12 avisos). Todos exigen mayores de versión incompatibles; ninguno tiene ficha ni VULN-NNN asignado. Queda para que el usuario decida en qué tarea se documentan y remedian.
+
+### T26 · 2026-09-26 · afab4e9
+- Qué cambió: Codex avanzó bien el compose/Dockerfile (todas las credenciales a `${VAR:?...}` desde `.env`) pero se detuvo con razón en Q21 (`identity_app` `NOLOGIN` sin contraseña; usar `POSTGRES_USER` lo volvería superusuario) y además chocó con "permission denied" de su sandbox contra el socket de Docker al intentar verificar. El usuario eligió la opción de un script en `docker-entrypoint-initdb.d`; Claude terminó: nuevo `deploy/postgres-init/01-identity-app-role.sh`, montado solo en el servicio `db`, da `LOGIN`/contraseña a `identity_app` desde `IDENTITY_APP_PASSWORD` la primera vez que el volumen está vacío.
+- Comandos y resultado observado: sin `.env`, `docker compose ps` falla nombrando cada variable faltante (RED real). Con `.env` poblado (el usuario lo escribió con `!` por las reglas `deny` de Claude sobre `.env.*`) y el volumen recreado: `db` queda `healthy`, el log confirma que corrió el script, `migrate` aplica sus 3 migraciones, y una conexión `psql` directa como `identity_app` confirma login y `SELECT` sobre `users`, sin imprimir la contraseña. `make scan-secrets`: mismos 20 hallazgos de siempre, todos del commit de línea base `053e15f` (historial, no árbol de trabajo). `make test` en verde.
+- Dudas abiertas: `make up` con el stack completo (api/worker/web) sigue fallando porque `backend/Dockerfile` usa `golang:1.22-bullseye` contra un `go.mod` que exige `go 1.25` desde T6 — ya es alcance explícito de T27 ("builder con versión de Go acorde"), no algo nuevo. Se verificó T26 arrancando solo `db`/`broker`/`mailpit`/`migrate`. Codex etiquetó su pregunta como "Q20", que ya estaba usado por otra decisión (2026-09-21); Claude la renumeró a Q21.
 

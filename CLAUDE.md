@@ -52,6 +52,11 @@ volver a acordarse.
   red saliente** (subir dependencias, `npm install` con paquetes nuevos, `curl` a un host externo,
   etc.); esas se toman directo con Claude (que sí tiene red en este entorno), como ya pasó en T23
   (401 de la API) y T24 (DNS del sandbox).
+- **Codex tampoco tiene el socket de Docker.** Confirmado en T26: al intentar verificar con `make up`,
+  el sandbox de Codex devolvió "permission denied while trying to connect to the docker API" (Claude,
+  en el mismo host y sin sandbox, sí pudo). Codex puede editar `docker-compose.yml`/`Dockerfile` sin
+  problema, pero no puede correr `docker build`, `make up`, `make scan-image` ni nada que hable con el
+  daemon de Docker — esa verificación también la cierra Claude directo (T27-T30 la van a necesitar).
 - **Monitoreo obligatorio de toda tarea delegada a Codex.** No basta con lanzar la tarea y esperar a
   que el usuario pregunte "¿cómo va?". Justo después de lanzarla (ID `task-...`), levantar en el acto
   un poll en segundo plano (`codex-companion.mjs status <job> --json` en un bucle con espera de ~15-20s)

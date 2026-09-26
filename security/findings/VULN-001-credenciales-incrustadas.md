@@ -3,13 +3,13 @@
 | | |
 |---|---|
 | **Severidad** | HIGH |
-| **Estado** | en remediación |
+| **Estado** | remediado |
 | **Detectado por** | Gitleaks · job `secrets` · gosec G101 · job `lint` |
 | **Componente** | `backend/internal/api/legacy_auth.go:38-45`, `deploy/docker-compose.yml`, `backend/Dockerfile` |
 | **Amenaza** | AM-012 (divulgación de información) |
 | **Sembrada** | sí |
 | **Evidencia antes** | |
-| **Commit de remediación** | `51a7a4f` (T23, solo el componente `legacy_auth.go`; `docker-compose.yml` y `Dockerfile` siguen abiertos, remedia otra tarea) |
+| **Commit de remediación** | `51a7a4f` (T23, `legacy_auth.go`); `afab4e9` (T26, `docker-compose.yml` y `Dockerfile`) — los tres componentes cierran |
 | **Evidencia después** | |
 | **Run de Actions (antes/después)** | |
 
