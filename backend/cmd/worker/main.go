@@ -87,6 +87,8 @@ func run() error {
 	}
 }
 
+type smtpSender func(string, smtp.Auth, string, []string, []byte) error
+
 type worker struct {
 	logger *slog.Logger
 	cfg    *config.Config
@@ -95,8 +97,9 @@ type worker struct {
 	// "al menos una vez", así que un reintento no debe traducirse en un segundo
 	// correo. En memoria basta para un worker único; con varias réplicas esto
 	// tendría que vivir en Postgres o Redis.
-	mu   sync.Mutex
-	seen map[string]time.Time
+	mu       sync.Mutex
+	seen     map[string]time.Time
+	sendMail smtpSender
 }
 
 func (w *worker) alreadyProcessed(eventID string) bool {
@@ -178,7 +181,11 @@ func (w *worker) deliver(ctx context.Context, env events.Envelope, body []byte) 
 	addr := net.JoinHostPort(w.cfg.SMTPHost, fmt.Sprint(w.cfg.SMTPPort))
 	// Mailpit no exige autenticación ni TLS; en un entorno real aquí irían
 	// credenciales y STARTTLS.
-	return smtp.SendMail(addr, nil, w.cfg.SMTPFrom, []string{message.To}, buildRawMessage(w.cfg.SMTPFrom, message))
+	send := w.sendMail
+	if send == nil {
+		send = smtp.SendMail
+	}
+	return send(addr, nil, w.cfg.SMTPFrom, []string{message.To}, buildRawMessage(w.cfg.SMTPFrom, message))
 }
 
 // buildRawMessage arma las cabeceras RFC 5322 y el cuerpo que espera smtp.SendMail.

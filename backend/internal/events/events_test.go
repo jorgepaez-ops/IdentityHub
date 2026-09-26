@@ -80,7 +80,7 @@ func TestRF012_LosTiposDeEventoCoincidenConLosCanalesDelSpec(t *testing.T) {
 	// de evento tiene que caer bajo uno de esos dos prefijos o se perdería en
 	// silencio, que es la peor forma de perder un mensaje.
 	for tipo := range esperados {
-		if len(tipo) < 6 || (tipo[:5] != "user." && tipo[:9] != "security.") {
+		if !strings.HasPrefix(tipo, "user.") && !strings.HasPrefix(tipo, "security.") {
 			t.Errorf("el tipo %q no encaja con los enlaces user.* ni security.* de la cola %s", tipo, QueueNotify)
 		}
 	}

@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
+	"net/smtp"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -99,5 +102,67 @@ func TestRF012_ConstruyeElMensajeSMTPConAsuntoYCuerpoRenderizados(t *testing.T) 
 	}
 	if !strings.Contains(raw, message.Body) {
 		t.Errorf("raw message missing rendered body: %s", raw)
+	}
+}
+
+type smtpCall struct {
+	address string
+	from    string
+	to      []string
+	body    []byte
+}
+
+func TestRNF005_DeliveryUsesInjectedSMTPTransportAfterRendering(t *testing.T) {
+	event := events.UserRegistered{Envelope: events.NewEnvelope(events.TypeUserRegistered, "")}
+	event.Data.Email = "recipient@example.test"
+	event.Data.DisplayName = "Recipient"
+	event.Data.VerificationToken = "verification-token"
+	body, err := json.Marshal(event)
+	if err != nil {
+		t.Fatalf("marshal event: %v", err)
+	}
+	var call smtpCall
+	w := &worker{
+		cfg: &config.Config{SMTPHost: "smtp.test", SMTPPort: 2525, SMTPFrom: "sender@example.test", PublicBaseURL: "https://identity.example.test"},
+		sendMail: func(address string, _ smtp.Auth, from string, to []string, message []byte) error {
+			call = smtpCall{address: address, from: from, to: to, body: message}
+			return nil
+		},
+	}
+	if err := w.deliver(context.Background(), event.Envelope, body); err != nil {
+		t.Fatalf("deliver() error = %v", err)
+	}
+	if call.address != "smtp.test:2525" || call.from != "sender@example.test" || !reflect.DeepEqual(call.to, []string{"recipient@example.test"}) {
+		t.Fatalf("SMTP call = %#v", call)
+	}
+	if !strings.Contains(string(call.body), "Subject: [Identity Hub]") || !strings.Contains(string(call.body), "recipient@example.test") {
+		t.Fatalf("SMTP body = %s", call.body)
+	}
+}
+
+func TestRNF005_DeliveryStopsBeforeSMTPWhenContextIsCanceled(t *testing.T) {
+	event := events.UserRegistered{Envelope: events.NewEnvelope(events.TypeUserRegistered, "")}
+	event.Data.Email = "recipient@example.test"
+	event.Data.DisplayName = "Recipient"
+	event.Data.VerificationToken = "verification-token"
+	body, err := json.Marshal(event)
+	if err != nil {
+		t.Fatalf("marshal event: %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	called := false
+	w := &worker{
+		cfg: &config.Config{SMTPHost: "smtp.test", SMTPPort: 2525, SMTPFrom: "sender@example.test", PublicBaseURL: "https://identity.example.test"},
+		sendMail: func(string, smtp.Auth, string, []string, []byte) error {
+			called = true
+			return nil
+		},
+	}
+	if err := w.deliver(ctx, event.Envelope, body); !errors.Is(err, context.Canceled) {
+		t.Fatalf("deliver() error = %v, want context canceled", err)
+	}
+	if called {
+		t.Fatal("SMTP transport was called after cancellation")
 	}
 }
