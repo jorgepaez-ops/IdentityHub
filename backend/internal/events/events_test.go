@@ -1,6 +1,7 @@
 package events
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 	"time"
@@ -81,6 +82,60 @@ func TestRF012_LosTiposDeEventoCoincidenConLosCanalesDelSpec(t *testing.T) {
 		if len(tipo) < 6 || (tipo[:5] != "user." && tipo[:9] != "security.") {
 			t.Errorf("el tipo %q no encaja con los enlaces user.* ni security.* de la cola %s", tipo, QueueNotify)
 		}
+	}
+}
+
+// RNF-005 — Ping se usa para /readyz: un Broker sin conexión (por ejemplo, si
+// Connect nunca llegó a asignarla) no debe reportarse como sano.
+func TestRNF005_PingFallaConConexionNula(t *testing.T) {
+	b := &Broker{}
+
+	if err := b.Ping(); err == nil {
+		t.Fatal("Ping() = nil; se esperaba un error con conn == nil")
+	}
+}
+
+// Close no debe entrar en pánico aunque Connect nunca haya llegado a asignar
+// canal o conexión: un fallo a mitad de Connect ya llama a Close() sobre un
+// Broker parcialmente construido.
+func TestRNF005_CloseNoEntraEnPanicoConBrokerVacio(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("Close() entró en pánico con un Broker vacío: %v", r)
+		}
+	}()
+
+	(&Broker{}).Close()
+}
+
+// Channel expone el canal AMQP subyacente tal cual, sin envolverlo: lo usa
+// cmd/worker para registrar el consumidor.
+func TestRNF005_ChannelDevuelveElCanalAsignado(t *testing.T) {
+	b := &Broker{}
+
+	if got := b.Channel(); got != nil {
+		t.Fatalf("Channel() = %v; se esperaba nil sobre un Broker sin canal asignado", got)
+	}
+}
+
+// Connect debe envolver el error de conexión, no perderlo ni entrar en pánico,
+// cuando el broker es inalcanzable.
+func TestRNF005_ConnectEnvuelveElErrorDeConexion(t *testing.T) {
+	_, err := Connect("amqp://guest:guest@127.0.0.1:1/")
+	if err == nil {
+		t.Fatal("Connect() = nil error; se esperaba un fallo de conexión contra un puerto inalcanzable")
+	}
+}
+
+// Publish serializa antes de tocar el canal: un evento no serializable debe
+// fallar ahí mismo, sin necesitar una conexión real al broker.
+func TestRNF005_PublishFallaAlSerializarSinNecesitarBroker(t *testing.T) {
+	b := &Broker{}
+
+	// Un canal de Go nunca es serializable a JSON.
+	err := b.Publish(context.Background(), TypeUserRegistered, make(chan int))
+	if err == nil {
+		t.Fatal("Publish() = nil error; se esperaba un fallo de serialización")
 	}
 }
 
