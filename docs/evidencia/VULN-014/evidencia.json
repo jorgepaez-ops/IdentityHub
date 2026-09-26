@@ -16,14 +16,19 @@
   },
   "remediacion": {
     "tarea": "T29",
-    "commit": null,
-    "ficha": null
+    "commit": "18dea33",
+    "ficha": "security/findings/VULN-014-server-tokens-on.md"
   },
   "despues": {
-    "commit": null,
+    "commit": "a2b57e2",
     "workflow": null,
     "run_id": null,
     "run_url": null,
-    "captura": null
+    "artefacto": "security/evidence/local-web-despues.txt",
+    "captura": null,
+    "hallazgos": [
+      "curl -sI http://localhost:8080/: cabecera 'Server: nginx' sin número de versión (server_tokens off)"
+    ],
+    "observacion": "Sin gate hoy. Misma ejecución local que VULN-013."
   }
 }

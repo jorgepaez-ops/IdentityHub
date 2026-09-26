@@ -1,0 +1,44 @@
+# Evidencia "después" de VULN-013, VULN-014 y VULN-015 (ejecución local, 2026-09-26)
+
+Método: stack completo levantado con `make up` (rama feat/idp-semana-2, commit a2b57e2, PR #2),
+con `db`, `broker`, `api`, `worker` y `web` sanos. A diferencia del "antes", aquí sí hay API detrás
+del proxy, así que el 502 del "antes" (por falta de backend) se reemplaza por el código real del
+endpoint de login.
+
+$ curl -sI http://localhost:8080/
+HTTP/1.1 200 OK
+Server: nginx
+Date: Sat, 26 Sep 2026 17:54:50 GMT
+Content-Type: text/html
+Content-Length: 397
+Last-Modified: Sat, 26 Sep 2026 14:28:13 GMT
+Connection: keep-alive
+ETag: "6ab7d67d-18d"
+Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Referrer-Policy: strict-origin-when-cross-origin
+Accept-Ranges: bytes
+
+Observaciones:
+- VULN-014: la cabecera Server ya no expone versión ("nginx", no "nginx/1.31.6"): server_tokens off.
+- VULN-013: las cinco cabeceras de RNF-009 están presentes (CSP sin unsafe-inline, HSTS,
+  X-Content-Type-Options, X-Frame-Options, Referrer-Policy).
+
+$ curl -sI http://localhost:8080/ && for i in $(seq 1 10); do curl -s -o /dev/null -w '%{http_code}\n' -X POST http://localhost:8080/api/v1/auth/login -H 'Content-Type: application/json' -d '{}'; done
+500
+500
+500
+500
+500
+500
+500
+429
+429
+429
+
+Observación (VULN-015): a partir de la séptima petición seguida al endpoint de autenticación,
+Nginx corta con 429 (limit_req activo) en vez de dejarlas pasar todas al backend. Los 500 previos
+al corte son la API respondiendo a un body {} inválido (hallazgo distinto, ya anotado como fuera de
+alcance en T29 — no es un fallo de Nginx ni de esta evidencia).

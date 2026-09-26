@@ -10,8 +10,8 @@
 | **Sembrada** | sí |
 | **Evidencia antes** | `docs/evidencia/VULN-015/evidencia.json` |
 | **Commit de remediación** | `18dea33` (T29) |
-| **Evidencia después** | |
-| **Run de Actions (antes/después)** | — / — |
+| **Evidencia después** | `docs/evidencia/VULN-015/evidencia.json` (`security/evidence/local-web-despues.txt`: `429` tras vaciarse el balde) |
+| **Run de Actions (antes/después)** | — / — (sin gate; local, Q18) |
 
 ## Evidencia
 
