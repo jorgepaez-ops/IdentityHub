@@ -1,0 +1,59 @@
+# .gitleaksignore — huellas exactas del historial (T31, decisión del usuario Q8: opción (a)).
+#
+# Cada huella listada aquí es un secreto ya conocido y documentado (línea base
+# deliberada, ADR 0007) o un falso positivo ya aprobado explícitamente (Q20).
+# Solo estas 14 huellas exactas están autorizadas: sin comodines, sin rutas,
+# sin patrones. Un secreto nuevo, en cualquier archivo o línea distinta, sigue
+# siendo detectado por el job `secrets`.
+
+# VULN-012 — secreto sembrado de la línea base, ADR 0007; se conserva como evidencia del antes.
+053e15fb27b1aaf974c7c818108eee64628973e9:backend/Dockerfile:contrasena-en-variable-de-entorno:48
+# VULN-012 — secreto sembrado de la línea base, ADR 0007; se conserva como evidencia del antes.
+053e15fb27b1aaf974c7c818108eee64628973e9:backend/Dockerfile:contrasena-en-variable-de-entorno:49
+# VULN-012 — secreto sembrado de la línea base, ADR 0007; se conserva como evidencia del antes.
+053e15fb27b1aaf974c7c818108eee64628973e9:backend/Dockerfile:contrasena-en-variable-de-entorno:64
+# VULN-001 — secreto sembrado de la línea base, ADR 0007; se conserva como evidencia del antes.
+053e15fb27b1aaf974c7c818108eee64628973e9:backend/internal/api/legacy_auth.go:aws-access-token:44
+# VULN-001 — secreto sembrado de la línea base, ADR 0007; se conserva como evidencia del antes.
+053e15fb27b1aaf974c7c818108eee64628973e9:backend/internal/api/legacy_auth.go:slack-bot-token:46
+# VULN-003 — secreto sembrado de la línea base, ADR 0007; se conserva como evidencia del antes.
+053e15fb27b1aaf974c7c818108eee64628973e9:deploy/docker-compose.yml:contrasena-en-variable-de-entorno:24
+# VULN-003 — secreto sembrado de la línea base, ADR 0007; se conserva como evidencia del antes.
+053e15fb27b1aaf974c7c818108eee64628973e9:deploy/docker-compose.yml:contrasena-en-variable-de-entorno:42
+# VULN-003 — secreto sembrado de la línea base, ADR 0007; se conserva como evidencia del antes.
+053e15fb27b1aaf974c7c818108eee64628973e9:deploy/docker-compose.yml:url-de-conexion-con-credenciales:82
+# VULN-003 — secreto sembrado de la línea base, ADR 0007; se conserva como evidencia del antes.
+053e15fb27b1aaf974c7c818108eee64628973e9:deploy/docker-compose.yml:url-de-conexion-con-credenciales:102
+# VULN-003 — secreto sembrado de la línea base, ADR 0007; se conserva como evidencia del antes.
+053e15fb27b1aaf974c7c818108eee64628973e9:deploy/docker-compose.yml:url-de-conexion-con-credenciales:103
+# VULN-003 — secreto sembrado de la línea base, ADR 0007; se conserva como evidencia del antes.
+053e15fb27b1aaf974c7c818108eee64628973e9:deploy/docker-compose.yml:url-de-conexion-con-credenciales:133
+# VULN-003 — secreto sembrado de la línea base, ADR 0007; se conserva como evidencia del antes.
+053e15fb27b1aaf974c7c818108eee64628973e9:deploy/docker-compose.yml:url-de-conexion-con-credenciales:134
+
+# Q20 (2026-09-21) — falso positivo en código propio, sin secreto: literal de estructura Go, no un valor real.
+4e8c6532a50c7766dd03d39b532af6d9e79648fc:backend/internal/config/config.go:contrasena-en-variable-de-entorno:106
+# Q20 (2026-09-21) — falso positivo en código propio, sin secreto: patrón de URL en una nota de handoff, no un valor real.
+f987772528ced85c71b6ee55c4453d0f5370d513:odd/tasks/idp-semana-2.md:url-de-conexion-con-credenciales:1000
+
+# ── Aparecidas al cerrar T31 (2026-09-26), aprobadas por el usuario en el momento — mismo criterio que Q20 ──
+# Falso positivo: sintaxis de Docker Compose para variables obligatorias
+# (${VAR:?VAR debe estar definida...}), no una contraseña. La introdujeron
+# T21/T26 al remediar VULN-003/012; el regex genérico lee "PASSWORD:?PASSWORD"
+# como si fuera una asignación con secreto.
+afab4e9dc73d3c07a59c66e70d25e13bcf6c37f1:deploy/docker-compose.yml:contrasena-en-variable-de-entorno:21
+afab4e9dc73d3c07a59c66e70d25e13bcf6c37f1:deploy/docker-compose.yml:contrasena-en-variable-de-entorno:25
+afab4e9dc73d3c07a59c66e70d25e13bcf6c37f1:deploy/docker-compose.yml:contrasena-en-variable-de-entorno:44
+afab4e9dc73d3c07a59c66e70d25e13bcf6c37f1:deploy/docker-compose.yml:contrasena-en-variable-de-entorno:196
+ba0ce220b43fabdeb9128f9f07726c804fa08969:deploy/docker-compose.yml:contrasena-en-variable-de-entorno:108
+ba0ce220b43fabdeb9128f9f07726c804fa08969:deploy/docker-compose.yml:contrasena-en-variable-de-entorno:140
+# Falso positivo: asignación de campo de struct Go (`Password: request.Password,`), no un valor literal.
+8ab9409b5c7f74361cd1e81643cefc0b20b8e9b2:backend/internal/api/login.go:contrasena-en-variable-de-entorno:25
+43d24640e71f83c52cf6099086d61c1cee8cafd5:backend/internal/api/register.go:contrasena-en-variable-de-entorno:26
+# Falso positivo: fixture de prueba con un valor inventado ("password-secret"), no un secreto real.
+f1547a0c05f681a0323491211225fcff7e66b96c:backend/internal/notify/notify_test.go:contrasena-en-variable-de-entorno:46
+# No es un falso positivo del regex: es el mismo valor inventado de la línea
+# base (ADR 0007, ya cubierto por VULN-003/VULN-012) copiado en un ejemplo de
+# comando de docs/guia-desarrollo.md. Nunca dio acceso a nada real; se
+# conserva como evidencia, igual que el resto de la línea base.
+ac159e86dc206f84a8f2163ace4f13682f3e2e22:docs/guia-desarrollo.md:url-de-conexion-con-credenciales:113
