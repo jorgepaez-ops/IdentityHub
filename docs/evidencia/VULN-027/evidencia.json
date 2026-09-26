@@ -1,0 +1,31 @@
+{
+  "vuln": "VULN-027",
+  "gate": [
+    "npm audit (ci.yml, job 5)"
+  ],
+  "antes": {
+    "commit_linea_base": null,
+    "commit_main": "f0a051f",
+    "workflow": "CI",
+    "run_id": "36259385478",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36259385478",
+    "artefacto": null,
+    "captura": null,
+    "hallazgos": [
+      "npm audit: 15 vulnerabilities (5 moderate, 8 high, 2 critical); esbuild <=0.24.2, minimatch 9.0.0-9.0.6 (3 ReDoS), react-router 6.0.0-7.17.0, undici <=6.27.0 (12 avisos)"
+    ],
+    "observacion": "No sembrada: hallazgo real que quedó documentado como fuera de alcance en T25 (2026-09-26), sin ficha propia hasta ahora. Mismo patrón que VULN-020."
+  },
+  "remediacion": {
+    "tarea": "T34a",
+    "commit": null,
+    "ficha": "security/findings/VULN-027-dependencias-frontend-post-t25.md"
+  },
+  "despues": {
+    "commit": null,
+    "workflow": null,
+    "run_id": null,
+    "run_url": null,
+    "captura": null
+  }
+}

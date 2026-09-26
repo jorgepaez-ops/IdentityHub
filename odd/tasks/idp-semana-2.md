@@ -1040,8 +1040,24 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 - Verificación: `python3 scripts/traceability.py --check`; `grep -c 'diferido' specs/07-traceability.md`; `make test-go`.
 - Commit:
 
+### T34a — Dependencias de build/frontend desactualizadas (VULN-027)
+- [ ] Estado · Ejecutor: `Claude` (`npm install` necesita red, ver regla en `CLAUDE.md`) · Cubre: AM-009 · Remedia: VULN-027 (vite/esbuild, minimatch/@typescript-eslint, react-router-dom, openapi-typescript/undici) · Bloquea a: T35
+- Hallazgo no previsto (como VULN-020): al cerrar el PR de la Fase 3 se confirmó que los 15 hallazgos
+  de `npm audit` que T25 dejó documentados como fuera de alcance no tienen arreglo sin salto de
+  versión mayor. T35 exige "CI en verde"; el usuario decidió resolver esto antes de T35 en vez de
+  aceptarlo como excepción permanente.
+  Subir `vite` (a v8), `@typescript-eslint/parser`/`@typescript-eslint/eslint-plugin` (a v8.70.1),
+  `react-router-dom` (a v7.18.4, o la versión estable más reciente disponible) y `openapi-typescript`
+  (a v7.13.0), verificando build, lint, tipos y tests después de cada uno por separado — son cambios
+  de versión mayor, revisar breaking changes de cada changelog antes de subir.
+- Criterios: `npm audit --audit-level=high` sin hallazgos; `npm run build`, `npm run lint`, `npm run typecheck`,
+  `npm run test` en verde; la SPA sigue funcionando (login real a través de Nginx, como en T29).
+- Verificación: `cd frontend && npm audit --audit-level=high && npm run build && npm run lint && npm run typecheck && npm run test`; smoke test manual con `make up`.
+- Commit:
+- Evidencia (`Usuario`):  - [ ] VULN-027
+
 ### T35 — CI en verde y evidencia "después"
-- [ ] Estado · Ejecutor: `Usuario` con Claude Desktop (PR, run, capturas en el informe) y `Claude` (completa los `evidencia.json`) · Cubre: todos los VULN de la Fase 3
+- [ ] Estado · Ejecutor: `Usuario` con Claude Desktop (PR, run, capturas en el informe) y `Claude` (completa los `evidencia.json`) · Cubre: todos los VULN de la Fase 3 · Bloqueada por: T34a
 - Abrir PR (o `workflow_dispatch`) con la rama; `CI` en verde. Registrar run ID/URL "después" en
   el "Registro de evidencia" y, como texto, en cada `evidencia.json` (`despues`, lo completa Claude con los
   datos que entrega Desktop); las capturas "después" van al informe externo (sin secretos). Prompt de Desktop
@@ -1077,8 +1093,8 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 | 1 — Contrato ejecutable | T1a, T1 a T3 (4) | 4 (T1a, T1, T2, T3) |
 | 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 20 (T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T14a, T15, T16, T17, T18, T19, T20, T21, T22) |
 | 3 — Remediación | T23 a T32 (10) | 10 (T23 a T32) |
-| 4 — Cierre | T33 a T38 (6) | 0 |
-| **Total** | **45** | **39** |
+| 4 — Cierre | T33 a T38 y T34a (7) | 0 |
+| **Total** | **46** | **39** |
 
 Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, cookie) y `T14a`
 (enmienda ADR 0005, sin ventana de gracia). Los ids existentes no cambian.
