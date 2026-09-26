@@ -860,11 +860,23 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 - Evidencia (`Usuario`):  - [ ] VULN-008  - [ ] VULN-009  - [ ] VULN-010  - [ ] VULN-011
 
 ### T28 — Dockerfile del frontend
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RNF-004, RNF-008 · Remedia: VULN-016, VULN-017, VULN-018 · Bloqueada por: T0.3
+- [x] Estado · Ejecutor: `Claude` (misma razón que T27: Codex no tiene el socket de Docker) · Cubre: RNF-004, RNF-008 · Remedia: VULN-016, VULN-017, VULN-018 · Bloqueada por: T0.3
 - Node LTS vigente en el builder, `nginxinc/nginx-unprivileged` fijado por digest real, usuario no-root; puerto 8080 se mantiene.
 - Criterios: Hadolint sin DL3007/DL3002; Trivy image sin HIGH/CRITICAL corregibles; `make up` sirve la SPA en 8080.
 - Verificación: `make scan-config`; `make build`; `make scan-image`; `cd frontend && npm run build`.
-- Commit:
+- **Hecho 2026-09-26.** Builder `node:24-bookworm` (Node 24, LTS activa desde octubre de 2025),
+  fijado por digest real. Imagen final `nginxinc/nginx-unprivileged:stable` (también por digest):
+  corre como uid 101 por defecto y ya escucha en 8080, así que `frontend/nginx/default.conf` no
+  necesitó ningún cambio. `USER 101` explícito de todas formas (mismo motivo que T27: Trivy config
+  no resuelve el `USER` heredado de una base referenciada solo por digest).
+- Comandos y resultado observado: `cd frontend && npm run build` en verde. `make scan-config`
+  (Trivy config + Hadolint): sin hallazgos en ningún Dockerfile — con esto los dos quedan limpios
+  (T27 ya había cerrado el de `backend`). `make build && make scan-image` sobre
+  `identity-hub-web`: `Total: 0 (HIGH: 0, CRITICAL: 0)`. `docker inspect --format
+  '{{.Config.User}}'` = `101`. `make up`: los 6 servicios arriba; `curl -sI
+  http://localhost:8080/` devuelve `200 OK` con el HTML de la SPA. `make test` (Go + frontend) en
+  verde.
+- Commit: 8f3d461
 - Evidencia (`Usuario`):  - [ ] VULN-016  - [ ] VULN-017  - [ ] VULN-018
 
 ### T29 — Nginx: cabeceras, `server_tokens` y `limit_req`
@@ -1256,4 +1268,9 @@ Formato por tarea (3 a 5 líneas):
 - Qué cambió: tomada directo por Claude (Codex no tiene el socket de Docker; la tarea es casi toda verificación con `docker`/`make build`/`make scan-image`). Builder `golang:1.25-bookworm` y final `gcr.io/distroless/static-debian12:nonroot`, ambos fijados por digest real, para `api` y `worker`. `USER 65532:65532` explícito en las dos (Trivy config no resuelve el `USER` heredado de una base referenciada solo por digest). `ADD` remoto eliminado. `cmd/api` gana un subcomando `healthcheck` (RED/GREEN con `httptest`, 3 pruebas `TestRNF004_*`) porque distroless no tiene `curl`; el compose lo invoca con exec form.
 - Comandos y resultado observado: Trivy image encontró CVEs HIGH/CRITICAL corregibles y reales en `golang.org/x/crypto` y `github.com/rabbitmq/amqp091-go` (arrastradas por `go.sum` aunque solo se usa `argon2`) — bloqueaban el propio criterio de aceptación de T27, así que se subieron a `v0.55.0`/`v1.15.0` (ninguna exige `go 1.26`, verificado antes de elegir versión). Tras eso: `make scan-config` sin hallazgos en `backend/Dockerfile`; `make scan-image` en `api` y `worker`: `Total: 0 (HIGH: 0, CRITICAL: 0)`; `docker inspect` confirma `65532:65532`; `make up` deja los 6 servicios arriba con `api` en `healthy`; `make test` y `go test -race ./...` en verde (dos rondas, la segunda tras arreglar `noctx`/`misspell` que marcó `golangci-lint`).
 - Dudas abiertas: ninguna bloqueante. `frontend/Dockerfile` sigue con el mismo hallazgo de Trivy config (`USER` root) — es VULN-018, alcance de T28, no se tocó.
+
+### T28 · 2026-09-26 · 8f3d461
+- Qué cambió: tomada directo por Claude (mismo motivo que T27). `frontend/Dockerfile`: builder `node:24-bookworm` y final `nginxinc/nginx-unprivileged:stable`, ambos por digest real. `USER 101` explícito (la base ya lo trae por defecto, pero Trivy config no lo resuelve si la base es solo un digest). `frontend/nginx/default.conf` no necesitó cambios: ya escuchaba en 8080, que es donde `nginx-unprivileged` espera.
+- Comandos y resultado observado: `npm run build` en verde. `make scan-config`: sin hallazgos en `backend/Dockerfile` ni `frontend/Dockerfile` (los dos Dockerfiles del proyecto quedan limpios). `make scan-image` sobre `identity-hub-web`: `Total: 0 (HIGH: 0, CRITICAL: 0)`. `docker inspect` confirma uid `101`. `make up` + `curl -sI http://localhost:8080/`: `200 OK`, SPA servida. `make test` en verde.
+- Dudas abiertas: ninguna.
 
