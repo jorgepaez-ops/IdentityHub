@@ -1018,12 +1018,25 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 ## Fase 4 — Trazabilidad, cierre y "después"
 
 ### T33 — Gate de cobertura (RNF-005)
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RNF-005 · Remedia: — · Depende de: T22
+- [x] Estado · Ejecutor: `Codex` + Sonnet 5 (store) · Cubre: RNF-005 · Remedia: — · Depende de: T22
 - En `ci.yml`, job `test-unit`, convertir el "Informe de cobertura" en gate: falla si la cobertura de `backend/internal/` < 70 %
   (el comentario del propio job pide activarlo en semana 2). Solo endurecer; no bajar el umbral ni excluir paquetes para llegar.
 - Criterios: con cobertura >= 70 % pasa; simulando un umbral de 99 % localmente falla.
 - Verificación: `make test-go` (imprime la cobertura total); comprobación del script del gate en local.
-- Commit:
+- **Cambio autorizado por el usuario (2026-09-26):** el gate se mide en el job `test-integration`
+  (Postgres real) con `-coverpkg=./internal/...`, no en `test-unit`. Motivo: `test-unit` corre con
+  `-short` y sin tag `integration`, así que `internal/store` y el código sqlc quedaban siempre en 0 %.
+  No se excluye ningún paquete. Ejecutor: Sonnet 5 (Codex no tiene Docker ni red).
+- Commit: `500635f` (tests unitarios de api, worker, admin y auditlog) y `9098d04` (tests de integración
+  de `internal/store` + gate movido a `test-integration`). Cobertura de `backend/internal/`: 77.2 %.
+- Progreso: `make test`, `make lint` (golangci-lint, 0 issues) y `make scan-secrets` en verde sobre `500635f`.
+  Sobre `9098d04`: suite de integración con Postgres local en verde (77.2 %), gate probado en local
+  (pasa con 70, falla con 99), golangci-lint 0 issues, gitleaks limpio. Falta confirmarlo en CI con el
+  próximo push.
+- Hallazgo (fuera de alcance, sin ficha): `TestRF001_UsersAceptaArgon2idYRechazaMD5`
+  (`internal/auth/password`, tag `integration`) falló 1 de 3 corridas de la suite completa en local y
+  pasó sola y en las otras 2. Intermitente; causa no confirmada (sospecha: `CREATE DATABASE`
+  concurrente entre paquetes en `testdb.New`).
 
 ### T34 — Regenerar la matriz de trazabilidad
 - [ ] Estado · Ejecutor: `Codex` · Cubre: RNF-011, todos los RF · Remedia: — · Depende de: T33
@@ -1109,7 +1122,7 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 | 1 — Contrato ejecutable | T1a, T1 a T3 (4) | 4 (T1a, T1, T2, T3) |
 | 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 20 (T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T14a, T15, T16, T17, T18, T19, T20, T21, T22) |
 | 3 — Remediación | T23 a T32 (10) | 10 (T23 a T32) |
-| 4 — Cierre | T33 a T38 y T34a (7) | 1 (T34a) |
+| 4 — Cierre | T33 a T38 y T34a (7) | 2 (T33, T34a) |
 | **Total** | **46** | **40** |
 
 Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, cookie) y `T14a`

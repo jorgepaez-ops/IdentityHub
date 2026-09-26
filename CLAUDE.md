@@ -45,6 +45,14 @@ volver a acordarse.
   mano y el job `secrets` de CI (que sí corre en cada push/PR). No asumir que el pre-commit de
   gitleaks protege nada hasta que alguien corra `pre-commit install` y se verifique.
 
+## Reparto de modelos (decisión del usuario, 2026-09-26)
+
+- **Opus 5.5 (sesión principal): auditar, orquestar y revisar.** No implementa tareas que un agente
+  menos capaz pueda hacer; revisa a fondo lo que ellos entregan antes de commitear.
+- **Codex es el ejecutor preferido.** El usuario quiere que Codex apoye siempre que pueda.
+- **Sonnet 5 (Agent con model "sonnet") cuando Codex no puede:** tareas cortas que necesitan red
+  saliente, el daemon de Docker o Postgres real (ver límites de Codex abajo).
+
 ## Delegación a Codex (`codex:codex-rescue`)
 
 - Nunca usar backticks simples en el prompt de instrucciones — ni para citar comandos, flags o
