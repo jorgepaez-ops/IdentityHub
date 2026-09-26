@@ -257,15 +257,16 @@ jobs:
         working-directory: backend
         run: go test -race -short -coverprofile=coverage.out -covermode=atomic ./...
 
-      # RNF-005 — Umbral de cobertura. Se activa como gate a partir de la
-      # semana 2, cuando exista lógica de dominio que medir; sobre un esqueleto
-      # el porcentaje no significa nada.
+      # RNF-005 — Informe de cobertura de este job. Es solo informativo: `-short`
+      # y sin el tag `integration` dejan `internal/store` y el código sqlc en 0 %,
+      # así que el gate real (>= 70 %) vive en el job "6b" con Postgres real y
+      # -coverpkg=./internal/... (ver su paso "Cobertura de internal/ (gate)").
       - name: Informe de cobertura
         working-directory: backend
         run: |
           go tool cover -func=coverage.out | tail -1
           COVERAGE=$(go tool cover -func=coverage.out | tail -1 | awk '{print substr($3, 1, length($3)-1)}')
-          echo "Cobertura actual: ${COVERAGE}% (umbral objetivo: 70%)"
+          echo "Cobertura actual (solo unitarias, sin gate): ${COVERAGE}%"
           echo "coverage=${COVERAGE}" >> "$GITHUB_OUTPUT"
         id: coverage
 
@@ -310,7 +311,26 @@ jobs:
 
       - name: go test integration
         working-directory: backend
-        run: go test -race -tags=integration ./...
+        run: go test -race -tags=integration -coverprofile=coverage.out -covermode=atomic -coverpkg=./internal/... ./...
+
+      # RNF-005 — Umbral de cobertura (>= 70 %). Este job corre con Postgres real
+      # y el tag `integration`, así que -coverpkg=./internal/... también atribuye
+      # cobertura a internal/store y a su código sqlc generado, que el job 6
+      # (unitarias, sin BD) nunca ejercita. No se excluye ningún paquete.
+      - name: Cobertura de internal/ (gate)
+        working-directory: backend
+        run: |
+          go tool cover -func=coverage.out | tail -1
+          COVERAGE=$(go tool cover -func=coverage.out | tail -1 | awk '{print substr($3, 1, length($3)-1)}')
+          echo "Cobertura actual: ${COVERAGE}% (umbral: 70%)"
+          awk -v coverage="$COVERAGE" 'BEGIN {
+            if (coverage + 0 < 70) {
+              printf "Cobertura insuficiente: %.1f%% (mínimo: 70%%)\n", coverage > "/dev/stderr"
+              exit 1
+            }
+          }'
+          echo "coverage=${COVERAGE}" >> "$GITHUB_OUTPUT"
+        id: coverage
 
   # ── 8. Configuración e infraestructura ──────────────────────────────────
   iac-scan:

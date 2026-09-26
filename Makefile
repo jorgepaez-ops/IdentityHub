@@ -73,8 +73,9 @@ test-go: ## Pruebas de Go con detector de carreras
 	cd backend && go test -race -coverprofile=coverage.out -covermode=atomic ./...
 	cd backend && go tool cover -func=coverage.out | tail -1
 
-test-integration: ## Pruebas de integración con PostgreSQL temporal
-	cd backend && go test -race -tags=integration ./...
+test-integration: ## Pruebas de integración con PostgreSQL temporal (imprime la cobertura del gate de CI)
+	cd backend && go test -race -tags=integration -coverprofile=coverage.out -covermode=atomic -coverpkg=./internal/... ./...
+	cd backend && go tool cover -func=coverage.out | tail -1
 
 test-front: ## Pruebas del frontend
 	cd frontend && npm run test
