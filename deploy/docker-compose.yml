@@ -1,12 +1,14 @@
 # ╔══════════════════════════════════════════════════════════════════════════╗
-# ║  Entorno de DESARROLLO — construye desde el código local.                 ║
-# ║                                                                          ║
-# ║  ⚠️ Contiene defectos sembrados a propósito (ver adr/0007):               ║
-# ║      VULN-019  imágenes base antiguas                  → Trivy image      ║
-# ║      VULN-020  sin endurecimiento de contenedores      → Trivy config     ║
+# ║  Entorno de DESARROLLO — construye desde el código local. Imágenes base   ║
+# ║  con soporte, fijadas por digest, y los tres servicios propios            ║
+# ║  endurecidos (read_only, cap_drop, no-new-privileges) desde T30.          ║
+# ║  Historia (ver specs/adr/0007): esta línea base sembraba a propósito      ║
+# ║  VULN-019 (imágenes base antiguas) y VULN-024 (sin endurecimiento; el     ║
+# ║  comentario original de este archivo lo llamaba "VULN-020", que en       ║
+# ║  realidad es el hallazgo de chi RealIP — ver VULN-024, Q9).               ║
 # ║                                                                          ║
 # ║  El compose de producción (docker-compose.prod.yml) llega en la semana 3: ║
-# ║  imágenes firmadas desde GHCR, secretos por entorno y endurecimiento.     ║
+# ║  imágenes firmadas desde GHCR y secretos por entorno gestionado.          ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 
 name: identity-hub
@@ -14,8 +16,8 @@ name: identity-hub
 services:
   # ── Datos ───────────────────────────────────────────────────────────────
   db:
-    # VULN-019 — PostgreSQL 14 sobre bullseye: rama antigua, muchos CVE de SO.
-    image: postgres:14-bullseye
+    # postgres:16-bookworm, con soporte, fijado por digest real.
+    image: postgres@sha256:efedf3595f1d6f415c08568ba171029bf54052e754cc9f030e3f2412b21f3d67
     environment:
       POSTGRES_USER: "${POSTGRES_USER:?POSTGRES_USER must be set in the repository root .env}"
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in the repository root .env}"
@@ -23,6 +25,9 @@ services:
       # Leída solo por deploy/postgres-init/01-identity-app-role.sh (Q21):
       # da login a identity_app (creado NOLOGIN por la migración 000002, T9).
       IDENTITY_APP_PASSWORD: "${IDENTITY_APP_PASSWORD:?IDENTITY_APP_PASSWORD must be set in the repository root .env}"
+    # Q12 (2026-09-19) — publicado al host a propósito en desarrollo (acceso
+    # directo con un cliente psql local); se revisa en docker-compose.prod.yml
+    # en la semana 3, no aquí.
     ports:
       - "5432:5432"
     volumes:
@@ -37,11 +42,13 @@ services:
       start_period: 10s
 
   broker:
-    # VULN-019 — RabbitMQ 3.11 está fuera de soporte.
-    image: rabbitmq:3.11-management
+    # rabbitmq:4-management, con soporte, fijado por digest real.
+    image: rabbitmq@sha256:ddc75301edf58a8332934cf2d801be7cbf8d65c6458d747364a8046238ff1c89
     environment:
       RABBITMQ_DEFAULT_USER: "${RABBITMQ_DEFAULT_USER:?RABBITMQ_DEFAULT_USER must be set in the repository root .env}"
       RABBITMQ_DEFAULT_PASS: "${RABBITMQ_DEFAULT_PASS:?RABBITMQ_DEFAULT_PASS must be set in the repository root .env}"
+    # Q12 (2026-09-19) — mismo criterio que `db`: publicado a propósito en
+    # desarrollo, se revisa en docker-compose.prod.yml en la semana 3.
     ports:
       - "5672:5672"    # AMQP
       - "15672:15672"  # interfaz de administración
@@ -119,8 +126,16 @@ services:
       timeout: 3s
       retries: 5
       start_period: 15s
-    # VULN-020 — Aquí faltan read_only, cap_drop, no-new-privileges y user.
-    # Se añaden en el compose de producción durante la remediación (RNF-008).
+    # T30 — endurecimiento (VULN-024): sistema de archivos raíz de solo
+    # lectura (el binario no escribe nada en disco), sin capacidades Linux y
+    # sin poder escalar privilegios. El usuario no-root ya lo fija la imagen
+    # (T27, distroless nonroot); tmpfs por si algo de la stdlib de Go
+    # necesita un temporal (perfiles, TLS), aunque hoy no le hace falta.
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /tmp
 
   worker:
     build:
@@ -146,6 +161,12 @@ services:
     ports:
       - "9091:9091"  # /metrics del worker
     restart: unless-stopped
+    # T30 — endurecimiento (VULN-024): mismo razonamiento que `api`.
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /tmp
 
   web:
     build:
@@ -156,6 +177,15 @@ services:
         condition: service_healthy
     ports:
       - "8080:8080"
+    # T30 — endurecimiento (VULN-024): el usuario no-root ya lo fija la
+    # imagen (T28, nginx-unprivileged); `nginx.conf` ya manda sus temporales
+    # (proxy_temp, client_temp, el pidfile) a /tmp, así que basta con tmpfs
+    # ahí para poder correr con el resto del filesystem en solo lectura.
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /tmp
 
   # ── Observabilidad (perfil aparte) ──────────────────────────────────────
   # Se arranca con:  docker compose --profile observability up -d
