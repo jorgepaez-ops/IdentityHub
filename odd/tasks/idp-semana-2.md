@@ -164,32 +164,32 @@ los archivos sembrados y fichas). Celdas vacías = aún no conocidas.
 
 | VULN | Hallazgo | Gate que lo detecta | Antes (run / captura) | Commit remediación | Después (run / captura) | Tarea |
 |---|---|---|---|---|---|---|
-| VULN-001 | Credenciales incrustadas (código, compose, Dockerfile) | Gitleaks (`secrets`), gosec G101 (`lint`), Trivy secret (imagen) | run 35476102444 / informe §3 | | | T23, T26 |
-| VULN-002 | MD5 para contraseñas | gosec G401/G501, CodeQL, Semgrep | run 35476102444 / informe §3 | | | T23 (con T7) |
-| VULN-003 | Credenciales en el compose | Gitleaks | run 35476102444 / informe §3 | | | T26 |
-| VULN-004 | `math/rand` para tokens | gosec G404 | run 35476102444 / informe §3 | | | T23 |
-| VULN-005 | SQL por concatenación | Ninguno hoy (D3 confirmado: sin G201/G202, Semgrep ni CodeQL) | run 35476102444 (no detectado) / informe §3 | | | T23 (con T5) |
-| VULN-006 | JWT sin validar algoritmo | Ninguno hoy (D3 confirmado) | run 35476102444 (no detectado) / informe §3 | | | T23 (con T8) |
-| VULN-007 | CORS comodín con credenciales | Ninguno hoy (D3 confirmado; ZAP en semana 3) | run 35476102444 (no detectado) / informe §3 | | | T23 |
-| VULN-008 | Base Debian 11 (backend) | `docker build` (falla: Debian 11 sin paquetes) y Trivy image sobre `debian:11-slim` | run 35476102444 / informe §3 | | | T27 |
-| VULN-009 | `USER root` (backend) | Trivy config DS002 (Hadolint no emite DL3002, D4); Trivy image pendiente (D2) | run 35476102444 / informe §3 | | | T27 |
-| VULN-010 | `apt-get` sin fijar ni limpiar | Hadolint DL3008/DL3009 | run 35476102444 / informe §3 | | | T27 |
-| VULN-011 | `ADD` desde URL remota | Ninguno hoy (Hadolint no marca un `ADD` con URL, D4) | run 35476102444 (no detectado) / sin captura | | | T27 |
-| VULN-012 | Secreto en `ENV` | Gitleaks, Trivy config DS031 | run 35476102444 / informe §3 | | | T26 |
-| VULN-013 | Sin CSP, HSTS, X-Frame-Options, nosniff | ZAP (semana 3; sin gate hoy) | local (`security/evidence/local-web-baseline.txt`) / sin captura | | | T29 |
-| VULN-014 | `server_tokens on` | ZAP (sin gate hoy) | local (`security/evidence/local-web-baseline.txt`) / sin captura | | | T29 |
-| VULN-015 | Sin `limit_req` en `/api/v1/auth/*` | AM-001/AM-017 (sin gate hoy) | local (`security/evidence/local-web-baseline.txt`) / sin captura | | | T29 |
-| VULN-016 | `node:18-bullseye` | Trivy image sobre `node:18-bullseye` (por nombre) | run 35534898422 / informe §3 | | | T28 |
-| VULN-017 | `nginx:latest` | Hadolint DL3007 | run 35476102444 / informe §3 | | | T28 |
-| VULN-018 | Imagen final del frontend como root | Trivy config DS002 (Hadolint no emite DL3002, D4) | run 35476102444 / informe §3 | | | T28 |
-| VULN-019 | Imágenes base antiguas en compose | Trivy image sobre las imágenes del compose (por nombre) | run 35534898422 / informe §3 | | | T30 |
-| VULN-020 | `RealIP` de chi suplantable (GO-2026-5774/5775/5777) | govulncheck (`sca`) | run 35476102444 / informe §3 | | | T6 |
-| VULN-021 | `golang-jwt/jwt/v4` (GO-2024-3250, GO-2025-3553) | govulncheck | run 35476102444 / informe §3 | | | T23 |
-| VULN-022 | pgx 5.5.1 (GO-2024-2606) | govulncheck | run 35476102444 / informe §3 | | | T24 |
-| VULN-023 | Reglas por defecto de Gitleaks insuficientes | comparación manual (ya `remediado`) | sin gate; sin run / sin captura | | | T31 (revisión) |
-| VULN-024 | Sin endurecimiento de contenedores (en el comentario del compose figura como VULN-020) | Ninguno hoy (Trivy config solo cubre los Dockerfiles, no el compose) | run 35476102444 (no detectado) / sin captura | | | T30 |
-| VULN-025 | axios 0.21.1 / lodash 4.17.15 | npm audit (baseline-scan), osv-scanner (solo en `ci.yml`) | run 35476102444 / informe §3 | | | T25 |
-| VULN-026 | `golang.org/x/text` (GO-2026-5970) | govulncheck | run 35476102444 / informe §3 | | | T24 |
+| VULN-001 | Credenciales incrustadas (código, compose, Dockerfile) | Gitleaks (`secrets`), gosec G101 (`lint`), Trivy secret (imagen) | run 35476102444 / informe §3 | `51a7a4f` (T23, código); `afab4e9` (T26, compose/Dockerfile) | | T23, T26 |
+| VULN-002 | MD5 para contraseñas | gosec G401/G501, CodeQL, Semgrep | run 35476102444 / informe §3 | `51a7a4f` | | T23 (con T7) |
+| VULN-003 | Credenciales en el compose | Gitleaks | run 35476102444 / informe §3 | `afab4e9` | | T26 |
+| VULN-004 | `math/rand` para tokens | gosec G404 | run 35476102444 / informe §3 | `51a7a4f` | | T23 |
+| VULN-005 | SQL por concatenación | Ninguno hoy (D3 confirmado: sin G201/G202, Semgrep ni CodeQL) | run 35476102444 (no detectado) / informe §3 | `51a7a4f` | | T23 (con T5) |
+| VULN-006 | JWT sin validar algoritmo | Ninguno hoy (D3 confirmado) | run 35476102444 (no detectado) / informe §3 | `51a7a4f` | | T23 (con T8) |
+| VULN-007 | CORS comodín con credenciales | Ninguno hoy (D3 confirmado; ZAP en semana 3) | run 35476102444 (no detectado) / informe §3 | `51a7a4f` | | T23 |
+| VULN-008 | Base Debian 11 (backend) | `docker build` (falla: Debian 11 sin paquetes) y Trivy image sobre `debian:11-slim` | run 35476102444 / informe §3 | `a0c64d6` | | T27 |
+| VULN-009 | `USER root` (backend) | Trivy config DS002 (Hadolint no emite DL3002, D4); Trivy image pendiente (D2) | run 35476102444 / informe §3 | `a0c64d6` | | T27 |
+| VULN-010 | `apt-get` sin fijar ni limpiar | Hadolint DL3008/DL3009 | run 35476102444 / informe §3 | `a0c64d6` | | T27 |
+| VULN-011 | `ADD` desde URL remota | Ninguno hoy (Hadolint no marca un `ADD` con URL, D4) | run 35476102444 (no detectado) / sin captura | `a0c64d6` | | T27 |
+| VULN-012 | Secreto en `ENV` | Gitleaks, Trivy config DS031 | run 35476102444 / informe §3 | `afab4e9` | | T26 |
+| VULN-013 | Sin CSP, HSTS, X-Frame-Options, nosniff | ZAP (semana 3; sin gate hoy) | local (`security/evidence/local-web-baseline.txt`) / sin captura | `18dea33` | | T29 |
+| VULN-014 | `server_tokens on` | ZAP (sin gate hoy) | local (`security/evidence/local-web-baseline.txt`) / sin captura | `18dea33` | | T29 |
+| VULN-015 | Sin `limit_req` en `/api/v1/auth/*` | AM-001/AM-017 (sin gate hoy) | local (`security/evidence/local-web-baseline.txt`) / sin captura | `18dea33` | | T29 |
+| VULN-016 | `node:18-bullseye` | Trivy image sobre `node:18-bullseye` (por nombre) | run 35534898422 / informe §3 | `8f3d461` | | T28 |
+| VULN-017 | `nginx:latest` | Hadolint DL3007 | run 35476102444 / informe §3 | `8f3d461` | | T28 |
+| VULN-018 | Imagen final del frontend como root | Trivy config DS002 (Hadolint no emite DL3002, D4) | run 35476102444 / informe §3 | `8f3d461` | | T28 |
+| VULN-019 | Imágenes base antiguas en compose | Trivy image sobre las imágenes del compose (por nombre) | run 35534898422 / informe §3 | `824be7d` (parcial: solo `postgres`/`rabbitmq`) | | T30 |
+| VULN-020 | `RealIP` de chi suplantable (GO-2026-5774/5775/5777) | govulncheck (`sca`) | run 35476102444 / informe §3 | `902a047` (T6; ficha corregida en la revisión de T32) | | T6 |
+| VULN-021 | `golang-jwt/jwt/v4` (GO-2024-3250, GO-2025-3553) | govulncheck | run 35476102444 / informe §3 | `51a7a4f` | | T23 |
+| VULN-022 | pgx 5.5.1 (GO-2024-2606) | govulncheck | run 35476102444 / informe §3 | `001a489` | | T24 |
+| VULN-023 | Reglas por defecto de Gitleaks insuficientes | comparación manual (ya `remediado`) | sin gate; sin run / sin captura | `8054f2e` (T31, `.gitleaksignore`) | | T31 (revisión) |
+| VULN-024 | Sin endurecimiento de contenedores (en el comentario del compose figura como VULN-020) | Ninguno hoy (Trivy config solo cubre los Dockerfiles, no el compose) | run 35476102444 (no detectado) / sin captura | `824be7d` | | T30 |
+| VULN-025 | axios 0.21.1 / lodash 4.17.15 | npm audit (baseline-scan), osv-scanner (solo en `ci.yml`) | run 35476102444 / informe §3 | `534f13e` | | T25 |
+| VULN-026 | `golang.org/x/text` (GO-2026-5970) | govulncheck | run 35476102444 / informe §3 | `001a489` | | T24 |
 
 Nota (Q9): `VULN-020` queda como el hallazgo de chi `RealIP`. VULN-024 a VULN-026 se asignan al
 crear sus fichas (T0.5); las fichas de 003, 004 y 006 a 019 también las crea T0.5, conservando sus
@@ -988,9 +988,25 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 - Evidencia (`Usuario`):  - [ ] VULN-023 (antes/después de la política acordada)
 
 ### T32 — Revisión de la Fase 3
-- [ ] Estado · Ejecutor: `Claude (revisión)` · Cubre: T23 a T31
+- [x] Estado · Ejecutor: `Claude (revisión)` · Cubre: T23 a T31
 - Revisar cada remediación contra su ficha y evidencia "antes"; comprobar que ningún gate se debilitó (`git diff` de `ci.yml`, `.gitleaks.toml`, `.trivyignore`).
-- Commit: —
+- **Hecho 2026-09-26.** `git log --oneline 51a7a4f..HEAD -- .github/workflows/ci.yml
+  .github/workflows/baseline-scan.yml .gitleaks.toml` no devuelve nada: ningún gate se tocó desde
+  que cerró T23. `.trivyignore` no existe (nunca se creó). Las 26 fichas se revisaron una por una
+  contra su "Estado" y su commit de remediación.
+  **Dos gaps de documentación encontrados y corregidos** (no de remediación — el código ya estaba
+  bien, faltaba registrarlo):
+  1. **VULN-020** (`RealIP` de chi) seguía marcado "abierto" en su ficha, sin commit de
+     remediación, aunque el hallazgo estaba cerrado desde **T6** (`902a047`): chi subió a v5.3.2
+     (>= v5.3.0, la versión corregida) y se añadió `TestRF017_BloqueoNoSeEvitaFalsificandoXForwardedFor`.
+     Confirmado con `govulncheck ./...`: ya no aparece ni como alcanzable ni como no alcanzable
+     (la versión instalada no contiene el código vulnerable). Ficha corregida a `remediado`.
+  2. La columna "Commit remediación" del "Registro de evidencia" (esta sección, más abajo) estaba
+     vacía en las 26 filas pese a que todas las fichas ya tenían su commit — se completó desde las
+     fichas.
+  Ningún otro estado de ficha estaba mal: 25 de 26 en `remediado`, VULN-019 correctamente en
+  `en remediación` (parcial, autorizado por el propio texto de T30).
+- Commit:
 
 ---
 
