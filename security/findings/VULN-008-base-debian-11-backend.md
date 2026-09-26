@@ -3,13 +3,13 @@
 | | |
 |---|---|
 | **Severidad** | CRITICAL y HIGH |
-| **Estado** | abierto |
+| **Estado** | remediado |
 | **Detectado por** | docker build (baseline-scan) · Trivy image sobre imágenes base (baseline-scan, run 35534898422) |
 | **Componente** | `backend/Dockerfile` (base `debian:11-slim`) |
 | **Amenaza** | AM-020 (escape de contenedor desde un proceso comprometido) |
 | **Sembrada** | sí |
 | **Evidencia antes** | `docs/evidencia/VULN-008/evidencia.json` |
-| **Commit de remediación** | |
+| **Commit de remediación** | `a0c64d6` (T27) |
 | **Evidencia después** | |
 | **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / — |
 
@@ -27,4 +27,7 @@ Una base sin soporte impide reconstrucciones fiables y conserva vulnerabilidades
 
 ## Remediación
 
-Actualizar y fijar las imágenes base soportadas en T27.
+Base final cambiada a `gcr.io/distroless/static-debian12:nonroot`, fijada por digest real
+(`sha256:afa5c872...`); builder a `golang:1.25-bookworm` (`sha256:3b4a1151...`), también por
+digest. Trivy image (`--severity HIGH,CRITICAL --ignore-unfixed`) sobre `identity-hub-api` e
+`identity-hub-worker`: `Total: 0 (HIGH: 0, CRITICAL: 0)`.

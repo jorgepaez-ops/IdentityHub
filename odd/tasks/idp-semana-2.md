@@ -830,12 +830,33 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 - Evidencia (`Usuario`):  - [ ] VULN-003  - [ ] VULN-012  - [ ] VULN-001 (Gitleaks/Trivy secret)
 
 ### T27 — Dockerfile del backend
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RNF-004, RNF-008, AM-020 · Remedia: VULN-008, VULN-009, VULN-010, VULN-011 · Bloqueada por: T0.3, T26
+- [x] Estado · Ejecutor: `Claude` (Codex no tiene el socket de Docker, ver regla en `CLAUDE.md`; esta tarea es casi toda verificación con Docker) · Cubre: RNF-004, RNF-008, AM-020 · Remedia: VULN-008, VULN-009, VULN-010, VULN-011 · Bloqueada por: T0.3, T26
 - Base distroless (o equivalente sin shell) fijada por digest real (verificado con `docker`), `USER` no-root,
   sin `apt-get` en la imagen final, sin `ADD` remoto; builder con versión de Go acorde; el healthcheck del compose usa `curl`: reemplazarlo por un mecanismo sin shell (p. ej. subcomando de sonda del binario) y ajustar el compose.
 - Criterios: `hadolint` sin DL3002/DL3008/DL3009/DL3020; Trivy image sin CRITICAL/HIGH corregibles (`--ignore-unfixed`); la imagen arranca como uid distinto de 0.
 - Verificación: `make scan-config`; `make build && make scan-image`; usuario de la imagen con `docker inspect --format '{{.Config.User}}' <imagen>` (en distroless no hay shell para `id`).
-- Commit:
+- **Hecho 2026-09-26.** Builder `golang:1.25-bookworm` (Go 1.25.14, satisface el `go 1.25.0` de
+  `go.mod`), fijado por digest real. Imagen final `gcr.io/distroless/static-debian12:nonroot`
+  (también por digest) para `api` y `worker`: sin shell, sin `apt-get`, con `ca-certificates` de
+  fábrica. `USER 65532:65532` explícito en ambas (defensa en profundidad: Trivy config no resuelve
+  el `USER` heredado de una base referenciada solo por digest). `ADD` remoto eliminado sin
+  reemplazo. El healthcheck del compose ya no usa `curl`: `cmd/api` gana un subcomando
+  `healthcheck` (RED/GREEN con `httptest`, 3 pruebas nuevas `TestRNF004_*`) que se autosondea sobre
+  `/healthz`, y el compose lo invoca como `["CMD", "/usr/local/bin/api", "healthcheck"]`.
+  **Hallazgo real que bloqueaba el propio criterio de aceptación:** Trivy image encontró CVEs
+  HIGH/CRITICAL corregibles en `golang.org/x/crypto` (familia `ssh`, aunque solo se usa `argon2`;
+  el binario la arrastra completa por `go.sum`) y `github.com/rabbitmq/amqp091-go`. Se subieron a
+  `v0.55.0` y `v1.15.0` respectivamente (ninguna exige `go 1.26`, verificado antes de elegir
+  versión, mismo método que T24). `govulncheck` pasó de 1 a 0 vulnerabilidades alcanzables.
+- Comandos y resultado observado: `make scan-config` (Trivy config + Hadolint): sin hallazgos en
+  `backend/Dockerfile` (el único que queda es `frontend/Dockerfile`, fuera de alcance, T28).
+  `make build && make scan-image`: `identity-hub-api` e `identity-hub-worker` en
+  `Total: 0 (HIGH: 0, CRITICAL: 0)`. `docker inspect --format '{{.Config.User}}'` = `65532:65532`
+  en ambas. `make up`: los seis servicios arrancan, `api` queda `healthy` con el nuevo subcomando.
+  `make test` (Go + frontend) en verde; `go test -race ./...` repetido dos veces (antes y después
+  de corregir `noctx`/`misspell` de `golangci-lint`) en verde. `python3 scripts/traceability.py`
+  regenerado (las 3 pruebas nuevas lo requerían).
+- Commit: a0c64d6
 - Evidencia (`Usuario`):  - [ ] VULN-008  - [ ] VULN-009  - [ ] VULN-010  - [ ] VULN-011
 
 ### T28 — Dockerfile del frontend
@@ -1230,4 +1251,9 @@ Formato por tarea (3 a 5 líneas):
 - Qué cambió: Codex avanzó bien el compose/Dockerfile (todas las credenciales a `${VAR:?...}` desde `.env`) pero se detuvo con razón en Q21 (`identity_app` `NOLOGIN` sin contraseña; usar `POSTGRES_USER` lo volvería superusuario) y además chocó con "permission denied" de su sandbox contra el socket de Docker al intentar verificar. El usuario eligió la opción de un script en `docker-entrypoint-initdb.d`; Claude terminó: nuevo `deploy/postgres-init/01-identity-app-role.sh`, montado solo en el servicio `db`, da `LOGIN`/contraseña a `identity_app` desde `IDENTITY_APP_PASSWORD` la primera vez que el volumen está vacío.
 - Comandos y resultado observado: sin `.env`, `docker compose ps` falla nombrando cada variable faltante (RED real). Con `.env` poblado (el usuario lo escribió con `!` por las reglas `deny` de Claude sobre `.env.*`) y el volumen recreado: `db` queda `healthy`, el log confirma que corrió el script, `migrate` aplica sus 3 migraciones, y una conexión `psql` directa como `identity_app` confirma login y `SELECT` sobre `users`, sin imprimir la contraseña. `make scan-secrets`: mismos 20 hallazgos de siempre, todos del commit de línea base `053e15f` (historial, no árbol de trabajo). `make test` en verde.
 - Dudas abiertas: `make up` con el stack completo (api/worker/web) sigue fallando porque `backend/Dockerfile` usa `golang:1.22-bullseye` contra un `go.mod` que exige `go 1.25` desde T6 — ya es alcance explícito de T27 ("builder con versión de Go acorde"), no algo nuevo. Se verificó T26 arrancando solo `db`/`broker`/`mailpit`/`migrate`. Codex etiquetó su pregunta como "Q20", que ya estaba usado por otra decisión (2026-09-21); Claude la renumeró a Q21.
+
+### T27 · 2026-09-26 · a0c64d6
+- Qué cambió: tomada directo por Claude (Codex no tiene el socket de Docker; la tarea es casi toda verificación con `docker`/`make build`/`make scan-image`). Builder `golang:1.25-bookworm` y final `gcr.io/distroless/static-debian12:nonroot`, ambos fijados por digest real, para `api` y `worker`. `USER 65532:65532` explícito en las dos (Trivy config no resuelve el `USER` heredado de una base referenciada solo por digest). `ADD` remoto eliminado. `cmd/api` gana un subcomando `healthcheck` (RED/GREEN con `httptest`, 3 pruebas `TestRNF004_*`) porque distroless no tiene `curl`; el compose lo invoca con exec form.
+- Comandos y resultado observado: Trivy image encontró CVEs HIGH/CRITICAL corregibles y reales en `golang.org/x/crypto` y `github.com/rabbitmq/amqp091-go` (arrastradas por `go.sum` aunque solo se usa `argon2`) — bloqueaban el propio criterio de aceptación de T27, así que se subieron a `v0.55.0`/`v1.15.0` (ninguna exige `go 1.26`, verificado antes de elegir versión). Tras eso: `make scan-config` sin hallazgos en `backend/Dockerfile`; `make scan-image` en `api` y `worker`: `Total: 0 (HIGH: 0, CRITICAL: 0)`; `docker inspect` confirma `65532:65532`; `make up` deja los 6 servicios arriba con `api` en `healthy`; `make test` y `go test -race ./...` en verde (dos rondas, la segunda tras arreglar `noctx`/`misspell` que marcó `golangci-lint`).
+- Dudas abiertas: ninguna bloqueante. `frontend/Dockerfile` sigue con el mismo hallazgo de Trivy config (`USER` root) — es VULN-018, alcance de T28, no se tocó.
 
