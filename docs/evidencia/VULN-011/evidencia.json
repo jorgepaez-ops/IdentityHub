@@ -13,14 +13,18 @@
   },
   "remediacion": {
     "tarea": "T27",
-    "commit": null,
-    "ficha": null
+    "commit": "a0c64d6",
+    "ficha": "security/findings/VULN-011-add-desde-url-remota.md"
   },
   "despues": {
-    "commit": null,
+    "commit": "a2b57e2",
     "workflow": null,
     "run_id": null,
     "run_url": null,
-    "captura": null
+    "captura": null,
+    "hallazgos": [
+      "backend/Dockerfile ya no tiene ninguna instrucción ADD: se eliminó por completo, sin reemplazo (diff del commit a0c64d6)"
+    ],
+    "observacion": "Sigue sin gate que lo detecte (ni antes ni después); evidencia por diff del commit, igual que VULN-005/006/007 en T23."
   }
 }

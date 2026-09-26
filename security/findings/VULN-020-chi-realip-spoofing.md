@@ -3,14 +3,14 @@
 | | |
 |---|---|
 | **Severidad** | HIGH |
-| **Estado** | abierto |
+| **Estado** | remediado |
 | **Detectado por** | govulncheck · job `sca` |
 | **Componente** | `github.com/go-chi/chi/v5@v5.0.11` → corregido en `v5.3.0` |
 | **Avisos** | GO-2026-5774, GO-2026-5775, GO-2026-5777 |
 | **Amenaza** | AM-001, AM-010 (frontera de confianza T2) |
 | **Sembrada** | **NO** — hallazgo no previsto |
 | **Evidencia antes** | |
-| **Commit de remediación** | |
+| **Commit de remediación** | `902a047` (T6) — hallazgo cerrado desde entonces; esta ficha quedó sin marcar hasta la revisión de T32 |
 | **Evidencia después** | |
 | **Run de Actions (antes/después)** | |
 

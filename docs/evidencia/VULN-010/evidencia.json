@@ -21,14 +21,18 @@
   },
   "remediacion": {
     "tarea": "T27",
-    "commit": null,
-    "ficha": null
+    "commit": "a0c64d6",
+    "ficha": "security/findings/VULN-010-apt-get-sin-fijar-ni-limpiar.md"
   },
   "despues": {
-    "commit": null,
+    "commit": "a2b57e2",
     "workflow": null,
     "run_id": null,
     "run_url": null,
-    "captura": null
+    "captura": null,
+    "hallazgos": [
+      "hadolint sobre backend/Dockerfile (local, T27): sin salida (limpio); apt-get eliminado por completo del Dockerfile, la imagen final es distroless sin gestor de paquetes"
+    ],
+    "observacion": "El \"antes\" venía de baseline-scan.yml, que solo corre sobre el tag v0.0.0-vuln-baseline. Confirmado con Desktop (job 108452162149): el job \"8 · Configuración de contenedores\" de ci.yml corre Trivy config pero NO tiene ningún step de Hadolint (tampoco en 9-10). No hay \"después\" de CI posible para este hallazgo hasta que baseline-scan.yml corra contra un tag nuevo (T38); mientras tanto, evidencia local ya verificada en T27."
   }
 }

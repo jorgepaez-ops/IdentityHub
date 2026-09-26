@@ -17,14 +17,18 @@
   },
   "remediacion": {
     "tarea": "T26",
-    "commit": null,
-    "ficha": null
+    "commit": "afab4e9",
+    "ficha": "security/findings/VULN-003-credenciales-en-el-compose.md"
   },
   "despues": {
-    "commit": null,
-    "workflow": null,
-    "run_id": null,
-    "run_url": null,
-    "captura": null
+    "commit": "a2b57e2",
+    "workflow": "CI",
+    "run_id": "36259385478",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36259385478",
+    "captura": null,
+    "hallazgos": [
+      "Job \"3 · Secretos en el historial\": \"no leaks found\" (27 commits, 51a7a4f^..a2b57e2)"
+    ],
+    "observacion": "Las credenciales de deploy/docker-compose.yml ya no aparecen; el gate está en verde con .gitleaksignore aplicando solo a la línea base (053e15f)."
   }
 }

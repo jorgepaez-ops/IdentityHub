@@ -33,10 +33,44 @@ import (
 )
 
 func main() {
+	// The distroless image (T27) has no shell or curl: the compose healthcheck
+	// invokes the binary itself instead of an external process.
+	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
+		os.Exit(runHealthcheck(http.DefaultClient, healthcheckURL()))
+	}
 	if err := run(); err != nil {
 		fmt.Fprintf(os.Stderr, "la api no pudo arrancar: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// healthcheckURL reads API_PORT directly instead of going through
+// config.Load(), which requires every mandatory variable of the main
+// process: the healthcheck only needs to know which local port to ask.
+func healthcheckURL() string {
+	port := os.Getenv("API_PORT")
+	if port == "" {
+		port = "8081"
+	}
+	return fmt.Sprintf("http://127.0.0.1:%s/healthz", port)
+}
+
+func runHealthcheck(client *http.Client, url string) int {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return 1
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return 1
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return 1
+	}
+	return 0
 }
 
 func run() error {

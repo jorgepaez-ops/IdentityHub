@@ -1,18 +1,12 @@
 # ╔══════════════════════════════════════════════════════════════════════════╗
-# ║  ⚠️  DOCKERFILE DELIBERADAMENTE VULNERABLE — NO CORREGIR SIN LEER ESTO    ║
-# ║                                                                          ║
-# ║  Ver specs/adr/0007-linea-base-vulnerable-deliberada.md                   ║
-# ║                                                                          ║
-# ║    VULN-016  node:18-bullseye, rama sin soporte        → Trivy image      ║
-# ║    VULN-017  nginx:latest, etiqueta móvil sin fijar    → Hadolint DL3007  ║
-# ║    VULN-018  la imagen final corre como root           → Hadolint DL3002  ║
-# ║                                                                          ║
-# ║  La versión remediada usa una LTS de Node vigente, nginx-unprivileged     ║
-# ║  fijado por digest y un usuario no-root.                                  ║
+# ║  Builder Node LTS vigente y nginx-unprivileged, ambos fijados por digest   ║
+# ║  real, usuario no-root explícito (T28). Historia (ver specs/adr/0007):    ║
+# ║  esta línea base sembraba a propósito VULN-016 (Node 18/bullseye sin      ║
+# ║  soporte), VULN-017 (`nginx:latest` sin fijar) y VULN-018 (root).         ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 
-# VULN-016 — Node 18 sobre Debian bullseye (11): ambas ramas acumulan CVE.
-FROM node:18-bullseye AS builder
+# node:24-bookworm — Node 24, LTS activa (desde octubre de 2025).
+FROM node@sha256:64af3819f9275802414d7cdc38c27e9d82bd564dec4d4da87d008255d36c63b4 AS builder
 
 WORKDIR /app
 
@@ -25,16 +19,18 @@ COPY . .
 RUN npm run build
 
 # ── Imagen final ──────────────────────────────────────────────────────────
-# VULN-017 — `latest` es una etiqueta móvil: la construcción de hoy y la de
-# mañana pueden no ser la misma imagen, y eso rompe la reproducibilidad y la
-# cadena de suministro. Lo correcto es fijar por digest.
-FROM nginx:latest AS web
+# nginxinc/nginx-unprivileged:stable — corre como uid 101 por defecto y ya
+# escucha en el puerto 8080 que usa este proyecto, sin cambiar nada más.
+FROM nginxinc/nginx-unprivileged@sha256:0918d093d6088225655ddf602fdf00679c1c0c9a89c01c6dcdce5ee5e6c2f3f3 AS web
 
 COPY nginx/default.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/dist /usr/share/nginx/html
 
 EXPOSE 8080
 
-# VULN-018 — nginx arranca su proceso maestro como root. La imagen
-# `nginxinc/nginx-unprivileged` existe justamente para evitarlo.
+# Explícito además del valor por defecto de la imagen: Trivy config (DS002)
+# analiza el Dockerfile de forma estática y no resuelve el USER heredado de
+# una base referenciada solo por digest (mismo caso que backend/Dockerfile, T27).
+USER 101
+
 CMD ["nginx", "-g", "daemon off;"]

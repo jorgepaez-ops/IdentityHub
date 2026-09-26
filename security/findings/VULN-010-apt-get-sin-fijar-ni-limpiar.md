@@ -3,15 +3,15 @@
 | | |
 |---|---|
 | **Severidad** | HIGH |
-| **Estado** | abierto |
+| **Estado** | remediado |
 | **Detectado por** | Hadolint DL3008/DL3009 (baseline-scan) · Trivy config DS029 |
 | **Componente** | `backend/Dockerfile:24,51,66` |
 | **Amenaza** | AM-020 (escape de contenedor desde un proceso comprometido) |
 | **Sembrada** | sí |
 | **Evidencia antes** | `docs/evidencia/VULN-010/evidencia.json` |
-| **Commit de remediación** | |
-| **Evidencia después** | |
-| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / — |
+| **Commit de remediación** | `a0c64d6` (T27) |
+| **Evidencia después** | `docs/evidencia/VULN-010/evidencia.json` (hadolint local, T27: limpio; `ci.yml` no corre Hadolint, confirmado por Desktop) |
+| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / — (sin gate de Hadolint en `ci.yml`; espera a `baseline-scan.yml` en T38) |
 
 ## Evidencia
 
@@ -28,4 +28,7 @@ Dependencias no fijadas y capas con paquetes sobrantes reducen reproducibilidad 
 
 ## Remediación
 
-Fijar dependencias, usar `--no-install-recommends` y limpiar listas en T27.
+`apt-get` eliminado por completo del `backend/Dockerfile`: la imagen final distroless no tiene
+gestor de paquetes, y ya trae `ca-certificates` de fábrica; `curl` dejó de hacer falta (T27 le da
+al binario su propio subcomando `healthcheck`). Hadolint sobre `backend/Dockerfile`: sin
+DL3008/DL3009/DL3015.

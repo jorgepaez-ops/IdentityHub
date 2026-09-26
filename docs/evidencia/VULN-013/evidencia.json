@@ -16,14 +16,19 @@
   },
   "remediacion": {
     "tarea": "T29",
-    "commit": null,
-    "ficha": null
+    "commit": "18dea33",
+    "ficha": "security/findings/VULN-013-sin-cabeceras-de-seguridad.md"
   },
   "despues": {
-    "commit": null,
+    "commit": "a2b57e2",
     "workflow": null,
     "run_id": null,
     "run_url": null,
-    "captura": null
+    "artefacto": "security/evidence/local-web-despues.txt",
+    "captura": null,
+    "hallazgos": [
+      "curl -sI http://localhost:8080/: las cinco cabeceras de RNF-009 presentes (Content-Security-Policy, Strict-Transport-Security, X-Content-Type-Options, X-Frame-Options, Referrer-Policy)"
+    ],
+    "observacion": "Sin gate hoy (ZAP llega en semana 3, misma decisión Q18 que el antes). Ejecución local del 2026-09-26 con el stack completo (make up) sobre PR #2."
   }
 }

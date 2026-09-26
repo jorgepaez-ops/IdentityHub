@@ -13,14 +13,15 @@
   },
   "remediacion": {
     "tarea": "T23",
-    "commit": null,
-    "ficha": null
+    "commit": "51a7a4f",
+    "ficha": "security/findings/VULN-006-jwt-sin-validar-algoritmo.md"
   },
   "despues": {
-    "commit": null,
+    "commit": "51a7a4f",
     "workflow": null,
     "run_id": null,
-    "run_url": null,
-    "captura": null
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/commit/51a7a4f86e41f6ef17fe6e39ef4337cbd11402be",
+    "captura": "informe Desktop §3 VULN-005/006/007",
+    "observacion": "Sin gate propio: evidencia por diff del commit (legacy_auth.go borrado entero). De paso, Security > Code scanning alerta #81 (CodeQL go/log-injection, legacy_auth.go:113, relacionada pero no es este VULN) también sigue \"Open · On branch main\" por Discrepancia #6."
   }
 }

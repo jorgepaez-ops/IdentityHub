@@ -18,14 +18,17 @@
   },
   "remediacion": {
     "tarea": "T23",
-    "commit": null,
+    "commit": "51a7a4f",
     "ficha": "security/findings/VULN-021-golang-jwt-v4.md"
   },
   "despues": {
-    "commit": null,
-    "workflow": null,
-    "run_id": null,
-    "run_url": null,
-    "captura": null
+    "commit": "55404f3",
+    "workflow": "CI",
+    "run_id": "36208104969",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36208104969",
+    "captura": "informe Desktop §3 VULN-021",
+    "hallazgos_ausentes": [
+      "GO-2025-3553 y GO-2024-3250 ya no aparecen en govulncheck (job 5 · Dependencias vulnerables). Esa corrida sigue mostrando 5 vulnerabilidades (GO-2026-6372, GO-2026-5970, GO-2026-5004, GO-2024-2606, GO-2024-2567) y \"Your code is affected by 5 vulnerabilities from 3 modules\" — todas de pgx/v5, alcance de T24, no de VULN-021."
+    ]
   }
 }

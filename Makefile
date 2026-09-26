@@ -22,14 +22,14 @@ up: ## Levanta el stack de desarrollo
 	@echo ""
 	@echo "  Aplicación      http://localhost:8080"
 	@echo "  API             http://localhost:8081/healthz"
-	@echo "  RabbitMQ        http://localhost:15672   (identity / rabbit_admin_2024)"
+	@echo "  RabbitMQ        http://localhost:15672   (credentials from .env)"
 	@echo "  Mailpit         http://localhost:8025"
 	@echo ""
 	@echo "  Observabilidad: make up-obs  →  Grafana en http://localhost:3000"
 
 up-obs: ## Levanta el stack incluida la observabilidad
 	$(COMPOSE_OBS) up -d --build
-	@echo "  Grafana         http://localhost:3000     (admin / admin)"
+	@echo "  Grafana         http://localhost:3000     (credentials from .env)"
 	@echo "  Prometheus      http://localhost:9090"
 
 down: ## Detiene el stack conservando los volúmenes

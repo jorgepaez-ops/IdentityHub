@@ -22,14 +22,18 @@
   },
   "remediacion": {
     "tarea": "T23, T26",
-    "commit": null,
+    "commit": "51a7a4f (T23, legacy_auth.go); afab4e9 (T26, compose/Dockerfile)",
     "ficha": "security/findings/VULN-001-credenciales-incrustadas.md"
   },
   "despues": {
-    "commit": null,
-    "workflow": null,
-    "run_id": null,
-    "run_url": null,
-    "captura": null
+    "commit": "a2b57e2",
+    "workflow": "CI",
+    "run_id": "36259385478",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36259385478",
+    "captura": null,
+    "hallazgos": [
+      "Job \"3 · Secretos en el historial\": gitleaks detect sobre el rango 51a7a4f^..a2b57e2 (27 commits del PR): \"no leaks found\""
+    ],
+    "observacion": "Texto literal de Desktop (job 108452162174): el escaneo del job está acotado al rango de commits del PR (--log-opts=--first-parent 51a7a4f^..a2b57e2), no a todo el historial. gosec G101 (job \"2 · Lint y tipos\") también en verde."
   }
 }

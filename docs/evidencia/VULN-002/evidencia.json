@@ -24,14 +24,18 @@
   },
   "remediacion": {
     "tarea": "T23",
-    "commit": null,
+    "commit": "51a7a4f",
     "ficha": "security/findings/VULN-002-md5-para-contrasenas.md"
   },
   "despues": {
-    "commit": null,
-    "workflow": null,
-    "run_id": null,
-    "run_url": null,
-    "captura": null
+    "commit": "55404f3",
+    "workflow": "CI",
+    "run_id": "36208104969",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36208104969",
+    "captura": "informe Desktop §3 VULN-002",
+    "hallazgos_ausentes": [
+      "gosec G401/G501 (golangci-lint: \"0 issues.\" / \"golangci-lint found no issues\", job 2 · Lint y tipos, paso golangci-lint (incluye gosec), 26025ms)"
+    ],
+    "observacion": "Security > Code scanning alerta #43 (Semgrep use-of-md5) sigue \"Open · On branch main\": GitHub referencia el estado de la alerta contra main, no contra feat/idp-semana-2 (aún no mergeada) — ver Discrepancia #6 del informe Desktop. El mecanismo de cierre funciona: la alerta #4 ya aparece \"closed as fixed\" en un caso con el fix en main."
   }
 }

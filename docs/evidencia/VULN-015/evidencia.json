@@ -16,14 +16,19 @@
   },
   "remediacion": {
     "tarea": "T29",
-    "commit": null,
-    "ficha": null
+    "commit": "18dea33",
+    "ficha": "security/findings/VULN-015-sin-limit-req-auth.md"
   },
   "despues": {
-    "commit": null,
+    "commit": "a2b57e2",
     "workflow": null,
     "run_id": null,
     "run_url": null,
-    "captura": null
+    "artefacto": "security/evidence/local-web-despues.txt",
+    "captura": null,
+    "hallazgos": [
+      "10 POST seguidos a /api/v1/auth/login: los primeros 7 dan 500 (body {} inválido, hallazgo distinto y ya anotado en T29), los siguientes 3 dan 429 (limit_req activo, burst=5)"
+    ],
+    "observacion": "Sin gate hoy. Misma ejecución local que VULN-013. A diferencia del antes (502 por falta de API), aquí sí hay API detrás; el corte a 429 llega antes de que la ráfaga complete el burst configurado."
   }
 }

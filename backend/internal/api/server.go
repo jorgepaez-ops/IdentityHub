@@ -104,12 +104,6 @@ func (s *Server) Routes() http.Handler {
 	// de Docker, puede alcanzarlo.
 	r.Handle("/metrics", promhttp.Handler())
 
-	r.Route("/api/v1", func(r chi.Router) {
-		// ⚠️ Endpoint de la línea base vulnerable. No está en el contrato
-		// OpenAPI y se elimina en la fase de remediación (ver adr/0007).
-		r.Get("/auth/legacy-login", s.LegacyLogin)
-	})
-
 	return HandlerWithOptions(s, ChiServerOptions{BaseRouter: r, ErrorHandlerFunc: s.handleBindingError})
 }
 

@@ -20,14 +20,18 @@
   },
   "remediacion": {
     "tarea": "T27",
-    "commit": null,
-    "ficha": null
+    "commit": "a0c64d6",
+    "ficha": "security/findings/VULN-008-base-debian-11-backend.md"
   },
   "despues": {
-    "commit": null,
-    "workflow": null,
-    "run_id": null,
-    "run_url": null,
-    "captura": null
+    "commit": "a2b57e2",
+    "workflow": "CI",
+    "run_id": "36259385478",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36259385478",
+    "captura": null,
+    "hallazgos": [
+      "Job \"9-10 · Construir y escanear imágenes (api)\": Trivy image, targets \"identity-hub/api ... (debian 12.15)\" y \"usr/local/bin/api (gobinary)\", ambos con 0 vulnerabilidades"
+    ],
+    "observacion": "Texto literal de Desktop (job 108452298422): el formato de esta versión de Trivy usa columna \"Vulnerabilities\" = 0 en vez de \"Total: 0 (HIGH: 0, CRITICAL: 0)\"; mismo dato, redacción distinta a la usada en verificación local."
   }
 }

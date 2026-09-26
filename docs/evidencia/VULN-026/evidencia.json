@@ -18,14 +18,18 @@
   },
   "remediacion": {
     "tarea": "T24",
-    "commit": null,
-    "ficha": null
+    "commit": "001a489",
+    "ficha": "security/findings/VULN-026-golang-x-text-go-2026-5970.md"
   },
   "despues": {
-    "commit": null,
-    "workflow": null,
-    "run_id": null,
-    "run_url": null,
-    "captura": null
+    "commit": "a2b57e2",
+    "workflow": "CI",
+    "run_id": "36259385478",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36259385478",
+    "captura": null,
+    "hallazgos": [
+      "Job \"5 · Dependencias vulnerables\", paso govulncheck: \"No vulnerabilities found. Your code is affected by 0 vulnerabilities.\""
+    ],
+    "observacion": "Mismo paso que VULN-022 (job 108452162164, texto literal de Desktop); el job sigue en rojo por npm audit, no por Go."
   }
 }

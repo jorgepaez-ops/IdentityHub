@@ -18,14 +18,18 @@
   },
   "remediacion": {
     "tarea": "T28",
-    "commit": null,
-    "ficha": null
+    "commit": "8f3d461",
+    "ficha": "security/findings/VULN-018-imagen-frontend-root.md"
   },
   "despues": {
-    "commit": null,
-    "workflow": null,
-    "run_id": null,
-    "run_url": null,
-    "captura": null
+    "commit": "a2b57e2",
+    "workflow": "CI",
+    "run_id": "36259385478",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36259385478",
+    "captura": null,
+    "hallazgos": [
+      "Job \"8 · Configuración de contenedores\": Trivy config, frontend/Dockerfile con 0 misconfiguraciones"
+    ],
+    "observacion": "Texto literal de Desktop (job 108452162149). Confirmado también en local con docker inspect: USER 101."
   }
 }

@@ -3,15 +3,15 @@
 | | |
 |---|---|
 | **Severidad** | no informada por el escáner |
-| **Estado** | abierto |
+| **Estado** | remediado |
 | **Detectado por** | ningún gate lo detecta hoy |
 | **Componente** | `frontend/nginx/default.conf` (sin línea reportada por el escáner) |
 | **Amenaza** | AM-001 (fuerza bruta sobre contraseñas) · AM-017 (Argon2id como amplificador) |
 | **Sembrada** | sí |
 | **Evidencia antes** | `docs/evidencia/VULN-015/evidencia.json` |
-| **Commit de remediación** | |
-| **Evidencia después** | |
-| **Run de Actions (antes/después)** | — / — |
+| **Commit de remediación** | `18dea33` (T29) |
+| **Evidencia después** | `docs/evidencia/VULN-015/evidencia.json` (`security/evidence/local-web-despues.txt`: `429` tras vaciarse el balde) |
+| **Run de Actions (antes/después)** | — / — (sin gate; local, Q18) |
 
 ## Evidencia
 
@@ -25,4 +25,8 @@ Sin limitación previa al proxy, intentos masivos de login permiten fuerza bruta
 
 ## Remediación
 
-Configurar `limit_req` para las rutas de autenticación en T29.
+`limit_req_zone` (5r/s) y `location /api/v1/auth/` con `limit_req zone=auth burst=5 nodelay` y
+`limit_req_status 429` (para que coincida con el `429` que ya declara el contrato OpenAPI, en vez
+del `503` por defecto de nginx). Verificado con una ráfaga real de 30 `POST` a
+`/api/v1/auth/login` contra el stack levantado: las primeras pasan, el resto vuelve `429` hasta
+que el balde de tokens se vacía.

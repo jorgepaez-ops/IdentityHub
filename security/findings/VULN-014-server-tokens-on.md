@@ -3,15 +3,15 @@
 | | |
 |---|---|
 | **Severidad** | no informada por el escáner |
-| **Estado** | abierto |
+| **Estado** | remediado |
 | **Detectado por** | ningún gate lo detecta hoy |
 | **Componente** | `frontend/nginx/default.conf` (sin línea reportada por el escáner) |
 | **Amenaza** | sin amenaza asociada en el modelo |
 | **Sembrada** | sí |
 | **Evidencia antes** | `docs/evidencia/VULN-014/evidencia.json` |
-| **Commit de remediación** | |
-| **Evidencia después** | |
-| **Run de Actions (antes/después)** | — / — |
+| **Commit de remediación** | `18dea33` (T29) |
+| **Evidencia después** | `docs/evidencia/VULN-014/evidencia.json` (`security/evidence/local-web-despues.txt`: `Server: nginx`, sin versión) |
+| **Run de Actions (antes/después)** | — / — (sin gate; local, Q18) |
 
 ## Evidencia
 
@@ -25,4 +25,5 @@ Exponer la versión facilita que un atacante seleccione exploits y reconocimient
 
 ## Remediación
 
-Desactivar `server_tokens` en T29.
+`server_tokens off;`. Verificado con `curl -sI http://localhost:8080/`: `Server: nginx`, sin
+número de versión.

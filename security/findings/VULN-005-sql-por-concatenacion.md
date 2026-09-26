@@ -3,15 +3,15 @@
 | | |
 |---|---|
 | **Severidad** | CRITICAL |
-| **Estado** | abierto |
+| **Estado** | remediado |
 | **Detectado por** | gosec G201 · CodeQL `go/sql-injection` · Semgrep |
 | **Componente** | `backend/internal/api/legacy_auth.go:66-68` |
 | **Amenaza** | AM-006 (manipulación) |
 | **Sembrada** | sí |
-| **Evidencia antes** | |
-| **Commit de remediación** | |
-| **Evidencia después** | |
-| **Run de Actions (antes/después)** | |
+| **Evidencia antes** | `docs/evidencia/VULN-005/evidencia.json` |
+| **Commit de remediación** | `51a7a4f` (T23) |
+| **Evidencia después** | `docs/evidencia/VULN-005/evidencia.json` (sin gate propio; evidencia por diff del commit, `legacy_auth.go` borrado entero) |
+| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / — (evidencia por commit, no por run) |
 
 ## Evidencia
 

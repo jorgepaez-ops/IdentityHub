@@ -19,14 +19,18 @@
   },
   "remediacion": {
     "tarea": "T28",
-    "commit": null,
-    "ficha": null
+    "commit": "8f3d461",
+    "ficha": "security/findings/VULN-016-node-18-bullseye.md"
   },
   "despues": {
-    "commit": null,
-    "workflow": null,
-    "run_id": null,
-    "run_url": null,
-    "captura": null
+    "commit": "a2b57e2",
+    "workflow": "CI",
+    "run_id": "36259385478",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36259385478",
+    "captura": null,
+    "hallazgos": [
+      "Job \"9-10 · Construir y escanear imágenes (web)\": Trivy image, target \"identity-hub/web ... (debian 13.7)\" con 0 vulnerabilidades"
+    ],
+    "observacion": "Texto literal de Desktop (job 108452298417). El builder node:18-bullseye ya no está en el Dockerfile (node:24-bookworm por digest); la imagen final es nginx-unprivileged, no lleva Node."
   }
 }

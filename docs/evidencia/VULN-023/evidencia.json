@@ -13,14 +13,18 @@
   },
   "remediacion": {
     "tarea": "T31",
-    "commit": null,
+    "commit": "8054f2e",
     "ficha": "security/findings/VULN-023-reglas-por-defecto-de-gitleaks-insuficientes.md"
   },
   "despues": {
-    "commit": null,
-    "workflow": null,
-    "run_id": null,
-    "run_url": null,
-    "captura": null
+    "commit": "a2b57e2",
+    "workflow": "CI",
+    "run_id": "36259385478",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36259385478",
+    "captura": null,
+    "hallazgos": [
+      "Job \"3 · Secretos en el historial\": \"no leaks found\" con .gitleaksignore (26 huellas exactas) aplicado"
+    ],
+    "observacion": "Confirma que las reglas propias de .gitleaks.toml siguen detectando (12 de 12 en la línea base) y que el .gitleaksignore por huella exacta funciona sin ocultar nada nuevo."
   }
 }

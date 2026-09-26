@@ -19,14 +19,18 @@
   },
   "remediacion": {
     "tarea": "T25",
-    "commit": null,
-    "ficha": null
+    "commit": "534f13e",
+    "ficha": "security/findings/VULN-025-axios-y-lodash-desactualizados.md"
   },
   "despues": {
-    "commit": null,
-    "workflow": null,
-    "run_id": null,
-    "run_url": null,
-    "captura": null
+    "commit": "a2b57e2",
+    "workflow": "CI",
+    "run_id": "36259385478",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36259385478",
+    "captura": null,
+    "hallazgos": [
+      "Job \"5 · Dependencias vulnerables\", paso npm audit: \"15 vulnerabilities (5 moderate, 8 high, 2 critical)\", sin axios ni lodash en el listado"
+    ],
+    "observacion": "Texto literal de Desktop (job 108452162164): bajó de 17 a 15 (las 2 de axios/lodash); las 15 restantes son el gap ya documentado en T25 (esbuild/vite, minimatch/@typescript-eslint, react-router, undici/openapi-typescript), no relacionado con este hallazgo. El job sigue en rojo por esas 15, a propósito."
   }
 }

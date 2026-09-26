@@ -19,14 +19,18 @@
   },
   "remediacion": {
     "tarea": "T23",
-    "commit": null,
-    "ficha": null
+    "commit": "51a7a4f",
+    "ficha": "security/findings/VULN-004-math-rand-para-tokens.md"
   },
   "despues": {
-    "commit": null,
-    "workflow": null,
-    "run_id": null,
-    "run_url": null,
-    "captura": null
+    "commit": "55404f3",
+    "workflow": "CI",
+    "run_id": "36208104969",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36208104969",
+    "captura": "informe Desktop §3 VULN-004",
+    "hallazgos_ausentes": [
+      "gosec G404 (golangci-lint: \"0 issues.\", job 2 · Lint y tipos, paso golangci-lint (incluye gosec))"
+    ],
+    "observacion": "Security > Code scanning alerta #42 (Semgrep math-random-used) sigue \"Open · On branch main\" por el mismo motivo que VULN-002 (Discrepancia #6): la alerta referencia main, no la rama sin mergear."
   }
 }

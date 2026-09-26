@@ -1,13 +1,14 @@
 # ╔══════════════════════════════════════════════════════════════════════════╗
-# ║  Entorno de DESARROLLO — construye desde el código local.                 ║
-# ║                                                                          ║
-# ║  ⚠️ Contiene defectos sembrados a propósito (ver adr/0007):               ║
-# ║      VULN-003  credenciales incrustadas en el compose  → Gitleaks         ║
-# ║      VULN-019  imágenes base antiguas                  → Trivy image      ║
-# ║      VULN-020  sin endurecimiento de contenedores      → Trivy config     ║
+# ║  Entorno de DESARROLLO — construye desde el código local. Imágenes base   ║
+# ║  con soporte, fijadas por digest, y los tres servicios propios            ║
+# ║  endurecidos (read_only, cap_drop, no-new-privileges) desde T30.          ║
+# ║  Historia (ver specs/adr/0007): esta línea base sembraba a propósito      ║
+# ║  VULN-019 (imágenes base antiguas) y VULN-024 (sin endurecimiento; el     ║
+# ║  comentario original de este archivo lo llamaba "VULN-020", que en       ║
+# ║  realidad es el hallazgo de chi RealIP — ver VULN-024, Q9).               ║
 # ║                                                                          ║
 # ║  El compose de producción (docker-compose.prod.yml) llega en la semana 3: ║
-# ║  imágenes firmadas desde GHCR, secretos por entorno y endurecimiento.     ║
+# ║  imágenes firmadas desde GHCR y secretos por entorno gestionado.          ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 
 name: identity-hub
@@ -15,31 +16,39 @@ name: identity-hub
 services:
   # ── Datos ───────────────────────────────────────────────────────────────
   db:
-    # VULN-019 — PostgreSQL 14 sobre bullseye: rama antigua, muchos CVE de SO.
-    image: postgres:14-bullseye
+    # postgres:16-bookworm, con soporte, fijado por digest real.
+    image: postgres@sha256:efedf3595f1d6f415c08568ba171029bf54052e754cc9f030e3f2412b21f3d67
     environment:
-      # VULN-003 — Credenciales incrustadas. Lo correcto es leerlas de .env,
-      # que está fuera de git, y fallar el arranque si no están.
-      POSTGRES_USER: identity
-      POSTGRES_PASSWORD: postgres_admin_2024
-      POSTGRES_DB: identity
+      POSTGRES_USER: "${POSTGRES_USER:?POSTGRES_USER must be set in the repository root .env}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in the repository root .env}"
+      POSTGRES_DB: "${POSTGRES_DB:?POSTGRES_DB must be set in the repository root .env}"
+      # Leída solo por deploy/postgres-init/01-identity-app-role.sh (Q21):
+      # da login a identity_app (creado NOLOGIN por la migración 000002, T9).
+      IDENTITY_APP_PASSWORD: "${IDENTITY_APP_PASSWORD:?IDENTITY_APP_PASSWORD must be set in the repository root .env}"
+    # Q12 (2026-09-19) — publicado al host a propósito en desarrollo (acceso
+    # directo con un cliente psql local); se revisa en docker-compose.prod.yml
+    # en la semana 3, no aquí.
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      # Corre una sola vez, cuando el volumen está vacío (ver el script).
+      - ./postgres-init/01-identity-app-role.sh:/docker-entrypoint-initdb.d/01-identity-app-role.sh:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U identity -d identity"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
       timeout: 3s
       retries: 10
       start_period: 10s
 
   broker:
-    # VULN-019 — RabbitMQ 3.11 está fuera de soporte.
-    image: rabbitmq:3.11-management
+    # rabbitmq:4-management, con soporte, fijado por digest real.
+    image: rabbitmq@sha256:ddc75301edf58a8332934cf2d801be7cbf8d65c6458d747364a8046238ff1c89
     environment:
-      RABBITMQ_DEFAULT_USER: identity
-      RABBITMQ_DEFAULT_PASS: rabbit_admin_2024
+      RABBITMQ_DEFAULT_USER: "${RABBITMQ_DEFAULT_USER:?RABBITMQ_DEFAULT_USER must be set in the repository root .env}"
+      RABBITMQ_DEFAULT_PASS: "${RABBITMQ_DEFAULT_PASS:?RABBITMQ_DEFAULT_PASS must be set in the repository root .env}"
+    # Q12 (2026-09-19) — mismo criterio que `db`: publicado a propósito en
+    # desarrollo, se revisa en docker-compose.prod.yml en la semana 3.
     ports:
       - "5672:5672"    # AMQP
       - "15672:15672"  # interfaz de administración
@@ -79,7 +88,7 @@ services:
       - ../db/migrations:/migrations:ro
     command:
       - "-path=/migrations"
-      - "-database=postgres://identity:postgres_admin_2024@db:5432/identity?sslmode=disable"
+      - "-database=${MIGRATE_DATABASE_URL:?MIGRATE_DATABASE_URL must be set in the repository root .env}"
       - "up"
     restart: on-failure
 
@@ -99,8 +108,8 @@ services:
       API_PORT: 8081
       LOG_LEVEL: debug
       APP_VERSION: 0.1.0-baseline
-      DATABASE_URL: postgres://identity:postgres_admin_2024@db:5432/identity?sslmode=disable
-      RABBITMQ_URL: amqp://identity:rabbit_admin_2024@broker:5672/
+      DATABASE_URL: "${DATABASE_URL:?DATABASE_URL must be set in the repository root .env}"
+      RABBITMQ_URL: "${RABBITMQ_URL:?RABBITMQ_URL must be set in the repository root .env}"
       SMTP_HOST: mailpit
       SMTP_PORT: 1025
       SMTP_FROM: no-reply@identity.local
@@ -110,13 +119,23 @@ services:
     ports:
       - "8081:8081"
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8081/healthz"]
+      # La imagen distroless (T27) no tiene shell ni curl: el binario se
+      # autosondea con su propio subcomando "healthcheck".
+      test: ["CMD", "/usr/local/bin/api", "healthcheck"]
       interval: 10s
       timeout: 3s
       retries: 5
       start_period: 15s
-    # VULN-020 — Aquí faltan read_only, cap_drop, no-new-privileges y user.
-    # Se añaden en el compose de producción durante la remediación (RNF-008).
+    # T30 — endurecimiento (VULN-024): sistema de archivos raíz de solo
+    # lectura (el binario no escribe nada en disco), sin capacidades Linux y
+    # sin poder escalar privilegios. El usuario no-root ya lo fija la imagen
+    # (T27, distroless nonroot); tmpfs por si algo de la stdlib de Go
+    # necesita un temporal (perfiles, TLS), aunque hoy no le hace falta.
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /tmp
 
   worker:
     build:
@@ -132,8 +151,8 @@ services:
     environment:
       LOG_LEVEL: debug
       APP_VERSION: 0.1.0-baseline
-      DATABASE_URL: postgres://identity:postgres_admin_2024@db:5432/identity?sslmode=disable
-      RABBITMQ_URL: amqp://identity:rabbit_admin_2024@broker:5672/
+      DATABASE_URL: "${DATABASE_URL:?DATABASE_URL must be set in the repository root .env}"
+      RABBITMQ_URL: "${RABBITMQ_URL:?RABBITMQ_URL must be set in the repository root .env}"
       SMTP_HOST: mailpit
       SMTP_PORT: 1025
       SMTP_FROM: no-reply@identity.local
@@ -142,6 +161,12 @@ services:
     ports:
       - "9091:9091"  # /metrics del worker
     restart: unless-stopped
+    # T30 — endurecimiento (VULN-024): mismo razonamiento que `api`.
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /tmp
 
   web:
     build:
@@ -152,6 +177,15 @@ services:
         condition: service_healthy
     ports:
       - "8080:8080"
+    # T30 — endurecimiento (VULN-024): el usuario no-root ya lo fija la
+    # imagen (T28, nginx-unprivileged); `nginx.conf` ya manda sus temporales
+    # (proxy_temp, client_temp, el pidfile) a /tmp, así que basta con tmpfs
+    # ahí para poder correr con el resto del filesystem en solo lectura.
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /tmp
 
   # ── Observabilidad (perfil aparte) ──────────────────────────────────────
   # Se arranca con:  docker compose --profile observability up -d
@@ -190,7 +224,8 @@ services:
     profiles: ["observability"]
     depends_on: [prometheus, loki]
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_USER: "${GRAFANA_ADMIN_USER:?GRAFANA_ADMIN_USER must be set in the repository root .env}"
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD must be set in the repository root .env}"
       GF_USERS_ALLOW_SIGN_UP: "false"
     volumes:
       - ./observability/grafana:/etc/grafana/provisioning:ro

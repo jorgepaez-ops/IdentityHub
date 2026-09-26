@@ -3,15 +3,15 @@
 | | |
 |---|---|
 | **Severidad** | CRITICAL y HIGH |
-| **Estado** | abierto |
+| **Estado** | remediado |
 | **Detectado por** | Trivy image sobre node:18-bullseye (baseline-scan) |
 | **Componente** | `frontend/Dockerfile` (builder `node:18-bullseye`) |
 | **Amenaza** | AM-009 (dependencia comprometida en la cadena de suministro) |
 | **Sembrada** | sí |
 | **Evidencia antes** | `docs/evidencia/VULN-016/evidencia.json` |
-| **Commit de remediación** | |
-| **Evidencia después** | |
-| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35534898422 / — |
+| **Commit de remediación** | `8f3d461` (T28) |
+| **Evidencia después** | `docs/evidencia/VULN-016/evidencia.json` (job "9-10" web, Trivy image: 0 vulnerabilidades) |
+| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35534898422 / https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36259385478 |
 
 ## Evidencia
 
@@ -26,4 +26,6 @@ La imagen de construcción contiene una base obsoleta con un volumen muy alto de
 
 ## Remediación
 
-Actualizar y fijar la base del builder en T28.
+Builder cambiado a `node:24-bookworm` (LTS activa desde octubre de 2025), fijado por digest real
+(`sha256:64af3819...`). Trivy image sobre `identity-hub-web` (`--severity HIGH,CRITICAL
+--ignore-unfixed`): `Total: 0 (HIGH: 0, CRITICAL: 0)`.

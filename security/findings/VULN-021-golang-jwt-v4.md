@@ -3,16 +3,16 @@
 | | |
 |---|---|
 | **Severidad** | MEDIUM |
-| **Estado** | abierto |
+| **Estado** | remediado |
 | **Detectado por** | govulncheck · job `sca` |
 | **Componente** | `github.com/golang-jwt/jwt/v4@v4.5.0` |
 | **Avisos** | GO-2024-3250 (corregido en v4.5.1) · GO-2025-3553 (corregido en v4.5.2) |
 | **Amenaza** | AM-003 (suplantación), AM-017 (denegación de servicio) |
 | **Sembrada** | sí |
-| **Evidencia antes** | |
-| **Commit de remediación** | |
-| **Evidencia después** | |
-| **Run de Actions (antes/después)** | |
+| **Evidencia antes** | `docs/evidencia/VULN-021/evidencia.json` |
+| **Commit de remediación** | `51a7a4f` (T23) |
+| **Evidencia después** | `docs/evidencia/VULN-021/evidencia.json` (govulncheck: GO-2025-3553 y GO-2024-3250 ya no aparecen; quedan 5 CVE de pgx, alcance T24) |
+| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36208104969 |
 
 ## Evidencia
 

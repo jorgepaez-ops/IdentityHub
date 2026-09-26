@@ -1,27 +1,15 @@
 # ╔══════════════════════════════════════════════════════════════════════════╗
-# ║  ⚠️  DOCKERFILE DELIBERADAMENTE VULNERABLE — NO CORREGIR SIN LEER ESTO    ║
-# ║                                                                          ║
-# ║  Ver specs/adr/0007-linea-base-vulnerable-deliberada.md                   ║
-# ║                                                                          ║
-# ║    VULN-008  base Debian 11 en vez de distroless  → Trivy image           ║
-# ║    VULN-009  USER root en la imagen final         → Hadolint DL3002, Trivy║
-# ║    VULN-010  apt-get sin fijar versión ni limpiar → Hadolint DL3008/DL3009║
-# ║    VULN-011  ADD desde una URL remota             → Hadolint DL3020       ║
-# ║    VULN-012  secreto en una instrucción ENV       → Trivy secret, Gitleaks║
-# ║                                                                          ║
-# ║  La versión remediada (semana 3) usa distroless, usuario no-root, imagen  ║
-# ║  base fijada por digest y ningún secreto en tiempo de construcción.       ║
+# ║  Imágenes finales: distroless (sin shell, sin gestor de paquetes), usuario ║
+# ║  no-root fijo (65532) e imagen base fijada por digest real (T27).         ║
+# ║  Historia (ver specs/adr/0007): esta línea base sembraba a propósito      ║
+# ║  VULN-008 (Debian 11 en vez de distroless), VULN-009 (USER root),         ║
+# ║  VULN-010 (apt-get sin fijar versión) y VULN-011 (ADD remoto).            ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 
-# VULN-008 — Go 1.22 sobre Debian bullseye (11), ya fuera de soporte estándar.
-FROM golang:1.22-bullseye AS builder
+# golang:1.25-bookworm — go1.25.14, satisface el "go 1.25.0" de go.mod (T6/T24).
+FROM golang@sha256:3b4a11519ad929d1e1d261a12cff056f0c85b735253d7d861346b9c6f8b36437 AS builder
 
 WORKDIR /src
-
-# VULN-010 — Instalación sin fijar versiones y sin limpiar la caché de apt:
-# la construcción no es reproducible y la imagen carga listas de paquetes que
-# no aporta nada llevar.
-RUN apt-get update && apt-get install -y curl ca-certificates
 
 COPY go.mod go.sum ./
 RUN go mod download
@@ -34,39 +22,29 @@ RUN CGO_ENABLED=0 go build -trimpath -o /out/api    ./cmd/api && \
     CGO_ENABLED=0 go build -trimpath -o /out/worker ./cmd/worker
 
 # ── Imagen final de la API ────────────────────────────────────────────────
-# VULN-008 — debian:11-slim arrastra decenas de CVE de paquetes del sistema.
-# Una imagen distroless no llevaría ninguno de ellos porque no lleva ni shell
-# ni gestor de paquetes.
-FROM debian:11-slim AS api
-
-# VULN-011 — ADD desde una URL remota: descarga sin verificar suma ni firma, y
-# el contenido puede cambiar entre construcciones.
-ADD https://raw.githubusercontent.com/golang/go/master/LICENSE /licenses/go-LICENSE
-
-# VULN-012 — Secreto incrustado en la imagen. ENV persiste en el manifiesto:
-# cualquiera con acceso a la imagen lo lee con `docker history`.
-ENV DB_PASSWORD=postgres_admin_2024
-ENV API_SIGNING_KEY=clave-de-firma-super-secreta-2024
-
-RUN apt-get update && apt-get install -y ca-certificates curl
+# gcr.io/distroless/static-debian12:nonroot — sin shell, sin apt, corre como
+# uid 65532 por defecto; trae /etc/ssl/certs/ca-certificates.crt para TLS
+# saliente, así que el binario estático no necesita nada más.
+FROM gcr.io/distroless/static-debian12@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab AS api
 
 COPY --from=builder /out/api /usr/local/bin/api
 
 EXPOSE 8081
 
-# VULN-009 — No se declara USER: el proceso corre como root. Si alguien logra
-# ejecución de código, la logra como root dentro del contenedor.
+# Explícito además del valor por defecto de la imagen: Trivy config (DS002)
+# analiza el Dockerfile de forma estática y no resuelve el USER heredado de
+# una base referenciada solo por digest.
+USER 65532:65532
+
 ENTRYPOINT ["/usr/local/bin/api"]
 
 # ── Imagen final del worker ───────────────────────────────────────────────
-FROM debian:11-slim AS worker
-
-ENV DB_PASSWORD=postgres_admin_2024
-
-RUN apt-get update && apt-get install -y ca-certificates
+FROM gcr.io/distroless/static-debian12@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab AS worker
 
 COPY --from=builder /out/worker /usr/local/bin/worker
 
 EXPOSE 9091
+
+USER 65532:65532
 
 ENTRYPOINT ["/usr/local/bin/worker"]
