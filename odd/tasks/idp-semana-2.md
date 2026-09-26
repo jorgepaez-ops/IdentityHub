@@ -911,7 +911,7 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 - Evidencia (`Usuario`):  - [ ] VULN-013  - [ ] VULN-014  - [ ] VULN-015 (`curl -sI` antes/después; sin gate hoy)
 
 ### T30 — Compose: imágenes base y endurecimiento
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RNF-008, RNF-004, AM-014, AM-020 · Remedia: VULN-019, VULN-024 (sin endurecimiento de contenedores; el comentario del compose lo llama VULN-020) · Bloqueada por: T0.3, T26, T27
+- [x] Estado · Ejecutor: `Claude` (mismo motivo que T27-T29: Codex no tiene el socket de Docker) · Cubre: RNF-008, RNF-004, AM-014, AM-020 · Remedia: VULN-019 (parcial: solo `postgres`/`rabbitmq`), VULN-024 (sin endurecimiento de contenedores; el comentario del compose lo llama VULN-020) · Bloqueada por: T0.3, T26, T27
 - Actualizar `postgres` y `rabbitmq` a versiones con soporte, fijadas por digest real (avisar: volúmenes previos pueden requerir
   `make clean`); en `api`, `worker` y `web`: `read_only`, `cap_drop: [ALL]`, `security_opt: [no-new-privileges:true]`, `user` no-root, `tmpfs` donde haga falta;
   puertos de `db` y `broker` publicados al host en desarrollo (Q12, decidido: se mantienen y se tratan en `docker-compose.prod.yml`, semana 3; anotar).
@@ -919,7 +919,31 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
   `VULN-024`, ya que `VULN-020` es el hallazgo de chi (Q9; la equivalencia está en la ficha VULN-024, T0.5). Esto solo se hace aquí, al tocar el compose.
 - Criterios: `make up` sano con esa configuración; Trivy config sin HIGH/CRITICAL en el compose (si el escáner lo cubre; anotar si no).
 - Verificación: `make up && make ps`; `make scan-config`; `make scan-image`; `make test`.
-- Commit:
+- **Hecho 2026-09-26.** `postgres:14-bullseye` → `postgres:16-bookworm` y `rabbitmq:3.11-management`
+  → `rabbitmq:4-management`, ambos fijados por digest real (`make clean` antes, para no arrancar
+  Postgres 16 sobre un volumen de datos de la 14). `api`, `worker` y `web`: `read_only: true`,
+  `cap_drop: [ALL]`, `security_opt: ["no-new-privileges:true"]`, `tmpfs: [/tmp]` donde hacía falta
+  (el usuario no-root ya lo fijan los Dockerfiles de T27/T28). Comentario del compose que llamaba
+  "VULN-020" a este hallazgo corregido a VULN-024 (Q9: VULN-020 es el hallazgo de chi `RealIP`).
+  Puertos de `db`/`broker` publicados al host: se mantienen a propósito (Q12, ya decidido);
+  anotado inline en vez de dejarlo implícito.
+- Comandos y resultado observado: `make clean` + `make up`: los 6 servicios arriba, todos
+  `healthy` o corriendo. `docker inspect` en `api`/`worker`/`web`: `ReadonlyRootfs=true
+  CapDrop=[ALL] SecurityOpt=[no-new-privileges:true]` en los tres. Ciclo real de extremo a extremo
+  bajo esa configuración endurecida: registro → verificación (token de Mailpit) → el worker
+  publica "notificación entregada" en su log → Mailpit recibe el correo. `make scan-config`: Trivy
+  config no cubre `docker-compose.yml` en esta versión (solo detecta los 2 Dockerfiles, num=2) — no
+  hay señal que anotar más allá de la verificación manual de arriba. `make scan-image` en `api`,
+  `worker` y `web`: `Total: 0 (HIGH: 0, CRITICAL: 0)` en los tres. `make test` en verde.
+- Dudas abiertas: **VULN-019 queda solo parcialmente remediado**, tal como autoriza el propio texto
+  de la tarea (solo menciona `postgres` y `rabbitmq`): `axllent/mailpit`, `migrate/migrate` y las
+  cuatro imágenes de observabilidad (`prometheus`, `loki`, `alloy`, `grafana`) siguen en las
+  versiones antiguas de la línea base, fuera de alcance de T30. Trivy image sobre el `postgres`
+  nuevo encontró un HIGH en `usr/local/bin/gosu` (binario empaquetado por la imagen oficial, 22
+  CVEs corregibles) y otro en el certificado de relleno `ssl-cert-snakeoil` que trae Debian —
+  ninguno de los dos lo puede corregir este proyecto (no construimos esa imagen, solo la
+  referenciamos); anotado, no se inventa VULN-NNN.
+- Commit: 824be7d
 - Evidencia (`Usuario`):  - [ ] VULN-019  - [ ] VULN-024
 
 ### T31 — Gitleaks frente al historial: `.gitleaksignore` por huella exacta
@@ -1297,4 +1321,9 @@ Formato por tarea (3 a 5 líneas):
 - Qué cambió: tomada directo por Claude (verificación con `make up` real). `frontend/nginx/default.conf`: las cinco cabeceras RNF-009 con `always`, `server_tokens off`, `limit_req_zone` + `location /api/v1/auth/` (más específica que `/api/`) con `limit_req zone=auth burst=5 nodelay` y `limit_req_status 429` (nginx responde 503 por defecto; el contrato ya declara 429). `X-Forwarded-For` de `$proxy_add_x_forwarded_for` a `$remote_addr` en ambas locations de proxy (complementa `TRUSTED_PROXIES`, T6).
 - Comandos y resultado observado: `curl -sI http://localhost:8080/` contra el stack real: cinco cabeceras, `Server: nginx` sin versión, SPA y `assets/` sirviendo `200`. Ráfaga real de 30 `POST` a `/api/v1/auth/login`: `429` tras vaciarse el balde. Ciclo real registro → verificación (token de Mailpit) → login por Nginx: `200` con el `Set-Cookie` de `refresh_token` (Path/HttpOnly/Secure/SameSite) intacto. `make test` en verde.
 - Dudas abiertas: hallazgo nuevo fuera de alcance — `POST /api/v1/auth/login` con `{}` devuelve `500`, no `400`; es el handler de login (`login.go`, caso `default`), no Nginx. No se toca aquí; anotado para que se decida en qué tarea se corrige.
+
+### T30 · 2026-09-26 · 824be7d
+- Qué cambió: tomada directo por Claude (mismo motivo que T27-T29). `postgres:14-bullseye` → `postgres:16-bookworm` y `rabbitmq:3.11-management` → `rabbitmq:4-management`, ambos por digest real (`make clean` antes, por la migración de volumen). `api`/`worker`/`web`: `read_only`, `cap_drop: [ALL]`, `no-new-privileges`, `tmpfs: [/tmp]` donde hacía falta. Comentario "VULN-020" del compose corregido a VULN-024 (Q9). Puertos de `db`/`broker` anotados como decisión deliberada (Q12).
+- Comandos y resultado observado: `make up` con los 6 servicios sanos; `docker inspect` confirma `ReadonlyRootfs=true CapDrop=[ALL] SecurityOpt=[no-new-privileges:true]` en los tres contenedores endurecidos. Ciclo real registro → verificación → worker → Mailpit funcionando bajo esa configuración. `make scan-image` en `api`/`worker`/`web`: `Total: 0 (HIGH: 0, CRITICAL: 0)`. `make scan-config`: Trivy config no cubre `docker-compose.yml` en esta versión (solo los 2 Dockerfiles). `make test` en verde.
+- Dudas abiertas: VULN-019 queda solo parcial — T30 únicamente cubría `postgres`/`rabbitmq`; `mailpit`, `migrate` y las 4 imágenes de observabilidad siguen en la línea base, fuera de alcance. Trivy sobre el `postgres` nuevo encontró un HIGH en `gosu` (empaquetado por la imagen oficial, no lo controlamos) y otro en un certificado de relleno de Debian; anotado, sin VULN-NNN nuevo.
 
