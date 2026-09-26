@@ -1041,7 +1041,7 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 - Commit:
 
 ### T34a — Dependencias de build/frontend desactualizadas (VULN-027)
-- [ ] Estado · Ejecutor: `Claude` (`npm install` necesita red, ver regla en `CLAUDE.md`) · Cubre: AM-009 · Remedia: VULN-027 (vite/esbuild, minimatch/@typescript-eslint, react-router-dom, openapi-typescript/undici) · Bloquea a: T35
+- [x] Estado · Ejecutor: `Claude` (`npm install` necesita red, ver regla en `CLAUDE.md`) · Cubre: AM-009 · Remedia: VULN-027 (vite/esbuild, minimatch/@typescript-eslint, react-router-dom, openapi-typescript/undici) · Bloquea a: T35
 - Hallazgo no previsto (como VULN-020): al cerrar el PR de la Fase 3 se confirmó que los 15 hallazgos
   de `npm audit` que T25 dejó documentados como fuera de alcance no tienen arreglo sin salto de
   versión mayor. T35 exige "CI en verde"; el usuario decidió resolver esto antes de T35 en vez de
@@ -1053,7 +1053,23 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 - Criterios: `npm audit --audit-level=high` sin hallazgos; `npm run build`, `npm run lint`, `npm run typecheck`,
   `npm run test` en verde; la SPA sigue funcionando (login real a través de Nginx, como en T29).
 - Verificación: `cd frontend && npm audit --audit-level=high && npm run build && npm run lint && npm run typecheck && npm run test`; smoke test manual con `make up`.
-- Commit:
+- **Hecho 2026-09-26.** `vite` 5→8, `vitest`/`@vitest/coverage-v8` 1→5, `@vitejs/plugin-react` 4→6
+  (sus nuevos peers son opcionales, no fuerzan Rolldown); `@typescript-eslint/parser`/`eslint-plugin`
+  6→8 con ESLint solo a 8.57 (v8 de typescript-eslint soporta `^8.57.0`; subir a ESLint 9/10 habría
+  roto `eslint-plugin-react-hooks@4.6.0` sin necesidad); `react-router-dom` 6→7 y `openapi-typescript`
+  6→7 (ninguno se usa todavía en `src/`, riesgo cero). Único cambio de código:
+  `vite.config.ts` importa `defineConfig` de `"vitest/config"` en vez de `"vite"` (Vitest 5 dejó de
+  fusionar la opción `test` en el tipo de Vite).
+- Comandos y resultado observado: cada paquete se subió y se verificó por separado (build, lint,
+  typecheck, test) antes de seguir con el siguiente. `npm audit`: de 15 a 0 vulnerabilidades.
+  `make gen` de punta a punta sin drift (`gen.go`, sqlc y `specs/07-traceability.md` sin cambios;
+  solo `schema.d.ts` cambia de forma, pero nada en `src/` lo consume todavía). `make up` con el
+  stack completo: ciclo real registro → verificación → login por Nginx, `200` con el `Set-Cookie`
+  intacto y las cinco cabeceras de RNF-009. `make test`, `make lint` y `python3
+  scripts/traceability.py --check` en verde.
+- Dudas abiertas: ninguna. Falta que el usuario confirme el mismo resultado en el job "5 ·
+  Dependencias vulnerables" del próximo run de CI, al abrir el PR de T35.
+- Commit: d149e59
 - Evidencia (`Usuario`):  - [ ] VULN-027
 
 ### T35 — CI en verde y evidencia "después"
@@ -1093,8 +1109,8 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 | 1 — Contrato ejecutable | T1a, T1 a T3 (4) | 4 (T1a, T1, T2, T3) |
 | 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 20 (T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T14a, T15, T16, T17, T18, T19, T20, T21, T22) |
 | 3 — Remediación | T23 a T32 (10) | 10 (T23 a T32) |
-| 4 — Cierre | T33 a T38 y T34a (7) | 0 |
-| **Total** | **46** | **39** |
+| 4 — Cierre | T33 a T38 y T34a (7) | 1 (T34a) |
+| **Total** | **46** | **40** |
 
 Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, cookie) y `T14a`
 (enmienda ADR 0005, sin ventana de gracia). Los ids existentes no cambian.
@@ -1396,4 +1412,9 @@ Formato por tarea (3 a 5 líneas):
 - Qué cambió: revisión de T23 a T31 contra sus fichas y el "Registro de evidencia". `git log --oneline 51a7a4f..HEAD` sobre `ci.yml`, `baseline-scan.yml` y `.gitleaks.toml`: vacío, ningún gate se tocó; `.trivyignore` no existe. Dos gaps de documentación (no de código) corregidos: VULN-020 (chi RealIP) estaba "abierto" en su ficha pese a cerrarse en T6 (`902a047`) — confirmado con `govulncheck` que ya no aparece; y la columna "Commit remediación" del registro estaba vacía en las 26 filas, se completó desde las fichas.
 - Comandos y resultado observado: revisión manual archivo por archivo (26 fichas, 3 workflows/config). `python3 scripts/traceability.py --check`: al día.
 - Dudas abiertas: ninguna. Fase 3 completa (10/10): corte de fase, PR pendiente de confirmación del usuario (estrategia `ask-on-risk`, "Alcance autorizado" del archivo de tareas).
+
+### T34a · 2026-09-26 · d149e59
+- Qué cambió: PR #2 (Fase 3) mergeado a `main` (`53f093c`). Al planear T35 ("CI en verde"), se confirmó que los 15 hallazgos de `npm audit` que T25 dejó fuera de alcance no tienen arreglo sin salto de versión mayor en 4 paquetes; el usuario decidió migrarlos antes de T35 (asignado VULN-027, hallazgo no previsto, igual que VULN-020) en vez de aceptarlos como excepción permanente. `vite` 5→8, `vitest`/`@vitest/coverage-v8` 1→5, `@vitejs/plugin-react` 4→6, `@typescript-eslint/parser`/`eslint-plugin` 6→8 (ESLint se quedó en 8.57, no subió a 9/10), `react-router-dom` 6→7, `openapi-typescript` 6→7. Único cambio de código: `vite.config.ts` importa `defineConfig` de `vitest/config`.
+- Comandos y resultado observado: cada paquete verificado por separado (build/lint/typecheck/test) antes de seguir. `npm audit`: 15→0. `make gen` sin drift. `make up` con ciclo real registro→verificación→login por Nginx en verde, cabeceras de RNF-009 intactas. `make test`/`make lint`/traceability en verde.
+- Dudas abiertas: ninguna. Falta confirmar el mismo resultado en CI cuando se abra el PR de T35.
 

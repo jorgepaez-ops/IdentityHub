@@ -18,14 +18,18 @@
   },
   "remediacion": {
     "tarea": "T34a",
-    "commit": null,
+    "commit": "d149e59",
     "ficha": "security/findings/VULN-027-dependencias-frontend-post-t25.md"
   },
   "despues": {
-    "commit": null,
+    "commit": "d149e59",
     "workflow": null,
     "run_id": null,
     "run_url": null,
-    "captura": null
+    "captura": null,
+    "hallazgos": [
+      "npm audit (local): \"found 0 vulnerabilities\""
+    ],
+    "observacion": "Verificado localmente (make up + curl real: registro → verificación → login por Nginx, 200 con Set-Cookie intacto y las cinco cabeceras RNF-009). Pendiente confirmar el mismo resultado en el próximo run de ci.yml (job 5) cuando se abra el PR de T35."
   }
 }

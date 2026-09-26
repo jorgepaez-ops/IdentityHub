@@ -3,16 +3,16 @@
 | | |
 |---|---|
 | **Severidad** | CRITICAL y HIGH (moderate incluidas) |
-| **Estado** | abierto |
+| **Estado** | remediado |
 | **Detectado por** | npm audit (`ci.yml`, job `5 · Dependencias vulnerables`) |
 | **Componente** | `frontend/package.json`: `vite`/`esbuild` (vía `vitest`/`@vitest/coverage-v8`), `@typescript-eslint/parser` (vía `minimatch`), `react-router-dom`, `openapi-typescript` (vía `undici`) |
 | **Avisos** | GHSA-67mh-4wv8-2f99 (esbuild); 3 ReDoS en `minimatch`; GHSA-wrjc-x8rr-h8h6 y GHSA-337j-9hxr-rhxg (react-router); 12 avisos de `undici` |
 | **Amenaza** | AM-009 (dependencia comprometida en la cadena de suministro) |
 | **Sembrada** | **NO** — hallazgo no previsto, igual que VULN-020 |
 | **Evidencia antes** | `docs/evidencia/VULN-027/evidencia.json` |
-| **Commit de remediación** | |
-| **Evidencia después** | |
-| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36259385478 / — |
+| **Commit de remediación** | `d149e59` (T34a) |
+| **Evidencia después** | `docs/evidencia/VULN-027/evidencia.json` (`npm audit`: 0 vulnerabilidades) |
+| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36259385478 / — (pendiente del próximo run de CI) |
 
 ## Cómo apareció
 
@@ -43,5 +43,14 @@ también es deuda técnica que un auditor señalaría.
 
 ## Remediación
 
-Subir los cuatro paquetes a la versión que corrige el aviso, verificando build, lint, tipos y tests
-después de cada uno (son cambios de versión mayor, con posibles cambios de API).
+Los cuatro subidos a la versión que corrige su aviso: `vite` 5→8, `vitest`/`@vitest/coverage-v8` 1→5,
+`@vitejs/plugin-react` 4→6 (los peers nuevos de esta versión — `oxc-transform-react`,
+`@rolldown/plugin-babel`, `babel-plugin-react-compiler` — son opcionales, no obligan a adoptar
+Rolldown); `@typescript-eslint/parser`/`eslint-plugin` 6→8, con ESLint solo a 8.57 (no a 9/10: v8 de
+typescript-eslint soporta `^8.57.0`, y `eslint-plugin-react-hooks@4.6.0` no soporta ESLint 9+, así
+que subir ESLint no aportaba nada); `react-router-dom` 6→7 y `openapi-typescript` 6→7 (ninguno de los
+dos se usa todavía en `src/`, riesgo cero). Único cambio de código: `vite.config.ts` importa
+`defineConfig` de `"vitest/config"` en vez de `"vite"` (Vitest 5 dejó de fusionar la opción `test`
+en el tipo `UserConfig` de Vite). `npm audit`: de 15 a 0. Verificado con el stack real: registro →
+verificación → login por Nginx sigue devolviendo `200` con el `Set-Cookie` intacto y las cinco
+cabeceras de RNF-009 presentes.
