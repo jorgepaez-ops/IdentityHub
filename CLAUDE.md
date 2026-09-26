@@ -36,6 +36,14 @@ volver a acordarse.
   correrlo de verdad — CI sí lo tiene y es la única señal real hasta entonces.
 - Generadores cacheados: usar `~/go/bin/oapi-codegen` (v2.5.1 real, no "(devel)") y `~/go/bin/sqlc`.
   Evitar binarios en `/private/tmp/idp-gen-bin/` sin el ldflag de versión correcto.
+- **El hook de pre-commit de gitleaks (`.pre-commit-config.yaml`) no está realmente instalado.**
+  `.git/hooks/pre-commit` solo corre `gga run` (Gentleman Guardian Angel); nunca se ejecutó
+  `pre-commit install`, así que gitleaks, gofmt, go-build y la comprobación de trazabilidad
+  declarados en ese YAML **no corren en ningún commit local**. Confirmado en T31: un secreto de
+  prueba con forma de clave de AWS se commiteó sin que nada lo bloqueara (se deshizo con `git reset
+  --hard` de inmediato, sin llegar a subirse). La única señal real hoy es `make scan-secrets` a
+  mano y el job `secrets` de CI (que sí corre en cada push/PR). No asumir que el pre-commit de
+  gitleaks protege nada hasta que alguien corra `pre-commit install` y se verifique.
 
 ## Delegación a Codex (`codex:codex-rescue`)
 

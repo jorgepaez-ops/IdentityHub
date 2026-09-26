@@ -947,7 +947,7 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 - Evidencia (`Usuario`):  - [ ] VULN-019  - [ ] VULN-024
 
 ### T31 — Gitleaks frente al historial: `.gitleaksignore` por huella exacta
-- [ ] Estado · Ejecutor: `Codex` (decisión ya tomada por el `Usuario`, Q8) · Cubre: RNF-003, AM-012 · Remedia: relacionada con VULN-023 · Bloqueada por: T26 y por la lista de huellas que entrega el `Usuario` desde el run de Gitleaks de T0.2
+- [x] Estado · Ejecutor: `Claude` (decisión ya tomada por el `Usuario`, Q8; verificación con `make scan-secrets`, mismo motivo que T27-T30) · Cubre: RNF-003, AM-012 · Remedia: relacionada con VULN-023 · Bloqueada por: T26 y por la lista de huellas que entrega el `Usuario` desde el run de Gitleaks de T0.2
 - El job `secrets` usa `fetch-depth: 0`: los secretos sembrados permanecerán en el historial aunque T23/T26 los retiren, así que el gate no
   pasará solo. **Decisión del usuario (2026-09-19): opción (a)**, `.gitleaksignore` en la raíz con **huella exacta**, limitado a los **12 hallazgos conocidos de la línea base y a las 2 huellas de la decisión Q20 (14 en total)**. Las opciones (b) allowlist por commit y (c) reescribir historial quedan **descartadas** ((c) también por el ADR 0007: el historial es la evidencia). Esta decisión es la aprobación explícita del usuario para esta excepción concreta; no autoriza ninguna otra.
 - **Q20 · APROBADA por el usuario (2026-09-21).** Al escanear el historial publicado hay **14** huellas y no 12: las 12 de la línea
@@ -961,7 +961,30 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 - Crear `.gitleaksignore`: una línea por huella, cada una precedida por un comentario con su `VULN-NNN` y una justificación breve ("secreto sembrado de la línea base, ADR 0007; se conserva como evidencia del antes"). Sin comodines, sin rutas ni patrones, sin huellas adicionales; no tocar `.gitleaks.toml`.
 - Criterios: `secrets` en verde; exactamente 14 huellas: las 12 de la línea base con su VULN y justificación, y las 2 de Q20 con la justificación "falso positivo en código propio"; un secreto nuevo de prueba (añadido en local y descartado, nunca commiteado) sigue siendo detectado; VULN-023 sigue `remediado` (12 de 12 con `.gitleaks.toml`).
 - Verificación: `make scan-secrets` y run de `CI` job `secrets`; `grep -c '^[^#[:space:]]' .gitleaksignore` = 14.
-- Commit:
+- **Hecho 2026-09-26, en dos pasadas.** Pasada 1: `.gitleaksignore` con las 14 huellas de
+  `security/evidence/gitleaks-huellas-historial.txt`, mapeadas a VULN-012 (3, `backend/Dockerfile`),
+  VULN-001 (2, `legacy_auth.go`), VULN-003 (7, `docker-compose.yml`) y las 2 de Q20 (falso positivo
+  en código propio). `grep -c` dio 14, pero `make scan-secrets` siguió en rojo: **10 hallazgos
+  nuevos**, ninguno catalogado en el T0.2 de 2026-09-20/21.
+  Revisados uno por uno: 6 son la sintaxis `${VAR:?VAR debe estar definida...}` que T21/T26
+  introdujeron para las variables obligatorias del compose (el regex genérico lee
+  `PASSWORD:?PASSWORD` como una asignación con secreto); 3 son asignaciones de struct de Go
+  (`Password: request.Password,` en `login.go`/`register.go`, y un fixture `"password":
+  "password-secret"` en `notify_test.go`); 1 es distinto de verdad — un commit de docs del
+  2026-09-25 (`docs/guia-desarrollo.md:113`) copió el valor **inventado** de la línea base
+  (`postgres_admin_2024`) en un ejemplo de comando, sin que nadie le asignara VULN-NNN.
+  Como la aprobación de Q8/Q20 dice explícitamente "no autoriza ninguna otra", se detuvo la tarea y
+  se preguntó al usuario. **Autorizado (2026-09-26): sí, las 10.** Pasada 2: se añadieron con su
+  justificación (misma política de huella exacta); `.gitleaksignore` queda en 24 líneas de huella.
+  `make scan-secrets`: `no leaks found` (117 commits escaneados).
+  **Hallazgo real de infraestructura, fuera de alcance de T31 (no se toca `.gitleaks.toml` ni los
+  hooks aquí):** al verificar que "un secreto nuevo sigue siendo detectado", se descubrió que el
+  hook de pre-commit de gitleaks declarado en `.pre-commit-config.yaml` **no está instalado** —
+  `.git/hooks/pre-commit` solo corre `gga run`. Un commit de prueba con un secreto con forma de
+  clave de AWS pasó sin que nada lo bloqueara (commit local `6ad4324`, deshecho de inmediato con
+  `git reset --hard` antes de este párrafo, nunca subido). Anotado en `CLAUDE.md`; la única
+  protección real hoy es `make scan-secrets` a mano y el job `secrets` de CI.
+- Commit: 8054f2e
 - Evidencia (`Usuario`):  - [ ] VULN-023 (antes/después de la política acordada)
 
 ### T32 — Revisión de la Fase 3
@@ -1326,4 +1349,9 @@ Formato por tarea (3 a 5 líneas):
 - Qué cambió: tomada directo por Claude (mismo motivo que T27-T29). `postgres:14-bullseye` → `postgres:16-bookworm` y `rabbitmq:3.11-management` → `rabbitmq:4-management`, ambos por digest real (`make clean` antes, por la migración de volumen). `api`/`worker`/`web`: `read_only`, `cap_drop: [ALL]`, `no-new-privileges`, `tmpfs: [/tmp]` donde hacía falta. Comentario "VULN-020" del compose corregido a VULN-024 (Q9). Puertos de `db`/`broker` anotados como decisión deliberada (Q12).
 - Comandos y resultado observado: `make up` con los 6 servicios sanos; `docker inspect` confirma `ReadonlyRootfs=true CapDrop=[ALL] SecurityOpt=[no-new-privileges:true]` en los tres contenedores endurecidos. Ciclo real registro → verificación → worker → Mailpit funcionando bajo esa configuración. `make scan-image` en `api`/`worker`/`web`: `Total: 0 (HIGH: 0, CRITICAL: 0)`. `make scan-config`: Trivy config no cubre `docker-compose.yml` en esta versión (solo los 2 Dockerfiles). `make test` en verde.
 - Dudas abiertas: VULN-019 queda solo parcial — T30 únicamente cubría `postgres`/`rabbitmq`; `mailpit`, `migrate` y las 4 imágenes de observabilidad siguen en la línea base, fuera de alcance. Trivy sobre el `postgres` nuevo encontró un HIGH en `gosu` (empaquetado por la imagen oficial, no lo controlamos) y otro en un certificado de relleno de Debian; anotado, sin VULN-NNN nuevo.
+
+### T31 · 2026-09-26 · 8054f2e
+- Qué cambió: tomada directo por Claude (verificación con `make scan-secrets`, mismo motivo que T27-T30). `.gitleaksignore` con 24 huellas exactas: las 14 ya conocidas (12 de línea base + 2 de Q20) más 10 nuevas encontradas al verificar — 6 falsos positivos de la sintaxis `${VAR:?...}` que T21/T26 metieron en el compose, 3 de asignaciones de struct Go, y 1 (docs/guia-desarrollo.md) con el valor inventado de la línea base copiado en un ejemplo de comando, nunca catalogado.
+- Comandos y resultado observado: primera pasada con las 14 huellas conocidas dejó `make scan-secrets` en rojo (10 nuevas); se detuvo la tarea y se preguntó al usuario por la ampliación de alcance (Q8/Q20 no la autorizaban). Autorizado, se añadieron las 10 con su justificación. `make scan-secrets`: `no leaks found` (117 commits). `make test` en verde.
+- Dudas abiertas: ninguna sobre T31 en sí. Hallazgo de infraestructura fuera de su alcance: el hook de pre-commit de gitleaks (`.pre-commit-config.yaml`) no está instalado — solo corre `gga run`. Se confirmó con un commit de prueba (secreto con forma de clave AWS) que pasó sin bloquearse; se deshizo de inmediato con `git reset --hard` sin llegar a subirse. Anotado en `CLAUDE.md`; no se toca `.gitleaks.toml` ni los hooks aquí, es decisión de otra tarea.
 
