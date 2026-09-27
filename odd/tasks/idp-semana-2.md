@@ -1195,6 +1195,11 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 - [ ] Estado · Ejecutor: `Usuario` · Cubre: ADR 0007 · Decisión pendiente
 - Crear y subir el tag del estado corregido (sugerencia: `v0.1.0-hardened`; el nombre lo decide el usuario) y no tocar `v0.0.0-vuln-baseline`.
 - Verificación: `git ls-remote --tags origin`.
+- Decisión del Usuario (2026-09-27): el tag se crea **después** de mergear el PR de la fase 4, sobre el
+  commit de merge en `main` (no sobre la rama), para que coincida con el ADR 0007 (baseline frente a
+  `main`) y sobreviva a los cambios que pida la revisión del PR. Tras crearlo: lanzar
+  `baseline-scan.yml` por `workflow_dispatch` con `ref` = el tag nuevo, para obtener el "después" de las
+  imágenes del compose (VULN-019), con el prompt de Desktop en el momento de lanzarlo.
 - Commit: —
 
 ---
