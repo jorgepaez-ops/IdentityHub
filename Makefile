@@ -100,7 +100,7 @@ scan: scan-secrets scan-deps scan-config scan-image ## Todos los gates de seguri
 
 scan-secrets: ## Gitleaks sobre el historial completo (RNF-003)
 	@echo "── Gitleaks ──────────────────────────────────────────────"
-	docker run --rm -v "$(PWD):/repo" zricethezav/gitleaks:v8.18.4 \
+	docker run --rm -v "$(PWD):/repo" ghcr.io/gitleaks/gitleaks:v8.24.3 \
 		detect --source=/repo --verbose || true
 
 scan-deps: ## govulncheck y npm audit (RNF-004)

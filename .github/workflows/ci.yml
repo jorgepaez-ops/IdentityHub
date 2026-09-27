@@ -29,7 +29,7 @@ env:
   # Go 1.25: chi >= 5.3.0 exige go 1.23 y los avisos de la biblioteca estándar solo se
   # corrigen a partir de Go 1.25.13 (decisión Q11 ampliada, 2026-09-21).
   GO_VERSION: "1.25"
-  NODE_VERSION: "18"
+  NODE_VERSION: "24"
 
 jobs:
   # ── 1. Los specs son la fuente de verdad ────────────────────────────────

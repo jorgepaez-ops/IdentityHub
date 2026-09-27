@@ -4,7 +4,9 @@ package store_test
 
 import (
 	"context"
-	"fmt"
+	"net"
+	"net/url"
+	"strconv"
 	"testing"
 	"time"
 
@@ -21,7 +23,13 @@ func TestRNF005_NewAbreUnPoolRealYVerificaConexionConPing(t *testing.T) {
 	// and migrated instead of provisioning a second database just for this test.
 	pool := testdb.New(t)
 	cfg := pool.Config().ConnConfig
-	dsn := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable", cfg.User, cfg.Password, cfg.Host, cfg.Port, cfg.Database)
+	dsn := (&url.URL{
+		Scheme:   "postgres",
+		User:     url.UserPassword(cfg.User, cfg.Password),
+		Host:     net.JoinHostPort(cfg.Host, strconv.Itoa(int(cfg.Port))),
+		Path:     cfg.Database,
+		RawQuery: "sslmode=disable",
+	}).String()
 
 	ctx := context.Background()
 	repository, err := store.New(ctx, dsn)
