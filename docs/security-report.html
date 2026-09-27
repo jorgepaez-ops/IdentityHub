@@ -532,7 +532,7 @@ footer p { margin-bottom: 0.5rem; }
 <div class="doc">
 
   <header class="masthead">
-    <p class="eyebrow">Identity Hub · Proyecto final de materia</p>
+    <p class="eyebrow">Identity Hub · Proyecto final de materia · Versión 2</p>
     <h1>Informe de seguridad de la línea base</h1>
     <p class="standfirst">
       Qué encontró el pipeline cuando se le dio, a propósito, algo real que
@@ -540,11 +540,11 @@ footer p { margin-bottom: 0.5rem; }
     </p>
 
     <dl class="colophon">
-      <div><dt>Referencia analizada</dt><dd>v0.0.0-vuln-baseline</dd></div>
-      <div><dt>Fecha</dt><dd>2026-09-05</dd></div>
-      <div><dt>Commit</dt><dd>053e15f</dd></div>
-      <div><dt>Herramientas</dt><dd>6</dd></div>
-      <div><dt>Fichas abiertas</dt><dd>7</dd></div>
+      <div><dt>Línea base</dt><dd>v0.0.0-vuln-baseline</dd></div>
+      <div><dt>Medida</dt><dd>2026-09-05 · 053e15f</dd></div>
+      <div><dt>Remediado</dt><dd>v0.1.0-hardened</dd></div>
+      <div><dt>Medido</dt><dd>2026-09-27 · 2ee59e2</dd></div>
+      <div><dt>Fichas</dt><dd>29 · 27 remediadas</dd></div>
     </dl>
   </header>
 
@@ -553,7 +553,9 @@ footer p { margin-bottom: 0.5rem; }
       <strong>Este informe describe código inseguro a propósito.</strong>
       El tag <code>v0.0.0-vuln-baseline</code> nunca se despliega. Existe para
       demostrar que cada control del pipeline detecta lo que dice detectar; la
-      rama <code>main</code> es la versión remediada.
+      rama <code>main</code> es la versión remediada, congelada en el tag
+      <code>v0.1.0-hardened</code>. Esta segunda versión del informe conserva las
+      cifras de la línea base y añade la medición del estado corregido.
     </p>
   </div>
 
@@ -904,10 +906,10 @@ footer p { margin-bottom: 0.5rem; }
   <section>
     <h2>Comparativa <span class="mono">baseline</span> → <span class="mono">remediado</span></h2>
     <p class="section-note">
-      La columna de la derecha fue medida en <span class="mono">feat/idp-semana-2</span>
-      en <span class="mono">c6fa5d6</span>, antes del merge. <span class="mono">main</span>
-      recibirá este estado con la PR de la fase 4; no se afirma aquí una medición sobre
-      <span class="mono">main</span>.
+      La columna de la derecha se midió el 2026-09-27 en <span class="mono">c6fa5d6</span>, con la
+      misma metodología que la línea base. El código y las imágenes coinciden con el tag
+      <span class="mono">v0.1.0-hardened</span> (<span class="mono">2ee59e2</span>, merge del PR #3 en
+      <span class="mono">main</span>); entre ambos solo cambian límites de tiempo de los workflows.
     </p>
 
     <div class="table-wrap wide">
@@ -964,6 +966,7 @@ footer p { margin-bottom: 0.5rem; }
       <li><strong>Imágenes:</strong> Trivy 0.56.2 midió 0 CVE corregibles <span class="mono">HIGH</span>/<span class="mono">CRITICAL</span> en <code>api</code> y <code>worker</code> al pasar a <code>static-debian12</code>, y en <code>web</code>; la web conserva 67 CVE sin parche del proveedor.</li>
       <li><strong>Secretos:</strong> <code>.gitleaks.toml</code> y <code>.gitleaksignore</code> dejan 0 hallazgos; los 12 secretos sembrados siguen en el historial público y se suprimen por huella, no se eliminaron (VULN-023).</li>
       <li><strong>Dependencias:</strong> <code>govulncheck</code> deja 0 vulnerabilidades alcanzables. GO-2026-5932 sigue requerida pero no alcanzable ni parcheada; es el riesgo aceptado VULN-028 y permanece filtrada en <code>backend/osv-scanner.toml</code> hasta 2026-12-25.</li>
+      <li><strong>Imágenes del compose (VULN-019):</strong> <code>baseline-scan.yml</code> sobre <code>v0.1.0-hardened</code> (run 36329751647) cuenta 625 <span class="mono">HIGH</span>/<span class="mono">CRITICAL</span> en las ocho imágenes de infraestructura, frente a 710 en la línea base. La diferencia viene toda de <code>postgres</code> (197 → 115; los 22 con parche están en el binario <code>gosu</code> de la imagen oficial) y <code>rabbitmq</code> (3 → 0). Mailpit, migrate y las cuatro imágenes de observabilidad no se actualizaron: remediación parcial.</li>
       <li><strong>Contenedores y endurecimiento:</strong> los tres contenedores de aplicación usan UID 65532, 65532 y 101; la infraestructura queda fuera de esta métrica. Nginx emite CSP, HSTS, <code>X-Content-Type-Options</code>, <code>X-Frame-Options</code> y <code>Referrer-Policy</code>, y oculta la versión de <code>Server</code>. Las tres imágenes, incluidos sus builders, se fijan por <code>sha256</code>.</li>
     </ul>
   </section>
@@ -1005,7 +1008,7 @@ trivy image --severity HIGH,CRITICAL identity-hub-api:latest
       Lo que todavía no se ha medido, dicho antes de que lo pregunte quien lo lea.
     </p>
     <ul class="plain">
-      <li>GitHub Actions sí se ejecutó: los runs de línea base 35476102444 y 35534898422, y los runs finales en verde 36283211113 y 36284740966. La medición remediada sigue siendo previa al merge de la PR de fase 4 a <span class="mono">main</span>.</li>
+      <li>GitHub Actions sí se ejecutó: runs de línea base 35476102444 y 35534898422; runs finales en verde 36283211113, 36284740966 y, sobre el tag corregido, 36329751647.</li>
       <li>El CI ejecuta CodeQL con <code>security-extended</code> para Go y JavaScript/TypeScript, y Semgrep con las reglas OWASP; este último rompe la build ante hallazgos de severidad <code>ERROR</code>. El informe no sustituye la revisión de las alertas SARIF publicadas.</li>
       <li>El escaneo DAST con OWASP ZAP no está cableado; queda para la semana 3.</li>
       <li>VULN-019 es parcial: Mailpit, migrate y cuatro imágenes de observabilidad no se actualizaron. VULN-028 es un riesgo aceptado mientras GO-2026-5932 siga no alcanzable y filtrada hasta 2026-12-25.</li>
@@ -1017,8 +1020,9 @@ trivy image --severity HIGH,CRITICAL identity-hub-api:latest
     <p>
       Identity Hub · proyecto final de materia · licencia Apache-2.0.
       Cifras medidas el 2026-09-05 sobre <span class="mono">v0.0.0-vuln-baseline</span>
-      (<span class="mono">053e15f</span>). Remediación medida el 2026-09-27 sobre
-      <span class="mono">feat/idp-semana-2</span> (<span class="mono">c6fa5d6</span>).
+      (<span class="mono">053e15f</span>). Versión 2: remediación medida el 2026-09-27 sobre
+      <span class="mono">c6fa5d6</span>, mismo código que <span class="mono">v0.1.0-hardened</span>
+      (<span class="mono">2ee59e2</span>).
     </p>
     <p>
       Documentos relacionados: <span class="mono">specs/05-security/threat-model.md</span> ·
