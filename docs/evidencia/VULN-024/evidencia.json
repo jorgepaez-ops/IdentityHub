@@ -25,6 +25,6 @@
     "hallazgos": [
       "docker inspect (local, T30) en identity-hub-api-1, identity-hub-worker-1 e identity-hub-web-1: ReadonlyRootfs=true CapDrop=[ALL] SecurityOpt=[no-new-privileges:true] en los tres"
     ],
-    "observacion": "Sigue sin gate que lo detecte (Trivy config no cubre docker-compose.yml). Verificado además con un ciclo real registro → verificación → login → worker → Mailpit funcionando bajo esa configuración endurecida."
+    "observacion": "Sigue sin gate que lo detecte (Trivy config no cubre docker-compose.yml). Verificado además con un ciclo real registro → verificación → login → worker → Mailpit funcionando bajo esa configuración endurecida. Sin gate de CI: Trivy config no cubre docker-compose.yml; la evidencia después es la verificación local documentada y run_url se mantiene en null."
   }
 }

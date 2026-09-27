@@ -22,14 +22,15 @@
     "ficha": "security/findings/VULN-027-dependencias-frontend-post-t25.md"
   },
   "despues": {
-    "commit": "d149e59",
-    "workflow": null,
-    "run_id": null,
-    "run_url": null,
-    "captura": null,
+    "commit": "59cf8cff8d25776f3cc558e6cd41da29949ef064",
+    "workflow": "CI",
+    "run_id": "36283211113",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36283211113",
+    "captura": "informe Desktop, seccion VULN-027 despues",
     "hallazgos": [
-      "npm audit (local): \"found 0 vulnerabilities\""
+      "Job \"5 · Dependencias vulnerables\" (108518929566), osv-scanner: \"Filtered 1 vulnerability\" (GO-2026-5932, riesgo aceptado VULN-028/T34b) y \"No issues found\" (exit 0).",
+      "Job \"5 · Dependencias vulnerables\" (108518929566), npm audit: audited 337 packages, found 0 vulnerabilities."
     ],
-    "observacion": "Verificado localmente (make up + curl real: registro → verificación → login por Nginx, 200 con Set-Cookie intacto y las cinco cabeceras RNF-009). Pendiente confirmar el mismo resultado en el próximo run de ci.yml (job 5) cuando se abra el PR de T35."
+    "observacion": "Verificado localmente (make up + curl real: registro → verificación → login por Nginx, 200 con Set-Cookie intacto y las cinco cabeceras RNF-009). Pendiente confirmar el mismo resultado en el próximo run de ci.yml (job 5) cuando se abra el PR de T35. Run verde 36283211113 (workflow_dispatch, feat/idp-semana-2, commit 59cf8cff, 13/13 jobs): npm audit encontró 0 vulnerabilidades; osv-scanner filtró únicamente GO-2026-5932 como riesgo aceptado de VULN-028/T34b."
   }
 }

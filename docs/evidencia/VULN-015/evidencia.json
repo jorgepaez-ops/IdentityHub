@@ -29,6 +29,6 @@
     "hallazgos": [
       "10 POST seguidos a /api/v1/auth/login: los primeros 7 dan 500 (body {} inválido, hallazgo distinto y ya anotado en T29), los siguientes 3 dan 429 (limit_req activo, burst=5)"
     ],
-    "observacion": "Sin gate hoy. Misma ejecución local que VULN-013. A diferencia del antes (502 por falta de API), aquí sí hay API detrás; el corte a 429 llega antes de que la ráfaga complete el burst configurado."
+    "observacion": "Sin gate hoy. Misma ejecución local que VULN-013. A diferencia del antes (502 por falta de API), aquí sí hay API detrás; el corte a 429 llega antes de que la ráfaga complete el burst configurado. Sin gate de CI: la evidencia después es la ejecución local documentada; run_url se mantiene en null."
   }
 }

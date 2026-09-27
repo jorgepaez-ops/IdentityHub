@@ -23,14 +23,15 @@
     "ficha": "security/findings/VULN-025-axios-y-lodash-desactualizados.md"
   },
   "despues": {
-    "commit": "a2b57e2",
+    "commit": "59cf8cff8d25776f3cc558e6cd41da29949ef064",
     "workflow": "CI",
-    "run_id": "36259385478",
-    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36259385478",
-    "captura": null,
+    "run_id": "36283211113",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36283211113",
+    "captura": "informe Desktop, seccion VULN-025 despues",
     "hallazgos": [
-      "Job \"5 · Dependencias vulnerables\", paso npm audit: \"15 vulnerabilities (5 moderate, 8 high, 2 critical)\", sin axios ni lodash en el listado"
+      "Job \"5 · Dependencias vulnerables\" (108518929566), osv-scanner: \"Filtered 1 vulnerability\" (GO-2026-5932, riesgo aceptado VULN-028/T34b) y \"No issues found\" (exit 0).",
+      "Job \"5 · Dependencias vulnerables\" (108518929566), npm audit: audited 337 packages, found 0 vulnerabilities."
     ],
-    "observacion": "Texto literal de Desktop (job 108452162164): bajó de 17 a 15 (las 2 de axios/lodash); las 15 restantes son el gap ya documentado en T25 (esbuild/vite, minimatch/@typescript-eslint, react-router, undici/openapi-typescript), no relacionado con este hallazgo. El job sigue en rojo por esas 15, a propósito."
+    "observacion": "Texto literal de Desktop (job 108452162164): bajó de 17 a 15 (las 2 de axios/lodash); las 15 restantes son el gap ya documentado en T25 (esbuild/vite, minimatch/@typescript-eslint, react-router, undici/openapi-typescript), no relacionado con este hallazgo. El job sigue en rojo por esas 15, a propósito. Referencia al run parcial anterior 36259385478: se reemplaza por el run verde 36283211113. Run verde 36283211113 (workflow_dispatch, feat/idp-semana-2, commit 59cf8cff, 13/13 jobs): npm audit encontró 0 vulnerabilidades; osv-scanner filtró únicamente GO-2026-5932 como riesgo aceptado de VULN-028/T34b."
   }
 }

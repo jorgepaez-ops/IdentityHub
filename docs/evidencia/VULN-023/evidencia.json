@@ -17,14 +17,14 @@
     "ficha": "security/findings/VULN-023-reglas-por-defecto-de-gitleaks-insuficientes.md"
   },
   "despues": {
-    "commit": "a2b57e2",
+    "commit": "59cf8cff8d25776f3cc558e6cd41da29949ef064",
     "workflow": "CI",
-    "run_id": "36259385478",
-    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36259385478",
-    "captura": null,
+    "run_id": "36283211113",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36283211113",
+    "captura": "informe Desktop, seccion VULN-023 despues",
     "hallazgos": [
-      "Job \"3 · Secretos en el historial\": \"no leaks found\" con .gitleaksignore (26 huellas exactas) aplicado"
+      "Job \"3 · Secretos en el historial\" (108518929834): gitleaks detect sobre 143 commits: \"no leaks found\""
     ],
-    "observacion": "Confirma que las reglas propias de .gitleaks.toml siguen detectando (12 de 12 en la línea base) y que el .gitleaksignore por huella exacta funciona sin ocultar nada nuevo."
+    "observacion": "Confirma que las reglas propias de .gitleaks.toml siguen detectando (12 de 12 en la línea base) y que el .gitleaksignore por huella exacta funciona sin ocultar nada nuevo. Referencia al run parcial anterior 36259385478: se reemplaza por el run verde 36283211113. Run verde 36283211113 (workflow_dispatch, feat/idp-semana-2, commit 59cf8cff, 13/13 jobs): Gitleaks no encontró filtraciones."
   }
 }

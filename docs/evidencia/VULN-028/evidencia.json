@@ -26,10 +26,10 @@
     "workflow": "CI",
     "run_id": "36283211113",
     "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36283211113",
-    "captura": null,
+    "captura": "informe Desktop, seccion VULN-028 despues",
     "hallazgos": [
       "osv-scanner v2.6.0 --all-vulns: No issues found (exit 0); GO-2026-5932 filtrado como riesgo aceptado (backend/osv-scanner.toml, vence 2026-12-25)"
     ],
-    "observacion": "CI completo en verde (13/13 jobs) sobre feat/idp-semana-2, workflow_dispatch. Captura pendiente de confirmación del usuario (Claude Desktop)."
+    "observacion": "CI completo en verde (13/13 jobs) sobre feat/idp-semana-2, workflow_dispatch. Captura pendiente de confirmación del usuario (Claude Desktop). Captura confirmada por el usuario; job 108518929566 (osv-scanner)."
   }
 }
