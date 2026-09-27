@@ -182,7 +182,7 @@ los archivos sembrados y fichas). Celdas vacías = aún no conocidas.
 | VULN-016 | `node:18-bullseye` | Trivy image sobre `node:18-bullseye` (por nombre) | run 35534898422 / informe §3 | `8f3d461` | run 36283211113 / informe Desktop, seccion VULN-016 despues (Trivy web: 0 vulnerabilidades) | T28 |
 | VULN-017 | `nginx:latest` | Hadolint DL3007 | run 35476102444 / informe §3 | `8f3d461` | run 36283211113 / informe Desktop, seccion VULN-017 despues (Hadolint job 2: sin hallazgos) | T28 |
 | VULN-018 | Imagen final del frontend como root | Trivy config DS002 (Hadolint no emite DL3002, D4) | run 35476102444 / informe §3 | `8f3d461` | run 36283211113 / informe Desktop, seccion VULN-018 despues (Trivy config frontend: 0 hallazgos) | T28 |
-| VULN-019 | Imágenes base antiguas en compose | Trivy image sobre las imágenes del compose (por nombre) | run 35534898422 / informe §3 | `824be7d` (parcial: solo `postgres`/`rabbitmq`; el resto sigue abierto) | run 36329751647 (`baseline-scan.yml` sobre `v0.1.0-hardened`, T38) / captura pendiente (Trivy sin `--ignore-unfixed`, como el antes: `postgres` 197 → 115, 22 con parche en `stdlib` de gosu; `rabbitmq` 3 → 0; Mailpit, migrate y 4 imágenes de observabilidad sin cambios; la medición local de T30 contaba solo hallazgos con parche) | T30, T38 |
+| VULN-019 | Imágenes base antiguas en compose | Trivy image sobre las imágenes del compose (por nombre) | run 35534898422 / informe §3 | `824be7d` (parcial: solo `postgres`/`rabbitmq`; el resto sigue abierto) | run 36329751647 (`baseline-scan.yml` sobre `v0.1.0-hardened`, T38) / informe Desktop, seccion VULN-019 despues, Discrepancia 8 (total compose 710 → 625; Trivy sin `--ignore-unfixed`, como el antes: `postgres` 197 → 115, 22 con parche en `stdlib` de gosu; `rabbitmq` 3 → 0; Mailpit, migrate y 4 imágenes de observabilidad sin cambios; la medición local de T30 contaba solo hallazgos con parche) | T30, T38 |
 | VULN-020 | `RealIP` de chi suplantable (GO-2026-5774/5775/5777) | govulncheck (`sca`) | run 35476102444 / informe §3 | `902a047` (T6; ficha corregida en la revisión de T32) | run 36283211113 / informe Desktop, seccion VULN-020 despues (govulncheck: no vulnerabilities found) | T6 |
 | VULN-021 | `golang-jwt/jwt/v4` (GO-2024-3250, GO-2025-3553) | govulncheck | run 35476102444 / informe §3 | `51a7a4f` | run 36208104969 / informe Desktop §3 | T23 |
 | VULN-022 | pgx 5.5.1 (GO-2024-2606) | govulncheck | run 35476102444 / informe §3 | `001a489` | run 36283211113 / informe Desktop, seccion VULN-022 despues (govulncheck: no vulnerabilities found) | T24 |
@@ -1208,8 +1208,8 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
   con la misma metodología que el antes (sin `--ignore-unfixed`). Discrepancia aclarada, no ocultada: T30
   midió en local solo hallazgos con parche ("0 en SO, 1 HIGH en gosu"); 93 de los 115 son del SO sin parche y
   los 22 con parche son `stdlib` de Go en gosu (mismo digest que T30: avisos nuevos). VULN-019 sigue parcial.
-- Evidencia (Usuario): captura "después" de VULN-019 en el informe Desktop con el run 36329751647 — pendiente;
-  al confirmarla, Claude rellena `despues.captura` en `docs/evidencia/VULN-019/evidencia.json`.
+- [x] Evidencia (Usuario): captura "después" de VULN-019 en el informe Desktop (run 36329751647), confirmada el
+  2026-09-27 como "Discrepancia 8" (remediación parcial); `despues.captura` completado en su `evidencia.json`.
 - Commit: tag `v0.1.0-hardened` → `2ee59e2`
 
 ---
