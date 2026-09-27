@@ -74,7 +74,7 @@ dinámico de clientes, consentimiento, `id_token`), TOTP/WebAuthn, correo real p
 - Controles de seguridad del flujo OAuth, no negociables: `redirect_uri` con coincidencia exacta,
   `state` obligatorio, PKCE `S256` obligatorio (sin `plain`), código de autorización de un solo
   uso con vencimiento corto, cliente y `redirect_uri` fijados en configuración, CORS abierto solo
-  en `/token` y sin credenciales. Cada control lleva su prueba.
+  en `/oauth/token` y en el JWKS, sin credenciales y solo para el origen del cliente (ADR 0009). Cada control lleva su prueba.
 - Codex no tiene red ni Docker (ver `CLAUDE.md`): lo que exija `npm install` de paquetes nuevos,
   `docker compose`, navegadores o ZAP lo cierra Claude.
 - **Portabilidad (requisito de la entrega):** un compañero clona el repo, ejecuta
@@ -184,11 +184,24 @@ Ninguna: P1 a P4 resueltas en D8 a D11.
 - Commit: —
 
 ### T2 — ADRs: SSO mínimo, MFA por correo, Docker Hub
-- [ ] Estado · Ejecutor: `Claude` (decisión de arquitectura) · Solo docs
+- [x] Estado · Ejecutor: `Claude` (decisión de arquitectura) · Solo docs
 - ADR 0009 (SSO entre dominios con authorization code + PKCE, alcance mínimo y límites frente a
   OIDC), ADR 0010 (MFA por correo en lugar de TOTP; enmienda RF-013/014) y ADR 0011 (Docker Hub;
   sustituye la parte de registro de la ADR 0008, que queda "sustituida parcialmente").
-- Commit: —
+- Hecho (2026-09-27). Decisiones de diseño que fija la ADR 0009 y que T3 y T9 deben respetar:
+  - La sesión del Hub usa una cookie propia `SameSite=Lax` (una llegada a `/oauth/authorize` es
+    una navegación de primer nivel desde otro sitio y `Strict` no la acompañaría); el refresh de la
+    consola conserva su cookie `Strict`. Su representación en base de datos se fija en T3.
+  - Contabilidad es cliente público (SPA sin secreto): PKCE sustituye al secreto.
+  - Sin refresh token para la aplicación: al vencer el access token vuelve a `/oauth/authorize`.
+  - Access token con `aud` = cliente y solo los roles de esa aplicación (D8).
+  - CORS también en el JWKS (la aplicación verifica la firma en el navegador); se corrigió la
+    restricción de este archivo, que solo mencionaba `/token`.
+  - Límites documentados: no es OIDC (sin `id_token`, discovery, `userinfo` ni cierre de sesión
+    único).
+  - ADR 0010 deja constancia de que NIST SP 800-63B no admite el correo como autenticador fuera de
+    banda: riesgo aceptado a sabiendas por alcance.
+- Commit:
 
 ### T3 — Enmienda de requisitos, OpenAPI y escenarios
 - [ ] Estado · Ejecutor: `Codex` · Depende de: T2 (decisiones D8 a D11)
