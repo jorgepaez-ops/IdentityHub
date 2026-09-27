@@ -1173,9 +1173,23 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 - Commit: `0d7e319`
 
 ### T37 — Revisión final, informe y bitácora
-- [ ] Estado · Ejecutor: `Claude (revisión)` · Cubre: toda la feature
+- [x] Estado · Ejecutor: `Claude (revisión)` · Cubre: toda la feature
 - Reconciliar el espejo en memoria; actualizar `docs/security-report.html` (columna `main` ya prevista) y una entrada en `docs/BITACORA.md`; revisar el "Registro de evidencia" completo.
-- Commit: —
+- Hecho (2026-09-27).
+  - Registro de evidencia: las 29 filas se cruzaron por script con fichas y `evidencia.json` (cada SHA existe
+    en git y figura en su ficha; cada run de la tabla y de la ficha está en su JSON): 0 inconsistencias.
+  - Informe: las seis métricas de la comparativa se midieron en local sobre `c6fa5d6` con la misma
+    metodología que la línea base (Sonnet; Claude verificó la salida cruda de Trivy, `FROM`, `curl -sI`,
+    govulncheck y uid): 64→0, 12→0, 6→0, 3→0, 0→5, 0→3; coinciden con los runs verdes 36283211113 y
+    36284740966 (`59cf8cf`, mismo código). La columna se rotuló "Remediado · medido" y se aclara que es
+    previa al merge: `main` no se midió. Salvedades en el informe: 67 CVE sin parche en `web`, los 12
+    secretos siguen en el historial (silenciados por `.gitleaksignore`), GO-2026-5932 aceptado (VULN-028),
+    VULN-019 parcial. Limitaciones desactualizadas corregidas (Actions sí corrió; CodeQL y Semgrep en CI).
+  - Bitácora: entrada "2026-09-27 · Semana 2 (cierre)". Redacción de Codex; Claude corrigió el conteo de
+    remediadas (27, no 26: 29 − VULN-019 parcial − VULN-028 riesgo aceptado) y el título.
+  - Espejo en memoria: `odd/idp-semana-2/tasks` sigue siendo un puntero (el archivo pesa ~211 KB, por encima
+    del límite de 50 KB de Engram); se actualizó al estado actual (47 tareas, 46 hechas).
+- Commit: `bfd4233`
 
 ### T38 — Etiquetar el estado corregido
 - [ ] Estado · Ejecutor: `Usuario` · Cubre: ADR 0007 · Decisión pendiente
@@ -1193,8 +1207,8 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 | 1 — Contrato ejecutable | T1a, T1 a T3 (4) | 4 (T1a, T1, T2, T3) |
 | 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 20 (T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T14a, T15, T16, T17, T18, T19, T20, T21, T22) |
 | 3 — Remediación | T23 a T32 (10) | 10 (T23 a T32) |
-| 4 — Cierre | T33 a T38 y T34a, T34b (8) | 6 (T33, T34, T34a, T34b, T35, T36) |
-| **Total** | **47** | **45** |
+| 4 — Cierre | T33 a T38 y T34a, T34b (8) | 7 (T33, T34, T34a, T34b, T35, T36, T37) |
+| **Total** | **47** | **46** |
 
 Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, cookie) y `T14a`
 (enmienda ADR 0005, sin ventana de gracia). Los ids existentes no cambian.
