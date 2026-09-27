@@ -261,10 +261,31 @@ Ninguna: P1 a P4 resueltas en D8 a D11.
 ## Fase 1 — Backend
 
 ### T4 — Roles de negocio
-- [ ] Estado · Ejecutor: `Codex` · Depende de: T3
+- [x] Estado · Ejecutor: `Sonnet` (Codex sin cuota) · Depende de: T3
 - Migración y catálogo de roles; RBAC y claims `roles` del JWT con los valores nuevos; pruebas de
   que un rol desconocido se rechaza.
-- Commit: —
+- Hecho (2026-09-27). Paquete `internal/auth/roles` (catálogo D8; `Directory` y `ForApplication`
+  para T9), migración `000004_business_roles` (sin cambio de esquema: `roles.name` ya era texto),
+  asignación por PATCH con: rol desconocido `400`, sin rol base `user` `400`, autoasignación `400`
+  auditada como `role_assignment_rejected` (el escenario Gherkin fija `400`, igual que el
+  autodeshabilitado), y tokens de consola (login y refresh) solo con roles de directorio.
+  - Revisión de Claude antes de commitear: faltaba la regla del rol base `user` (se podía quitar) y
+    la migración de bajada fallaba con roles asignados (`user_roles.role_id` es `ON DELETE
+    RESTRICT`). Sonnet corrigió ambas con RED observado; Claude añadió el escenario Gherkin del rol
+    base, que el contrato no tenía.
+  - Revisión nativa (RDD): el primer candidato (toda la rama, 3077 líneas) excedió el presupuesto de
+    contexto de los revisores (`lens_context_budget_exceeded`, por `gen.go`); se revisó el commit
+    `fde38cb` solo: **aprobado**, con 10 observaciones informativas. Dos eran reales y Claude las
+    corrigió con TDD en `4670436`: la autoasignación con una solicitud además inválida se rechazaba
+    sin auditar (ahora la regla de autoasignación corre primero) y `Directory` aceptaba nombres sin
+    punto fuera del catálogo. Esa corrección también pasó revisión nativa: **aprobada**.
+  - Observaciones informativas que quedan para después: `ForApplication(roles, "")` aún no filtra
+    por catálogo (nadie la llama así; T9 debe usar `Directory` o corregirla); UUID cero tratado como
+    autoasignación (el handler siempre pone el actor autenticado); la bajada de la migración revoca
+    asignaciones en silencio (documentado en el propio SQL).
+  - Verificación: `make test-go`, `make lint` (0 issues), `go vet` con tag `integration`,
+    `make test-integration` contra PostgreSQL 16 temporal (75,6 %), `traceability.py --check`.
+- Commit: `fde38cb`, `4670436`
 
 ### T5 — Alta de empleados por admin e invitación por correo
 - [ ] Estado · Ejecutor: `Codex` · Depende de: T3, T4
@@ -367,14 +388,14 @@ Ninguna: P1 a P4 resueltas en D8 a D11.
 | Fase | Tareas | Hechas |
 |---|---|---|
 | 0 — Enmiendas de spec y decisiones | T1 a T3 (3) | 3 (T1 a T3) |
-| 1 — Backend | T4 a T10 (7) | 0 |
+| 1 — Backend | T4 a T10 (7) | 1 (T4) |
 | 2 — Dominios locales y frontend | T11 a T13 (3) | 0 |
 | 3 — Verificación, DAST y cierre | T14 a T17 (4) | 0 |
-| **Total** | **17** | **3** |
+| **Total** | **17** | **4** |
 
 ## Siguiente paso
 
-Fase 0 cerrada. Fase 1 (backend): T4 roles, luego T5 alta e invitación (Codex, cuando recupere su cuota; si no, Sonnet).
+T5: alta de empleados e invitación (Sonnet hasta que el usuario avise que Codex tiene cuota).
 
 ## Cambios de spec propuestos
 
