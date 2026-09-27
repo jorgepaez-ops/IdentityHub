@@ -9,10 +9,10 @@
 | **Avisos** | GO-2026-5774, GO-2026-5775, GO-2026-5777 |
 | **Amenaza** | AM-001, AM-010 (frontera de confianza T2) |
 | **Sembrada** | **NO** — hallazgo no previsto |
-| **Evidencia antes** | |
+| **Evidencia antes** | `docs/evidencia/VULN-020/evidencia.json` — informe Desktop §3 VULN-020 |
 | **Commit de remediación** | `902a047` (T6) — hallazgo cerrado desde entonces; esta ficha quedó sin marcar hasta la revisión de T32 |
-| **Evidencia después** | |
-| **Run de Actions (antes/después)** | |
+| **Evidencia después** | `docs/evidencia/VULN-020/evidencia.json` — informe Desktop, seccion VULN-020 despues |
+| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36283211113 |
 
 ## Por qué esta ficha importa más que las demás
 

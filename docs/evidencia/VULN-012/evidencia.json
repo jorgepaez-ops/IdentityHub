@@ -24,15 +24,14 @@
     "ficha": "security/findings/VULN-012-secreto-en-env.md"
   },
   "despues": {
-    "commit": "a2b57e2",
+    "commit": "59cf8cff8d25776f3cc558e6cd41da29949ef064",
     "workflow": "CI",
-    "run_id": "36259385478",
-    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36259385478",
-    "captura": null,
+    "run_id": "36283211113",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36283211113",
+    "captura": "informe Desktop, seccion VULN-012 despues",
     "hallazgos": [
-      "Job \"3 · Secretos en el historial\": \"no leaks found\"",
-      "Job \"8 · Configuración de contenedores\": Trivy config, backend/Dockerfile con 0 misconfiguraciones (cubre DS031)"
+      "Job \"3 · Secretos en el historial\" (108518929834): gitleaks detect sobre 143 commits: \"no leaks found\""
     ],
-    "observacion": "Los ENV con secretos se eliminaron por completo del Dockerfile en T27; ya no hay nada que Gitleaks ni Trivy config puedan marcar ahí."
+    "observacion": "Los ENV con secretos se eliminaron por completo del Dockerfile en T27; ya no hay nada que Gitleaks ni Trivy config puedan marcar ahí. Referencia al run parcial anterior 36259385478: se reemplaza por el run verde 36283211113. Run verde 36283211113 (workflow_dispatch, feat/idp-semana-2, commit 59cf8cff, 13/13 jobs): Gitleaks no encontró filtraciones."
   }
 }

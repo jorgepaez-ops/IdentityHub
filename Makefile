@@ -73,8 +73,9 @@ test-go: ## Pruebas de Go con detector de carreras
 	cd backend && go test -race -coverprofile=coverage.out -covermode=atomic ./...
 	cd backend && go tool cover -func=coverage.out | tail -1
 
-test-integration: ## Pruebas de integración con PostgreSQL temporal
-	cd backend && go test -race -tags=integration ./...
+test-integration: ## Pruebas de integración con PostgreSQL temporal (imprime la cobertura del gate de CI)
+	cd backend && go test -race -tags=integration -coverprofile=coverage.out -covermode=atomic -coverpkg=./internal/... ./...
+	cd backend && go tool cover -func=coverage.out | tail -1
 
 test-front: ## Pruebas del frontend
 	cd frontend && npm run test
@@ -99,7 +100,7 @@ scan: scan-secrets scan-deps scan-config scan-image ## Todos los gates de seguri
 
 scan-secrets: ## Gitleaks sobre el historial completo (RNF-003)
 	@echo "── Gitleaks ──────────────────────────────────────────────"
-	docker run --rm -v "$(PWD):/repo" zricethezav/gitleaks:v8.18.4 \
+	docker run --rm -v "$(PWD):/repo" ghcr.io/gitleaks/gitleaks:v8.24.3 \
 		detect --source=/repo --verbose || true
 
 scan-deps: ## govulncheck y npm audit (RNF-004)

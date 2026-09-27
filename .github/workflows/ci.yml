@@ -26,10 +26,12 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # Go 1.25: chi >= 5.3.0 exige go 1.23 y los avisos de la biblioteca estándar solo se
-  # corrigen a partir de Go 1.25.13 (decisión Q11 ampliada, 2026-09-21).
-  GO_VERSION: "1.25"
-  NODE_VERSION: "18"
+  # Go 1.26: chi >= 5.3.0 exige go 1.23 y los avisos de la biblioteca estándar solo se
+  # corrigen a partir de Go 1.25.13 (decisión Q11 ampliada, 2026-09-21). Subido a
+  # 1.26 en T34b (decisión Q11 amendment 2, 2026-09-26, autorizado por el usuario):
+  # golang.org/x/crypto >= 0.56.0 (VULN-028) declara "go 1.26.0" en su propio go.mod.
+  GO_VERSION: "1.26"
+  NODE_VERSION: "24"
 
 jobs:
   # ── 1. Los specs son la fuente de verdad ────────────────────────────────
@@ -95,7 +97,7 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: backend/go.sum
 
-      # golangci-lint v2: la v1 se compila con Go 1.22 y no analiza código que apunte a Go 1.25.
+      # golangci-lint v2: la v1 se compila con Go 1.22 y no analiza código que apunte a Go 1.26.
       - name: golangci-lint (incluye gosec)
         uses: golangci/golangci-lint-action@v9
         with:
@@ -239,12 +241,26 @@ jobs:
           npm install --package-lock-only
           npm audit --audit-level=high
 
+      # v1.9.0 traía Go 1.22.7 embebido: el análisis de alcanzabilidad (govulncheck)
+      # fallaba porque backend/go.mod exige >= 1.26.0 (desde T34b; >= 1.25.0 antes), y
+      # el escáner degradaba a listar cada advisory de go.mod sin filtrar (ruido,
+      # incluida toda la stdlib). v2.6.0
+      # trae Go 1.27.1 embebido (ya cumple el mínimo) y además fija GOTOOLCHAIN=auto
+      # en su propio action.yml, igual que el reusable workflow oficial, por si un
+      # futuro `go` del módulo supera la versión embebida. El análisis de llamadas de
+      # Go viene activado por defecto (no hace falta --call-analysis=go); lo que no se
+      # invoca se marca "called": false en vez de fallar. --skip-git ya no existe en
+      # v2 (el root del repo se excluye por defecto salvo --include-git-root, mismo
+      # efecto). --all-vulns evita que el formato tabla por defecto oculte los
+      # hallazgos no invocados: sin ese flag el paso queda en verde sin listar nada.
       - name: osv-scanner
-        uses: google/osv-scanner-action/osv-scanner-action@v1.9.0
+        uses: google/osv-scanner-action/osv-scanner-action@a345acffa64b0eaede81a3d9aae6141214d9c8fc # v2.6.0
+        env:
+          GOTOOLCHAIN: auto
         with:
           scan-args: |-
             --recursive
-            --skip-git
+            --all-vulns
             ./
 
   # ── 6. Pruebas unitarias ────────────────────────────────────────────────
@@ -264,15 +280,16 @@ jobs:
         working-directory: backend
         run: go test -race -short -coverprofile=coverage.out -covermode=atomic ./...
 
-      # RNF-005 — Umbral de cobertura. Se activa como gate a partir de la
-      # semana 2, cuando exista lógica de dominio que medir; sobre un esqueleto
-      # el porcentaje no significa nada.
+      # RNF-005 — Informe de cobertura de este job. Es solo informativo: `-short`
+      # y sin el tag `integration` dejan `internal/store` y el código sqlc en 0 %,
+      # así que el gate real (>= 70 %) vive en el job "6b" con Postgres real y
+      # -coverpkg=./internal/... (ver su paso "Cobertura de internal/ (gate)").
       - name: Informe de cobertura
         working-directory: backend
         run: |
           go tool cover -func=coverage.out | tail -1
           COVERAGE=$(go tool cover -func=coverage.out | tail -1 | awk '{print substr($3, 1, length($3)-1)}')
-          echo "Cobertura actual: ${COVERAGE}% (umbral objetivo: 70%)"
+          echo "Cobertura actual (solo unitarias, sin gate): ${COVERAGE}%"
           echo "coverage=${COVERAGE}" >> "$GITHUB_OUTPUT"
         id: coverage
 
@@ -317,7 +334,26 @@ jobs:
 
       - name: go test integration
         working-directory: backend
-        run: go test -race -tags=integration ./...
+        run: go test -race -tags=integration -coverprofile=coverage.out -covermode=atomic -coverpkg=./internal/... ./...
+
+      # RNF-005 — Umbral de cobertura (>= 70 %). Este job corre con Postgres real
+      # y el tag `integration`, así que -coverpkg=./internal/... también atribuye
+      # cobertura a internal/store y a su código sqlc generado, que el job 6
+      # (unitarias, sin BD) nunca ejercita. No se excluye ningún paquete.
+      - name: Cobertura de internal/ (gate)
+        working-directory: backend
+        run: |
+          go tool cover -func=coverage.out | tail -1
+          COVERAGE=$(go tool cover -func=coverage.out | tail -1 | awk '{print substr($3, 1, length($3)-1)}')
+          echo "Cobertura actual: ${COVERAGE}% (umbral: 70%)"
+          awk -v coverage="$COVERAGE" 'BEGIN {
+            if (coverage + 0 < 70) {
+              printf "Cobertura insuficiente: %.1f%% (mínimo: 70%%)\n", coverage > "/dev/stderr"
+              exit 1
+            }
+          }'
+          echo "coverage=${COVERAGE}" >> "$GITHUB_OUTPUT"
+        id: coverage
 
   # ── 8. Configuración e infraestructura ──────────────────────────────────
   iac-scan:

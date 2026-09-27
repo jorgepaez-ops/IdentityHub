@@ -3,784 +3,1211 @@
  * Do not make direct changes to the file.
  */
 
-
 export interface paths {
-  "/healthz": {
-    /** Sonda de vitalidad */
-    get: operations["getHealth"];
-  };
-  "/readyz": {
-    /** Sonda de disponibilidad (comprueba base de datos y broker) */
-    get: operations["getReadiness"];
-  };
-  "/.well-known/jwks.json": {
-    /** Clave pública para validar los tokens emitidos */
-    get: operations["getJwks"];
-  };
-  "/api/v1/auth/register": {
-    /** Crear una cuenta */
-    post: operations["register"];
-  };
-  "/api/v1/auth/verify-email": {
-    /** Activar la cuenta con el token recibido por correo */
-    post: operations["verifyEmail"];
-  };
-  "/api/v1/auth/login": {
-    /**
-     * Iniciar sesión con correo y contraseña
-     * @description Devuelve `200` con el par de tokens si la cuenta no tiene segundo factor.
-     * Si lo tiene, devuelve `202` con un `mfa_token` de corta vida que debe
-     * canjearse en `/api/v1/auth/mfa/verify`.
-     */
-    post: operations["login"];
-  };
-  "/api/v1/auth/mfa/verify": {
-    /** Canjear el desafío de segundo factor por una sesión */
-    post: operations["verifyMfa"];
-  };
-  "/api/v1/auth/refresh": {
-    /**
-     * Rotar el refresh token y obtener un par nuevo
-     * @description La rotación es obligatoria: el token presentado queda invalidado.
-     * Presentar un token ya rotado se interpreta como robo de credencial y
-     * revoca la familia de sesiones completa (RF-006).
-     */
-    post: operations["refreshSession"];
-  };
-  "/api/v1/auth/logout": {
-    /** Revocar el refresh token de la sesión actual */
-    post: operations["logout"];
-  };
-  "/api/v1/auth/password-reset/request": {
-    /**
-     * Solicitar un enlace de restablecimiento
-     * @description Responde `202` exista o no la cuenta, para no revelar qué correos están registrados.
-     */
-    post: operations["requestPasswordReset"];
-  };
-  "/api/v1/auth/password-reset/confirm": {
-    /** Fijar una contraseña nueva con el token recibido */
-    post: operations["confirmPasswordReset"];
-  };
-  "/api/v1/me": {
-    /** Perfil del usuario autenticado */
-    get: operations["getCurrentUser"];
-    /** Actualizar el perfil propio */
-    patch: operations["updateCurrentUser"];
-  };
-  "/api/v1/me/sessions": {
-    /** Sesiones activas del titular */
-    get: operations["listSessions"];
-  };
-  "/api/v1/me/sessions/{sessionId}": {
-    /** Revocar una sesión concreta */
-    delete: operations["revokeSession"];
-  };
-  "/api/v1/me/mfa/enroll": {
-    /**
-     * Iniciar el alta de TOTP
-     * @description Devuelve el secreto una única vez. No se puede volver a consultar.
-     */
-    post: operations["enrollMfa"];
-  };
-  "/api/v1/me/mfa/activate": {
-    /** Confirmar el alta con un código TOTP válido */
-    post: operations["activateMfa"];
-  };
-  "/api/v1/me/mfa": {
-    /** Desactivar el segundo factor */
-    delete: operations["disableMfa"];
-  };
-  "/api/v1/admin/users": {
-    /** Listar y buscar cuentas */
-    get: operations["listUsers"];
-  };
-  "/api/v1/admin/users/{userId}": {
-    /** Consultar una cuenta */
-    get: operations["getUser"];
-    /**
-     * Cambiar el estado o los roles de una cuenta
-     * @description Un administrador no puede deshabilitarse a sí mismo (invariante 6).
-     */
-    patch: operations["updateUser"];
-  };
-  "/api/v1/admin/audit-log": {
-    /** Consultar el registro de auditoría */
-    get: operations["listAuditLog"];
-  };
+    "/healthz": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sonda de vitalidad */
+        get: operations["getHealth"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/readyz": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sonda de disponibilidad (comprueba base de datos y broker) */
+        get: operations["getReadiness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/.well-known/jwks.json": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Clave pública para validar los tokens emitidos */
+        get: operations["getJwks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Crear una cuenta */
+        post: operations["register"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/verify-email": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Activar la cuenta con el token recibido por correo */
+        post: operations["verifyEmail"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Iniciar sesión con correo y contraseña
+         * @description Devuelve `200` con el par de tokens si la cuenta no tiene segundo factor.
+         *     Si lo tiene, devuelve `202` con un `mfa_token` de corta vida que debe
+         *     canjearse en `/api/v1/auth/mfa/verify`.
+         */
+        post: operations["login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/mfa/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Canjear el desafío de segundo factor por una sesión */
+        post: operations["verifyMfa"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rotar el refresh token y obtener un par nuevo
+         * @description La rotación es obligatoria: el token presentado queda invalidado.
+         *     Presentar un token ya rotado se interpreta como robo de credencial y
+         *     revoca la familia de sesiones completa (RF-006).
+         */
+        post: operations["refreshSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revocar el refresh token de la sesión actual */
+        post: operations["logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/password-reset/request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Solicitar un enlace de restablecimiento
+         * @description Responde `202` exista o no la cuenta, para no revelar qué correos están registrados.
+         */
+        post: operations["requestPasswordReset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/password-reset/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Fijar una contraseña nueva con el token recibido */
+        post: operations["confirmPasswordReset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Perfil del usuario autenticado */
+        get: operations["getCurrentUser"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Actualizar el perfil propio */
+        patch: operations["updateCurrentUser"];
+        trace?: never;
+    };
+    "/api/v1/me/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sesiones activas del titular */
+        get: operations["listSessions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/sessions/{sessionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revocar una sesión concreta */
+        delete: operations["revokeSession"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/mfa/enroll": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Iniciar el alta de TOTP
+         * @description Devuelve el secreto una única vez. No se puede volver a consultar.
+         */
+        post: operations["enrollMfa"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/mfa/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirmar el alta con un código TOTP válido */
+        post: operations["activateMfa"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/mfa": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Desactivar el segundo factor */
+        delete: operations["disableMfa"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Listar y buscar cuentas */
+        get: operations["listUsers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Consultar una cuenta */
+        get: operations["getUser"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Cambiar el estado o los roles de una cuenta
+         * @description Un administrador no puede deshabilitarse a sí mismo (invariante 6).
+         */
+        patch: operations["updateUser"];
+        trace?: never;
+    };
+    "/api/v1/admin/audit-log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Consultar el registro de auditoría */
+        get: operations["listAuditLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
-
 export type webhooks = Record<string, never>;
-
 export interface components {
-  schemas: {
-    /** @description Error en formato RFC 7807. Nunca revela si un correo está registrado. */
-    Problem: {
-      /**
-       * Format: uri
-       * @example https://identity.local/problems/invalid-credentials
-       */
-      type: string;
-      /** @example Credenciales inválidas */
-      title: string;
-      /** @example 401 */
-      status: number;
-      detail?: string;
-      instance?: string;
-      /** @description Detalle por campo en errores de validación */
-      errors?: {
-          field: string;
-          message: string;
-        }[];
-    };
-    HealthStatus: {
-      /** @enum {string} */
-      status: "ok";
-      version: string;
-    };
-    ReadinessStatus: {
-      /** @enum {string} */
-      status: "ready" | "degraded";
-      checks: {
-        [key: string]: {
-          /** @enum {string} */
-          status: "up" | "down";
-          error?: string;
+    schemas: {
+        /** @description Error en formato RFC 7807. Nunca revela si un correo está registrado. */
+        Problem: {
+            /**
+             * Format: uri
+             * @example https://identity.local/problems/invalid-credentials
+             */
+            type: string;
+            /** @example Credenciales inválidas */
+            title: string;
+            /** @example 401 */
+            status: number;
+            detail?: string;
+            instance?: string;
+            /** @description Detalle por campo en errores de validación */
+            errors?: {
+                field: string;
+                message: string;
+            }[];
         };
-      };
+        HealthStatus: {
+            /** @enum {string} */
+            status: "ok";
+            version: string;
+        };
+        ReadinessStatus: {
+            /** @enum {string} */
+            status: "ready" | "degraded";
+            checks: {
+                [key: string]: {
+                    /** @enum {string} */
+                    status: "up" | "down";
+                    error?: string;
+                };
+            };
+        };
+        Jwks: {
+            keys: {
+                /** @example OKP */
+                kty: string;
+                /** @example Ed25519 */
+                crv: string;
+                /** @description Clave pública en base64url */
+                x: string;
+                kid: string;
+                /** @example sig */
+                use: string;
+                /** @example EdDSA */
+                alg: string;
+            }[];
+        };
+        /** @enum {string} */
+        UserStatus: "pending_verification" | "active" | "locked" | "disabled";
+        /** @enum {string} */
+        Role: "admin" | "user";
+        User: {
+            /** Format: uuid */
+            id: string;
+            /** Format: email */
+            email: string;
+            displayName: string;
+            status: components["schemas"]["UserStatus"];
+            roles: components["schemas"]["Role"][];
+            mfaEnabled: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            lastLoginAt?: string | null;
+        };
+        UserPage: {
+            items: components["schemas"]["User"][];
+            nextCursor?: string | null;
+        };
+        RegisterRequest: {
+            /** Format: email */
+            email: string;
+            /** Format: password */
+            password: string;
+            displayName: string;
+        };
+        RegisterResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: email */
+            email: string;
+            status: components["schemas"]["UserStatus"];
+        };
+        LoginRequest: {
+            /** Format: email */
+            email: string;
+            /** Format: password */
+            password: string;
+        };
+        TokenPair: {
+            /** @description JWT Ed25519 */
+            accessToken: string;
+            /** @enum {string} */
+            tokenType: "Bearer";
+            /**
+             * @description Segundos de vigencia del access token
+             * @example 900
+             */
+            expiresIn: number;
+        };
+        MfaChallenge: {
+            /** @description Token de un solo uso, vigente 5 minutos */
+            mfaToken: string;
+            /** @example 300 */
+            expiresIn: number;
+        };
+        MfaVerifyRequest: {
+            mfaToken: string;
+            /** @description Código TOTP de 6 dígitos o código de recuperación */
+            code: string;
+        };
+        MfaEnrollment: {
+            /** @description Secreto TOTP en base32. Se muestra una sola vez. */
+            secret: string;
+            /** @description URI otpauth:// para el código QR */
+            otpauthUri: string;
+            /** @description Diez códigos de un solo uso. Se muestran una sola vez. */
+            recoveryCodes: string[];
+        };
+        MfaCodeRequest: {
+            code: string;
+        };
+        PasswordConfirmRequest: {
+            /** Format: password */
+            password: string;
+        };
+        TokenRequest: {
+            token: string;
+        };
+        EmailRequest: {
+            /** Format: email */
+            email: string;
+        };
+        PasswordResetConfirmRequest: {
+            token: string;
+            /** Format: password */
+            password: string;
+        };
+        UpdateProfileRequest: {
+            displayName?: string;
+        };
+        AdminUpdateUserRequest: {
+            status?: components["schemas"]["UserStatus"];
+            roles?: components["schemas"]["Role"][];
+        };
+        Session: {
+            /** Format: uuid */
+            id: string;
+            ip: string;
+            userAgent: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            lastUsedAt: string;
+            /** @description Indica si es la sesión desde la que se consulta */
+            current: boolean;
+        };
+        AuditEvent: {
+            /** Format: int64 */
+            id: number;
+            /** Format: uuid */
+            actorUserId?: string | null;
+            /** @example login_failed */
+            action: string;
+            resourceType?: string | null;
+            resourceId?: string | null;
+            ip?: string | null;
+            userAgent?: string | null;
+            metadata?: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            createdAt: string;
+        };
+        AuditLogPage: {
+            items: components["schemas"]["AuditEvent"][];
+            nextCursor?: string | null;
+        };
     };
-    Jwks: {
-      keys: {
-          /** @example OKP */
-          kty: string;
-          /** @example Ed25519 */
-          crv: string;
-          /** @description Clave pública en base64url */
-          x: string;
-          kid: string;
-          /** @example sig */
-          use: string;
-          /** @example EdDSA */
-          alg: string;
-        }[];
+    responses: {
+        /** @description Petición mal formada o que no supera la validación */
+        BadRequest: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description Credenciales ausentes, inválidas o expiradas */
+        Unauthorized: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description Autenticado pero sin permiso para este recurso */
+        Forbidden: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description El recurso no existe */
+        NotFound: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description Límite de peticiones excedido */
+        TooManyRequests: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
     };
-    /** @enum {string} */
-    UserStatus: "pending_verification" | "active" | "locked" | "disabled";
-    /** @enum {string} */
-    Role: "admin" | "user";
-    User: {
-      /** Format: uuid */
-      id: string;
-      /** Format: email */
-      email: string;
-      displayName: string;
-      status: components["schemas"]["UserStatus"];
-      roles: components["schemas"]["Role"][];
-      mfaEnabled: boolean;
-      /** Format: date-time */
-      createdAt: string;
-      /** Format: date-time */
-      lastLoginAt?: string | null;
+    parameters: {
+        UserId: string;
+        SessionId: string;
+        /** @description Búsqueda parcial por correo o nombre */
+        Query: string;
+        Status: components["schemas"]["UserStatus"];
+        Action: string;
+        ActorId: string;
+        Since: string;
+        Limit: number;
+        Cursor: string;
     };
-    UserPage: {
-      items: components["schemas"]["User"][];
-      nextCursor?: string | null;
-    };
-    RegisterRequest: {
-      /** Format: email */
-      email: string;
-      /** Format: password */
-      password: string;
-      displayName: string;
-    };
-    RegisterResponse: {
-      /** Format: uuid */
-      id: string;
-      /** Format: email */
-      email: string;
-      status: components["schemas"]["UserStatus"];
-    };
-    LoginRequest: {
-      /** Format: email */
-      email: string;
-      /** Format: password */
-      password: string;
-    };
-    TokenPair: {
-      /** @description JWT Ed25519 */
-      accessToken: string;
-      /** @enum {string} */
-      tokenType: "Bearer";
-      /**
-       * @description Segundos de vigencia del access token
-       * @example 900
-       */
-      expiresIn: number;
-    };
-    MfaChallenge: {
-      /** @description Token de un solo uso, vigente 5 minutos */
-      mfaToken: string;
-      /** @example 300 */
-      expiresIn: number;
-    };
-    MfaVerifyRequest: {
-      mfaToken: string;
-      /** @description Código TOTP de 6 dígitos o código de recuperación */
-      code: string;
-    };
-    MfaEnrollment: {
-      /** @description Secreto TOTP en base32. Se muestra una sola vez. */
-      secret: string;
-      /** @description URI otpauth:// para el código QR */
-      otpauthUri: string;
-      /** @description Diez códigos de un solo uso. Se muestran una sola vez. */
-      recoveryCodes: string[];
-    };
-    MfaCodeRequest: {
-      code: string;
-    };
-    PasswordConfirmRequest: {
-      /** Format: password */
-      password: string;
-    };
-    TokenRequest: {
-      token: string;
-    };
-    EmailRequest: {
-      /** Format: email */
-      email: string;
-    };
-    PasswordResetConfirmRequest: {
-      token: string;
-      /** Format: password */
-      password: string;
-    };
-    UpdateProfileRequest: {
-      displayName?: string;
-    };
-    AdminUpdateUserRequest: {
-      status?: components["schemas"]["UserStatus"];
-      roles?: components["schemas"]["Role"][];
-    };
-    Session: {
-      /** Format: uuid */
-      id: string;
-      ip: string;
-      userAgent: string;
-      /** Format: date-time */
-      createdAt: string;
-      /** Format: date-time */
-      lastUsedAt: string;
-      /** @description Indica si es la sesión desde la que se consulta */
-      current: boolean;
-    };
-    AuditEvent: {
-      /** Format: int64 */
-      id: number;
-      /** Format: uuid */
-      actorUserId?: string | null;
-      /** @example login_failed */
-      action: string;
-      resourceType?: string | null;
-      resourceId?: string | null;
-      ip?: string | null;
-      userAgent?: string | null;
-      metadata?: {
-        [key: string]: unknown;
-      };
-      /** Format: date-time */
-      createdAt: string;
-    };
-    AuditLogPage: {
-      items: components["schemas"]["AuditEvent"][];
-      nextCursor?: string | null;
-    };
-  };
-  responses: {
-    /** @description Petición mal formada o que no supera la validación */
-    BadRequest: {
-      content: {
-        "application/problem+json": components["schemas"]["Problem"];
-      };
-    };
-    /** @description Credenciales ausentes, inválidas o expiradas */
-    Unauthorized: {
-      content: {
-        "application/problem+json": components["schemas"]["Problem"];
-      };
-    };
-    /** @description Autenticado pero sin permiso para este recurso */
-    Forbidden: {
-      content: {
-        "application/problem+json": components["schemas"]["Problem"];
-      };
-    };
-    /** @description El recurso no existe */
-    NotFound: {
-      content: {
-        "application/problem+json": components["schemas"]["Problem"];
-      };
-    };
-    /** @description Límite de peticiones excedido */
-    TooManyRequests: {
-      content: {
-        "application/problem+json": components["schemas"]["Problem"];
-      };
-    };
-  };
-  parameters: {
-    UserId: string;
-    SessionId: string;
-    /** @description Búsqueda parcial por correo o nombre */
-    Query?: string;
-    Status?: components["schemas"]["UserStatus"];
-    Action?: string;
-    ActorId?: string;
-    Since?: string;
-    Limit?: number;
-    Cursor?: string;
-  };
-  requestBodies: never;
-  headers: never;
-  pathItems: never;
+    requestBodies: never;
+    headers: never;
+    pathItems: never;
 }
-
 export type $defs = Record<string, never>;
-
-export type external = Record<string, never>;
-
 export interface operations {
-
-  /** Sonda de vitalidad */
-  getHealth: {
-    responses: {
-      /** @description El proceso está vivo */
-      200: {
-        content: {
-          "application/json": components["schemas"]["HealthStatus"];
+    getHealth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-      };
-    };
-  };
-  /** Sonda de disponibilidad (comprueba base de datos y broker) */
-  getReadiness: {
-    responses: {
-      /** @description Todas las dependencias responden */
-      200: {
-        content: {
-          "application/json": components["schemas"]["ReadinessStatus"];
+        requestBody?: never;
+        responses: {
+            /** @description El proceso está vivo */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthStatus"];
+                };
+            };
         };
-      };
-      /** @description Alguna dependencia no responde */
-      503: {
-        content: {
-          "application/json": components["schemas"]["ReadinessStatus"];
+    };
+    getReadiness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-      };
-    };
-  };
-  /** Clave pública para validar los tokens emitidos */
-  getJwks: {
-    responses: {
-      /** @description Conjunto de claves públicas */
-      200: {
-        content: {
-          "application/json": components["schemas"]["Jwks"];
+        requestBody?: never;
+        responses: {
+            /** @description Todas las dependencias responden */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessStatus"];
+                };
+            };
+            /** @description Alguna dependencia no responde */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessStatus"];
+                };
+            };
         };
-      };
     };
-  };
-  /** Crear una cuenta */
-  register: {
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["RegisterRequest"];
-      };
-    };
-    responses: {
-      /** @description Cuenta creada en estado pending_verification */
-      201: {
-        content: {
-          "application/json": components["schemas"]["RegisterResponse"];
+    getJwks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-      };
-      400: components["responses"]["BadRequest"];
-      /** @description El correo ya está registrado */
-      409: {
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
+        requestBody?: never;
+        responses: {
+            /** @description Conjunto de claves públicas */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Jwks"];
+                };
+            };
         };
-      };
-      429: components["responses"]["TooManyRequests"];
     };
-  };
-  /** Activar la cuenta con el token recibido por correo */
-  verifyEmail: {
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["TokenRequest"];
-      };
-    };
-    responses: {
-      /** @description Cuenta activada */
-      204: {
-        content: never;
-      };
-      400: components["responses"]["BadRequest"];
-      /** @description El token expiró o ya fue usado */
-      410: {
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
+    register: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-      };
-    };
-  };
-  /**
-   * Iniciar sesión con correo y contraseña
-   * @description Devuelve `200` con el par de tokens si la cuenta no tiene segundo factor.
-   * Si lo tiene, devuelve `202` con un `mfa_token` de corta vida que debe
-   * canjearse en `/api/v1/auth/mfa/verify`.
-   */
-  login: {
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["LoginRequest"];
-      };
-    };
-    responses: {
-      /** @description Sesión iniciada */
-      200: {
-        headers: {
-          /** @description refresh_token=<opaco>; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Max-Age=<vigencia del refresh> */
-          "Set-Cookie"?: string;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterRequest"];
+            };
         };
-        content: {
-          "application/json": components["schemas"]["TokenPair"];
+        responses: {
+            /** @description Cuenta creada en estado pending_verification */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisterResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            /** @description El correo ya está registrado */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            429: components["responses"]["TooManyRequests"];
         };
-      };
-      /** @description Se requiere segundo factor */
-      202: {
-        content: {
-          "application/json": components["schemas"]["MfaChallenge"];
+    };
+    verifyEmail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-      };
-      400: components["responses"]["BadRequest"];
-      401: components["responses"]["Unauthorized"];
-      /** @description Cuenta bloqueada por intentos fallidos */
-      423: {
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TokenRequest"];
+            };
         };
-      };
-      429: components["responses"]["TooManyRequests"];
-    };
-  };
-  /** Canjear el desafío de segundo factor por una sesión */
-  verifyMfa: {
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["MfaVerifyRequest"];
-      };
-    };
-    responses: {
-      /** @description Sesión iniciada */
-      200: {
-        headers: {
-          /** @description refresh_token=<opaco>; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Max-Age=<vigencia del refresh> */
-          "Set-Cookie"?: string;
+        responses: {
+            /** @description Cuenta activada */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            /** @description El token expiró o ya fue usado */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
-        content: {
-          "application/json": components["schemas"]["TokenPair"];
+    };
+    login: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-      };
-      400: components["responses"]["BadRequest"];
-      401: components["responses"]["Unauthorized"];
-    };
-  };
-  /**
-   * Rotar el refresh token y obtener un par nuevo
-   * @description La rotación es obligatoria: el token presentado queda invalidado.
-   * Presentar un token ya rotado se interpreta como robo de credencial y
-   * revoca la familia de sesiones completa (RF-006).
-   */
-  refreshSession: {
-    parameters: {
-      cookie: {
-        /** @description Refresh token opaco de la sesión actual. */
-        refresh_token: string;
-      };
-    };
-    responses: {
-      /** @description Par de tokens renovado */
-      200: {
-        headers: {
-          /** @description refresh_token=<opaco>; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Max-Age=<vigencia del refresh> */
-          "Set-Cookie"?: string;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginRequest"];
+            };
         };
-        content: {
-          "application/json": components["schemas"]["TokenPair"];
+        responses: {
+            /** @description Sesión iniciada */
+            200: {
+                headers: {
+                    /** @description refresh_token=<opaco>; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Max-Age=<vigencia del refresh> */
+                    "Set-Cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenPair"];
+                };
+            };
+            /** @description Se requiere segundo factor */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MfaChallenge"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            /** @description Cuenta bloqueada por intentos fallidos */
+            423: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            429: components["responses"]["TooManyRequests"];
         };
-      };
-      401: components["responses"]["Unauthorized"];
     };
-  };
-  /** Revocar el refresh token de la sesión actual */
-  logout: {
-    parameters: {
-      cookie: {
-        /** @description Refresh token opaco de la sesión actual. */
-        refresh_token: string;
-      };
-    };
-    responses: {
-      /** @description Sesión cerrada */
-      204: {
-        headers: {
-          /** @description refresh_token=; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Max-Age=0 */
-          "Set-Cookie"?: string;
+    verifyMfa: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-        content: never;
-      };
-      401: components["responses"]["Unauthorized"];
-    };
-  };
-  /**
-   * Solicitar un enlace de restablecimiento
-   * @description Responde `202` exista o no la cuenta, para no revelar qué correos están registrados.
-   */
-  requestPasswordReset: {
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["EmailRequest"];
-      };
-    };
-    responses: {
-      /** @description Si la cuenta existe, se envió el correo */
-      202: {
-        content: never;
-      };
-      429: components["responses"]["TooManyRequests"];
-    };
-  };
-  /** Fijar una contraseña nueva con el token recibido */
-  confirmPasswordReset: {
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["PasswordResetConfirmRequest"];
-      };
-    };
-    responses: {
-      /** @description Contraseña actualizada y sesiones revocadas */
-      204: {
-        content: never;
-      };
-      400: components["responses"]["BadRequest"];
-      /** @description El token expiró o ya fue usado */
-      410: {
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MfaVerifyRequest"];
+            };
         };
-      };
-    };
-  };
-  /** Perfil del usuario autenticado */
-  getCurrentUser: {
-    responses: {
-      /** @description Perfil */
-      200: {
-        content: {
-          "application/json": components["schemas"]["User"];
+        responses: {
+            /** @description Sesión iniciada */
+            200: {
+                headers: {
+                    /** @description refresh_token=<opaco>; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Max-Age=<vigencia del refresh> */
+                    "Set-Cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenPair"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
         };
-      };
-      401: components["responses"]["Unauthorized"];
     };
-  };
-  /** Actualizar el perfil propio */
-  updateCurrentUser: {
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["UpdateProfileRequest"];
-      };
-    };
-    responses: {
-      /** @description Perfil actualizado */
-      200: {
-        content: {
-          "application/json": components["schemas"]["User"];
+    refreshSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie: {
+                /** @description Refresh token opaco de la sesión actual. */
+                refresh_token: string;
+            };
         };
-      };
-      400: components["responses"]["BadRequest"];
-      401: components["responses"]["Unauthorized"];
-    };
-  };
-  /** Sesiones activas del titular */
-  listSessions: {
-    responses: {
-      /** @description Listado de sesiones */
-      200: {
-        content: {
-          "application/json": components["schemas"]["Session"][];
+        requestBody?: never;
+        responses: {
+            /** @description Par de tokens renovado */
+            200: {
+                headers: {
+                    /** @description refresh_token=<opaco>; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Max-Age=<vigencia del refresh> */
+                    "Set-Cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenPair"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
         };
-      };
-      401: components["responses"]["Unauthorized"];
     };
-  };
-  /** Revocar una sesión concreta */
-  revokeSession: {
-    parameters: {
-      path: {
-        sessionId: components["parameters"]["SessionId"];
-      };
-    };
-    responses: {
-      /** @description Sesión revocada */
-      204: {
-        content: never;
-      };
-      401: components["responses"]["Unauthorized"];
-      404: components["responses"]["NotFound"];
-    };
-  };
-  /**
-   * Iniciar el alta de TOTP
-   * @description Devuelve el secreto una única vez. No se puede volver a consultar.
-   */
-  enrollMfa: {
-    responses: {
-      /** @description Secreto y códigos de recuperación */
-      200: {
-        content: {
-          "application/json": components["schemas"]["MfaEnrollment"];
+    logout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie: {
+                /** @description Refresh token opaco de la sesión actual. */
+                refresh_token: string;
+            };
         };
-      };
-      401: components["responses"]["Unauthorized"];
-      /** @description El segundo factor ya está activo */
-      409: {
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
+        requestBody?: never;
+        responses: {
+            /** @description Sesión cerrada */
+            204: {
+                headers: {
+                    /** @description refresh_token=; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Max-Age=0 */
+                    "Set-Cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
         };
-      };
     };
-  };
-  /** Confirmar el alta con un código TOTP válido */
-  activateMfa: {
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["MfaCodeRequest"];
-      };
-    };
-    responses: {
-      /** @description Segundo factor activado */
-      204: {
-        content: never;
-      };
-      400: components["responses"]["BadRequest"];
-      401: components["responses"]["Unauthorized"];
-    };
-  };
-  /** Desactivar el segundo factor */
-  disableMfa: {
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["PasswordConfirmRequest"];
-      };
-    };
-    responses: {
-      /** @description Segundo factor desactivado */
-      204: {
-        content: never;
-      };
-      401: components["responses"]["Unauthorized"];
-    };
-  };
-  /** Listar y buscar cuentas */
-  listUsers: {
-    parameters: {
-      query?: {
-        q?: components["parameters"]["Query"];
-        status?: components["parameters"]["Status"];
-        limit?: components["parameters"]["Limit"];
-        cursor?: components["parameters"]["Cursor"];
-      };
-    };
-    responses: {
-      /** @description Página de cuentas */
-      200: {
-        content: {
-          "application/json": components["schemas"]["UserPage"];
+    requestPasswordReset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-      };
-      401: components["responses"]["Unauthorized"];
-      403: components["responses"]["Forbidden"];
-    };
-  };
-  /** Consultar una cuenta */
-  getUser: {
-    parameters: {
-      path: {
-        userId: components["parameters"]["UserId"];
-      };
-    };
-    responses: {
-      /** @description Cuenta */
-      200: {
-        content: {
-          "application/json": components["schemas"]["User"];
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmailRequest"];
+            };
         };
-      };
-      401: components["responses"]["Unauthorized"];
-      403: components["responses"]["Forbidden"];
-      404: components["responses"]["NotFound"];
-    };
-  };
-  /**
-   * Cambiar el estado o los roles de una cuenta
-   * @description Un administrador no puede deshabilitarse a sí mismo (invariante 6).
-   */
-  updateUser: {
-    parameters: {
-      path: {
-        userId: components["parameters"]["UserId"];
-      };
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["AdminUpdateUserRequest"];
-      };
-    };
-    responses: {
-      /** @description Cuenta actualizada */
-      200: {
-        content: {
-          "application/json": components["schemas"]["User"];
+        responses: {
+            /** @description Si la cuenta existe, se envió el correo */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            429: components["responses"]["TooManyRequests"];
         };
-      };
-      400: components["responses"]["BadRequest"];
-      401: components["responses"]["Unauthorized"];
-      403: components["responses"]["Forbidden"];
-      404: components["responses"]["NotFound"];
     };
-  };
-  /** Consultar el registro de auditoría */
-  listAuditLog: {
-    parameters: {
-      query?: {
-        action?: components["parameters"]["Action"];
-        actorId?: components["parameters"]["ActorId"];
-        since?: components["parameters"]["Since"];
-        limit?: components["parameters"]["Limit"];
-        cursor?: components["parameters"]["Cursor"];
-      };
-    };
-    responses: {
-      /** @description Página de eventos */
-      200: {
-        content: {
-          "application/json": components["schemas"]["AuditLogPage"];
+    confirmPasswordReset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-      };
-      401: components["responses"]["Unauthorized"];
-      403: components["responses"]["Forbidden"];
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordResetConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Contraseña actualizada y sesiones revocadas */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            /** @description El token expiró o ya fue usado */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
     };
-  };
+    getCurrentUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Perfil */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["User"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    updateCurrentUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateProfileRequest"];
+            };
+        };
+        responses: {
+            /** @description Perfil actualizado */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["User"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    listSessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Listado de sesiones */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    revokeSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: components["parameters"]["SessionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sesión revocada */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    enrollMfa: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Secreto y códigos de recuperación */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MfaEnrollment"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            /** @description El segundo factor ya está activo */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    activateMfa: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MfaCodeRequest"];
+            };
+        };
+        responses: {
+            /** @description Segundo factor activado */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    disableMfa: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Segundo factor desactivado */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    listUsers: {
+        parameters: {
+            query?: {
+                /** @description Búsqueda parcial por correo o nombre */
+                q?: components["parameters"]["Query"];
+                status?: components["parameters"]["Status"];
+                limit?: components["parameters"]["Limit"];
+                cursor?: components["parameters"]["Cursor"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Página de cuentas */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserPage"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cuenta */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["User"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminUpdateUserRequest"];
+            };
+        };
+        responses: {
+            /** @description Cuenta actualizada */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["User"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listAuditLog: {
+        parameters: {
+            query?: {
+                action?: components["parameters"]["Action"];
+                actorId?: components["parameters"]["ActorId"];
+                since?: components["parameters"]["Since"];
+                limit?: components["parameters"]["Limit"];
+                cursor?: components["parameters"]["Cursor"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Página de eventos */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditLogPage"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
 }

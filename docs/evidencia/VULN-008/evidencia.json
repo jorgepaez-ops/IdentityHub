@@ -24,14 +24,15 @@
     "ficha": "security/findings/VULN-008-base-debian-11-backend.md"
   },
   "despues": {
-    "commit": "a2b57e2",
+    "commit": "59cf8cff8d25776f3cc558e6cd41da29949ef064",
     "workflow": "CI",
-    "run_id": "36259385478",
-    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36259385478",
-    "captura": null,
+    "run_id": "36283211113",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36283211113",
+    "captura": "informe Desktop, seccion VULN-008 despues",
     "hallazgos": [
-      "Job \"9-10 · Construir y escanear imágenes (api)\": Trivy image, targets \"identity-hub/api ... (debian 12.15)\" y \"usr/local/bin/api (gobinary)\", ambos con 0 vulnerabilidades"
+      "Job de imagen api (108519065541): Trivy image sobre debian 12.15 y el binario api: 0 vulnerabilidades en ambos targets.",
+      "Job de imagen worker (108519065671): Trivy image sobre debian 12.15 y el binario worker: 0 vulnerabilidades en ambos targets."
     ],
-    "observacion": "Texto literal de Desktop (job 108452298422): el formato de esta versión de Trivy usa columna \"Vulnerabilities\" = 0 en vez de \"Total: 0 (HIGH: 0, CRITICAL: 0)\"; mismo dato, redacción distinta a la usada en verificación local."
+    "observacion": "Texto literal de Desktop (job 108452298422): el formato de esta versión de Trivy usa columna \"Vulnerabilities\" = 0 en vez de \"Total: 0 (HIGH: 0, CRITICAL: 0)\"; mismo dato, redacción distinta a la usada en verificación local. Referencia al run parcial anterior 36259385478: se reemplaza por el run verde 36283211113. Run verde 36283211113 (workflow_dispatch, feat/idp-semana-2, commit 59cf8cff, 13/13 jobs): Trivy confirmó cero vulnerabilidades para api y worker."
   }
 }

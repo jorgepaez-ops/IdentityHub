@@ -1,0 +1,18 @@
+# Riesgo aceptado — VULN-028 / T34b (ver ficha en security/findings/).
+#
+# GO-2026-5932 (golang.org/x/crypto/openpgp y subpaquetes: packet, armor,
+# clearsign, errors, elgamal, s2k) no tiene versión corregida: el aviso es de
+# diseño/mantenimiento del paquete completo, no de una versión concreta.
+# `golang.org/x/crypto` no puede eliminarse del módulo (lo usa
+# internal/auth para Argon2id, ADR 0004), pero ningún paquete propio ni
+# ninguna dependencia importa `golang.org/x/crypto/openpgp` ni sus
+# subpaquetes: `go list -deps ./...` desde backend/ no lo lista, y el
+# análisis de llamadas tanto de osv-scanner v2.6.0 como de govulncheck marca
+# los tres avisos de x/crypto@v0.55.0/v0.56.0 (incluido este) como no
+# invocados/no alcanzables. Se acepta el riesgo por ausencia de
+# alcanzabilidad; revisar antes de la fecha de expiración por si una
+# dependencia futura empieza a importar ese subpaquete.
+[[IgnoredVulns]]
+id = "GO-2026-5932"
+ignoreUntil = 2026-12-25
+reason = "VULN-028/T34b: golang.org/x/crypto/openpgp (y subpaquetes) sin versión corregida; no importado por el módulo ni por sus dependencias (go list -deps ./... no lo lista); osv-scanner y govulncheck lo marcan no alcanzable. Riesgo aceptado, revisar en la fecha de expiracion."

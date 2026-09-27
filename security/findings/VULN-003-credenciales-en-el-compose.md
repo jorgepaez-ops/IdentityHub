@@ -8,10 +8,10 @@
 | **Componente** | `deploy/docker-compose.yml:24,42,82,102-103,133-134` |
 | **Amenaza** | AM-012 (secretos en el repositorio o en la imagen) |
 | **Sembrada** | sí |
-| **Evidencia antes** | `docs/evidencia/VULN-003/evidencia.json` |
+| **Evidencia antes** | `docs/evidencia/VULN-003/evidencia.json` — informe Desktop §3 VULN-003 |
 | **Commit de remediación** | `afab4e9` (T26) |
-| **Evidencia después** | `docs/evidencia/VULN-003/evidencia.json` (job "3 · Secretos en el historial": "no leaks found") |
-| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36259385478 |
+| **Evidencia después** | `docs/evidencia/VULN-003/evidencia.json` (job "3 · Secretos en el historial": "no leaks found") — informe Desktop, seccion VULN-003 despues |
+| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36283211113 |
 
 ## Evidencia
 

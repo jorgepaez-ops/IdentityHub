@@ -55,7 +55,11 @@ func healthcheckURL() string {
 	return fmt.Sprintf("http://127.0.0.1:%s/healthz", port)
 }
 
-func runHealthcheck(client *http.Client, url string) int {
+type healthcheckHTTPClient interface {
+	Do(*http.Request) (*http.Response, error)
+}
+
+func runHealthcheck(client healthcheckHTTPClient, url string) int {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)

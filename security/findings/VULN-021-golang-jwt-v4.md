@@ -9,9 +9,9 @@
 | **Avisos** | GO-2024-3250 (corregido en v4.5.1) · GO-2025-3553 (corregido en v4.5.2) |
 | **Amenaza** | AM-003 (suplantación), AM-017 (denegación de servicio) |
 | **Sembrada** | sí |
-| **Evidencia antes** | `docs/evidencia/VULN-021/evidencia.json` |
+| **Evidencia antes** | `docs/evidencia/VULN-021/evidencia.json` — informe Desktop §3 VULN-021 |
 | **Commit de remediación** | `51a7a4f` (T23) |
-| **Evidencia después** | `docs/evidencia/VULN-021/evidencia.json` (govulncheck: GO-2025-3553 y GO-2024-3250 ya no aparecen; quedan 5 CVE de pgx, alcance T24) |
+| **Evidencia después** | `docs/evidencia/VULN-021/evidencia.json` (govulncheck: GO-2025-3553 y GO-2024-3250 ya no aparecen; quedan 5 CVE de pgx, alcance T24) — informe Desktop §3 VULN-021 |
 | **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36208104969 |
 
 ## Evidencia

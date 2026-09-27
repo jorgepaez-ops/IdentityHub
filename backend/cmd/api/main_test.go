@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
-	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -78,33 +79,22 @@ func TestRF017_LoginSecurityEventPublisherPublishesRecipient(t *testing.T) {
 // healthcheck T27 needs: distroless has no shell, so the compose healthcheck
 // can no longer run `curl`, and must instead invoke the binary itself.
 func TestRNF004_HealthcheckSubcommandReportsHealthyServer(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/healthz" {
-			w.WriteHeader(http.StatusNotFound)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer srv.Close()
-
-	if got := runHealthcheck(srv.Client(), srv.URL+"/healthz"); got != 0 {
+	doer := &healthcheckDoer{response: &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader("ok"))}}
+	if got := runHealthcheck(doer, "http://health.test/healthz"); got != 0 {
 		t.Fatalf("runHealthcheck() = %d, want 0 for a healthy server", got)
 	}
 }
 
 func TestRNF004_HealthcheckSubcommandReportsUnhealthyServer(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusServiceUnavailable)
-	}))
-	defer srv.Close()
-
-	if got := runHealthcheck(srv.Client(), srv.URL+"/healthz"); got != 1 {
+	doer := &healthcheckDoer{response: &http.Response{StatusCode: http.StatusServiceUnavailable, Body: io.NopCloser(strings.NewReader("unhealthy"))}}
+	if got := runHealthcheck(doer, "http://health.test/healthz"); got != 1 {
 		t.Fatalf("runHealthcheck() = %d, want 1 for an unhealthy server", got)
 	}
 }
 
 func TestRNF004_HealthcheckSubcommandReportsConnectionFailure(t *testing.T) {
-	if got := runHealthcheck(http.DefaultClient, "http://127.0.0.1:1/healthz"); got != 1 {
+	doer := &healthcheckDoer{err: errors.New("connection failed")}
+	if got := runHealthcheck(doer, "http://health.test/healthz"); got != 1 {
 		t.Fatalf("runHealthcheck() = %d, want 1 when the server is unreachable", got)
 	}
 }

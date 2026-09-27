@@ -29,6 +29,6 @@
     "hallazgos": [
       "curl -sI http://localhost:8080/: cabecera 'Server: nginx' sin número de versión (server_tokens off)"
     ],
-    "observacion": "Sin gate hoy. Misma ejecución local que VULN-013."
+    "observacion": "Sin gate hoy. Misma ejecución local que VULN-013. Sin gate de CI (ZAP llega en semana 3): la evidencia después es la ejecución local documentada; run_url se mantiene en null."
   }
 }

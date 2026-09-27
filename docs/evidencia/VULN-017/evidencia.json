@@ -21,14 +21,14 @@
     "ficha": "security/findings/VULN-017-nginx-latest.md"
   },
   "despues": {
-    "commit": "a2b57e2",
-    "workflow": null,
-    "run_id": null,
-    "run_url": null,
-    "captura": null,
+    "commit": "59cf8cff8d25776f3cc558e6cd41da29949ef064",
+    "workflow": "CI",
+    "run_id": "36283211113",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36283211113",
+    "captura": "informe Desktop, seccion VULN-017 despues",
     "hallazgos": [
-      "hadolint sobre frontend/Dockerfile (local, T28, vía make scan-config): sin salida (limpio); nginx:latest ya no está, imagen fijada por digest real (nginxinc/nginx-unprivileged@sha256:...)"
+      "Job \"2 · Lint y tipos\" (108518929695): Hadolint sobre frontend/Dockerfile: sin hallazgos."
     ],
-    "observacion": "Mismo caso que VULN-010: el \"antes\" venía de baseline-scan.yml; ci.yml no tiene ningún step de Hadolint (confirmado por Desktop, job 108452162149). Evidencia local ya verificada en T28 hasta que corra baseline-scan.yml sobre un tag nuevo."
+    "observacion": "Mismo caso que VULN-010: el \"antes\" venía de baseline-scan.yml; ci.yml no tiene ningún step de Hadolint (confirmado por Desktop, job 108452162149). Evidencia local ya verificada en T28 hasta que corra baseline-scan.yml sobre un tag nuevo. Corrección de la observación anterior: Hadolint sí tiene gate en el job 2 de ci.yml (cerca de las líneas 124/130). Run verde 36283211113: sin hallazgos."
   }
 }

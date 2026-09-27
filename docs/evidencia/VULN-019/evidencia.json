@@ -32,6 +32,6 @@
       "Trivy image (local, T30) sobre postgres:16-bookworm: 0 en el sistema operativo; 1 HIGH en gosu (binario empaquetado por la imagen oficial, fuera de nuestro control) y 1 en un certificado de relleno de Debian",
       "axllent/mailpit, migrate/migrate y las 4 imágenes de observabilidad siguen sin actualizar, fuera de alcance de T30"
     ],
-    "observacion": "baseline-scan.yml (el workflow que escanea estas imágenes por nombre) solo corre sobre el tag v0.0.0-vuln-baseline, no sobre ramas ni PRs — no hay \"después\" de CI posible hasta que T38 cree el tag endurecido. Evidencia local ya verificada en T30."
+    "observacion": "baseline-scan.yml (el workflow que escanea estas imágenes por nombre) solo corre sobre el tag v0.0.0-vuln-baseline, no sobre ramas ni PRs — no hay \"después\" de CI posible hasta que T38 cree el tag endurecido. Evidencia local ya verificada en T30. El run verde 36283211113 es solo referencia: ci.yml no escanea las imágenes de infraestructura de docker-compose.yml; no existe gate de CI para este hallazgo."
   }
 }

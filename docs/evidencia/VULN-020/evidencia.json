@@ -22,10 +22,14 @@
     "ficha": "security/findings/VULN-020-chi-realip-spoofing.md"
   },
   "despues": {
-    "commit": null,
-    "workflow": null,
-    "run_id": null,
-    "run_url": null,
-    "captura": null
+    "commit": "59cf8cff8d25776f3cc558e6cd41da29949ef064",
+    "workflow": "CI",
+    "run_id": "36283211113",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36283211113",
+    "captura": "informe Desktop, seccion VULN-020 despues",
+    "hallazgos": [
+      "Job \"5 · Dependencias vulnerables\" (108518929566), govulncheck: \"No vulnerabilities found\"; affected 0, imported 0, required modules uncalled 1."
+    ],
+    "observacion": "Run verde 36283211113 (workflow_dispatch, feat/idp-semana-2, commit 59cf8cff, 13/13 jobs): govulncheck no encontró vulnerabilidades."
   }
 }

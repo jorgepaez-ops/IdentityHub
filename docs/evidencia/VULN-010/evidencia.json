@@ -25,14 +25,14 @@
     "ficha": "security/findings/VULN-010-apt-get-sin-fijar-ni-limpiar.md"
   },
   "despues": {
-    "commit": "a2b57e2",
-    "workflow": null,
-    "run_id": null,
-    "run_url": null,
-    "captura": null,
+    "commit": "59cf8cff8d25776f3cc558e6cd41da29949ef064",
+    "workflow": "CI",
+    "run_id": "36283211113",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36283211113",
+    "captura": "informe Desktop, seccion VULN-010 despues",
     "hallazgos": [
-      "hadolint sobre backend/Dockerfile (local, T27): sin salida (limpio); apt-get eliminado por completo del Dockerfile, la imagen final es distroless sin gestor de paquetes"
+      "Job \"2 · Lint y tipos\" (108518929695): Hadolint sobre backend/Dockerfile: sin hallazgos."
     ],
-    "observacion": "El \"antes\" venía de baseline-scan.yml, que solo corre sobre el tag v0.0.0-vuln-baseline. Confirmado con Desktop (job 108452162149): el job \"8 · Configuración de contenedores\" de ci.yml corre Trivy config pero NO tiene ningún step de Hadolint (tampoco en 9-10). No hay \"después\" de CI posible para este hallazgo hasta que baseline-scan.yml corra contra un tag nuevo (T38); mientras tanto, evidencia local ya verificada en T27."
+    "observacion": "El \"antes\" venía de baseline-scan.yml, que solo corre sobre el tag v0.0.0-vuln-baseline. Confirmado con Desktop (job 108452162149): el job \"8 · Configuración de contenedores\" de ci.yml corre Trivy config pero NO tiene ningún step de Hadolint (tampoco en 9-10). No hay \"después\" de CI posible para este hallazgo hasta que baseline-scan.yml corra contra un tag nuevo (T38); mientras tanto, evidencia local ya verificada en T27. Corrección de la observación anterior: Hadolint sí tiene gate en el job 2 de ci.yml (cerca de las líneas 124/130). Run verde 36283211113: sin hallazgos."
   }
 }

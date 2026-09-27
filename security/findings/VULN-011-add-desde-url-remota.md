@@ -8,9 +8,9 @@
 | **Componente** | `backend/Dockerfile:44` |
 | **Amenaza** | AM-009 (dependencia comprometida en la cadena de suministro) |
 | **Sembrada** | sí |
-| **Evidencia antes** | `docs/evidencia/VULN-011/evidencia.json` |
+| **Evidencia antes** | `docs/evidencia/VULN-011/evidencia.json` — sin captura |
 | **Commit de remediación** | `a0c64d6` (T27) |
-| **Evidencia después** | `docs/evidencia/VULN-011/evidencia.json` (diff del commit: `ADD` eliminado por completo) |
+| **Evidencia después** | `docs/evidencia/VULN-011/evidencia.json` (diff del commit: `ADD` eliminado por completo) — sin captura |
 | **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / — (sin gate ni antes ni después) |
 
 ## Evidencia

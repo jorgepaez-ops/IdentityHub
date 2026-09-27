@@ -26,14 +26,15 @@
     "ficha": "security/findings/VULN-001-credenciales-incrustadas.md"
   },
   "despues": {
-    "commit": "a2b57e2",
+    "commit": "59cf8cff8d25776f3cc558e6cd41da29949ef064",
     "workflow": "CI",
-    "run_id": "36259385478",
-    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36259385478",
-    "captura": null,
+    "run_id": "36283211113",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36283211113",
+    "captura": "informe Desktop, seccion VULN-001 despues",
     "hallazgos": [
-      "Job \"3 · Secretos en el historial\": gitleaks detect sobre el rango 51a7a4f^..a2b57e2 (27 commits del PR): \"no leaks found\""
+      "Job \"3 · Secretos en el historial\" (108518929834): gitleaks detect sobre 143 commits: \"no leaks found\"",
+      "Job \"2 · Lint y tipos\" (108518929695): golangci-lint: \"0 issues\""
     ],
-    "observacion": "Texto literal de Desktop (job 108452162174): el escaneo del job está acotado al rango de commits del PR (--log-opts=--first-parent 51a7a4f^..a2b57e2), no a todo el historial. gosec G101 (job \"2 · Lint y tipos\") también en verde."
+    "observacion": "Texto literal de Desktop (job 108452162174): el escaneo del job está acotado al rango de commits del PR (--log-opts=--first-parent 51a7a4f^..a2b57e2), no a todo el historial. gosec G101 (job \"2 · Lint y tipos\") también en verde. Referencia al run parcial anterior 36259385478: se reemplaza por el run verde 36283211113. Run verde 36283211113 (workflow_dispatch, feat/idp-semana-2, commit 59cf8cff, 13/13 jobs): Gitleaks no encontró filtraciones y golangci-lint no reportó issues."
   }
 }

@@ -8,10 +8,10 @@
 | **Componente** | `backend/Dockerfile:48-49,64` |
 | **Amenaza** | AM-012 (secretos en el repositorio o en la imagen) |
 | **Sembrada** | sí |
-| **Evidencia antes** | `docs/evidencia/VULN-012/evidencia.json` |
+| **Evidencia antes** | `docs/evidencia/VULN-012/evidencia.json` — informe Desktop §3 VULN-012 |
 | **Commit de remediación** | `afab4e9` (T26) |
-| **Evidencia después** | `docs/evidencia/VULN-012/evidencia.json` (jobs "3" y "8": ambos limpios) |
-| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36259385478 |
+| **Evidencia después** | `docs/evidencia/VULN-012/evidencia.json` (jobs "3" y "8": ambos limpios) — informe Desktop, seccion VULN-012 despues |
+| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36283211113 |
 
 ## Evidencia
 

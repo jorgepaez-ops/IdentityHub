@@ -29,6 +29,6 @@
     "hallazgos": [
       "curl -sI http://localhost:8080/: las cinco cabeceras de RNF-009 presentes (Content-Security-Policy, Strict-Transport-Security, X-Content-Type-Options, X-Frame-Options, Referrer-Policy)"
     ],
-    "observacion": "Sin gate hoy (ZAP llega en semana 3, misma decisión Q18 que el antes). Ejecución local del 2026-09-26 con el stack completo (make up) sobre PR #2."
+    "observacion": "Sin gate hoy (ZAP llega en semana 3, misma decisión Q18 que el antes). Ejecución local del 2026-09-26 con el stack completo (make up) sobre PR #2. Sin gate de CI (ZAP llega en semana 3): la evidencia después es la ejecución local documentada; run_url se mantiene en null."
   }
 }

@@ -20,8 +20,8 @@
     "commit": "51a7a4f",
     "workflow": null,
     "run_id": null,
-    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/commit/51a7a4f86e41f6ef17fe6e39ef4337cbd11402be",
+    "run_url": null,
     "captura": "informe Desktop §3 VULN-005/006/007",
-    "observacion": "Sin gate propio ni antes ni después (ya documentado): la evidencia es el diff del commit, que borra backend/internal/api/legacy_auth.go entero (\"-131,+0\", \"This file was deleted\")."
+    "observacion": "Sin gate propio ni antes ni después (ya documentado): la evidencia es el diff del commit, que borra backend/internal/api/legacy_auth.go entero (\"-131,+0\", \"This file was deleted\"). Sin gate de CI: la evidencia después es el diff del commit de remediación; run_url se mantiene en null."
   }
 }

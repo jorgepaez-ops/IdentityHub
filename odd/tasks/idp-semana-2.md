@@ -164,32 +164,35 @@ los archivos sembrados y fichas). Celdas vacías = aún no conocidas.
 
 | VULN | Hallazgo | Gate que lo detecta | Antes (run / captura) | Commit remediación | Después (run / captura) | Tarea |
 |---|---|---|---|---|---|---|
-| VULN-001 | Credenciales incrustadas (código, compose, Dockerfile) | Gitleaks (`secrets`), gosec G101 (`lint`), Trivy secret (imagen) | run 35476102444 / informe §3 | `51a7a4f` (T23, código); `afab4e9` (T26, compose/Dockerfile) | run 36259385478 (secrets: "no leaks found") | T23, T26 |
+| VULN-001 | Credenciales incrustadas (código, compose, Dockerfile) | Gitleaks (`secrets`), gosec G101 (`lint`), Trivy secret (imagen) | run 35476102444 / informe §3 | `51a7a4f` (T23, código); `afab4e9` (T26, compose/Dockerfile) | run 36283211113 / informe Desktop, seccion VULN-001 despues (Gitleaks: no leaks found; golangci-lint: 0 issues) | T23, T26 |
 | VULN-002 | MD5 para contraseñas | gosec G401/G501, CodeQL, Semgrep | run 35476102444 / informe §3 | `51a7a4f` | run 36208104969 / informe Desktop §3 | T23 (con T7) |
-| VULN-003 | Credenciales en el compose | Gitleaks | run 35476102444 / informe §3 | `afab4e9` | run 36259385478 (secrets: "no leaks found") | T26 |
+| VULN-003 | Credenciales en el compose | Gitleaks | run 35476102444 / informe §3 | `afab4e9` | run 36283211113 / informe Desktop, seccion VULN-003 despues (Gitleaks: no leaks found) | T26 |
 | VULN-004 | `math/rand` para tokens | gosec G404 | run 35476102444 / informe §3 | `51a7a4f` | run 36208104969 / informe Desktop §3 | T23 |
-| VULN-005 | SQL por concatenación | Ninguno hoy (D3 confirmado: sin G201/G202, Semgrep ni CodeQL) | run 35476102444 (no detectado) / informe §3 | `51a7a4f` | diff del commit (sin gate) | T23 (con T5) |
-| VULN-006 | JWT sin validar algoritmo | Ninguno hoy (D3 confirmado) | run 35476102444 (no detectado) / informe §3 | `51a7a4f` | diff del commit (sin gate) | T23 (con T8) |
-| VULN-007 | CORS comodín con credenciales | Ninguno hoy (D3 confirmado; ZAP en semana 3) | run 35476102444 (no detectado) / informe §3 | `51a7a4f` | diff del commit (sin gate) | T23 |
-| VULN-008 | Base Debian 11 (backend) | `docker build` (falla: Debian 11 sin paquetes) y Trivy image sobre `debian:11-slim` | run 35476102444 / informe §3 | `a0c64d6` | run 36259385478 (Trivy image: 0 vulnerabilidades) | T27 |
-| VULN-009 | `USER root` (backend) | Trivy config DS002 (Hadolint no emite DL3002, D4); Trivy image pendiente (D2) | run 35476102444 / informe §3 | `a0c64d6` | run 36259385478 (Trivy config: 0 misconfig.) | T27 |
-| VULN-010 | `apt-get` sin fijar ni limpiar | Hadolint DL3008/DL3009 | run 35476102444 / informe §3 | `a0c64d6` | local (hadolint, sin gate en `ci.yml`) | T27 |
-| VULN-011 | `ADD` desde URL remota | Ninguno hoy (Hadolint no marca un `ADD` con URL, D4) | run 35476102444 (no detectado) / sin captura | `a0c64d6` | diff del commit (sin gate) | T27 |
-| VULN-012 | Secreto en `ENV` | Gitleaks, Trivy config DS031 | run 35476102444 / informe §3 | `afab4e9` | run 36259385478 (secrets y config, ambos limpios) | T26 |
-| VULN-013 | Sin CSP, HSTS, X-Frame-Options, nosniff | ZAP (semana 3; sin gate hoy) | local (`security/evidence/local-web-baseline.txt`) / sin captura | `18dea33` | local (`security/evidence/local-web-despues.txt`) | T29 |
-| VULN-014 | `server_tokens on` | ZAP (sin gate hoy) | local (`security/evidence/local-web-baseline.txt`) / sin captura | `18dea33` | local (`security/evidence/local-web-despues.txt`) | T29 |
-| VULN-015 | Sin `limit_req` en `/api/v1/auth/*` | AM-001/AM-017 (sin gate hoy) | local (`security/evidence/local-web-baseline.txt`) / sin captura | `18dea33` | local (`security/evidence/local-web-despues.txt`) | T29 |
-| VULN-016 | `node:18-bullseye` | Trivy image sobre `node:18-bullseye` (por nombre) | run 35534898422 / informe §3 | `8f3d461` | run 36259385478 (Trivy image: 0 vulnerabilidades) | T28 |
-| VULN-017 | `nginx:latest` | Hadolint DL3007 | run 35476102444 / informe §3 | `8f3d461` | local (hadolint, sin gate en `ci.yml`) | T28 |
-| VULN-018 | Imagen final del frontend como root | Trivy config DS002 (Hadolint no emite DL3002, D4) | run 35476102444 / informe §3 | `8f3d461` | run 36259385478 (Trivy config: 0 misconfig.) | T28 |
-| VULN-019 | Imágenes base antiguas en compose | Trivy image sobre las imágenes del compose (por nombre) | run 35534898422 / informe §3 | `824be7d` (parcial: solo `postgres`/`rabbitmq`) | local, parcial (`baseline-scan.yml` no corre sobre ramas) | T30 |
-| VULN-020 | `RealIP` de chi suplantable (GO-2026-5774/5775/5777) | govulncheck (`sca`) | run 35476102444 / informe §3 | `902a047` (T6; ficha corregida en la revisión de T32) | sin captura (remediado antes de existir este protocolo) | T6 |
+| VULN-005 | SQL por concatenación | Ninguno hoy (D3 confirmado: sin G201/G202, Semgrep ni CodeQL) | run 35476102444 (no detectado) / informe §3 | `51a7a4f` | diff del commit / informe Desktop §3 VULN-005/006/007 (sin gate; run_url nulo) | T23 (con T5) |
+| VULN-006 | JWT sin validar algoritmo | Ninguno hoy (D3 confirmado) | run 35476102444 (no detectado) / informe §3 | `51a7a4f` | diff del commit / informe Desktop §3 VULN-005/006/007 (sin gate; run_url nulo) | T23 (con T8) |
+| VULN-007 | CORS comodín con credenciales | Ninguno hoy (D3 confirmado; ZAP en semana 3) | run 35476102444 (no detectado) / informe §3 | `51a7a4f` | diff del commit / informe Desktop §3 VULN-005/006/007 (sin gate; run_url nulo) | T23 |
+| VULN-008 | Base Debian 11 (backend) | `docker build` (falla: Debian 11 sin paquetes) y Trivy image sobre `debian:11-slim` | run 35476102444 / informe §3 | `a0c64d6` | run 36283211113 / informe Desktop, seccion VULN-008 despues (Trivy api/worker: 0 vulnerabilidades) | T27 |
+| VULN-009 | `USER root` (backend) | Trivy config DS002 (Hadolint no emite DL3002, D4); Trivy image pendiente (D2) | run 35476102444 / informe §3 | `a0c64d6` | run 36283211113 / informe Desktop, seccion VULN-009 despues (Trivy config backend: 0 hallazgos) | T27 |
+| VULN-010 | `apt-get` sin fijar ni limpiar | Hadolint DL3008/DL3009 | run 35476102444 / informe §3 | `a0c64d6` | run 36283211113 / informe Desktop, seccion VULN-010 despues (Hadolint job 2: sin hallazgos) | T27 |
+| VULN-011 | `ADD` desde URL remota | Ninguno hoy (Hadolint no marca un `ADD` con URL, D4) | run 35476102444 (no detectado) / sin captura | `a0c64d6` | diff del commit / sin captura (sin gate; run_url nulo) | T27 |
+| VULN-012 | Secreto en `ENV` | Gitleaks, Trivy config DS031 | run 35476102444 / informe §3 | `afab4e9` | run 36283211113 / informe Desktop, seccion VULN-012 despues (Gitleaks: no leaks found) | T26 |
+| VULN-013 | Sin CSP, HSTS, X-Frame-Options, nosniff | ZAP (semana 3; sin gate hoy) | local (`security/evidence/local-web-baseline.txt`) / sin captura | `18dea33` | evidencia local / sin captura (sin gate; run_url nulo) | T29 |
+| VULN-014 | `server_tokens on` | ZAP (sin gate hoy) | local (`security/evidence/local-web-baseline.txt`) / sin captura | `18dea33` | evidencia local / sin captura (sin gate; run_url nulo) | T29 |
+| VULN-015 | Sin `limit_req` en `/api/v1/auth/*` | AM-001/AM-017 (sin gate hoy) | local (`security/evidence/local-web-baseline.txt`) / sin captura | `18dea33` | evidencia local / sin captura (sin gate; run_url nulo) | T29 |
+| VULN-016 | `node:18-bullseye` | Trivy image sobre `node:18-bullseye` (por nombre) | run 35534898422 / informe §3 | `8f3d461` | run 36283211113 / informe Desktop, seccion VULN-016 despues (Trivy web: 0 vulnerabilidades) | T28 |
+| VULN-017 | `nginx:latest` | Hadolint DL3007 | run 35476102444 / informe §3 | `8f3d461` | run 36283211113 / informe Desktop, seccion VULN-017 despues (Hadolint job 2: sin hallazgos) | T28 |
+| VULN-018 | Imagen final del frontend como root | Trivy config DS002 (Hadolint no emite DL3002, D4) | run 35476102444 / informe §3 | `8f3d461` | run 36283211113 / informe Desktop, seccion VULN-018 despues (Trivy config frontend: 0 hallazgos) | T28 |
+| VULN-019 | Imágenes base antiguas en compose | Trivy image sobre las imágenes del compose (por nombre) | run 35534898422 / informe §3 | `824be7d` (parcial: solo `postgres`/`rabbitmq`; el resto sigue abierto) | evidencia local Trivy: `rabbitmq:4-management` total 0; `postgres:16-bookworm` 0 en SO, 1 HIGH en gosu fuera de nuestro control y 1 certificado de relleno Debian; Mailpit, migrate y 4 imágenes de observabilidad siguen abiertas/fuera de alcance T30 / sin captura (sin gate en CI; `baseline-scan.yml` espera T38; run 36283211113 solo referencia: compose no escaneado) | T30 |
+| VULN-020 | `RealIP` de chi suplantable (GO-2026-5774/5775/5777) | govulncheck (`sca`) | run 35476102444 / informe §3 | `902a047` (T6; ficha corregida en la revisión de T32) | run 36283211113 / informe Desktop, seccion VULN-020 despues (govulncheck: no vulnerabilities found) | T6 |
 | VULN-021 | `golang-jwt/jwt/v4` (GO-2024-3250, GO-2025-3553) | govulncheck | run 35476102444 / informe §3 | `51a7a4f` | run 36208104969 / informe Desktop §3 | T23 |
-| VULN-022 | pgx 5.5.1 (GO-2024-2606) | govulncheck | run 35476102444 / informe §3 | `001a489` | run 36259385478 (govulncheck: "No vulnerabilities found") | T24 |
-| VULN-023 | Reglas por defecto de Gitleaks insuficientes | comparación manual (ya `remediado`) | sin gate; sin run / sin captura | `8054f2e` (T31, `.gitleaksignore`) | run 36259385478 (secrets: "no leaks found") | T31 (revisión) |
-| VULN-024 | Sin endurecimiento de contenedores (en el comentario del compose figura como VULN-020) | Ninguno hoy (Trivy config solo cubre los Dockerfiles, no el compose) | run 35476102444 (no detectado) / sin captura | `824be7d` | local (`docker inspect`, sin gate) | T30 |
-| VULN-025 | axios 0.21.1 / lodash 4.17.15 | npm audit (baseline-scan), osv-scanner (solo en `ci.yml`) | run 35476102444 / informe §3 | `534f13e` | run 36259385478 (npm audit: 15, sin axios/lodash) | T25 |
-| VULN-026 | `golang.org/x/text` (GO-2026-5970) | govulncheck | run 35476102444 / informe §3 | `001a489` | run 36259385478 (govulncheck: "No vulnerabilities found") | T24 |
+| VULN-022 | pgx 5.5.1 (GO-2024-2606) | govulncheck | run 35476102444 / informe §3 | `001a489` | run 36283211113 / informe Desktop, seccion VULN-022 despues (govulncheck: no vulnerabilities found) | T24 |
+| VULN-023 | Reglas por defecto de Gitleaks insuficientes | comparación manual (ya `remediado`) | sin gate; sin run / sin captura | `8054f2e` (T31, `.gitleaksignore`) | run 36283211113 / informe Desktop, seccion VULN-023 despues (Gitleaks: no leaks found) | T31 (revisión) |
+| VULN-024 | Sin endurecimiento de contenedores (en el comentario del compose figura como VULN-020) | Ninguno hoy (Trivy config solo cubre los Dockerfiles, no el compose) | run 35476102444 (no detectado) / sin captura | `824be7d` | evidencia local / sin captura (sin gate; run_url nulo) | T30 |
+| VULN-025 | axios 0.21.1 / lodash 4.17.15 | npm audit (baseline-scan), osv-scanner (solo en `ci.yml`) | run 35476102444 / informe §3 | `534f13e` | tras T25: npm audit 15 (sin axios/lodash); run 36283211113 / informe Desktop, seccion VULN-025 despues (npm audit: 0; osv: filtered 1, no issues) | T25 |
+| VULN-026 | `golang.org/x/text` (GO-2026-5970) | govulncheck | run 35476102444 / informe §3 | `001a489` | run 36283211113 / informe Desktop, seccion VULN-026 despues (govulncheck: no vulnerabilities found) | T24 |
+| VULN-027 | dependencias de build/frontend desactualizadas: vite, minimatch, react-router, undici | npm audit, osv-scanner (`ci.yml`, job 5) | run 36259385478 / sin captura | `d149e59` | run 36283211113 / informe Desktop, seccion VULN-027 despues (npm audit: 0; osv: filtered 1, no issues) | T34a |
+| VULN-028 | `golang.org/x/crypto` 0.55.0 (GO-2026-6354, GO-2026-6355, GO-2026-5932) | osv-scanner v2.6.0 (`ci.yml`, job `5 · Dependencias vulnerables`) | run 36281691237 / informe Desktop | `98f5f98` | run 36283211113 / informe Desktop, seccion VULN-028 despues (CI 13/13 en verde) | T34b |
+| VULN-029 | `google.golang.org/protobuf` 1.31.0 (GO-2024-2611) | osv-scanner v2.6.0 (`ci.yml`, job `5 · Dependencias vulnerables`) | run 36281691237 / informe Desktop | `98f5f98` | run 36283211113 / informe Desktop, seccion VULN-029 despues (CI 13/13 en verde) | T34b |
 
 Nota (Q9): `VULN-020` queda como el hallazgo de chi `RealIP`. VULN-024 a VULN-026 se asignan al
 crear sus fichas (T0.5); las fichas de 003, 004 y 006 a 019 también las crea T0.5, conservando sus
@@ -1018,15 +1021,28 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 ## Fase 4 — Trazabilidad, cierre y "después"
 
 ### T33 — Gate de cobertura (RNF-005)
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RNF-005 · Remedia: — · Depende de: T22
+- [x] Estado · Ejecutor: `Codex` + Sonnet 5 (store) · Cubre: RNF-005 · Remedia: — · Depende de: T22
 - En `ci.yml`, job `test-unit`, convertir el "Informe de cobertura" en gate: falla si la cobertura de `backend/internal/` < 70 %
   (el comentario del propio job pide activarlo en semana 2). Solo endurecer; no bajar el umbral ni excluir paquetes para llegar.
 - Criterios: con cobertura >= 70 % pasa; simulando un umbral de 99 % localmente falla.
 - Verificación: `make test-go` (imprime la cobertura total); comprobación del script del gate en local.
-- Commit:
+- **Cambio autorizado por el usuario (2026-09-26):** el gate se mide en el job `test-integration`
+  (Postgres real) con `-coverpkg=./internal/...`, no en `test-unit`. Motivo: `test-unit` corre con
+  `-short` y sin tag `integration`, así que `internal/store` y el código sqlc quedaban siempre en 0 %.
+  No se excluye ningún paquete. Ejecutor: Sonnet 5 (Codex no tiene Docker ni red).
+- Commit: `500635f` (tests unitarios de api, worker, admin y auditlog) y `9098d04` (tests de integración
+  de `internal/store` + gate movido a `test-integration`). Cobertura de `backend/internal/`: 77.2 %.
+- Progreso: `make test`, `make lint` (golangci-lint, 0 issues) y `make scan-secrets` en verde sobre `500635f`.
+  Sobre `9098d04`: suite de integración con Postgres local en verde (77.2 %), gate probado en local
+  (pasa con 70, falla con 99), golangci-lint 0 issues, gitleaks limpio. Falta confirmarlo en CI con el
+  próximo push.
+- Hallazgo (fuera de alcance, sin ficha): `TestRF001_UsersAceptaArgon2idYRechazaMD5`
+  (`internal/auth/password`, tag `integration`) falló 1 de 3 corridas de la suite completa en local y
+  pasó sola y en las otras 2. Intermitente; causa no confirmada (sospecha: `CREATE DATABASE`
+  concurrente entre paquetes en `testdb.New`).
 
 ### T34 — Regenerar la matriz de trazabilidad
-- [ ] Estado · Ejecutor: `Codex` · Cubre: RNF-011, todos los RF · Remedia: — · Depende de: T33
+- [x] Estado · Ejecutor: `Codex` · Cubre: RNF-011, todos los RF · Remedia: — · Depende de: T33
 - **Diferidos (Q14):** RF-013, RF-014, RF-015, RF-016, RF-018 y RF-019 van al backlog de semana 3: deben
   aparecer como **diferido** (no olvidados) en la matriz. Como `scripts/traceability.py` hoy solo conoce
   completo/parcial/sin cubrir, esta tarea lo extiende de forma mínima (excepción autorizada en "Alcance autorizado"):
@@ -1038,33 +1054,152 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 - Criterios: objetivo mínimo del criterio 3 de la feature; el resumen deja de decir "0 completos"; los seis
   requisitos aparecen como "diferido" y el resumen los cuenta aparte; el resto no cambia de estado por esta tarea.
 - Verificación: `python3 scripts/traceability.py --check`; `grep -c 'diferido' specs/07-traceability.md`; `make test-go`.
-- Commit:
+- Commit: `45c0dc4`. Resumen: 31 requisitos · 11 completos · 7 parciales · 7 sin cubrir · 6 diferidos
+  (antes: 11 · 9 · 11 · 0). Los 11 RF del criterio 3 en "completo"; sin regresiones. `--check` en verde,
+  `grep -c diferido` = 8 (6 filas + resumen + leyenda). No hicieron falta pruebas Go nuevas.
+
+### T34a — Dependencias de build/frontend desactualizadas (VULN-027)
+- [x] Estado · Ejecutor: `Claude` (`npm install` necesita red, ver regla en `CLAUDE.md`) · Cubre: AM-009 · Remedia: VULN-027 (vite/esbuild, minimatch/@typescript-eslint, react-router-dom, openapi-typescript/undici) · Bloquea a: T35
+- Hallazgo no previsto (como VULN-020): al cerrar el PR de la Fase 3 se confirmó que los 15 hallazgos
+  de `npm audit` que T25 dejó documentados como fuera de alcance no tienen arreglo sin salto de
+  versión mayor. T35 exige "CI en verde"; el usuario decidió resolver esto antes de T35 en vez de
+  aceptarlo como excepción permanente.
+  Subir `vite` (a v8), `@typescript-eslint/parser`/`@typescript-eslint/eslint-plugin` (a v8.70.1),
+  `react-router-dom` (a v7.18.4, o la versión estable más reciente disponible) y `openapi-typescript`
+  (a v7.13.0), verificando build, lint, tipos y tests después de cada uno por separado — son cambios
+  de versión mayor, revisar breaking changes de cada changelog antes de subir.
+- Criterios: `npm audit --audit-level=high` sin hallazgos; `npm run build`, `npm run lint`, `npm run typecheck`,
+  `npm run test` en verde; la SPA sigue funcionando (login real a través de Nginx, como en T29).
+- Verificación: `cd frontend && npm audit --audit-level=high && npm run build && npm run lint && npm run typecheck && npm run test`; smoke test manual con `make up`.
+- **Hecho 2026-09-26.** `vite` 5→8, `vitest`/`@vitest/coverage-v8` 1→5, `@vitejs/plugin-react` 4→6
+  (sus nuevos peers son opcionales, no fuerzan Rolldown); `@typescript-eslint/parser`/`eslint-plugin`
+  6→8 con ESLint solo a 8.57 (v8 de typescript-eslint soporta `^8.57.0`; subir a ESLint 9/10 habría
+  roto `eslint-plugin-react-hooks@4.6.0` sin necesidad); `react-router-dom` 6→7 y `openapi-typescript`
+  6→7 (ninguno se usa todavía en `src/`, riesgo cero). Único cambio de código:
+  `vite.config.ts` importa `defineConfig` de `"vitest/config"` en vez de `"vite"` (Vitest 5 dejó de
+  fusionar la opción `test` en el tipo de Vite).
+- Comandos y resultado observado: cada paquete se subió y se verificó por separado (build, lint,
+  typecheck, test) antes de seguir con el siguiente. `npm audit`: de 15 a 0 vulnerabilidades.
+  `make gen` de punta a punta sin drift (`gen.go`, sqlc y `specs/07-traceability.md` sin cambios;
+  solo `schema.d.ts` cambia de forma, pero nada en `src/` lo consume todavía). `make up` con el
+  stack completo: ciclo real registro → verificación → login por Nginx, `200` con el `Set-Cookie`
+  intacto y las cinco cabeceras de RNF-009. `make test`, `make lint` y `python3
+  scripts/traceability.py --check` en verde.
+- Dudas abiertas: ninguna. Falta que el usuario confirme el mismo resultado en el job "5 ·
+  Dependencias vulnerables" del próximo run de CI, al abrir el PR de T35.
+- Commit: d149e59
+- Evidencia (`Usuario`):  - [ ] VULN-027
+
+### T34b — Dependencias Go desactualizadas (VULN-028 y VULN-029)
+- [x] Estado · Ejecutor: `Claude` (Sonnet 5; `go get` y `go mod tidy` necesitan red) · Cubre: AM-009 · Remedia: VULN-028, VULN-029 · Bloquea a: T35
+- Alcance: subir `golang.org/x/crypto` a 0.56.0 o superior y `google.golang.org/protobuf` a 1.33.0 o superior mediante `go get` y `go mod tidy`. Para GO-2026-5932, identificar el subpaquete e importaciones afectadas y su alcanzabilidad; después decidir con el usuario entre eliminarlo o documentar y aceptar el riesgo.
+- Criterios: `osv-scanner` v2.6.0 con `--all-vulns` termina en 0 o deja únicamente un riesgo aceptado y documentado; `govulncheck` limpio; `make test` y `make lint` en verde.
+- Verificación: `osv-scanner --recursive --all-vulns`; `cd backend && govulncheck ./...`; `make test`; `make lint`.
+- **Trabajo hecho 2026-09-26 (Claude, pendiente commit y confirmación en CI):** `golang.org/x/crypto`
+  0.55.0 → 0.56.0 (corrige GO-2026-6354 y GO-2026-6355) y `google.golang.org/protobuf` 1.31.0 →
+  1.36.12 (corrige GO-2024-2611), ambos con `go get` + `go mod tidy` desde `backend/`. `protobuf`
+  llega como indirecta de `github.com/prometheus/client_golang` (`go mod why -m`:
+  `internal/observability` → `prometheus/client_golang` → `protobuf/proto`; también la piden
+  `prometheus/client_model` y `prometheus/common`); como ya estaba fijada explícita en `go.mod`, se
+  subió directo sin tocar `client_golang`. GO-2026-5932 (`x/crypto/openpgp` y subpaquetes, sin
+  versión corregida): confirmado con `go list -deps ./...` que ningún paquete propio ni dependencia
+  lo importa; osv-scanner y govulncheck lo marcan no alcanzable — riesgo aceptado y documentado en
+  la ficha VULN-028 e ignorado solo a él en `backend/osv-scanner.toml`
+  (`ignoreUntil = 2026-12-25`, ~90 días). Efecto colateral no evitable: `x/crypto` >= 0.56.0 declara
+  `go 1.26.0` en su propio `go.mod`, así que la directiva `go` del módulo subió de 1.25.0 a 1.26.0
+  (MVS).
+  **Seguimiento 2026-09-26, mismo día (autorizado por el usuario):** el primer cierre dejó
+  `backend/Dockerfile` y `GO_VERSION` de `ci.yml` sin tocar (fuera del alcance original de T34b) y
+  dependiendo de `GOTOOLCHAIN=auto` para descargar un toolchain 1.26.0 al vuelo. El orquestador
+  probó `docker build` de la imagen `api`/`worker` y confirmó que rompe: la imagen oficial
+  `golang` fija `GOTOOLCHAIN=local`, así que no hay descarga automática dentro del build, y
+  descargarla ahí además habría roto el endurecimiento de imagen fijada por digest de T27. El
+  usuario autorizó mover el proyecto a Go 1.26 de una vez (ver Q11, amendment 2026-09-26) y se
+  completó: `backend/Dockerfile` → `golang:1.26-bookworm` fijada por digest
+  (`sha256:a688600ca24f8a4d3ca77f95b0dd40704a9fc787c826660eb7ba0b641b8b175d`, re-verificado con
+  `docker buildx imagetools inspect golang:1.26-bookworm`, resuelve a `1.26.8-bookworm`);
+  `ci.yml` → `GO_VERSION: "1.26"` y comentarios de Q11/golangci-lint/osv-scanner actualizados;
+  comentario de cabecera de `go.mod` corregido (ya no dice que depende de `GOTOOLCHAIN=auto`).
+  `scheduled-scan.yml` sigue en `go-version: "1.25"` — no se tocó (no estaba en el alcance pedido
+  por el orquestador) y queda anotado como hallazgo pendiente. `baseline-scan.yml` sigue en
+  `golang:1.22-bullseye` a propósito (analiza el tag de la línea base vulnerable, VULN-008, no el
+  código actual) — no se toca.
+  Verificación observada: `docker run ... osv-scanner-action:v2.6.0 --recursive --all-vulns ./`
+  desde la raíz → exit 0, "No issues found", `GO-2026-5932 has been filtered out` (único filtrado).
+  `cd backend && govulncheck ./...` → "No vulnerabilities found" en el código propio (1 vuln no
+  alcanzable en módulos requeridos, la aceptada). `make test` → todos los paquetes Go en verde
+  (`go test -race`) y frontend en verde. `make lint` → `go vet` 0 issues, `golangci-lint` 0 issues,
+  `eslint` en verde. `gofmt -l backend` sin salida. `python3 scripts/traceability.py --check` →
+  matriz al día. `docker build --target api` y `--target worker` sobre `backend/Dockerfile`
+  (`golang:1.26-bookworm`) → ambos en verde. `docker buildx imagetools inspect
+  golang:1.26-bookworm` → confirma el digest `sha256:a688600c...` (`1.26.8-bookworm`). `make
+  build` (las tres imágenes) y `make scan-image` (Trivy 0.56.2, `--severity HIGH,CRITICAL
+  --ignore-unfixed`) → `identity-hub-api`, `identity-hub-worker` e `identity-hub-web` en 0
+  hallazgos HIGH/CRITICAL cada una. `make up` → stack completo saludable; `curl
+  http://localhost:8081/healthz` → `200`, `{"status":"ok","version":"0.1.0-baseline"}`; `make
+  down` limpio. Frontend (`frontend/Dockerfile`, base `node`) no se reconstruyó aparte porque no
+  depende de Go: ya se reconstruyó dentro de `make build`/`make up` sin cambios de código y con
+  Trivy limpio.
+- Commit: `98f5f98`
+- Evidencia (`Usuario`):  - [ ] VULN-028  - [ ] VULN-029 ("antes" capturado en el informe, run 36281691237; falta el "después")
 
 ### T35 — CI en verde y evidencia "después"
-- [ ] Estado · Ejecutor: `Usuario` con Claude Desktop (PR, run, capturas en el informe) y `Claude` (completa los `evidencia.json`) · Cubre: todos los VULN de la Fase 3
+- [x] Estado · Ejecutor: `Usuario` con Claude Desktop (PR, run, capturas en el informe) y `Claude` (completa los `evidencia.json`) · Cubre: todos los VULN de la Fase 3 · Bloqueada por: T34a, T34b
 - Abrir PR (o `workflow_dispatch`) con la rama; `CI` en verde. Registrar run ID/URL "después" en
   el "Registro de evidencia" y, como texto, en cada `evidencia.json` (`despues`, lo completa Claude con los
   datos que entrega Desktop); las capturas "después" van al informe externo (sin secretos). Prompt de Desktop
   para esta captura: el "prompt después" que Claude entrega al usuario al cerrar la Fase 3.
-- Verificación: `python3 -m json.tool` valida los 26 `evidencia.json` y ninguno deja `despues.run_url` en `null`
+- Verificación: `python3 -m json.tool` valida los 29 `evidencia.json` y ninguno deja `despues.run_url` en `null`
   sin nota; Actions muestra `CI` en verde sobre el SHA final; el usuario confirma las capturas en el informe.
-- Commit: —
+- **Progreso 2026-09-26.** El run 36280742280 falló en los jobs 3, 5 y 6. El commit `6c1f6f2` corrigió el job 6 (`NODE_VERSION` 24) y el job 3 (dos falsos positivos de Gitleaks). El commit `9820635` actualizó osv-scanner a v2.6.0, fijado por SHA del tag, con `--all-vulns`; el run 36281691237 es la evidencia "antes" de VULN-028 y VULN-029.
+- **Progreso 2026-09-26 (después).** El run verde `36283211113` sobre `59cf8cf` (`workflow_dispatch`, rama `feat/idp-semana-2`) terminó con 13/13 jobs en verde. El usuario confirmó 12 capturas nuevas en Claude Desktop; Hadolint quedó confirmado en el job 2.
+- Cierre 2026-09-26: run final 36284740966 sobre `d704178` en verde (13/13), confirma el SHA final tras
+  los commits de evidencia. Evidencia "después" de las VULN con gate: run 36283211113 (capturas de
+  Desktop confirmadas por el usuario). 29 `evidencia.json` válidos; 9 con `run_url` nulo, todos con nota
+  (sin gate en CI). Commits: `6c1f6f2`, `9820635`, `0de04ec`, `d704178` (T34b aparte).
+- Commit: `d704178`
 
 ### T36 — Fichas actualizadas
-- [ ] Estado · Ejecutor: `Codex` · Cubre: ADR 0007 · Remedia: — · Solo docs · Depende de: T35
-- En cada ficha: estado `remediado`, Commit de remediación (SHA real), Evidencia antes/después y Run de Actions; las 26 filas del registro (VULN-001 a VULN-026) coherentes con las 26 fichas.
+- [x] Estado · Ejecutor: `Codex` · Cubre: ADR 0007 · Remedia: — · Solo docs · Depende de: T35
+- Alcance autorizado por el Usuario (2026-09-26): actualizar las 29 fichas y las 29 filas del registro (VULN-001 a VULN-029).
+- En cada ficha: estado `remediado` (o el estado parcial/riesgo aceptado documentado), Commit de remediación (SHA real), Evidencia antes/después y Run de Actions; las 29 filas del registro coherentes con las 29 fichas.
 - Verificación: `git diff --stat` solo en `security/findings/**` y este archivo; `python3 scripts/traceability.py --check`.
-- Commit:
+- Hecho (2026-09-27). Un primer intento (2026-09-26) reemplazó campos enteros y perdió contexto en 20 fichas;
+  se rehízo como fusión campo por campo: se conservaron referencias locales, alcances parciales, razones de
+  ausencia de gate y resultados de jobs; se corrigieron VULN-010/017 (Hadolint sí corre en el job 2 de `ci.yml`),
+  VULN-025 (las 15 vulnerabilidades eran el estado intermedio tras T25; run final: npm audit 0) y los runs
+  "después" intermedios (36259385478 → 36283211113). Revisión de Claude: cada dato nuevo trazado a su
+  `evidencia.json`; `traceability.py --check` en verde. Commit `0d7e319`.
+- Commit: `0d7e319`
 
 ### T37 — Revisión final, informe y bitácora
-- [ ] Estado · Ejecutor: `Claude (revisión)` · Cubre: toda la feature
+- [x] Estado · Ejecutor: `Claude (revisión)` · Cubre: toda la feature
 - Reconciliar el espejo en memoria; actualizar `docs/security-report.html` (columna `main` ya prevista) y una entrada en `docs/BITACORA.md`; revisar el "Registro de evidencia" completo.
-- Commit: —
+- Hecho (2026-09-27).
+  - Registro de evidencia: las 29 filas se cruzaron por script con fichas y `evidencia.json` (cada SHA existe
+    en git y figura en su ficha; cada run de la tabla y de la ficha está en su JSON): 0 inconsistencias.
+  - Informe: las seis métricas de la comparativa se midieron en local sobre `c6fa5d6` con la misma
+    metodología que la línea base (Sonnet; Claude verificó la salida cruda de Trivy, `FROM`, `curl -sI`,
+    govulncheck y uid): 64→0, 12→0, 6→0, 3→0, 0→5, 0→3; coinciden con los runs verdes 36283211113 y
+    36284740966 (`59cf8cf`, mismo código). La columna se rotuló "Remediado · medido" y se aclara que es
+    previa al merge: `main` no se midió. Salvedades en el informe: 67 CVE sin parche en `web`, los 12
+    secretos siguen en el historial (silenciados por `.gitleaksignore`), GO-2026-5932 aceptado (VULN-028),
+    VULN-019 parcial. Limitaciones desactualizadas corregidas (Actions sí corrió; CodeQL y Semgrep en CI).
+  - Bitácora: entrada "2026-09-27 · Semana 2 (cierre)". Redacción de Codex; Claude corrigió el conteo de
+    remediadas (27, no 26: 29 − VULN-019 parcial − VULN-028 riesgo aceptado) y el título.
+  - Espejo en memoria: `odd/idp-semana-2/tasks` sigue siendo un puntero (el archivo pesa ~211 KB, por encima
+    del límite de 50 KB de Engram); se actualizó al estado actual (47 tareas, 46 hechas).
+- Commit: `bfd4233`
 
 ### T38 — Etiquetar el estado corregido
 - [ ] Estado · Ejecutor: `Usuario` · Cubre: ADR 0007 · Decisión pendiente
 - Crear y subir el tag del estado corregido (sugerencia: `v0.1.0-hardened`; el nombre lo decide el usuario) y no tocar `v0.0.0-vuln-baseline`.
 - Verificación: `git ls-remote --tags origin`.
+- Decisión del Usuario (2026-09-27): el tag se crea **después** de mergear el PR de la fase 4, sobre el
+  commit de merge en `main` (no sobre la rama), para que coincida con el ADR 0007 (baseline frente a
+  `main`) y sobreviva a los cambios que pida la revisión del PR. Tras crearlo: lanzar
+  `baseline-scan.yml` por `workflow_dispatch` con `ref` = el tag nuevo, para obtener el "después" de las
+  imágenes del compose (VULN-019), con el prompt de Desktop en el momento de lanzarlo.
 - Commit: —
 
 ---
@@ -1077,8 +1212,8 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 | 1 — Contrato ejecutable | T1a, T1 a T3 (4) | 4 (T1a, T1, T2, T3) |
 | 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 20 (T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T14a, T15, T16, T17, T18, T19, T20, T21, T22) |
 | 3 — Remediación | T23 a T32 (10) | 10 (T23 a T32) |
-| 4 — Cierre | T33 a T38 (6) | 0 |
-| **Total** | **45** | **39** |
+| 4 — Cierre | T33 a T38 y T34a, T34b (8) | 7 (T33, T34, T34a, T34b, T35, T36, T37) |
+| **Total** | **47** | **46** |
 
 Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, cookie) y `T14a`
 (enmienda ADR 0005, sin ventana de gracia). Los ids existentes no cambian.
@@ -1141,7 +1276,7 @@ Todas resueltas por el usuario el 2026-09-19 (las que no traen cambio se aceptar
 - **Q8 · Gitleaks e historial.** Decisión: opción (a), `.gitleaksignore` por huella exacta limitado a los 12 hallazgos conocidos de la línea base, cada entrada con su VULN y justificación; opciones (b) y (c) descartadas; Codex lo implementa cuando el usuario entregue la lista de huellas del run de T0.2, fecha 2026-09-19, afecta a: T0.2, T31.
 - **Q9 · Ids.** Decisión: `VULN-020` se queda como el hallazgo de chi `RealIP`; ids nuevos desde VULN-024: VULN-024 = endurecimiento de contenedores del compose (su comentario hoy dice VULN-020), VULN-025 = axios/lodash, VULN-026 = `golang.org/x/text` GO-2026-5970; los ids únicos ya usados en comentarios (003, 004, 006 a 019) se conservan y T0.5 crea sus fichas; un id solo se asigna al crear su ficha, nunca se inventa en un comentario; el comentario del compose NO se renumera antes del push de la línea base (se documenta la equivalencia en T0.5 y se corrige en T30), fecha 2026-09-19, afecta a: T0.5, T24, T25, T30, T36, "Registro de evidencia".
 - **Q10 · Visibilidad del repo.** Decisión: público, `git@github.com:jorgepaez-ops/IdentityHub.git`; code scanning y subida de SARIF disponibles; comprobación previa al push de que las credenciales sembradas no son reales ni reutilizadas, fecha 2026-09-19, afecta a: T0.1, T0.2, "Protocolo de evidencia".
-- **Q11 · Directiva `go` y `GO_VERSION`.** Decisión: parar y preguntar antes de subirla si un aviso lo exige; no subirla sin aprobación, fecha 2026-09-19, afecta a: T1, T24.
+- **Q11 · Directiva `go` y `GO_VERSION`.** Decisión: parar y preguntar antes de subirla si un aviso lo exige; no subirla sin aprobación, fecha 2026-09-19, afecta a: T1, T24. **Amendment (2026-09-26, T34b):** `golang.org/x/crypto` >= 0.56.0 (VULN-028) declara `go 1.26.0` en su propio `go.mod`, así que `go get` habría subido la directiva de forma inevitable (MVS); Q11 se activó y el usuario autorizó la subida. La directiva `go` de `backend/go.mod`, `GO_VERSION` de `ci.yml` y la imagen base de `backend/Dockerfile` pasan de 1.25 a **1.26** (`golang:1.26-bookworm`, fijada por digest, re-verificada con `docker buildx imagetools inspect`). No se agregó línea `toolchain`. `scheduled-scan.yml` sigue en `go-version: "1.25"` (no se tocó en T34b, fuera del alcance explícito de este cambio; queda como hallazgo para revisar) y `baseline-scan.yml` sigue en `golang:1.22-bullseye` a propósito (analiza la línea base sembrada, VULN-008, no el código actual).
 - **Q12 · Puertos en desarrollo.** Decisión: mantener `db` y `broker` publicados en desarrollo y tratarlo en `docker-compose.prod.yml` (semana 3), fecha 2026-09-19, afecta a: T30.
 - **Q13 · CIDR de `TRUSTED_PROXIES`.** Decisión: fijar una subred en la red por defecto del compose y usarla como valor, fecha 2026-09-19, afecta a: T21, T6.
 - **Q14 · Alcance.** Decisión: RF-013, RF-014, RF-015, RF-016, RF-018 y RF-019 fuera de esta feature y al backlog de semana 3; se muestran como "diferido" (no olvidados) en la matriz de trazabilidad y T13 rechaza con un error claro las cuentas con MFA activado, fecha 2026-09-19, afecta a: T13, T34.
@@ -1381,3 +1516,7 @@ Formato por tarea (3 a 5 líneas):
 - Comandos y resultado observado: revisión manual archivo por archivo (26 fichas, 3 workflows/config). `python3 scripts/traceability.py --check`: al día.
 - Dudas abiertas: ninguna. Fase 3 completa (10/10): corte de fase, PR pendiente de confirmación del usuario (estrategia `ask-on-risk`, "Alcance autorizado" del archivo de tareas).
 
+### T34a · 2026-09-26 · d149e59
+- Qué cambió: PR #2 (Fase 3) mergeado a `main` (`53f093c`). Al planear T35 ("CI en verde"), se confirmó que los 15 hallazgos de `npm audit` que T25 dejó fuera de alcance no tienen arreglo sin salto de versión mayor en 4 paquetes; el usuario decidió migrarlos antes de T35 (asignado VULN-027, hallazgo no previsto, igual que VULN-020) en vez de aceptarlos como excepción permanente. `vite` 5→8, `vitest`/`@vitest/coverage-v8` 1→5, `@vitejs/plugin-react` 4→6, `@typescript-eslint/parser`/`eslint-plugin` 6→8 (ESLint se quedó en 8.57, no subió a 9/10), `react-router-dom` 6→7, `openapi-typescript` 6→7. Único cambio de código: `vite.config.ts` importa `defineConfig` de `vitest/config`.
+- Comandos y resultado observado: cada paquete verificado por separado (build/lint/typecheck/test) antes de seguir. `npm audit`: 15→0. `make gen` sin drift. `make up` con ciclo real registro→verificación→login por Nginx en verde, cabeceras de RNF-009 intactas. `make test`/`make lint`/traceability en verde.
+- Dudas abiertas: ninguna. Falta confirmar el mismo resultado en CI cuando se abra el PR de T35.

@@ -22,14 +22,14 @@
     "ficha": "security/findings/VULN-018-imagen-frontend-root.md"
   },
   "despues": {
-    "commit": "a2b57e2",
+    "commit": "59cf8cff8d25776f3cc558e6cd41da29949ef064",
     "workflow": "CI",
-    "run_id": "36259385478",
-    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36259385478",
-    "captura": null,
+    "run_id": "36283211113",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36283211113",
+    "captura": "informe Desktop, seccion VULN-018 despues",
     "hallazgos": [
-      "Job \"8 · Configuración de contenedores\": Trivy config, frontend/Dockerfile con 0 misconfiguraciones"
+      "Job \"8 · Configuración de contenedores\" (108518929740): Trivy config sobre frontend/Dockerfile: 0 hallazgos."
     ],
-    "observacion": "Texto literal de Desktop (job 108452162149). Confirmado también en local con docker inspect: USER 101."
+    "observacion": "Texto literal de Desktop (job 108452162149). Confirmado también en local con docker inspect: USER 101. Referencia al run parcial anterior 36259385478: se reemplaza por el run verde 36283211113. Run verde 36283211113 (workflow_dispatch, feat/idp-semana-2, commit 59cf8cff, 13/13 jobs): Trivy config no reportó hallazgos en frontend/Dockerfile."
   }
 }

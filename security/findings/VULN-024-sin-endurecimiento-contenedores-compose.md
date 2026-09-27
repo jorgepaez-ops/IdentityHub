@@ -8,9 +8,9 @@
 | **Componente** | `deploy/docker-compose.yml` (sin línea reportada por el escáner) |
 | **Amenaza** | AM-020 (escape de contenedor desde un proceso comprometido) |
 | **Sembrada** | sí |
-| **Evidencia antes** | `docs/evidencia/VULN-024/evidencia.json` |
+| **Evidencia antes** | `docs/evidencia/VULN-024/evidencia.json` — sin captura |
 | **Commit de remediación** | `824be7d` (T30) |
-| **Evidencia después** | `docs/evidencia/VULN-024/evidencia.json` (`docker inspect` local: `ReadonlyRootfs=true CapDrop=[ALL] SecurityOpt=[no-new-privileges:true]`) |
+| **Evidencia después** | `docs/evidencia/VULN-024/evidencia.json` (`docker inspect` local: `ReadonlyRootfs=true CapDrop=[ALL] SecurityOpt=[no-new-privileges:true]`) — sin captura |
 | **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / — (sin gate ni antes ni después) |
 
 ## Evidencia
