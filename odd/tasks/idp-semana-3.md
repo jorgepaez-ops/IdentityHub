@@ -48,7 +48,8 @@ con DAST (ZAP) y E2E (Playwright) añadidos al pipeline.
 - RF-015 (restablecimiento de contraseña) y RF-016 (sesiones activas).
 - Frontend: consola de Identity Hub y aplicación Contabilidad, según los mockups; refresh
   compartido entre pestañas (ADR 0005, Q4 de la semana 2).
-- Dominios locales separados con HTTPS local (`mkcert`).
+- Dominios locales separados sin preparación del equipo: `identityhub.localhost` y
+  `contabilidad.localhost` por HTTP (D10).
 - DAST con OWASP ZAP en CI y E2E con Playwright (escenarios Gherkin corregidos al contrato vigente).
 - Pendientes chicos de la semana 2 (ver T10).
 
@@ -68,14 +69,17 @@ dinámico de clientes, consentimiento, `id_token`), TOTP/WebAuthn, correo real p
 - `specs/` manda; el OpenAPI (camelCase, RFC 7807) es el contrato y `gen.go` no se edita a mano.
   Las enmiendas de esta feature son las de T3; ninguna otra tarea toca `specs/` sin volver a
   "Cambios de spec propuestos".
-- Nunca debilitar un gate. Nunca secretos reales en el repo. Los certificados de `mkcert` y su CA
-  local **no se versionan** (se generan con un comando documentado).
+- Nunca debilitar un gate. Nunca secretos reales en el repo. Ningún certificado ni clave TLS se
+  versiona (el modo HTTPS opcional de la semana 4 los genera en un contenedor).
 - Controles de seguridad del flujo OAuth, no negociables: `redirect_uri` con coincidencia exacta,
   `state` obligatorio, PKCE `S256` obligatorio (sin `plain`), código de autorización de un solo
   uso con vencimiento corto, cliente y `redirect_uri` fijados en configuración, CORS abierto solo
   en `/token` y sin credenciales. Cada control lleva su prueba.
 - Codex no tiene red ni Docker (ver `CLAUDE.md`): lo que exija `npm install` de paquetes nuevos,
-  `docker compose`, `mkcert` o ZAP lo cierra Claude.
+  `docker compose`, navegadores o ZAP lo cierra Claude.
+- **Portabilidad (requisito de la entrega):** un compañero clona el repo, ejecuta
+  `docker compose up -d` y el proyecto funciona, sin instalar nada más que Docker ni editar archivos
+  del sistema. Ninguna decisión de esta feature puede romperlo.
 - Tamaño orientativo por tarea: ~400 líneas de cambio (heurística, no tope).
 - Estrategia de entrega: `ask-on-risk`. Commits de unidad de trabajo en `feat/idp-semana-3`;
   push, PR y merge los decide el usuario (un PR por corte de fase, merge commit).
@@ -94,8 +98,9 @@ dinámico de clientes, consentimiento, `id_token`), TOTP/WebAuthn, correo real p
    Mailpit → definir contraseña → login con código MFA desde Mailpit → abrir Contabilidad en su
    dominio → redirección al Hub → vuelta sin pedir la contraseña si ya había sesión → vistas según
    el rol.
-2. Los dos dominios responden por HTTPS local y la sesión del Hub no es legible desde Contabilidad
-   (la aplicación solo recibe el token por el flujo de autorización).
+2. Los dos dominios responden en Chrome y Firefox sin tocar `/etc/hosts` ni instalar certificados,
+   y la sesión del Hub no es legible desde Contabilidad (la aplicación solo recibe el token por el
+   flujo de autorización).
 3. Cada control del flujo OAuth tiene prueba que falla si se quita.
 4. `ci.yml` en verde con los jobs nuevos de ZAP y Playwright; ningún gate debilitado.
 5. Matriz de trazabilidad al día: RF-013 a RF-016 y los RF nuevos de T3 cubiertos; RF-018 y
@@ -112,8 +117,8 @@ dinámico de clientes, consentimiento, `id_token`), TOTP/WebAuthn, correo real p
 - **D3 · Dominios.** Identity Hub y Contabilidad en dominios distintos, como en un despliegue real
   (el Hub hace de Entra ID; Contabilidad es la aplicación del usuario). Rutas bajo un mismo origen
   quedan descartadas: harían el SSO trivial e indemostrable.
-- **D4 · SSO.** OAuth 2.0 authorization code + PKCE en versión mínima, un cliente, HTTPS local con
-  `mkcert`.
+- **D4 · SSO.** OAuth 2.0 authorization code + PKCE en versión mínima, un cliente (dominios y
+  transporte en D10).
 - **D5 · MFA.** Código de un solo uso por correo (Mailpit), no TOTP/QR, por tiempo y alcance. Se
   documenta que es más débil que TOTP (depende del buzón) y que se aceptó conscientemente.
 - **D6 · Alta de empleados.** La hace un admin con el cargo/rol; el empleado define su contraseña
@@ -122,15 +127,49 @@ dinámico de clientes, consentimiento, `id_token`), TOTP/WebAuthn, correo real p
 - **D7 · Buzón de la demo.** La interfaz web de Mailpit (`:8025`) es el buzón que se muestra en
   clase; los comandos `curl` quedan como plan B y Playwright lee los correos por la API de Mailpit.
 
-## Preguntas abiertas (una a la vez, las decide el usuario)
+- **D8 · Modelo de roles (P1, 2026-09-27).** Roles del directorio separados de los roles de
+  aplicación, como los *app roles* de Entra ID:
+  - Directorio (Identity Hub): `admin` (sistemas: alta de empleados y asignación de accesos) y
+    `user` (rol base de toda cuenta; sin roles de aplicación = sin acceso a aplicaciones).
+  - Aplicación Contabilidad: `contabilidad.senior` (todas las opciones, incluidos aprobar y cierre
+    del mes) y `contabilidad.analista` (solo sus transacciones, sin cierre).
+  - El token emitido para una aplicación lleva solo los roles de esa aplicación.
+  - Separación de funciones: `admin` no ve datos contables salvo que se le asigne un rol de
+    Contabilidad, y **un admin no puede asignarse roles a sí mismo** (lo hace otro admin, auditado;
+    análogo a la regla de auto-deshabilitado de RF-010).
+  - Escena de la demo: empleado con solo `user` se autentica bien (MFA incluido) y Contabilidad le
+    muestra "sin acceso": autenticar y autorizar son pasos distintos.
 
-- **P1 · Catálogo de roles.** ¿Los roles de negocio son exactamente los del mockup (`admin`,
-  `contador_senior`, `analista_contable`) o hay más? ¿`user` se conserva?
-- **P2 · Autoregistro (RF-001).** Con alta por admin, ¿el registro público sigue abierto (como una
-  cuenta de invitado) o se cierra, como en un directorio corporativo?
-- **P3 · Nombres de dominio locales.** Propuesta: `hub.empresa.test` y `contabilidad.test`
-  (`.test` está reservado, RFC 2606).
-- **P4 · MFA obligatorio u opcional.** ¿Todos los empleados, solo admins, o a elección del usuario?
+- **D9 · Autoregistro cerrado (P2, 2026-09-27).** Como en un directorio corporativo, nadie se
+  registra solo: la única forma de tener cuenta es el alta por un admin con invitación (D6).
+  `POST /api/v1/auth/register` se retira del contrato con enmienda documentada en T3; su lógica
+  (hash Argon2id, eventos, plantillas) se reutiliza en el alta por admin. RF-001 se reescribe como
+  alta de empleados, y RF-002 queda cubierto por la invitación: definir la contraseña con el enlace
+  prueba la posesión del correo. Menos superficie de ataque (cuentas falsas, abuso de envío de
+  correos).
+
+- **D10 · Dominios locales y portabilidad (P3, 2026-09-27).** `identityhub.localhost` (Hub:
+  consola y login) y `contabilidad.localhost` (aplicación). Chrome y Firefox resuelven `*.localhost`
+  a la propia máquina sin `/etc/hosts` y lo tratan como contexto seguro, así que la cookie `Secure`
+  funciona por HTTP sin certificados. Son sitios distintos: `localhost` no está en la Public Suffix
+  List (verificado 2026-09-27), así que cada `*.localhost` es su propio sitio y el SSO entre dominios
+  sigue siendo demostrable. Se descartan `.test` y `mkcert` por exigir preparar el equipo. Costos
+  aceptados: la demo es en Chrome o Firefox (Safari no resuelve `*.localhost` igual) y HSTS no aplica
+  por HTTP. **HTTPS opcional en la semana 4**: certificado autofirmado con SAN de ambos nombres,
+  generado con `openssl` por un servicio de una sola ejecución del compose (idea tomada del
+  `generate-dev-cert.sh` de otro proyecto del usuario, sin `ifconfig` ni dependencias del host) y un
+  comando documentado por sistema operativo para confiar en él. T11 confirma con Playwright en
+  Chromium y Firefox la resolución de `*.localhost` y las cookies `Secure` antes de construir encima;
+  si falla, se vuelve a `.test` con script.
+
+- **D11 · MFA obligatorio para todos (P4, 2026-09-27).** Todo inicio de sesión exige el código de
+  un solo uso por correo (D5), como una política de acceso condicional de Entra ID. Como el correo
+  ya queda verificado con la invitación (D9), no hay paso de "activar el segundo factor": RF-013 se
+  reduce a la política y RF-014 al desafío en el login.
+
+## Preguntas abiertas
+
+Ninguna: P1 a P4 resueltas en D8 a D11.
 
 ---
 
@@ -152,7 +191,7 @@ dinámico de clientes, consentimiento, `id_token`), TOTP/WebAuthn, correo real p
 - Commit: —
 
 ### T3 — Enmienda de requisitos, OpenAPI y escenarios
-- [ ] Estado · Ejecutor: `Codex` · Depende de: T2 y P1, P2, P4
+- [ ] Estado · Ejecutor: `Codex` · Depende de: T2 (decisiones D8 a D11)
 - `specs/01-requirements.md`: RF-013/014 a código por correo; requisito nuevo de alta de empleados
   por admin con invitación; requisito nuevo del flujo de autorización para aplicaciones cliente;
   roles de negocio en el modelo de dominio.
@@ -182,10 +221,11 @@ dinámico de clientes, consentimiento, `id_token`), TOTP/WebAuthn, correo real p
 - Respuesta no enumerable, token de una hora, revocación de las sesiones anteriores al cambiar.
 - Commit: —
 
-### T7 — RF-013/014 MFA por correo
+### T7 — RF-013/014 MFA obligatorio por correo
 - [ ] Estado · Ejecutor: `Codex` · Depende de: T3
-- Activación, desafío `202` con `mfa_token` temporal, código de 6 dígitos con vencimiento corto,
-  límite de intentos y auditoría. Quitar el rechazo explícito de cuentas con MFA de la semana 2.
+- Política D11: todo login exige el código. Desafío `202` con `mfa_token` temporal, código de 6
+  dígitos enviado por el worker, vencimiento corto, un solo uso, límite de intentos y auditoría; sin
+  paso de activación. Quitar el rechazo explícito de cuentas con MFA de la semana 2.
 - Commit: —
 
 ### T8 — RF-016 Sesiones activas
@@ -210,10 +250,16 @@ dinámico de clientes, consentimiento, `id_token`), TOTP/WebAuthn, correo real p
 
 ## Fase 2 — Dominios locales y frontend
 
-### T11 — Dominios separados con HTTPS local
-- [ ] Estado · Ejecutor: `Claude` (Docker y `mkcert`; Codex no puede) · Depende de: P3
-- Dos `server` en Nginx (Hub y Contabilidad) con TLS local, entradas de `/etc/hosts` documentadas,
-  certificados fuera del repo, cabeceras RNF-009 en ambos dominios.
+### T11 — Dos dominios locales y portabilidad
+- [ ] Estado · Ejecutor: `Claude` (Docker y navegadores; Codex no puede) · Depende de: D10
+- Primero, la comprobación de D10 con Playwright en Chromium y Firefox: `*.localhost` resuelve sin
+  `/etc/hosts` y una cookie `Secure` por HTTP se guarda y se envía.
+- Dos `server` en Nginx (`identityhub.localhost` y `contabilidad.localhost`), cabeceras RNF-009 en
+  ambos, CSP de cada uno acotada a su propio origen y al Hub donde haga falta.
+- Brecha conocida de portabilidad, anotada para la semana 4: hoy un clon limpio no levanta con
+  `docker compose up -d` porque el compose vive en `deploy/` (no en la raíz) y exige un `.env` que no
+  se versiona (secretos, VULN-001/003). La solución (compose en la raíz y generación de `.env` o de
+  secretos de desarrollo sin reabrir esos VULN) se decide en la semana 4.
 - Commit: —
 
 ### T12 — Consola de Identity Hub (React)
@@ -271,11 +317,11 @@ dinámico de clientes, consentimiento, `id_token`), TOTP/WebAuthn, correo real p
 
 ## Siguiente paso
 
-Resolver P1 a P4 con el usuario (una a la vez); después T1 y T2 en paralelo (docs), y T3.
+T1 (Codex) y T2 (Claude) en paralelo, ambos solo docs; después T3.
 
 ## Cambios de spec propuestos
 
-Todos en T3, tras T2 y las respuestas a P1, P2 y P4.
+Todos en T3, tras T2.
 
 ## Notas de handoff Codex
 
