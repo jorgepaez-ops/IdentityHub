@@ -59,14 +59,19 @@ func Application(role string) string {
 // The Identity Hub console access token carries only these (D8, RF-009): an
 // application role must never reach the console's roles claim.
 func Directory(allRoles []string) []string {
-	return ForApplication(allRoles, "")
+	filtered := make([]string, 0, len(allRoles))
+	for _, role := range allRoles {
+		if IsDirectory(role) {
+			filtered = append(filtered, role)
+		}
+	}
+	return filtered
 }
 
 // ForApplication filters allRoles down to the roles that belong to
-// application (for example ApplicationContabilidad). Pass "" to select
-// directory roles, same as Directory; kept as its own function so a future
-// application-scoped access token (T9) can select its roles by name without
-// special-casing the directory prefix at each call site.
+// application (for example ApplicationContabilidad), for the
+// application-scoped access token of T9. Use Directory for directory roles:
+// it accepts only admin and user, never an unknown dotless name.
 func ForApplication(allRoles []string, application string) []string {
 	filtered := make([]string, 0, len(allRoles))
 	for _, role := range allRoles {

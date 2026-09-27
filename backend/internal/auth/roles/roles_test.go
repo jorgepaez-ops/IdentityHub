@@ -55,3 +55,11 @@ func TestRF009_ForApplicationVacioEquivaleADirectory(t *testing.T) {
 		t.Fatalf("ForApplication(all, \"\") = %v, want %v (same as Directory)", got, want)
 	}
 }
+
+func TestRF009_DirectoryDescartaNombresSinPuntoFueraDelCatalogo(t *testing.T) {
+	got := roles.Directory([]string{roles.User, "operator", roles.Admin})
+	want := []string{roles.User, roles.Admin}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("Directory() = %v, want %v: an unknown dotless name is not a directory role", got, want)
+	}
+}

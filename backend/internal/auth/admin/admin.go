@@ -127,6 +127,19 @@ func (s *Service) UpdateUser(ctx context.Context, input UpdateInput) (User, erro
 	if s.repository == nil {
 		return User{}, errors.New("admin user service is unavailable")
 	}
+	// Invariant 11 (D8): an administrator never grants itself roles, even when
+	// the requested set matches what it already has or is otherwise invalid.
+	// It runs before request validation so that every self-assignment attempt
+	// is audited; the audit needs its own committed transaction.
+	if input.Roles != nil && input.ActorUserID == input.UserID {
+		auditErr := s.repository.WithinUserManagementTransaction(ctx, func(writer Writer) error {
+			return writer.InsertAuditEvent(ctx, AuditEvent{ActorUserID: &input.ActorUserID, Action: "role_assignment_rejected", ResourceType: "user", ResourceID: input.UserID.String()})
+		})
+		if auditErr != nil {
+			return User{}, fmt.Errorf("audit rejected self role assignment: %w", auditErr)
+		}
+		return User{}, ErrSelfRoleAssignment
+	}
 	if input.Status != nil && !validStatus(*input.Status) {
 		return User{}, ErrInvalidStatus
 	}
@@ -142,19 +155,6 @@ func (s *Service) UpdateUser(ctx context.Context, input UpdateInput) (User, erro
 	}
 	if input.Status != nil && *input.Status == StatusDisabled && input.ActorUserID == input.UserID {
 		return User{}, ErrSelfDisable
-	}
-	// Invariant 11 (D8): an administrator never grants itself roles, even when
-	// the requested set matches what it already has. The rejected attempt is
-	// still audited, so it needs its own committed transaction (self.repository
-	// is guaranteed non-nil by the check at the top of this method).
-	if input.Roles != nil && input.ActorUserID == input.UserID {
-		auditErr := s.repository.WithinUserManagementTransaction(ctx, func(writer Writer) error {
-			return writer.InsertAuditEvent(ctx, AuditEvent{ActorUserID: &input.ActorUserID, Action: "role_assignment_rejected", ResourceType: "user", ResourceID: input.UserID.String()})
-		})
-		if auditErr != nil {
-			return User{}, fmt.Errorf("audit rejected self role assignment: %w", auditErr)
-		}
-		return User{}, ErrSelfRoleAssignment
 	}
 
 	var result User

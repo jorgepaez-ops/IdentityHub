@@ -183,6 +183,28 @@ func TestRF010_AdminNoPuedeAsignarseRolesASiMismo(t *testing.T) {
 	}
 }
 
+func TestRF010_AutoasignacionSeAuditaAunqueLaSolicitudSeaInvalida(t *testing.T) {
+	for name, requested := range map[string][]string{
+		"sin rol base user": {"admin", "contabilidad.senior"},
+		"rol desconocido":   {"user", "operator"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			adminID := uuid.New()
+			repository := &repositoryStub{
+				users: map[uuid.UUID]User{adminID: {ID: adminID, Status: StatusActive}},
+				roles: map[uuid.UUID][]string{adminID: {"admin", "user"}},
+			}
+			_, err := New(repository).UpdateUser(context.Background(), UpdateInput{ActorUserID: adminID, UserID: adminID, Roles: &requested})
+			if !errors.Is(err, ErrSelfRoleAssignment) {
+				t.Fatalf("UpdateUser() error=%v, want ErrSelfRoleAssignment: the self-assignment rule must win over request validation", err)
+			}
+			if len(repository.audits) != 1 || repository.audits[0].Action != "role_assignment_rejected" {
+				t.Fatalf("audits=%+v, want one role_assignment_rejected event", repository.audits)
+			}
+		})
+	}
+}
+
 func TestRF009_UpdateUserRequiereMantenerElRolBaseUser(t *testing.T) {
 	actorID, targetID := uuid.New(), uuid.New()
 	repository := &repositoryStub{
