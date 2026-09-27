@@ -1160,14 +1160,17 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 - Commit: `d704178`
 
 ### T36 — Fichas actualizadas
-- [ ] Estado · Ejecutor: `Codex` · Cubre: ADR 0007 · Remedia: — · Solo docs · Depende de: T35
-- En cada ficha: estado `remediado`, Commit de remediación (SHA real), Evidencia antes/después y Run de Actions; las 26 filas del registro (VULN-001 a VULN-026) coherentes con las 26 fichas.
+- [x] Estado · Ejecutor: `Codex` · Cubre: ADR 0007 · Remedia: — · Solo docs · Depende de: T35
+- Alcance autorizado por el Usuario (2026-09-26): actualizar las 29 fichas y las 29 filas del registro (VULN-001 a VULN-029).
+- En cada ficha: estado `remediado` (o el estado parcial/riesgo aceptado documentado), Commit de remediación (SHA real), Evidencia antes/después y Run de Actions; las 29 filas del registro coherentes con las 29 fichas.
 - Verificación: `git diff --stat` solo en `security/findings/**` y este archivo; `python3 scripts/traceability.py --check`.
-- **Pendiente de revisión (2026-09-26, sin commitear).** Se fusionó el contexto de HEAD con los datos nuevos de
-  las 29 fichas y filas: se conservaron referencias locales, alcances parciales, razones de ausencia de gate y
-  resultados de jobs; se corrigieron VULN-010/017 (Hadolint sí corre en job 2 de `ci.yml`) y VULN-025 (run final:
-  npm audit 0; las 15 eran el estado intermedio tras T25). Falta la revisión humana de este diff; T36 sigue abierta.
-- Commit:
+- Hecho (2026-09-27). Un primer intento (2026-09-26) reemplazó campos enteros y perdió contexto en 20 fichas;
+  se rehízo como fusión campo por campo: se conservaron referencias locales, alcances parciales, razones de
+  ausencia de gate y resultados de jobs; se corrigieron VULN-010/017 (Hadolint sí corre en el job 2 de `ci.yml`),
+  VULN-025 (las 15 vulnerabilidades eran el estado intermedio tras T25; run final: npm audit 0) y los runs
+  "después" intermedios (36259385478 → 36283211113). Revisión de Claude: cada dato nuevo trazado a su
+  `evidencia.json`; `traceability.py --check` en verde. Commit `0d7e319`.
+- Commit: `0d7e319`
 
 ### T37 — Revisión final, informe y bitácora
 - [ ] Estado · Ejecutor: `Claude (revisión)` · Cubre: toda la feature
@@ -1190,8 +1193,8 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 | 1 — Contrato ejecutable | T1a, T1 a T3 (4) | 4 (T1a, T1, T2, T3) |
 | 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 20 (T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T14a, T15, T16, T17, T18, T19, T20, T21, T22) |
 | 3 — Remediación | T23 a T32 (10) | 10 (T23 a T32) |
-| 4 — Cierre | T33 a T38 y T34a, T34b (8) | 5 (T33, T34, T34a, T34b, T35) |
-| **Total** | **47** | **44** |
+| 4 — Cierre | T33 a T38 y T34a, T34b (8) | 6 (T33, T34, T34a, T34b, T35, T36) |
+| **Total** | **47** | **45** |
 
 Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, cookie) y `T14a`
 (enmienda ADR 0005, sin ventana de gracia). Los ids existentes no cambian.
