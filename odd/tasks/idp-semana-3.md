@@ -191,7 +191,7 @@ Ninguna: P1 a P4 resueltas en D8 a D11.
   CI ya en Go 1.26. Claude verificó cada dato contra `go.mod`, `backend/Dockerfile`, `ci.yml` y el
   `Makefile`, y corrigió que `specs/adr/README.md` no es un índice (ahora enlaza la carpeta).
   El enunciado original del README no está en el repo: se usó `ANALISIS-REQUISITOS.md` §6.
-- Commit:
+- Commit: `892e906`
 
 ### T2 — ADRs: SSO mínimo, MFA por correo, Docker Hub
 - [x] Estado · Ejecutor: `Claude` (decisión de arquitectura) · Solo docs
@@ -211,7 +211,7 @@ Ninguna: P1 a P4 resueltas en D8 a D11.
     único).
   - ADR 0010 deja constancia de que NIST SP 800-63B no admite el correo como autenticador fuera de
     banda: riesgo aceptado a sabiendas por alcance.
-- Commit:
+- Commit: `dc681e5`
 
 ### T3 — Enmienda de requisitos, OpenAPI y escenarios
 - [ ] Estado · Ejecutor: `Codex` · Depende de: T2 (decisiones D8 a D11)
@@ -332,15 +332,15 @@ Ninguna: P1 a P4 resueltas en D8 a D11.
 
 | Fase | Tareas | Hechas |
 |---|---|---|
-| 0 — Enmiendas de spec y decisiones | T1 a T3 (3) | 0 |
+| 0 — Enmiendas de spec y decisiones | T1 a T3 (3) | 2 (T1, T2) |
 | 1 — Backend | T4 a T10 (7) | 0 |
 | 2 — Dominios locales y frontend | T11 a T13 (3) | 0 |
 | 3 — Verificación, DAST y cierre | T14 a T17 (4) | 0 |
-| **Total** | **17** | **0** |
+| **Total** | **17** | **2** |
 
 ## Siguiente paso
 
-T1 (Codex) y T2 (Claude) en paralelo, ambos solo docs; después T3.
+T3 (Codex): enmienda de requisitos, OpenAPI y escenarios según D8 a D11 y las ADR 0009 a 0011.
 
 ## Cambios de spec propuestos
 
