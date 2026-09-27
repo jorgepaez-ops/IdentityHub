@@ -1,56 +1,49 @@
 # language: es
-Característica: Registro de cuenta y verificación por correo
-  Para poder usar la plataforma
-  Como visitante
-  Quiero crear una cuenta y demostrar que controlo mi correo
+Característica: Alta de empleados y aceptación de invitación
+  Para incorporar empleados sin exponer sus contraseñas
+  Como administrador
+  Quiero crear cuentas que el titular active desde su correo
 
   Antecedentes:
     Dado que la plataforma está disponible
+    Y que inicié sesión con una cuenta de rol "admin"
     Y que no existe ninguna cuenta con el correo "ana@example.com"
 
-  @RF-001 @p0
-  Escenario: Registro con datos válidos
-    Cuando me registro con el correo "ana@example.com" y la contraseña "correcta-horse-battery"
+  @RF-001 @RF-012 @p0
+  Escenario: Alta administrativa con datos válidos
+    Cuando doy de alta a "ana@example.com" con nombre "Ana" y rol "contabilidad.analista"
     Entonces recibo una respuesta 201
-    Y la cuenta queda en estado "pending_verification"
-    Y se encola un mensaje "user.registered" en el broker
+    Y la cuenta queda en estado "pending_verification" con los roles "user" y "contabilidad.analista"
+    Y se encola una invitación para "ana@example.com"
 
   @RF-001 @p0
-  Esquema del escenario: Contraseñas que no cumplen la política
-    Cuando me registro con el correo "ana@example.com" y la contraseña "<password>"
-    Entonces recibo una respuesta 400
-    Y el error indica el campo "password"
-
-    Ejemplos:
-      | password     |
-      | corta        |
-      | 12345678901  |
+  Escenario: El autorregistro público no está disponible
+    Cuando intento crear una cuenta en "/api/v1/auth/register"
+    Entonces recibo una respuesta 404
 
   @RF-001 @AM-004 @p0
-  Escenario: El registro no revela qué correos existen
+  Escenario: Un correo no puede darse de alta dos veces
     Dado que existe una cuenta activa con el correo "ana@example.com"
-    Cuando me registro con el correo "ana@example.com" y la contraseña "correcta-horse-battery"
+    Cuando doy de alta a "ana@example.com" con nombre "Ana" y rol "user"
     Entonces recibo una respuesta 409
-    Y el cuerpo de la respuesta no contiene la palabra "existe"
-    Y el tiempo de respuesta no difiere en más de 50 ms del de un correo nuevo
+    Y el cuerpo de la respuesta no revela datos de la cuenta existente
 
   @RF-002 @p0
-  Escenario: Verificación del correo con el enlace recibido
-    Dado que me registré con el correo "ana@example.com"
-    Y que el correo de verificación llegó a Mailpit
-    Cuando abro el enlace de verificación
+  Escenario: Aceptar la invitación verifica el correo y fija la contraseña
+    Dado que el correo de invitación para "ana@example.com" llegó a Mailpit
+    Cuando acepto el enlace con la contraseña "correcta-horse-battery"
     Entonces recibo una respuesta 204
     Y la cuenta queda en estado "active"
-    Y puedo iniciar sesión
+    Y puedo iniciar el desafío MFA con esa contraseña
 
   @RF-002 @p0
-  Escenario: El enlace de verificación es de un solo uso
-    Dado que ya verifiqué mi cuenta con el enlace recibido
-    Cuando abro el mismo enlace por segunda vez
+  Escenario: La invitación es de un solo uso
+    Dado que ya acepté la invitación recibida
+    Cuando vuelvo a aceptar el mismo enlace
     Entonces recibo una respuesta 410
 
-  @RF-003 @p0
-  Escenario: Una cuenta sin verificar no puede iniciar sesión
-    Dado que me registré con el correo "ana@example.com" pero no verifiqué el correo
-    Cuando inicio sesión con "ana@example.com" y la contraseña correcta
+  @RF-002 @p0
+  Escenario: Una cuenta que no aceptó la invitación no puede iniciar sesión
+    Dado que la invitación para "ana@example.com" sigue pendiente
+    Cuando inicio sesión con "ana@example.com" y cualquier contraseña
     Entonces recibo una respuesta 401

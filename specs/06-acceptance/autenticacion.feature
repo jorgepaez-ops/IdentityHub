@@ -2,19 +2,37 @@
 Característica: Autenticación y emisión de tokens
   Para acceder a mis recursos
   Como titular de una cuenta activa
-  Quiero obtener credenciales de sesión verificables
+  Quiero completar una contraseña y un segundo factor verificable
 
   Antecedentes:
     Dado que existe una cuenta activa "ana@example.com" con la contraseña "correcta-horse-battery"
 
-  @RF-003 @RF-004 @p0
-  Escenario: Inicio de sesión correcto
+  @RF-003 @RF-013 @RF-014 @p0
+  Escenario: Todo inicio de sesión exige MFA por correo
     Cuando inicio sesión con "ana@example.com" y "correcta-horse-battery"
-    Entonces recibo una respuesta 200
-    Y la respuesta contiene un "accessToken" y un "refreshToken"
+    Entonces recibo una respuesta 202 con un "mfaToken"
+    Y recibo en Mailpit un código de 6 dígitos
+    Y todavía no recibo un access token ni una cookie "refresh_token"
+    Cuando canjeo el "mfaToken" con el código recibido
+    Entonces recibo una respuesta 200 con un "accessToken"
+    Y recibo una cookie "refresh_token" HttpOnly Secure y SameSite Strict
     Y el "accessToken" está firmado con el algoritmo "EdDSA"
-    Y el "kid" del token coincide con una clave publicada en el JWKS
-    Y se registra un evento de auditoría "login_succeeded"
+    Y se registra un evento de auditoría "mfa_succeeded"
+
+  @RF-014 @p1
+  Escenario: Reenviar el código invalida el anterior
+    Dado que inicié un desafío MFA
+    Cuando solicito reenviar el código
+    Entonces recibo una respuesta 202 y un código nuevo en Mailpit
+    Y el código anterior ya no completa el desafío
+
+  @RF-014 @RF-017 @AM-001 @p1
+  Escenario: Agotar los intentos MFA anula el desafío
+    Dado que inicié un desafío MFA
+    Cuando presento códigos incorrectos hasta agotar sus intentos
+    Entonces el "mfaToken" deja de ser válido
+    Y los fallos cuentan para el bloqueo de la cuenta
+    Y se registra un evento de auditoría "mfa_challenge_exhausted"
 
   @RF-003 @AM-004 @p0
   Escenario: Contraseña incorrecta
@@ -35,11 +53,3 @@ Característica: Autenticación y emisión de tokens
     Y vuelvo a intentarlo con la contraseña correcta
     Entonces recibo una respuesta 423
     Y recibo un correo de aviso en Mailpit
-
-  @RF-013 @RF-014 @p1
-  Escenario: Inicio de sesión con segundo factor activo
-    Dado que tengo el segundo factor TOTP activado
-    Cuando inicio sesión con "ana@example.com" y "correcta-horse-battery"
-    Entonces recibo una respuesta 202 con un "mfaToken"
-    Cuando canjeo el "mfaToken" con un código TOTP válido
-    Entonces recibo una respuesta 200 con el par de tokens

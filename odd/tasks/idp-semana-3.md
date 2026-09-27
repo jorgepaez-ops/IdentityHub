@@ -214,7 +214,7 @@ Ninguna: P1 a P4 resueltas en D8 a D11.
 - Commit: `dc681e5`
 
 ### T3 — Enmienda de requisitos, OpenAPI y escenarios
-- [ ] Estado · Ejecutor: `Codex` · Depende de: T2 (decisiones D8 a D11)
+- [x] Estado · Ejecutor: `Codex` · Depende de: T2 (decisiones D8 a D11)
 - `specs/01-requirements.md`: RF-013/014 a código por correo; requisito nuevo de alta de empleados
   por admin con invitación; requisito nuevo del flujo de autorización para aplicaciones cliente;
   roles de negocio en el modelo de dominio.
@@ -223,6 +223,39 @@ Ninguna: P1 a P4 resueltas en D8 a D11.
 - `specs/06-acceptance/*.feature`: corregir los escenarios que esperan `refreshToken` en el cuerpo
   (va en cookie desde C1 de la semana 2) y añadir los escenarios nuevos.
 - Regenerar `gen.go` con `~/go/bin/oapi-codegen`; `make spec-drift` en verde.
+- Hecho (2026-09-27). Codex hizo la mayor parte y se cortó por límite de uso de su cuenta
+  (job task-muk3wc8y-7divbz, "usage limit") antes de reportar; Claude verificó y completó:
+  - Requisitos: RF-001 (alta por admin), RF-002 (aceptar invitación), RF-003 (202 + MFA), RF-009
+    (roles de directorio y de aplicación), RF-010 (no autoasignarse roles), RF-011 (eventos),
+    RF-012, RF-013/014 (MFA obligatorio por correo), RF-015 (token compartido) y RF-020 nuevo
+    (autorización de aplicaciones cliente). Cada uno con nota de enmienda fechada y su fuente.
+  - OpenAPI: fuera `register`, `verifyEmail`, `enrollMfa`, `activateMfa`, `disableMfa`; nuevos
+    `createEmployee`, `acceptInvitation`, `resendMfaCode`, `authorizeClient`, `exchangeAuthorizationCode`;
+    `Role` = admin, user, contabilidad.senior, contabilidad.analista. Parámetros OAuth en snake_case
+    por ser nombres de protocolo (única excepción al camelCase).
+  - Escenarios: refresh por cookie corregido; nuevo `autorizacion-oauth.feature`.
+  - Código: stubs `501` para las operaciones nuevas; retirado el handler HTTP de registro y su
+    prueba; la lógica de `internal/auth/registration` se conserva para T5.
+  - Completado por Claude: (1) Codex no regeneró `frontend/src/api/schema.d.ts` (el job de deriva
+    de CI habría fallado): `make gen`. (2) Hueco de seguridad en el spec: faltaba qué hace
+    `/oauth/authorize` sin sesión y quién crea la cookie SSO. Ahora: `verifyMfa` emite
+    `hub_session` (`SameSite=Lax`, `Path=/oauth`) además del refresh `Strict`; sin sesión,
+    `302` al login del Hub con `continue` que solo admite rutas relativas que empiecen por
+    `/oauth/authorize` (sin redirección abierta); dos escenarios nuevos lo cubren.
+  - Verificación (Claude): `go build`, `go vet` (con y sin tag `integration`), `make test-go`,
+    `make lint` (0 issues, ESLint sin avisos), `tsc` y Vitest del frontend, `make gen` sin deriva,
+    `traceability.py --check`, y `make test-integration` contra PostgreSQL 16 temporal: todo verde,
+    cobertura de integración 75,1 %.
+  - Estado transitorio conocido: el contrato ya exige `202` + MFA en el login, pero el login
+    implementado sigue devolviendo `200` con tokens hasta T7. `backend/internal/api/verify_email.go`
+    quedó sin ruta (su operación salió del contrato): T5 lo reutiliza para aceptar la invitación o
+    lo borra.
+  - Observaciones de GGA (hook de pre-commit) al commitear: `handleBindingError` en
+    `backend/internal/api/server.go` (preexistente, no de T3) responde con `http.Error` en texto
+    plano, no RFC 7807, y devuelve el texto interno del binding: se suma a T10. El campo
+    `registration` y `SetRegistrationService` de `Server` quedaron sin uso: los limpia T5.
+    (GGA marcó FAILED en una primera pasada por ese hallazgo preexistente y PASSED al repetirla:
+    su veredicto no es determinista.)
 - Commit: —
 
 ## Fase 1 — Backend
@@ -266,7 +299,8 @@ Ninguna: P1 a P4 resueltas en D8 a D11.
 
 ### T10 — Pendientes chicos de la semana 2
 - [ ] Estado · Ejecutor: `Codex`
-- `POST /api/v1/auth/login` con `{}` responde 500 en vez de 400; `/readyz` devuelve
+- `handleBindingError` responde en texto plano y no en RFC 7807 (hallado por GGA en T3);
+  `POST /api/v1/auth/login` con `{}` responde 500 en vez de 400; `/readyz` devuelve
   `err.Error()` por dependencia (puede filtrar host/usuario/base); investigar la intermitencia de
   `TestRF001_UsersAceptaArgon2idYRechazaMD5`.
 - Commit: —
@@ -332,15 +366,15 @@ Ninguna: P1 a P4 resueltas en D8 a D11.
 
 | Fase | Tareas | Hechas |
 |---|---|---|
-| 0 — Enmiendas de spec y decisiones | T1 a T3 (3) | 2 (T1, T2) |
+| 0 — Enmiendas de spec y decisiones | T1 a T3 (3) | 3 (T1 a T3) |
 | 1 — Backend | T4 a T10 (7) | 0 |
 | 2 — Dominios locales y frontend | T11 a T13 (3) | 0 |
 | 3 — Verificación, DAST y cierre | T14 a T17 (4) | 0 |
-| **Total** | **17** | **2** |
+| **Total** | **17** | **3** |
 
 ## Siguiente paso
 
-T3 (Codex): enmienda de requisitos, OpenAPI y escenarios según D8 a D11 y las ADR 0009 a 0011.
+Fase 0 cerrada. Fase 1 (backend): T4 roles, luego T5 alta e invitación (Codex, cuando recupere su cuota; si no, Sonnet).
 
 ## Cambios de spec propuestos
 

@@ -21,20 +21,6 @@ func TestRNF011_GeneratedServerContract(t *testing.T) {
 		}
 	})
 
-	t.Run("unwired registration returns RFC7807", func(t *testing.T) {
-		server := NewServer(nil, "test", nil)
-		response := httptest.NewRecorder()
-
-		server.Routes().ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/v1/auth/register", nil))
-
-		if response.Code != http.StatusServiceUnavailable {
-			t.Fatalf("POST /api/v1/auth/register status = %d, want %d", response.Code, http.StatusServiceUnavailable)
-		}
-		if got := response.Header().Get("Content-Type"); got != "application/problem+json; charset=utf-8" {
-			t.Fatalf("Content-Type = %q, want RFC 7807 content type", got)
-		}
-	})
-
 	t.Run("refresh token is only a cookie parameter", func(t *testing.T) {
 		if _, exists := reflect.TypeOf(TokenPair{}).FieldByName("RefreshToken"); exists {
 			t.Fatal("TokenPair must not expose RefreshToken")

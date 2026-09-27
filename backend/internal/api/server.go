@@ -150,13 +150,21 @@ func (s *Server) UpdateUser(w http.ResponseWriter, r *http.Request, userID UserI
 		s.updateUser(w, request, userID)
 	}))).ServeHTTP(w, r)
 }
+func (s *Server) CreateEmployee(w http.ResponseWriter, r *http.Request) { s.notImplemented(w) }
+func (s *Server) AcceptInvitation(w http.ResponseWriter, r *http.Request) {
+	s.notImplemented(w)
+}
+func (s *Server) ResendMfaCode(w http.ResponseWriter, r *http.Request) { s.notImplemented(w) }
+func (s *Server) AuthorizeClient(w http.ResponseWriter, r *http.Request, params AuthorizeClientParams) {
+	s.notImplemented(w)
+}
+func (s *Server) ExchangeAuthorizationCode(w http.ResponseWriter, r *http.Request) {
+	s.notImplemented(w)
+}
 func (s *Server) VerifyMfa(w http.ResponseWriter, r *http.Request)            { s.notImplemented(w) }
 func (s *Server) ConfirmPasswordReset(w http.ResponseWriter, r *http.Request) { s.notImplemented(w) }
 func (s *Server) RequestPasswordReset(w http.ResponseWriter, r *http.Request) { s.notImplemented(w) }
 
-func (s *Server) DisableMfa(w http.ResponseWriter, r *http.Request)   { s.notImplemented(w) }
-func (s *Server) ActivateMfa(w http.ResponseWriter, r *http.Request)  { s.notImplemented(w) }
-func (s *Server) EnrollMfa(w http.ResponseWriter, r *http.Request)    { s.notImplemented(w) }
 func (s *Server) ListSessions(w http.ResponseWriter, r *http.Request) { s.notImplemented(w) }
 func (s *Server) RevokeSession(w http.ResponseWriter, r *http.Request, sessionID SessionId) {
 	s.notImplemented(w)

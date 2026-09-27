@@ -45,7 +45,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Clave pública para validar los tokens emitidos */
+        /**
+         * Clave pública para validar los tokens emitidos
+         * @description CORS sin credenciales, permitido solo al origen configurado del cliente.
+         */
         get: operations["getJwks"];
         put?: never;
         post?: never;
@@ -55,7 +58,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/auth/register": {
+    "/api/v1/auth/invitations/accept": {
         parameters: {
             query?: never;
             header?: never;
@@ -64,25 +67,11 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Crear una cuenta */
-        post: operations["register"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/verify-email": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Activar la cuenta con el token recibido por correo */
-        post: operations["verifyEmail"];
+        /**
+         * Aceptar una invitación y definir la contraseña
+         * @description Consume un token de invitación de un solo uso y activa la cuenta.
+         */
+        post: operations["acceptInvitation"];
         delete?: never;
         options?: never;
         head?: never;
@@ -100,9 +89,8 @@ export interface paths {
         put?: never;
         /**
          * Iniciar sesión con correo y contraseña
-         * @description Devuelve `200` con el par de tokens si la cuenta no tiene segundo factor.
-         *     Si lo tiene, devuelve `202` con un `mfa_token` de corta vida que debe
-         *     canjearse en `/api/v1/auth/mfa/verify`.
+         * @description Una contraseña correcta siempre devuelve `202` con un `mfaToken` temporal y
+         *     envía por correo un código de 6 dígitos. No crea sesión hasta completar MFA.
          */
         post: operations["login"];
         delete?: never;
@@ -122,6 +110,26 @@ export interface paths {
         put?: never;
         /** Canjear el desafío de segundo factor por una sesión */
         post: operations["verifyMfa"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/mfa/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reenviar el código del desafío MFA
+         * @description Anula el código anterior, conserva el desafío y limita la frecuencia de envío.
+         */
+        post: operations["resendMfaCode"];
         delete?: never;
         options?: never;
         head?: never;
@@ -204,6 +212,56 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/oauth/authorize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Autorizar al cliente mediante Authorization Code con PKCE
+         * @description Valida el cliente configurado, la coincidencia exacta de `redirect_uri`, `state`
+         *     obligatorio y PKCE S256. Si existe la cookie SSO del Hub (`HttpOnly`, `Secure`,
+         *     `SameSite=Lax`) no vuelve a pedir contraseña. Sin sesión SSO
+         *     válida responde `302` al login del Hub con `continue` = la ruta relativa de esta misma
+         *     petición; el login solo acepta `continue` si es una ruta relativa que empieza por
+         *     `/oauth/authorize` (nunca una URL absoluta ni `//host`, para evitar redirección abierta)
+         *     y vuelve a ella tras completar el MFA. Los errores con una URI validada se
+         *     devuelven por redirección según RFC 6749 §4.1.2.1. No se habilita CORS aquí.
+         *     Los parámetros en `snake_case` son nombres de protocolo definidos por RFC 6749.
+         */
+        get: operations["authorizeClient"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/oauth/token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Canjear un código de autorización por un access token
+         * @description Acepta exclusivamente `application/x-www-form-urlencoded`. CORS se permite sin
+         *     credenciales y solo para el origen configurado del cliente. No emite refresh token.
+         *     Los campos en `snake_case` son nombres de protocolo definidos por RFC 6749.
+         */
+        post: operations["exchangeAuthorizationCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me": {
         parameters: {
             query?: never;
@@ -256,60 +314,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/me/mfa/enroll": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Iniciar el alta de TOTP
-         * @description Devuelve el secreto una única vez. No se puede volver a consultar.
-         */
-        post: operations["enrollMfa"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/me/mfa/activate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Confirmar el alta con un código TOTP válido */
-        post: operations["activateMfa"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/me/mfa": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Desactivar el segundo factor */
-        delete: operations["disableMfa"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/admin/users": {
         parameters: {
             query?: never;
@@ -320,7 +324,8 @@ export interface paths {
         /** Listar y buscar cuentas */
         get: operations["listUsers"];
         put?: never;
-        post?: never;
+        /** Dar de alta a un empleado y enviar su invitación */
+        post: operations["createEmployee"];
         delete?: never;
         options?: never;
         head?: never;
@@ -343,7 +348,7 @@ export interface paths {
         head?: never;
         /**
          * Cambiar el estado o los roles de una cuenta
-         * @description Un administrador no puede deshabilitarse a sí mismo (invariante 6).
+         * @description Un administrador no puede deshabilitarse ni asignarse roles a sí mismo (invariantes 6 y 11).
          */
         patch: operations["updateUser"];
         trace?: never;
@@ -422,7 +427,7 @@ export interface components {
         /** @enum {string} */
         UserStatus: "pending_verification" | "active" | "locked" | "disabled";
         /** @enum {string} */
-        Role: "admin" | "user";
+        Role: "admin" | "user" | "contabilidad.senior" | "contabilidad.analista";
         User: {
             /** Format: uuid */
             id: string;
@@ -431,6 +436,7 @@ export interface components {
             displayName: string;
             status: components["schemas"]["UserStatus"];
             roles: components["schemas"]["Role"][];
+            /** @description Siempre verdadero para cuentas activas; no requiere enrolamiento */
             mfaEnabled: boolean;
             /** Format: date-time */
             createdAt: string;
@@ -441,19 +447,15 @@ export interface components {
             items: components["schemas"]["User"][];
             nextCursor?: string | null;
         };
-        RegisterRequest: {
+        AdminCreateUserRequest: {
             /** Format: email */
             email: string;
+            displayName: string;
+            roles: components["schemas"]["Role"][];
+        };
+        InvitationAcceptRequest: components["schemas"]["TokenRequest"] & {
             /** Format: password */
             password: string;
-            displayName: string;
-        };
-        RegisterResponse: {
-            /** Format: uuid */
-            id: string;
-            /** Format: email */
-            email: string;
-            status: components["schemas"]["UserStatus"];
         };
         LoginRequest: {
             /** Format: email */
@@ -480,23 +482,11 @@ export interface components {
         };
         MfaVerifyRequest: {
             mfaToken: string;
-            /** @description Código TOTP de 6 dígitos o código de recuperación */
+            /** @description Código de un solo uso enviado por correo */
             code: string;
         };
-        MfaEnrollment: {
-            /** @description Secreto TOTP en base32. Se muestra una sola vez. */
-            secret: string;
-            /** @description URI otpauth:// para el código QR */
-            otpauthUri: string;
-            /** @description Diez códigos de un solo uso. Se muestran una sola vez. */
-            recoveryCodes: string[];
-        };
-        MfaCodeRequest: {
-            code: string;
-        };
-        PasswordConfirmRequest: {
-            /** Format: password */
-            password: string;
+        MfaResendRequest: {
+            mfaToken: string;
         };
         TokenRequest: {
             token: string;
@@ -516,6 +506,23 @@ export interface components {
         AdminUpdateUserRequest: {
             status?: components["schemas"]["UserStatus"];
             roles?: components["schemas"]["Role"][];
+        };
+        OAuthTokenRequest: {
+            /** @enum {string} */
+            grant_type: "authorization_code";
+            code: string;
+            /** Format: uri */
+            redirect_uri: string;
+            client_id: string;
+            code_verifier: string;
+        };
+        OAuthTokenResponse: {
+            /** @description JWT Ed25519 con `aud` del cliente y solo sus roles */
+            access_token: string;
+            /** @enum {string} */
+            token_type: "Bearer";
+            /** @example 900 */
+            expires_in: number;
         };
         Session: {
             /** Format: uuid */
@@ -685,7 +692,7 @@ export interface operations {
             };
         };
     };
-    register: {
+    acceptInvitation: {
         parameters: {
             query?: never;
             header?: never;
@@ -694,46 +701,11 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["RegisterRequest"];
+                "application/json": components["schemas"]["InvitationAcceptRequest"];
             };
         };
         responses: {
-            /** @description Cuenta creada en estado pending_verification */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RegisterResponse"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            /** @description El correo ya está registrado */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            429: components["responses"]["TooManyRequests"];
-        };
-    };
-    verifyEmail: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TokenRequest"];
-            };
-        };
-        responses: {
-            /** @description Cuenta activada */
+            /** @description Invitación aceptada y cuenta activada */
             204: {
                 headers: {
                     [name: string]: unknown;
@@ -765,17 +737,6 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Sesión iniciada */
-            200: {
-                headers: {
-                    /** @description refresh_token=<opaco>; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Max-Age=<vigencia del refresh> */
-                    "Set-Cookie"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TokenPair"];
-                };
-            };
             /** @description Se requiere segundo factor */
             202: {
                 headers: {
@@ -812,10 +773,10 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Sesión iniciada */
+            /** @description Sesión iniciada. Emite dos cookies independientes: el refresh de la consola (`SameSite=Strict`, ADR 0005) y la sesión SSO del Hub (`SameSite=Lax`, ADR 0009), que usa `/oauth/authorize` para no volver a pedir credenciales. */
             200: {
                 headers: {
-                    /** @description refresh_token=<opaco>; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Max-Age=<vigencia del refresh> */
+                    /** @description 'refresh_token=<opaco>; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Max-Age=<vigencia del refresh>' y, en otra cabecera Set-Cookie, 'hub_session=<opaco>; HttpOnly; Secure; SameSite=Lax; Path=/oauth; Max-Age=<vigencia de la sesión SSO>' */
                     "Set-Cookie"?: string;
                     [name: string]: unknown;
                 };
@@ -825,6 +786,31 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    resendMfaCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MfaResendRequest"];
+            };
+        };
+        responses: {
+            /** @description Código anterior anulado y nuevo envío encolado */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            429: components["responses"]["TooManyRequests"];
         };
     };
     refreshSession: {
@@ -932,6 +918,66 @@ export interface operations {
             };
         };
     };
+    authorizeClient: {
+        parameters: {
+            query: {
+                client_id: string;
+                redirect_uri: string;
+                response_type: "code";
+                state: string;
+                code_challenge: string;
+                code_challenge_method: "S256";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Redirección al cliente con `code` y `state`, o con `error` y el mismo `state`. */
+            302: {
+                headers: {
+                    Location: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Petición inválida que no puede redirigirse de forma segura. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    exchangeAuthorizationCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/x-www-form-urlencoded": components["schemas"]["OAuthTokenRequest"];
+            };
+        };
+        responses: {
+            /** @description Access token dirigido al cliente */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OAuthTokenResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+        };
+    };
     getCurrentUser: {
         parameters: {
             query?: never;
@@ -1022,83 +1068,6 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
-    enrollMfa: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Secreto y códigos de recuperación */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MfaEnrollment"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            /** @description El segundo factor ya está activo */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    activateMfa: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["MfaCodeRequest"];
-            };
-        };
-        responses: {
-            /** @description Segundo factor activado */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-        };
-    };
-    disableMfa: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PasswordConfirmRequest"];
-            };
-        };
-        responses: {
-            /** @description Segundo factor desactivado */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            401: components["responses"]["Unauthorized"];
-        };
-    };
     listUsers: {
         parameters: {
             query?: {
@@ -1125,6 +1094,42 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    createEmployee: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminCreateUserRequest"];
+            };
+        };
+        responses: {
+            /** @description Cuenta creada en estado pending_verification */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["User"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            /** @description El correo ya está registrado */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     getUser: {
