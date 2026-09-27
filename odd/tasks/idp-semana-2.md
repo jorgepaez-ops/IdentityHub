@@ -1139,7 +1139,7 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
   down` limpio. Frontend (`frontend/Dockerfile`, base `node`) no se reconstruyó aparte porque no
   depende de Go: ya se reconstruyó dentro de `make build`/`make up` sin cambios de código y con
   Trivy limpio.
-- Commit: —
+- Commit: `98f5f98`
 - Evidencia (`Usuario`):  - [ ] VULN-028  - [ ] VULN-029 ("antes" capturado en el informe, run 36281691237; falta el "después")
 
 ### T35 — CI en verde y evidencia "después"

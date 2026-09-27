@@ -18,7 +18,7 @@
   },
   "remediacion": {
     "tarea": "T34b",
-    "commit": null,
+    "commit": "98f5f98",
     "ficha": "security/findings/VULN-028-x-crypto-desactualizado.md"
   },
   "despues": {

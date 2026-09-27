@@ -10,7 +10,7 @@
 | **Amenaza** | AM-009 (dependencia comprometida en la cadena de suministro) |
 | **Sembrada** | no — hallazgo nuevo detectado al actualizar el escáner |
 | **Evidencia antes** | `docs/evidencia/VULN-029/evidencia.json` |
-| **Commit de remediación** | pendiente (T34b) |
+| **Commit de remediación** | `98f5f98` (T34b) |
 | **Evidencia después** | pendiente (T34b) |
 | **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36281691237 / — |
 
