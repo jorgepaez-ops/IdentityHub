@@ -176,12 +176,22 @@ Ninguna: P1 a P4 resueltas en D8 a D11.
 ## Fase 0 — Enmiendas de spec y decisiones (sin código)
 
 ### T1 — Documentación desactualizada y constancia de decisiones
-- [ ] Estado · Ejecutor: `Codex` · Solo docs
+- [x] Estado · Ejecutor: `Codex` · Solo docs
 - README (estado "Semana 2 de 4", CI rojo, repo en línea base), `AGENTS.md` (Go 1.25 y
   `x/crypto` v0.17.0 → Go 1.26 tras T34b) y la ficha VULN-028 (dice que Dockerfile y CI siguen en
   Go 1.25). Nota breve en README sobre D1 (stack elegido con aval del profesor).
 - Verificación: `python3 scripts/traceability.py --check`.
-- Commit: —
+- Hecho (2026-09-27, Codex; revisión de Claude). README reorganizado en 10 secciones para el
+  evaluador y para quien clone el repo: descripción, badges reales (CI, versión por tag, licencia;
+  cobertura pendiente de un servicio que la publique, sin URL inventada, y el gate del 70 % del job
+  "6b · Pruebas de integración" citado en el texto), estado, tecnologías con la nota de D1,
+  arquitectura, inicio rápido honesto (hoy `.env` + `make up`; la portabilidad llega en la semana 4),
+  mapa de evidencia de seguridad, gestión y trazabilidad, estructura y licencia. 27 enlaces
+  relativos comprobados. `AGENTS.md`: Go 1.26 y versiones reales de go.mod. VULN-028: Dockerfile y
+  CI ya en Go 1.26. Claude verificó cada dato contra `go.mod`, `backend/Dockerfile`, `ci.yml` y el
+  `Makefile`, y corrigió que `specs/adr/README.md` no es un índice (ahora enlaza la carpeta).
+  El enunciado original del README no está en el repo: se usó `ANALISIS-REQUISITOS.md` §6.
+- Commit:
 
 ### T2 — ADRs: SSO mínimo, MFA por correo, Docker Hub
 - [x] Estado · Ejecutor: `Claude` (decisión de arquitectura) · Solo docs

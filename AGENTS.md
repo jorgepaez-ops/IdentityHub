@@ -58,7 +58,7 @@ Puertos del stack: web 8080, api 8081, Mailpit 8025, RabbitMQ 15672.
 **No existen todavía** (los crean las tareas): pruebas Playwright y `docs/runbook.md`. `make e2e` es un
 placeholder. Las pruebas de integración usan `make test-integration` y `TEST_DATABASE_URL` (una PostgreSQL local):
 tu sandbox no llega a ella, así que déjalas compilando (`go vet -tags=integration ./...`) y avisa: Claude las ejecuta.
-Go es 1.25 (`go.mod`, decisión Q19); `x/crypto` se queda en v0.17.0 hasta T24.
+Go es 1.26 (`go.mod`, T34b); `x/crypto` está en v0.56.0.
 
 ## Cómo trabajas (acuerdo con Codex)
 
@@ -94,8 +94,8 @@ Go es 1.25 (`go.mod`, decisión Q19); `x/crypto` se queda en v0.17.0 hasta T24.
   archivos, sembrados a propósito y necesarios como evidencia "antes", hasta que lo haga la
   tarea designada (entre paréntesis):
   `backend/internal/api/legacy_auth.go` y su ruta `/auth/legacy-login` en `server.go`
-  (VULN-001, 002, 004, 005, 006, 007; T23) · `backend/go.mod` con jwt v4, pgx 5.5.1 y
-  x/text (VULN-021 T23, VULN-022 y x/text T24; chi y la directiva `go` ya se remediaron en T6: `go 1.25`, decisión Q19) ·
+  (VULN-001, 002, 004, 005, 006, 007; T23) · `backend/go.mod` con jwt v5, pgx 5.11.0, x/text v0.41.0 y x/crypto v0.56.0
+  (VULN-021 T23, VULN-022 y x/text T24, VULN-028 T34b; chi y la directiva `go` ya se remediaron: `go 1.26`) ·
   `backend/Dockerfile` (VULN-008 a 012; T26, T27) · `frontend/Dockerfile` (VULN-016 a 018; T28) ·
   `frontend/nginx/default.conf` (VULN-013 a 015; T29) · `frontend/package.json` con axios y
   lodash antiguos (T25) · `deploy/docker-compose.yml` (VULN-003, 019 y 024; T26, T30). Su comentario de endurecimiento dice hoy
