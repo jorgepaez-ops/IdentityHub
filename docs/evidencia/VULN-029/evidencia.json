@@ -22,12 +22,14 @@
     "ficha": "security/findings/VULN-029-protobuf-desactualizado.md"
   },
   "despues": {
-    "commit": null,
-    "workflow": null,
-    "run_id": null,
-    "run_url": null,
+    "commit": "59cf8cff8d25776f3cc558e6cd41da29949ef064",
+    "workflow": "CI",
+    "run_id": "36283211113",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36283211113",
     "captura": null,
-    "hallazgos": null,
-    "observacion": null
+    "hallazgos": [
+      "osv-scanner v2.6.0 --all-vulns: No issues found (exit 0)"
+    ],
+    "observacion": "CI completo en verde (13/13 jobs) sobre feat/idp-semana-2, workflow_dispatch. Captura pendiente de confirmación del usuario (Claude Desktop)."
   }
 }

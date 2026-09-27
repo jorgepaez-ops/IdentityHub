@@ -190,8 +190,8 @@ los archivos sembrados y fichas). Celdas vacías = aún no conocidas.
 | VULN-024 | Sin endurecimiento de contenedores (en el comentario del compose figura como VULN-020) | Ninguno hoy (Trivy config solo cubre los Dockerfiles, no el compose) | run 35476102444 (no detectado) / sin captura | `824be7d` | local (`docker inspect`, sin gate) | T30 |
 | VULN-025 | axios 0.21.1 / lodash 4.17.15 | npm audit (baseline-scan), osv-scanner (solo en `ci.yml`) | run 35476102444 / informe §3 | `534f13e` | run 36259385478 (npm audit: 15, sin axios/lodash) | T25 |
 | VULN-026 | `golang.org/x/text` (GO-2026-5970) | govulncheck | run 35476102444 / informe §3 | `001a489` | run 36259385478 (govulncheck: "No vulnerabilities found") | T24 |
-| VULN-028 | `golang.org/x/crypto` 0.55.0 (GO-2026-6354, GO-2026-6355, GO-2026-5932) | osv-scanner v2.6.0 (`ci.yml`, job `5 · Dependencias vulnerables`) | run 36281691237 / informe Desktop | — | — | T34b |
-| VULN-029 | `google.golang.org/protobuf` 1.31.0 (GO-2024-2611) | osv-scanner v2.6.0 (`ci.yml`, job `5 · Dependencias vulnerables`) | run 36281691237 / informe Desktop | — | — | T34b |
+| VULN-028 | `golang.org/x/crypto` 0.55.0 (GO-2026-6354, GO-2026-6355, GO-2026-5932) | osv-scanner v2.6.0 (`ci.yml`, job `5 · Dependencias vulnerables`) | run 36281691237 / informe Desktop | `98f5f98` | run 36283211113 (CI 13/13 en verde) | T34b |
+| VULN-029 | `google.golang.org/protobuf` 1.31.0 (GO-2024-2611) | osv-scanner v2.6.0 (`ci.yml`, job `5 · Dependencias vulnerables`) | run 36281691237 / informe Desktop | `98f5f98` | run 36283211113 (CI 13/13 en verde) | T34b |
 
 Nota (Q9): `VULN-020` queda como el hallazgo de chi `RealIP`. VULN-024 a VULN-026 se asignan al
 crear sus fichas (T0.5); las fichas de 003, 004 y 006 a 019 también las crea T0.5, conservando sus
@@ -1090,7 +1090,7 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 - Evidencia (`Usuario`):  - [ ] VULN-027
 
 ### T34b — Dependencias Go desactualizadas (VULN-028 y VULN-029)
-- [ ] Estado · Ejecutor: `Claude` (`go get` y `go mod tidy` necesitan red) · Cubre: AM-009 · Remedia: VULN-028, VULN-029 · Bloquea a: T35
+- [x] Estado · Ejecutor: `Claude` (Sonnet 5; `go get` y `go mod tidy` necesitan red) · Cubre: AM-009 · Remedia: VULN-028, VULN-029 · Bloquea a: T35
 - Alcance: subir `golang.org/x/crypto` a 0.56.0 o superior y `google.golang.org/protobuf` a 1.33.0 o superior mediante `go get` y `go mod tidy`. Para GO-2026-5932, identificar el subpaquete e importaciones afectadas y su alcanzabilidad; después decidir con el usuario entre eliminarlo o documentar y aceptar el riesgo.
 - Criterios: `osv-scanner` v2.6.0 con `--all-vulns` termina en 0 o deja únicamente un riesgo aceptado y documentado; `govulncheck` limpio; `make test` y `make lint` en verde.
 - Verificación: `osv-scanner --recursive --all-vulns`; `cd backend && govulncheck ./...`; `make test`; `make lint`.
@@ -1180,8 +1180,8 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 | 1 — Contrato ejecutable | T1a, T1 a T3 (4) | 4 (T1a, T1, T2, T3) |
 | 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 20 (T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T14a, T15, T16, T17, T18, T19, T20, T21, T22) |
 | 3 — Remediación | T23 a T32 (10) | 10 (T23 a T32) |
-| 4 — Cierre | T33 a T38 y T34a, T34b (8) | 3 (T33, T34, T34a) |
-| **Total** | **47** | **40** |
+| 4 — Cierre | T33 a T38 y T34a, T34b (8) | 4 (T33, T34, T34a, T34b) |
+| **Total** | **47** | **43** |
 
 Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, cookie) y `T14a`
 (enmienda ADR 0005, sin ventana de gracia). Los ids existentes no cambian.
