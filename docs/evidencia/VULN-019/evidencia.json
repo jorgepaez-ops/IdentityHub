@@ -22,16 +22,18 @@
     "ficha": "security/findings/VULN-019-imagenes-base-antiguas-compose.md"
   },
   "despues": {
-    "commit": "a2b57e2",
-    "workflow": null,
-    "run_id": null,
-    "run_url": null,
+    "commit": "2ee59e2565a68b05be74b46a2c498f69d5eb17ce",
+    "workflow": "Escaneo de la línea base",
+    "run_id": "36329751647",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36329751647",
     "captura": null,
     "hallazgos": [
+      "Trivy HIGH/CRITICAL (run 36329751647, misma metodología que el antes): postgres@sha256:efedf359 (16-bookworm) 115, de ellos 22 con parche, todos stdlib de Go en gosu; rabbitmq@sha256:ddc75301 (4-management) 0; axllent/mailpit:v1.20 69; migrate/migrate:v4.17.0 65; prom/prometheus:v2.51.0 112; grafana/loki:2.9.4 59; grafana/alloy:v1.0.0 79; grafana/grafana:10.4.0 126",
       "Trivy image (local, T30) sobre rabbitmq:4-management: Total 0 (HIGH: 0, CRITICAL: 0)",
       "Trivy image (local, T30) sobre postgres:16-bookworm: 0 en el sistema operativo; 1 HIGH en gosu (binario empaquetado por la imagen oficial, fuera de nuestro control) y 1 en un certificado de relleno de Debian",
       "axllent/mailpit, migrate/migrate y las 4 imágenes de observabilidad siguen sin actualizar, fuera de alcance de T30"
     ],
-    "observacion": "baseline-scan.yml (el workflow que escanea estas imágenes por nombre) solo corre sobre el tag v0.0.0-vuln-baseline, no sobre ramas ni PRs — no hay \"después\" de CI posible hasta que T38 cree el tag endurecido. Evidencia local ya verificada en T30. El run verde 36283211113 es solo referencia: ci.yml no escanea las imágenes de infraestructura de docker-compose.yml; no existe gate de CI para este hallazgo."
+    "observacion": "T38: baseline-scan.yml lanzado por workflow_dispatch con ref=v0.1.0-hardened (tag sobre el merge del PR #3 en main), job 108649306649, paso \"Trivy sobre las imágenes base\". Cuenta todos los HIGH/CRITICAL, sin --ignore-unfixed, igual que el run 35534898422: postgres 197 → 115, rabbitmq 3 → 0. De los 115 de postgres, 93 son paquetes del sistema operativo sin parche publicado; la medición local de T30 contaba solo hallazgos con parche, de ahí su \"0 en el sistema operativo\". Los 22 con parche están en stdlib de Go dentro de gosu (T30 registró 1, con el mismo digest): avisos nuevos en la base de datos, fuera de nuestro control. Remediación parcial: el resto de imágenes del compose sigue abierto. captura pendiente de confirmación del usuario (Claude Desktop).",
+    "artefacto": "security/evidence/actions-36329751647/README.md"
   }
 }
