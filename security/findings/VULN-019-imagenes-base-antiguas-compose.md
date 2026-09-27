@@ -10,8 +10,8 @@
 | **Sembrada** | sí |
 | **Evidencia antes** | `docs/evidencia/VULN-019/evidencia.json` — informe Desktop §3 VULN-019 |
 | **Commit de remediación** | `824be7d` (T30, solo `postgres` y `rabbitmq`; el resto sigue abierto) |
-| **Evidencia después** | `docs/evidencia/VULN-019/evidencia.json` (Trivy local: `rabbitmq:4-management` total 0; `postgres:16-bookworm` 0 en SO, 1 HIGH en gosu fuera de nuestro control y 1 certificado de relleno Debian; Mailpit, migrate y las 4 imágenes de observabilidad siguen abiertas/fuera de alcance T30) — sin captura |
-| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35534898422 / — (`baseline-scan.yml` solo corre sobre el tag; espera a T38); `ci.yml` no escanea las imágenes de infraestructura del compose |
+| **Evidencia después** | `docs/evidencia/VULN-019/evidencia.json` y `security/evidence/actions-36329751647/README.md` (T38, run sobre `v0.1.0-hardened`, sin `--ignore-unfixed` como el antes: `postgres` 197 → 115, de ellos 22 con parche, todos `stdlib` de Go en gosu, fuera de nuestro control; `rabbitmq` 3 → 0; Mailpit, migrate y las 4 imágenes de observabilidad sin cambios, siguen abiertas/fuera de alcance T30. La medición local de T30 —`postgres:16-bookworm` 0 en SO, 1 HIGH en gosu— contaba solo hallazgos con parche; total de las 8 imágenes del compose 710 → 625) — informe Desktop, seccion VULN-019 despues (T38; Discrepancia 8) |
+| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35534898422 / https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36329751647 (`baseline-scan.yml` por `workflow_dispatch` con `ref=v0.1.0-hardened`, T38); `ci.yml` no escanea las imágenes de infraestructura del compose |
 
 ## Evidencia
 

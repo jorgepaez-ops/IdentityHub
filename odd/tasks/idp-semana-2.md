@@ -182,7 +182,7 @@ los archivos sembrados y fichas). Celdas vacías = aún no conocidas.
 | VULN-016 | `node:18-bullseye` | Trivy image sobre `node:18-bullseye` (por nombre) | run 35534898422 / informe §3 | `8f3d461` | run 36283211113 / informe Desktop, seccion VULN-016 despues (Trivy web: 0 vulnerabilidades) | T28 |
 | VULN-017 | `nginx:latest` | Hadolint DL3007 | run 35476102444 / informe §3 | `8f3d461` | run 36283211113 / informe Desktop, seccion VULN-017 despues (Hadolint job 2: sin hallazgos) | T28 |
 | VULN-018 | Imagen final del frontend como root | Trivy config DS002 (Hadolint no emite DL3002, D4) | run 35476102444 / informe §3 | `8f3d461` | run 36283211113 / informe Desktop, seccion VULN-018 despues (Trivy config frontend: 0 hallazgos) | T28 |
-| VULN-019 | Imágenes base antiguas en compose | Trivy image sobre las imágenes del compose (por nombre) | run 35534898422 / informe §3 | `824be7d` (parcial: solo `postgres`/`rabbitmq`; el resto sigue abierto) | evidencia local Trivy: `rabbitmq:4-management` total 0; `postgres:16-bookworm` 0 en SO, 1 HIGH en gosu fuera de nuestro control y 1 certificado de relleno Debian; Mailpit, migrate y 4 imágenes de observabilidad siguen abiertas/fuera de alcance T30 / sin captura (sin gate en CI; `baseline-scan.yml` espera T38; run 36283211113 solo referencia: compose no escaneado) | T30 |
+| VULN-019 | Imágenes base antiguas en compose | Trivy image sobre las imágenes del compose (por nombre) | run 35534898422 / informe §3 | `824be7d` (parcial: solo `postgres`/`rabbitmq`; el resto sigue abierto) | run 36329751647 (`baseline-scan.yml` sobre `v0.1.0-hardened`, T38) / informe Desktop, seccion VULN-019 despues, Discrepancia 8 (total compose 710 → 625; Trivy sin `--ignore-unfixed`, como el antes: `postgres` 197 → 115, 22 con parche en `stdlib` de gosu; `rabbitmq` 3 → 0; Mailpit, migrate y 4 imágenes de observabilidad sin cambios; la medición local de T30 contaba solo hallazgos con parche) | T30, T38 |
 | VULN-020 | `RealIP` de chi suplantable (GO-2026-5774/5775/5777) | govulncheck (`sca`) | run 35476102444 / informe §3 | `902a047` (T6; ficha corregida en la revisión de T32) | run 36283211113 / informe Desktop, seccion VULN-020 despues (govulncheck: no vulnerabilities found) | T6 |
 | VULN-021 | `golang-jwt/jwt/v4` (GO-2024-3250, GO-2025-3553) | govulncheck | run 35476102444 / informe §3 | `51a7a4f` | run 36208104969 / informe Desktop §3 | T23 |
 | VULN-022 | pgx 5.5.1 (GO-2024-2606) | govulncheck | run 35476102444 / informe §3 | `001a489` | run 36283211113 / informe Desktop, seccion VULN-022 despues (govulncheck: no vulnerabilities found) | T24 |
@@ -1192,7 +1192,7 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 - Commit: `bfd4233`
 
 ### T38 — Etiquetar el estado corregido
-- [ ] Estado · Ejecutor: `Usuario` · Cubre: ADR 0007 · Decisión pendiente
+- [x] Estado · Ejecutor: `Usuario` (con Claude, autorizado 2026-09-27) · Cubre: ADR 0007
 - Crear y subir el tag del estado corregido (sugerencia: `v0.1.0-hardened`; el nombre lo decide el usuario) y no tocar `v0.0.0-vuln-baseline`.
 - Verificación: `git ls-remote --tags origin`.
 - Decisión del Usuario (2026-09-27): el tag se crea **después** de mergear el PR de la fase 4, sobre el
@@ -1200,7 +1200,17 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
   `main`) y sobreviva a los cambios que pida la revisión del PR. Tras crearlo: lanzar
   `baseline-scan.yml` por `workflow_dispatch` con `ref` = el tag nuevo, para obtener el "después" de las
   imágenes del compose (VULN-019), con el prompt de Desktop en el momento de lanzarlo.
-- Commit: —
+- Hecho (2026-09-27). PR #3 mergeado con merge commit (`2ee59e2`, CI del PR 36329397019 en verde,
+  17/17). Tag anotado `v0.1.0-hardened` (nombre elegido por el Usuario) sobre `2ee59e2` y subido;
+  `git ls-remote --tags origin` lista `v0.0.0-vuln-baseline` (`053e15f`, intacto) y `v0.1.0-hardened`
+  (`2ee59e2`). `baseline-scan.yml` con `ref=v0.1.0-hardened`: run 36329751647, `success`. Resultado para
+  VULN-019 en `security/evidence/actions-36329751647/README.md`: `postgres` 197 → 115 y `rabbitmq` 3 → 0
+  con la misma metodología que el antes (sin `--ignore-unfixed`). Discrepancia aclarada, no ocultada: T30
+  midió en local solo hallazgos con parche ("0 en SO, 1 HIGH en gosu"); 93 de los 115 son del SO sin parche y
+  los 22 con parche son `stdlib` de Go en gosu (mismo digest que T30: avisos nuevos). VULN-019 sigue parcial.
+- [x] Evidencia (Usuario): captura "después" de VULN-019 en el informe Desktop (run 36329751647), confirmada el
+  2026-09-27 como "Discrepancia 8" (remediación parcial); `despues.captura` completado en su `evidencia.json`.
+- Commit: tag `v0.1.0-hardened` → `2ee59e2`
 
 ---
 
@@ -1212,8 +1222,8 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 | 1 — Contrato ejecutable | T1a, T1 a T3 (4) | 4 (T1a, T1, T2, T3) |
 | 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 20 (T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T14a, T15, T16, T17, T18, T19, T20, T21, T22) |
 | 3 — Remediación | T23 a T32 (10) | 10 (T23 a T32) |
-| 4 — Cierre | T33 a T38 y T34a, T34b (8) | 7 (T33, T34, T34a, T34b, T35, T36, T37) |
-| **Total** | **47** | **46** |
+| 4 — Cierre | T33 a T38 y T34a, T34b (8) | 8 (T33, T34, T34a, T34b, T35, T36, T37, T38) |
+| **Total** | **47** | **47** |
 
 Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, cookie) y `T14a`
 (enmienda ADR 0005, sin ventana de gracia). Los ids existentes no cambian.

@@ -1,0 +1,60 @@
+── debian:11-slim ──
+2026-09-27T15:35:46Z	WARN	Using severities from other vendors for some vulnerabilities. Read https://aquasecurity.github.io/trivy/v0.56/docs/scanner/vulnerability#severity-selection for details.
+2026-09-27T15:35:46Z	WARN	This OS version is no longer supported by the distribution	family="debian" version="11.11"
+2026-09-27T15:35:46Z	WARN	The vulnerability detection may be insufficient because security updates are not provided
+hallazgos HIGH/CRITICAL: 58
+── golang:1.22-bullseye ──
+2026-09-27T15:35:54Z	WARN	Using severities from other vendors for some vulnerabilities. Read https://aquasecurity.github.io/trivy/v0.56/docs/scanner/vulnerability#severity-selection for details.
+2026-09-27T15:35:54Z	WARN	This OS version is no longer supported by the distribution	family="debian" version="11.11"
+2026-09-27T15:35:54Z	WARN	The vulnerability detection may be insufficient because security updates are not provided
+hallazgos HIGH/CRITICAL: 1621
+── node:18-bullseye ──
+2026-09-27T15:36:03Z	WARN	Using severities from other vendors for some vulnerabilities. Read https://aquasecurity.github.io/trivy/v0.56/docs/scanner/vulnerability#severity-selection for details.
+2026-09-27T15:36:03Z	WARN	This OS version is no longer supported by the distribution	family="debian" version="11.11"
+2026-09-27T15:36:03Z	WARN	The vulnerability detection may be insufficient because security updates are not provided
+hallazgos HIGH/CRITICAL: 2110
+── nginx:latest ──
+2026-09-27T15:36:38Z	INFO	[debian] Detecting vulnerabilities...	os_version="13" pkg_num=151
+2026-09-27T15:36:38Z	INFO	Number of language-specific files	num=0
+2026-09-27T15:36:38Z	WARN	Using severities from other vendors for some vulnerabilities. Read https://aquasecurity.github.io/trivy/v0.56/docs/scanner/vulnerability#severity-selection for details.
+hallazgos HIGH/CRITICAL: 67
+── postgres@sha256:efedf3595f1d6f415c08568ba171029bf54052e754cc9f030e3f2412b21f3d67 ──
+2026-09-27T15:36:45Z	INFO	Number of language-specific files	num=1
+2026-09-27T15:36:45Z	INFO	[gobinary] Detecting vulnerabilities...
+2026-09-27T15:36:45Z	WARN	Using severities from other vendors for some vulnerabilities. Read https://aquasecurity.github.io/trivy/v0.56/docs/scanner/vulnerability#severity-selection for details.
+hallazgos HIGH/CRITICAL: 115
+── rabbitmq@sha256:ddc75301edf58a8332934cf2d801be7cbf8d65c6458d747364a8046238ff1c89 ──
+2026-09-27T15:36:48Z	INFO	Detected OS	family="ubuntu" version="24.04"
+2026-09-27T15:36:48Z	INFO	[ubuntu] Detecting vulnerabilities...	os_version="24.04" pkg_num=97
+2026-09-27T15:36:48Z	INFO	Number of language-specific files	num=0
+hallazgos HIGH/CRITICAL: 0
+── axllent/mailpit:v1.20 ──
+2026-09-27T15:36:50Z	WARN	Using severities from other vendors for some vulnerabilities. Read https://aquasecurity.github.io/trivy/v0.56/docs/scanner/vulnerability#severity-selection for details.
+2026-09-27T15:36:50Z	WARN	This OS version is no longer supported by the distribution	family="alpine" version="3.20.3"
+2026-09-27T15:36:50Z	WARN	The vulnerability detection may be insufficient because security updates are not provided
+hallazgos HIGH/CRITICAL: 69
+── migrate/migrate:v4.17.0 ──
+2026-09-27T15:36:51Z	WARN	Using severities from other vendors for some vulnerabilities. Read https://aquasecurity.github.io/trivy/v0.56/docs/scanner/vulnerability#severity-selection for details.
+2026-09-27T15:36:51Z	WARN	This OS version is no longer supported by the distribution	family="alpine" version="3.19.0"
+2026-09-27T15:36:51Z	WARN	The vulnerability detection may be insufficient because security updates are not provided
+hallazgos HIGH/CRITICAL: 65
+── prom/prometheus:v2.51.0 ──
+2026-09-27T15:36:54Z	INFO	Number of language-specific files	num=2
+2026-09-27T15:36:54Z	INFO	[gobinary] Detecting vulnerabilities...
+2026-09-27T15:36:54Z	WARN	Using severities from other vendors for some vulnerabilities. Read https://aquasecurity.github.io/trivy/v0.56/docs/scanner/vulnerability#severity-selection for details.
+hallazgos HIGH/CRITICAL: 112
+── grafana/loki:2.9.4 ──
+2026-09-27T15:36:56Z	WARN	Using severities from other vendors for some vulnerabilities. Read https://aquasecurity.github.io/trivy/v0.56/docs/scanner/vulnerability#severity-selection for details.
+2026-09-27T15:36:56Z	WARN	This OS version is no longer supported by the distribution	family="alpine" version="3.18.5"
+2026-09-27T15:36:56Z	WARN	The vulnerability detection may be insufficient because security updates are not provided
+hallazgos HIGH/CRITICAL: 59
+── grafana/alloy:v1.0.0 ──
+2026-09-27T15:37:01Z	WARN	Using severities from other vendors for some vulnerabilities. Read https://aquasecurity.github.io/trivy/v0.56/docs/scanner/vulnerability#severity-selection for details.
+2026-09-27T15:37:01Z	WARN	This OS version is no longer supported by the distribution	family="ubuntu" version="23.10"
+2026-09-27T15:37:01Z	WARN	The vulnerability detection may be insufficient because security updates are not provided
+hallazgos HIGH/CRITICAL: 79
+── grafana/grafana:10.4.0 ──
+2026-09-27T15:37:05Z	WARN	Using severities from other vendors for some vulnerabilities. Read https://aquasecurity.github.io/trivy/v0.56/docs/scanner/vulnerability#severity-selection for details.
+2026-09-27T15:37:05Z	WARN	This OS version is no longer supported by the distribution	family="alpine" version="3.19.1"
+2026-09-27T15:37:05Z	WARN	The vulnerability detection may be insufficient because security updates are not provided
+hallazgos HIGH/CRITICAL: 126
