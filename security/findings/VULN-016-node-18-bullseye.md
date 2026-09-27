@@ -8,10 +8,10 @@
 | **Componente** | `frontend/Dockerfile` (builder `node:18-bullseye`) |
 | **Amenaza** | AM-009 (dependencia comprometida en la cadena de suministro) |
 | **Sembrada** | sí |
-| **Evidencia antes** | `docs/evidencia/VULN-016/evidencia.json` |
+| **Evidencia antes** | `docs/evidencia/VULN-016/evidencia.json` — informe Desktop §3 VULN-016 |
 | **Commit de remediación** | `8f3d461` (T28) |
-| **Evidencia después** | `docs/evidencia/VULN-016/evidencia.json` (job "9-10" web, Trivy image: 0 vulnerabilidades) |
-| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35534898422 / https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36259385478 |
+| **Evidencia después** | `docs/evidencia/VULN-016/evidencia.json` (job "9-10" web, Trivy image: 0 vulnerabilidades) — informe Desktop, seccion VULN-016 despues |
+| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35534898422 / https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36283211113 |
 
 ## Evidencia
 

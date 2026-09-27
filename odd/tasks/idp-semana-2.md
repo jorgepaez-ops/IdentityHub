@@ -182,13 +182,13 @@ los archivos sembrados y fichas). Celdas vacías = aún no conocidas.
 | VULN-016 | `node:18-bullseye` | Trivy image sobre `node:18-bullseye` (por nombre) | run 35534898422 / informe §3 | `8f3d461` | run 36283211113 / informe Desktop, seccion VULN-016 despues (Trivy web: 0 vulnerabilidades) | T28 |
 | VULN-017 | `nginx:latest` | Hadolint DL3007 | run 35476102444 / informe §3 | `8f3d461` | run 36283211113 / informe Desktop, seccion VULN-017 despues (Hadolint job 2: sin hallazgos) | T28 |
 | VULN-018 | Imagen final del frontend como root | Trivy config DS002 (Hadolint no emite DL3002, D4) | run 35476102444 / informe §3 | `8f3d461` | run 36283211113 / informe Desktop, seccion VULN-018 despues (Trivy config frontend: 0 hallazgos) | T28 |
-| VULN-019 | Imágenes base antiguas en compose | Trivy image sobre las imágenes del compose (por nombre) | run 35534898422 / informe §3 | `824be7d` (parcial: solo `postgres`/`rabbitmq`) | sin gate en CI; run 36283211113 solo referencia (compose no escaneado) | T30 |
+| VULN-019 | Imágenes base antiguas en compose | Trivy image sobre las imágenes del compose (por nombre) | run 35534898422 / informe §3 | `824be7d` (parcial: solo `postgres`/`rabbitmq`; el resto sigue abierto) | evidencia local Trivy: `rabbitmq:4-management` total 0; `postgres:16-bookworm` 0 en SO, 1 HIGH en gosu fuera de nuestro control y 1 certificado de relleno Debian; Mailpit, migrate y 4 imágenes de observabilidad siguen abiertas/fuera de alcance T30 / sin captura (sin gate en CI; `baseline-scan.yml` espera T38; run 36283211113 solo referencia: compose no escaneado) | T30 |
 | VULN-020 | `RealIP` de chi suplantable (GO-2026-5774/5775/5777) | govulncheck (`sca`) | run 35476102444 / informe §3 | `902a047` (T6; ficha corregida en la revisión de T32) | run 36283211113 / informe Desktop, seccion VULN-020 despues (govulncheck: no vulnerabilities found) | T6 |
 | VULN-021 | `golang-jwt/jwt/v4` (GO-2024-3250, GO-2025-3553) | govulncheck | run 35476102444 / informe §3 | `51a7a4f` | run 36208104969 / informe Desktop §3 | T23 |
 | VULN-022 | pgx 5.5.1 (GO-2024-2606) | govulncheck | run 35476102444 / informe §3 | `001a489` | run 36283211113 / informe Desktop, seccion VULN-022 despues (govulncheck: no vulnerabilities found) | T24 |
 | VULN-023 | Reglas por defecto de Gitleaks insuficientes | comparación manual (ya `remediado`) | sin gate; sin run / sin captura | `8054f2e` (T31, `.gitleaksignore`) | run 36283211113 / informe Desktop, seccion VULN-023 despues (Gitleaks: no leaks found) | T31 (revisión) |
 | VULN-024 | Sin endurecimiento de contenedores (en el comentario del compose figura como VULN-020) | Ninguno hoy (Trivy config solo cubre los Dockerfiles, no el compose) | run 35476102444 (no detectado) / sin captura | `824be7d` | evidencia local / sin captura (sin gate; run_url nulo) | T30 |
-| VULN-025 | axios 0.21.1 / lodash 4.17.15 | npm audit (baseline-scan), osv-scanner (solo en `ci.yml`) | run 35476102444 / informe §3 | `534f13e` | run 36283211113 / informe Desktop, seccion VULN-025 despues (npm audit: 0; osv: filtered 1, no issues) | T25 |
+| VULN-025 | axios 0.21.1 / lodash 4.17.15 | npm audit (baseline-scan), osv-scanner (solo en `ci.yml`) | run 35476102444 / informe §3 | `534f13e` | tras T25: npm audit 15 (sin axios/lodash); run 36283211113 / informe Desktop, seccion VULN-025 despues (npm audit: 0; osv: filtered 1, no issues) | T25 |
 | VULN-026 | `golang.org/x/text` (GO-2026-5970) | govulncheck | run 35476102444 / informe §3 | `001a489` | run 36283211113 / informe Desktop, seccion VULN-026 despues (govulncheck: no vulnerabilities found) | T24 |
 | VULN-027 | dependencias de build/frontend desactualizadas: vite, minimatch, react-router, undici | npm audit, osv-scanner (`ci.yml`, job 5) | run 36259385478 / sin captura | `d149e59` | run 36283211113 / informe Desktop, seccion VULN-027 despues (npm audit: 0; osv: filtered 1, no issues) | T34a |
 | VULN-028 | `golang.org/x/crypto` 0.55.0 (GO-2026-6354, GO-2026-6355, GO-2026-5932) | osv-scanner v2.6.0 (`ci.yml`, job `5 · Dependencias vulnerables`) | run 36281691237 / informe Desktop | `98f5f98` | run 36283211113 / informe Desktop, seccion VULN-028 despues (CI 13/13 en verde) | T34b |
@@ -1163,6 +1163,10 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 - [ ] Estado · Ejecutor: `Codex` · Cubre: ADR 0007 · Remedia: — · Solo docs · Depende de: T35
 - En cada ficha: estado `remediado`, Commit de remediación (SHA real), Evidencia antes/después y Run de Actions; las 26 filas del registro (VULN-001 a VULN-026) coherentes con las 26 fichas.
 - Verificación: `git diff --stat` solo en `security/findings/**` y este archivo; `python3 scripts/traceability.py --check`.
+- **Pendiente de revisión (2026-09-26, sin commitear).** Se fusionó el contexto de HEAD con los datos nuevos de
+  las 29 fichas y filas: se conservaron referencias locales, alcances parciales, razones de ausencia de gate y
+  resultados de jobs; se corrigieron VULN-010/017 (Hadolint sí corre en job 2 de `ci.yml`) y VULN-025 (run final:
+  npm audit 0; las 15 eran el estado intermedio tras T25). Falta la revisión humana de este diff; T36 sigue abierta.
 - Commit:
 
 ### T37 — Revisión final, informe y bitácora

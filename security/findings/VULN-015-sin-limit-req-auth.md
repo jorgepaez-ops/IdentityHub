@@ -8,9 +8,9 @@
 | **Componente** | `frontend/nginx/default.conf` (sin línea reportada por el escáner) |
 | **Amenaza** | AM-001 (fuerza bruta sobre contraseñas) · AM-017 (Argon2id como amplificador) |
 | **Sembrada** | sí |
-| **Evidencia antes** | `docs/evidencia/VULN-015/evidencia.json` |
+| **Evidencia antes** | `docs/evidencia/VULN-015/evidencia.json` (`security/evidence/local-web-baseline.txt`) — sin captura |
 | **Commit de remediación** | `18dea33` (T29) |
-| **Evidencia después** | `docs/evidencia/VULN-015/evidencia.json` (`security/evidence/local-web-despues.txt`: `429` tras vaciarse el balde) |
+| **Evidencia después** | `docs/evidencia/VULN-015/evidencia.json` (`security/evidence/local-web-despues.txt`: `429` tras vaciarse el balde) — sin captura |
 | **Run de Actions (antes/después)** | — / — (sin gate; local, Q18) |
 
 ## Evidencia

@@ -8,9 +8,9 @@
 | **Componente** | `backend/internal/api/legacy_auth.go:30,66` |
 | **Amenaza** | AM-002 (robo de refresh token y uso paralelo) |
 | **Sembrada** | sí |
-| **Evidencia antes** | `docs/evidencia/VULN-004/evidencia.json` |
+| **Evidencia antes** | `docs/evidencia/VULN-004/evidencia.json` — informe Desktop §3 VULN-004 |
 | **Commit de remediación** | `51a7a4f` (T23) |
-| **Evidencia después** | `docs/evidencia/VULN-004/evidencia.json` (golangci-lint: "0 issues."; Code scanning #42 sigue "Open" en `main`, ver Discrepancia #6 del informe) |
+| **Evidencia después** | `docs/evidencia/VULN-004/evidencia.json` (golangci-lint: "0 issues."; Code scanning #42 sigue "Open" en `main`, ver Discrepancia #6 del informe) — informe Desktop §3 VULN-004 |
 | **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36208104969 |
 
 ## Evidencia

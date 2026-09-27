@@ -8,10 +8,10 @@
 | **Componente** | job `secrets` del pipeline |
 | **Amenaza** | AM-012 |
 | **Sembrada** | **NO** — hallazgo sobre la herramienta, no sobre la aplicación |
-| **Evidencia antes** | |
+| **Evidencia antes** | `docs/evidencia/VULN-023/evidencia.json` — sin captura |
 | **Commit de remediación** | `8054f2e` (T31, `.gitleaksignore`; las reglas propias de `.gitleaks.toml` ya estaban) |
-| **Evidencia después** | `docs/evidencia/VULN-023/evidencia.json` (job "3", `.gitleaksignore` de 26 huellas: "no leaks found") |
-| **Run de Actions (antes/después)** | — / https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36259385478 |
+| **Evidencia después** | `docs/evidencia/VULN-023/evidencia.json` (job "3", `.gitleaksignore` de 26 huellas: "no leaks found") — informe Desktop, seccion VULN-023 despues |
+| **Run de Actions (antes/después)** | — / https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36283211113 |
 
 ## Qué pasó
 

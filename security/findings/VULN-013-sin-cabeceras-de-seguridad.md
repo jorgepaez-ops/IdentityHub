@@ -8,9 +8,9 @@
 | **Componente** | `frontend/nginx/default.conf` (sin línea reportada por el escáner) |
 | **Amenaza** | AM-015 (XSS que roba el token del `localStorage`) |
 | **Sembrada** | sí |
-| **Evidencia antes** | `docs/evidencia/VULN-013/evidencia.json` |
+| **Evidencia antes** | `docs/evidencia/VULN-013/evidencia.json` (`security/evidence/local-web-baseline.txt`) — sin captura |
 | **Commit de remediación** | `18dea33` (T29) |
-| **Evidencia después** | `docs/evidencia/VULN-013/evidencia.json` (`security/evidence/local-web-despues.txt`: las cinco cabeceras presentes) |
+| **Evidencia después** | `docs/evidencia/VULN-013/evidencia.json` (`security/evidence/local-web-despues.txt`: las cinco cabeceras presentes) — sin captura |
 | **Run de Actions (antes/después)** | — / — (sin gate; local, Q18) |
 
 ## Evidencia

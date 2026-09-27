@@ -9,10 +9,10 @@
 | **Aviso** | GO-2024-2606 |
 | **Amenaza** | AM-006 (manipulación) |
 | **Sembrada** | parcialmente — la versión antigua sí; este aviso concreto, no |
-| **Evidencia antes** | `docs/evidencia/VULN-022/evidencia.json` |
+| **Evidencia antes** | `docs/evidencia/VULN-022/evidencia.json` — informe Desktop §3 VULN-022 |
 | **Commit de remediación** | `001a489` (T24) |
-| **Evidencia después** | `docs/evidencia/VULN-022/evidencia.json` (job "5", govulncheck: "No vulnerabilities found") |
-| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36259385478 |
+| **Evidencia después** | `docs/evidencia/VULN-022/evidencia.json` (job "5", govulncheck: "No vulnerabilities found") — informe Desktop, seccion VULN-022 despues |
+| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36283211113 |
 
 ## Evidencia
 

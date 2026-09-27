@@ -8,10 +8,10 @@
 | **Componente** | `backend/Dockerfile` (base `debian:11-slim`) |
 | **Amenaza** | AM-020 (escape de contenedor desde un proceso comprometido) |
 | **Sembrada** | sí |
-| **Evidencia antes** | `docs/evidencia/VULN-008/evidencia.json` |
+| **Evidencia antes** | `docs/evidencia/VULN-008/evidencia.json` — informe Desktop §3 VULN-008 |
 | **Commit de remediación** | `a0c64d6` (T27) |
-| **Evidencia después** | `docs/evidencia/VULN-008/evidencia.json` (job "9-10", Trivy image: 0 vulnerabilidades) |
-| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36259385478 |
+| **Evidencia después** | `docs/evidencia/VULN-008/evidencia.json` (job "9-10", Trivy image: 0 vulnerabilidades) — informe Desktop, seccion VULN-008 despues |
+| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36283211113 |
 
 ## Evidencia
 

@@ -8,10 +8,10 @@
 | **Componente** | `backend/internal/api/legacy_auth.go:38-45`, `deploy/docker-compose.yml`, `backend/Dockerfile` |
 | **Amenaza** | AM-012 (divulgación de información) |
 | **Sembrada** | sí |
-| **Evidencia antes** | |
+| **Evidencia antes** | `docs/evidencia/VULN-001/evidencia.json` — informe Desktop §3 VULN-001 |
 | **Commit de remediación** | `51a7a4f` (T23, `legacy_auth.go`); `afab4e9` (T26, `docker-compose.yml` y `Dockerfile`) — los tres componentes cierran |
-| **Evidencia después** | `docs/evidencia/VULN-001/evidencia.json` (job "3 · Secretos en el historial": "no leaks found") |
-| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36259385478 |
+| **Evidencia después** | `docs/evidencia/VULN-001/evidencia.json` (job "3 · Secretos en el historial": "no leaks found") — informe Desktop, seccion VULN-001 despues |
+| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36283211113 |
 
 ## Evidencia
 

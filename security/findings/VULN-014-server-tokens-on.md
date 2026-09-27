@@ -8,9 +8,9 @@
 | **Componente** | `frontend/nginx/default.conf` (sin línea reportada por el escáner) |
 | **Amenaza** | sin amenaza asociada en el modelo |
 | **Sembrada** | sí |
-| **Evidencia antes** | `docs/evidencia/VULN-014/evidencia.json` |
+| **Evidencia antes** | `docs/evidencia/VULN-014/evidencia.json` (`security/evidence/local-web-baseline.txt`) — sin captura |
 | **Commit de remediación** | `18dea33` (T29) |
-| **Evidencia después** | `docs/evidencia/VULN-014/evidencia.json` (`security/evidence/local-web-despues.txt`: `Server: nginx`, sin versión) |
+| **Evidencia después** | `docs/evidencia/VULN-014/evidencia.json` (`security/evidence/local-web-despues.txt`: `Server: nginx`, sin versión) — sin captura |
 | **Run de Actions (antes/después)** | — / — (sin gate; local, Q18) |
 
 ## Evidencia

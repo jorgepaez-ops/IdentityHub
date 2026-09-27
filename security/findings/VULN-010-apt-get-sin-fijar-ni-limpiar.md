@@ -8,10 +8,10 @@
 | **Componente** | `backend/Dockerfile:24,51,66` |
 | **Amenaza** | AM-020 (escape de contenedor desde un proceso comprometido) |
 | **Sembrada** | sí |
-| **Evidencia antes** | `docs/evidencia/VULN-010/evidencia.json` |
+| **Evidencia antes** | `docs/evidencia/VULN-010/evidencia.json` — informe Desktop §3 VULN-010 |
 | **Commit de remediación** | `a0c64d6` (T27) |
-| **Evidencia después** | `docs/evidencia/VULN-010/evidencia.json` (hadolint local, T27: limpio; `ci.yml` no corre Hadolint, confirmado por Desktop) |
-| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / — (sin gate de Hadolint en `ci.yml`; espera a `baseline-scan.yml` en T38) |
+| **Evidencia después** | `docs/evidencia/VULN-010/evidencia.json` (Hadolint local, T27: limpio; Hadolint en job 2 de `ci.yml`: sin hallazgos) — informe Desktop, seccion VULN-010 despues |
+| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36283211113 (Hadolint en job 2 de `ci.yml`: sin hallazgos; conserva evidencia local de T27) |
 
 ## Evidencia
 

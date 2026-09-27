@@ -9,10 +9,10 @@
 | **Avisos** | GHSA-67mh-4wv8-2f99 (esbuild); 3 ReDoS en `minimatch`; GHSA-wrjc-x8rr-h8h6 y GHSA-337j-9hxr-rhxg (react-router); 12 avisos de `undici` |
 | **Amenaza** | AM-009 (dependencia comprometida en la cadena de suministro) |
 | **Sembrada** | **NO** — hallazgo no previsto, igual que VULN-020 |
-| **Evidencia antes** | `docs/evidencia/VULN-027/evidencia.json` |
+| **Evidencia antes** | `docs/evidencia/VULN-027/evidencia.json` — sin captura |
 | **Commit de remediación** | `d149e59` (T34a) |
-| **Evidencia después** | `docs/evidencia/VULN-027/evidencia.json` (`npm audit`: 0 vulnerabilidades) |
-| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36259385478 / — (pendiente del próximo run de CI) |
+| **Evidencia después** | `docs/evidencia/VULN-027/evidencia.json` (`npm audit`: 0 vulnerabilidades) — informe Desktop, seccion VULN-027 despues |
+| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36259385478 / https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36283211113 (job 5: npm audit 0; osv-scanner filtra solo GO-2026-5932 aceptado) |
 
 ## Cómo apareció
 

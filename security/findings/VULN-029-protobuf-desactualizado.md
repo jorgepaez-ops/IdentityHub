@@ -9,9 +9,9 @@
 | **Avisos** | GO-2024-2611 / GHSA-8r3f-844c-mc37 (CVE-2024-24786), corregido en 1.33.0 |
 | **Amenaza** | AM-009 (dependencia comprometida en la cadena de suministro) |
 | **Sembrada** | no — hallazgo nuevo detectado al actualizar el escáner |
-| **Evidencia antes** | `docs/evidencia/VULN-029/evidencia.json` |
+| **Evidencia antes** | `docs/evidencia/VULN-029/evidencia.json` — informe Desktop §VULN-029 antes |
 | **Commit de remediación** | `98f5f98` (T34b) |
-| **Evidencia después** | run 36283211113 (CI 13/13 en verde) |
+| **Evidencia después** | run 36283211113 (CI 13/13 en verde) — informe Desktop, seccion VULN-029 despues |
 | **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36281691237 / https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36283211113 |
 
 ## Evidencia

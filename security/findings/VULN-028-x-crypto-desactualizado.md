@@ -9,9 +9,9 @@
 | **Avisos** | GO-2026-6354 (CVE-2026-78662, corregido en 0.56.0); GO-2026-6355 (CVE-2026-56855, corregido en 0.56.0); GO-2026-5932 (sin versión corregida, riesgo aceptado) |
 | **Amenaza** | AM-009 (dependencia comprometida en la cadena de suministro) |
 | **Sembrada** | no — hallazgo nuevo detectado al actualizar el escáner |
-| **Evidencia antes** | `docs/evidencia/VULN-028/evidencia.json` |
+| **Evidencia antes** | `docs/evidencia/VULN-028/evidencia.json` — informe Desktop §VULN-028 antes |
 | **Commit de remediación** | `98f5f98` (T34b) |
-| **Evidencia después** | run 36283211113 (CI 13/13 en verde) |
+| **Evidencia después** | run 36283211113 (CI 13/13 en verde) — informe Desktop, seccion VULN-028 despues |
 | **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36281691237 / https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36283211113 |
 
 ## Evidencia

@@ -8,10 +8,10 @@
 | **Componente** | `backend/go.mod`: golang.org/x/text@v0.14.0 |
 | **Amenaza** | AM-009 (dependencia comprometida en la cadena de suministro) |
 | **Sembrada** | sí |
-| **Evidencia antes** | `docs/evidencia/VULN-026/evidencia.json` |
+| **Evidencia antes** | `docs/evidencia/VULN-026/evidencia.json` — informe Desktop §3 VULN-026 |
 | **Commit de remediación** | `001a489` (T24) |
-| **Evidencia después** | `docs/evidencia/VULN-026/evidencia.json` (job "5", govulncheck: "No vulnerabilities found") |
-| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36259385478 |
+| **Evidencia después** | `docs/evidencia/VULN-026/evidencia.json` (job "5", govulncheck: "No vulnerabilities found") — informe Desktop, seccion VULN-026 despues |
+| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36283211113 |
 
 ## Evidencia
 

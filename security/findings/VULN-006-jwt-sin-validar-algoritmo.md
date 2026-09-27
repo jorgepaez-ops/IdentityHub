@@ -8,9 +8,9 @@
 | **Componente** | `backend/internal/api/legacy_auth.go` (sin línea reportada por el escáner) |
 | **Amenaza** | AM-003 (falsificación de JWT con `alg: none` o cambio a HS256) |
 | **Sembrada** | sí |
-| **Evidencia antes** | `docs/evidencia/VULN-006/evidencia.json` |
+| **Evidencia antes** | `docs/evidencia/VULN-006/evidencia.json` — informe Desktop §3 VULN-005/006/007 (no aparecen) |
 | **Commit de remediación** | `51a7a4f` (T23) |
-| **Evidencia después** | `docs/evidencia/VULN-006/evidencia.json` (sin gate propio; evidencia por diff del commit; de paso, alerta CodeQL #81 go/log-injection sigue "Open" en `main`, Discrepancia #6) |
+| **Evidencia después** | `docs/evidencia/VULN-006/evidencia.json` (sin gate propio; evidencia por diff del commit; de paso, alerta CodeQL #81 go/log-injection sigue "Open" en `main`, Discrepancia #6) — informe Desktop §3 VULN-005/006/007 |
 | **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / — (evidencia por commit, no por run) |
 
 ## Evidencia

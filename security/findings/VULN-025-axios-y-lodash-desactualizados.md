@@ -8,10 +8,10 @@
 | **Componente** | `frontend/package.json`: axios@0.21.1, lodash@4.17.15 |
 | **Amenaza** | AM-009 (dependencia comprometida en la cadena de suministro) |
 | **Sembrada** | sí |
-| **Evidencia antes** | `docs/evidencia/VULN-025/evidencia.json` |
+| **Evidencia antes** | `docs/evidencia/VULN-025/evidencia.json` — informe Desktop §3 VULN-025 |
 | **Commit de remediación** | `534f13e` (T25) |
-| **Evidencia después** | `docs/evidencia/VULN-025/evidencia.json` (job "5", npm audit: 15 vulnerabilidades, sin axios/lodash) |
-| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36259385478 |
+| **Evidencia después** | `docs/evidencia/VULN-025/evidencia.json` (tras T25: npm audit 15 vulnerabilidades, sin axios/lodash; run 36283211113: npm audit 0, osv-scanner filtered 1, no issues) — informe Desktop, seccion VULN-025 despues |
+| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35476102444 / https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36283211113 |
 
 ## Evidencia
 

@@ -3,15 +3,15 @@
 | | |
 |---|---|
 | **Severidad** | CRITICAL y HIGH |
-| **Estado** | en remediación |
+| **Estado** | remediado parcialmente: solo `postgres` y `rabbitmq`; el resto sigue abierto |
 | **Detectado por** | Trivy image sobre las imágenes del compose (baseline-scan) |
 | **Componente** | `deploy/docker-compose.yml` (imágenes declaradas) |
 | **Amenaza** | AM-009 (dependencia comprometida en la cadena de suministro) |
 | **Sembrada** | sí |
-| **Evidencia antes** | `docs/evidencia/VULN-019/evidencia.json` |
+| **Evidencia antes** | `docs/evidencia/VULN-019/evidencia.json` — informe Desktop §3 VULN-019 |
 | **Commit de remediación** | `824be7d` (T30, solo `postgres` y `rabbitmq`; el resto sigue abierto) |
-| **Evidencia después** | `docs/evidencia/VULN-019/evidencia.json` (Trivy image local: `rabbitmq:4-management` 0; `postgres:16-bookworm` 0 en SO, parcial) |
-| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35534898422 / — (`baseline-scan.yml` solo corre sobre el tag; espera a T38) |
+| **Evidencia después** | `docs/evidencia/VULN-019/evidencia.json` (Trivy local: `rabbitmq:4-management` total 0; `postgres:16-bookworm` 0 en SO, 1 HIGH en gosu fuera de nuestro control y 1 certificado de relleno Debian; Mailpit, migrate y las 4 imágenes de observabilidad siguen abiertas/fuera de alcance T30) — sin captura |
+| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35534898422 / — (`baseline-scan.yml` solo corre sobre el tag; espera a T38); `ci.yml` no escanea las imágenes de infraestructura del compose |
 
 ## Evidencia
 
