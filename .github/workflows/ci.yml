@@ -233,12 +233,25 @@ jobs:
           npm install --package-lock-only
           npm audit --audit-level=high
 
+      # v1.9.0 traía Go 1.22.7 embebido: el análisis de alcanzabilidad (govulncheck)
+      # fallaba porque backend/go.mod exige >= 1.25.0, y el escáner degradaba a listar
+      # cada advisory de go.mod sin filtrar (ruido, incluida toda la stdlib). v2.6.0
+      # trae Go 1.27.1 embebido (ya cumple el mínimo) y además fija GOTOOLCHAIN=auto
+      # en su propio action.yml, igual que el reusable workflow oficial, por si un
+      # futuro `go` del módulo supera la versión embebida. El análisis de llamadas de
+      # Go viene activado por defecto (no hace falta --call-analysis=go); lo que no se
+      # invoca se marca "called": false en vez de fallar. --skip-git ya no existe en
+      # v2 (el root del repo se excluye por defecto salvo --include-git-root, mismo
+      # efecto). --all-vulns evita que el formato tabla por defecto oculte los
+      # hallazgos no invocados: sin ese flag el paso queda en verde sin listar nada.
       - name: osv-scanner
-        uses: google/osv-scanner-action/osv-scanner-action@v1.9.0
+        uses: google/osv-scanner-action/osv-scanner-action@a345acffa64b0eaede81a3d9aae6141214d9c8fc # v2.6.0
+        env:
+          GOTOOLCHAIN: auto
         with:
           scan-args: |-
             --recursive
-            --skip-git
+            --all-vulns
             ./
 
   # ── 6. Pruebas unitarias ────────────────────────────────────────────────
