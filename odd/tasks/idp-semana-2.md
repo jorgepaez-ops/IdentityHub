@@ -1144,7 +1144,7 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 - Evidencia (`Usuario`):  - [ ] VULN-028  - [ ] VULN-029 ("antes" capturado en el informe, run 36281691237; falta el "después")
 
 ### T35 — CI en verde y evidencia "después"
-- [ ] Estado · Ejecutor: `Usuario` con Claude Desktop (PR, run, capturas en el informe) y `Claude` (completa los `evidencia.json`) · Cubre: todos los VULN de la Fase 3 · Bloqueada por: T34a, T34b
+- [x] Estado · Ejecutor: `Usuario` con Claude Desktop (PR, run, capturas en el informe) y `Claude` (completa los `evidencia.json`) · Cubre: todos los VULN de la Fase 3 · Bloqueada por: T34a, T34b
 - Abrir PR (o `workflow_dispatch`) con la rama; `CI` en verde. Registrar run ID/URL "después" en
   el "Registro de evidencia" y, como texto, en cada `evidencia.json` (`despues`, lo completa Claude con los
   datos que entrega Desktop); las capturas "después" van al informe externo (sin secretos). Prompt de Desktop
@@ -1153,7 +1153,11 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
   sin nota; Actions muestra `CI` en verde sobre el SHA final; el usuario confirma las capturas en el informe.
 - **Progreso 2026-09-26.** El run 36280742280 falló en los jobs 3, 5 y 6. El commit `6c1f6f2` corrigió el job 6 (`NODE_VERSION` 24) y el job 3 (dos falsos positivos de Gitleaks). El commit `9820635` actualizó osv-scanner a v2.6.0, fijado por SHA del tag, con `--all-vulns`; el run 36281691237 es la evidencia "antes" de VULN-028 y VULN-029.
 - **Progreso 2026-09-26 (después).** El run verde `36283211113` sobre `59cf8cf` (`workflow_dispatch`, rama `feat/idp-semana-2`) terminó con 13/13 jobs en verde. El usuario confirmó 12 capturas nuevas en Claude Desktop; Hadolint quedó confirmado en el job 2.
-- Commit: —
+- Cierre 2026-09-26: run final 36284740966 sobre `d704178` en verde (13/13), confirma el SHA final tras
+  los commits de evidencia. Evidencia "después" de las VULN con gate: run 36283211113 (capturas de
+  Desktop confirmadas por el usuario). 29 `evidencia.json` válidos; 9 con `run_url` nulo, todos con nota
+  (sin gate en CI). Commits: `6c1f6f2`, `9820635`, `0de04ec`, `d704178` (T34b aparte).
+- Commit: `d704178`
 
 ### T36 — Fichas actualizadas
 - [ ] Estado · Ejecutor: `Codex` · Cubre: ADR 0007 · Remedia: — · Solo docs · Depende de: T35
@@ -1182,8 +1186,8 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 | 1 — Contrato ejecutable | T1a, T1 a T3 (4) | 4 (T1a, T1, T2, T3) |
 | 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 20 (T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T14a, T15, T16, T17, T18, T19, T20, T21, T22) |
 | 3 — Remediación | T23 a T32 (10) | 10 (T23 a T32) |
-| 4 — Cierre | T33 a T38 y T34a, T34b (8) | 4 (T33, T34, T34a, T34b) |
-| **Total** | **47** | **43** |
+| 4 — Cierre | T33 a T38 y T34a, T34b (8) | 5 (T33, T34, T34a, T34b, T35) |
+| **Total** | **47** | **44** |
 
 Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, cookie) y `T14a`
 (enmienda ADR 0005, sin ventana de gracia). Los ids existentes no cambian.
