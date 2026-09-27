@@ -256,7 +256,7 @@ Ninguna: P1 a P4 resueltas en D8 a D11.
     `registration` y `SetRegistrationService` de `Server` quedaron sin uso: los limpia T5.
     (GGA marcó FAILED en una primera pasada por ese hallazgo preexistente y PASSED al repetirla:
     su veredicto no es determinista.)
-- Commit: —
+- Commit: `9523f27`
 
 ## Fase 1 — Backend
 
