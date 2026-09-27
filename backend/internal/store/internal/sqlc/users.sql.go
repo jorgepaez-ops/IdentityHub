@@ -31,43 +31,6 @@ func (q *Queries) AddUserRole(ctx context.Context, arg AddUserRoleParams) error 
 	return err
 }
 
-const consumeEmailVerificationToken = `-- name: ConsumeEmailVerificationToken :one
-WITH consumed AS (
-    UPDATE verification_tokens
-    SET used_at = now()
-    WHERE token_hash = $1
-      AND purpose = 'email_verification'
-      AND used_at IS NULL
-      AND expires_at > now()
-    RETURNING user_id
-)
-UPDATE users
-SET status = 'active', updated_at = now()
-WHERE id = (SELECT user_id FROM consumed)
-  AND status = 'pending_verification'
-RETURNING id, email, password_hash, display_name, status, mfa_enabled, mfa_secret_enc, failed_login_count, locked_until, last_login_at, created_at, updated_at
-`
-
-func (q *Queries) ConsumeEmailVerificationToken(ctx context.Context, tokenHash []byte) (User, error) {
-	row := q.db.QueryRow(ctx, consumeEmailVerificationToken, tokenHash)
-	var i User
-	err := row.Scan(
-		&i.ID,
-		&i.Email,
-		&i.PasswordHash,
-		&i.DisplayName,
-		&i.Status,
-		&i.MfaEnabled,
-		&i.MfaSecretEnc,
-		&i.FailedLoginCount,
-		&i.LockedUntil,
-		&i.LastLoginAt,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
 const consumeInvitationToken = `-- name: ConsumeInvitationToken :one
 WITH consumed AS (
     UPDATE verification_tokens
@@ -92,8 +55,8 @@ type ConsumeInvitationTokenParams struct {
 
 // Consumes a one-time invitation token and, in the same statement, sets the
 // password the invitee just chose and activates the account (T5, RF-002).
-// Shares the verification_tokens table with ConsumeEmailVerificationToken but
-// never accepts the other purpose's token (invariant 7).
+// Shares the verification_tokens table with other token purposes but never
+// accepts a token whose purpose is not invitation (invariant 7).
 func (q *Queries) ConsumeInvitationToken(ctx context.Context, arg ConsumeInvitationTokenParams) (User, error) {
 	row := q.db.QueryRow(ctx, consumeInvitationToken, arg.TokenHash, arg.PasswordHash)
 	var i User
@@ -186,22 +149,6 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.UpdatedAt,
 	)
 	return i, err
-}
-
-const createVerificationToken = `-- name: CreateVerificationToken :exec
-INSERT INTO verification_tokens (user_id, token_hash, purpose, expires_at)
-VALUES ($1, $2, 'email_verification', $3)
-`
-
-type CreateVerificationTokenParams struct {
-	UserID    uuid.UUID
-	TokenHash []byte
-	ExpiresAt pgtype.Timestamptz
-}
-
-func (q *Queries) CreateVerificationToken(ctx context.Context, arg CreateVerificationTokenParams) error {
-	_, err := q.db.Exec(ctx, createVerificationToken, arg.UserID, arg.TokenHash, arg.ExpiresAt)
-	return err
 }
 
 const deleteUserRoles = `-- name: DeleteUserRoles :exec
@@ -321,6 +268,26 @@ func (q *Queries) GetUserByIDForUpdate(ctx context.Context, id uuid.UUID) (User,
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const invitationTokenIsUsable = `-- name: InvitationTokenIsUsable :one
+SELECT EXISTS (
+    SELECT 1
+    FROM verification_tokens
+    WHERE token_hash = $1
+      AND purpose = 'invitation'
+      AND used_at IS NULL
+      AND expires_at > now()
+) AS token_is_usable
+`
+
+// This cheap read prevents password hashing for invalid public invitation
+// tokens. ConsumeInvitationToken remains the atomic source of truth.
+func (q *Queries) InvitationTokenIsUsable(ctx context.Context, tokenHash []byte) (bool, error) {
+	row := q.db.QueryRow(ctx, invitationTokenIsUsable, tokenHash)
+	var token_is_usable bool
+	err := row.Scan(&token_is_usable)
+	return token_is_usable, err
 }
 
 const listAdminUsers = `-- name: ListAdminUsers :many

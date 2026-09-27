@@ -14,8 +14,10 @@ import (
 )
 
 type fakeRepository struct {
-	writer    *fakeWriter
-	committed bool
+	writer                *fakeWriter
+	committed             bool
+	invitationUnavailable bool
+	invitationCheckErr    error
 }
 type fakeWriter struct {
 	user        store.User
@@ -33,6 +35,9 @@ func (r *fakeRepository) WithinInvitationAcceptanceTransaction(_ context.Context
 	}
 	r.committed = true
 	return nil
+}
+func (r *fakeRepository) InvitationTokenIsUsable(_ context.Context, _ []byte) (bool, error) {
+	return !r.invitationUnavailable, r.invitationCheckErr
 }
 func (w *fakeWriter) ConsumeInvitationToken(_ context.Context, params store.ConsumeInvitationTokenParams) (store.User, error) {
 	w.consumed++
@@ -119,11 +124,36 @@ func TestRF002_LaInvitacionEsDeUnSoloUso(t *testing.T) {
 	}
 }
 
-func TestRF002_TokenExpiradoDevuelve410(t *testing.T) {
-	repo := &fakeRepository{writer: &fakeWriter{consumeErr: ErrTokenInvalid}}
-	err := New(repo, &fakePublisher{}, &fakeHasher{}).Accept(context.Background(), Input{Token: "expired-token", Password: "correct horse battery"})
+func TestRF002_TokenInvalidoNoCalculaHash(t *testing.T) {
+	repo := &fakeRepository{writer: &fakeWriter{}, invitationUnavailable: true}
+	hasher := &fakeHasher{}
+	err := New(repo, &fakePublisher{}, hasher).Accept(context.Background(), Input{
+		Token:    base64.RawURLEncoding.EncodeToString([]byte("unknown-invitation-token")),
+		Password: "correct horse battery",
+	})
 	if !errors.Is(err, ErrTokenInvalid) {
 		t.Fatalf("Accept() error = %v, want ErrTokenInvalid", err)
+	}
+	if hasher.calls != 0 {
+		t.Fatalf("hasher calls = %d, want 0 for an invalid token", hasher.calls)
+	}
+	if repo.writer.consumed != 0 {
+		t.Fatal("token was consumed after the cheap precheck rejected it")
+	}
+}
+
+func TestRF002_TokenValidoCalculaHashExactamenteUnaVez(t *testing.T) {
+	repo := &fakeRepository{writer: &fakeWriter{user: store.User{ID: uuid.New(), Email: "ada@example.com", DisplayName: "Ada", Status: "active"}}}
+	hasher := &fakeHasher{}
+	err := New(repo, &fakePublisher{}, hasher).Accept(context.Background(), Input{
+		Token:    base64.RawURLEncoding.EncodeToString([]byte("valid-invitation-token")),
+		Password: "correct horse battery",
+	})
+	if err != nil {
+		t.Fatalf("Accept() error = %v", err)
+	}
+	if hasher.calls != 1 {
+		t.Fatalf("hasher calls = %d, want exactly 1 for a valid token", hasher.calls)
 	}
 }
 

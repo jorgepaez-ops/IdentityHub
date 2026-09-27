@@ -1,7 +1,6 @@
 // Package invitation implements the one-time invitation-acceptance use case
-// (T5, RF-002). It mirrors internal/auth/verification's shape (same
-// hash-only, single-use token consumption pattern) but also sets the
-// Argon2id password hash the invitee chooses, since D9 folded email
+// (T5, RF-002). It uses a hash-only, single-use token-consumption pattern and
+// sets the Argon2id password hash the invitee chooses, since D9 folded email
 // verification into invitation acceptance.
 package invitation
 
@@ -33,6 +32,7 @@ type Publisher interface {
 	Publish(context.Context, string, any) error
 }
 type Repository interface {
+	InvitationTokenIsUsable(context.Context, []byte) (bool, error)
 	WithinInvitationAcceptanceTransaction(context.Context, func(store.InvitationAcceptanceWriter) error) error
 }
 
@@ -76,6 +76,13 @@ func (s *Service) Accept(ctx context.Context, input Input) error {
 		return ErrTokenInvalid
 	}
 	tokenHash := sha256.Sum256(raw)
+	usable, err := s.repository.InvitationTokenIsUsable(ctx, tokenHash[:])
+	if err != nil {
+		return fmt.Errorf("check invitation token: %w", err)
+	}
+	if !usable {
+		return ErrTokenInvalid
+	}
 	passwordHash, err := s.hasher.Hash(input.Password)
 	if err != nil {
 		return fmt.Errorf("hash password: %w", err)

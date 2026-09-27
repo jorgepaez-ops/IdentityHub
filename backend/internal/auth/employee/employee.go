@@ -1,9 +1,8 @@
 // Package employee implements the admin-only account-creation-plus-invitation
 // use case (T5, RF-001, D6/D9). D9 retired public self-registration; an
 // employee account can only be created by an administrator, who never sets
-// or learns its password. This mirrors internal/auth/registration's shape
-// (same Argon2id hasher, event-publish, and hash-only-token pattern) since
-// D9 says that self-registration logic is reused here.
+// or learns its password. It uses the same Argon2id, event-publish, and
+// hash-only-token patterns as the rest of the authentication core.
 package employee
 
 import (

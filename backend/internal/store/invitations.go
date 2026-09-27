@@ -22,8 +22,19 @@ type InvitationAcceptanceWriter interface {
 	InsertAuditEvent(context.Context, InsertAuditEventParams) (AuditEvent, error)
 }
 
+// InvitationTokenIsUsable cheaply checks whether an invitation can still be
+// accepted. The subsequent consume operation remains authoritative because the
+// token may change state between this read and the transaction.
+func (s *Store) InvitationTokenIsUsable(ctx context.Context, tokenHash []byte) (bool, error) {
+	usable, err := s.queries.InvitationTokenIsUsable(ctx, tokenHash)
+	if err != nil {
+		return false, fmt.Errorf("check invitation token: %w", err)
+	}
+	return usable, nil
+}
+
 // WithinInvitationAcceptanceTransaction runs invitation-acceptance writes in
-// one PostgreSQL transaction, mirroring WithinEmailVerificationTransaction.
+// one PostgreSQL transaction.
 func (s *Store) WithinInvitationAcceptanceTransaction(ctx context.Context, fn func(InvitationAcceptanceWriter) error) error {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {

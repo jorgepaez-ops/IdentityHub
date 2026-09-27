@@ -10,8 +10,8 @@ declaración de buenas intenciones.
 
 | Requisito | Título | Pri | Operaciones de la API | Escenarios | Pruebas Go | E2E | Estado |
 |---|---|---|---|---|---|---|---|
-| **RF-001** | Alta de empleados por administración | P0 | `createEmployee` | 3 | 28 | — | ✅ completo |
-| **RF-002** | Aceptación de invitación y verificación de correo | P0 | `acceptInvitation` | 3 | 17 | — | ✅ completo |
+| **RF-001** | Alta de empleados por administración | P0 | `createEmployee` | 3 | 23 | — | ✅ completo |
+| **RF-002** | Aceptación de invitación y verificación de correo | P0 | `acceptInvitation` | 3 | 15 | — | ✅ completo |
 | **RF-003** | Inicio de sesión | P0 | `login` | 2 | 10 | — | ✅ completo |
 | **RF-004** | Emisión y validación de JWT | P0 | `getJwks` | 1 | 8 | — | ✅ completo |
 | **RF-005** | Renovación de sesión | P0 | `refreshSession` | 1 | 7 | — | ✅ completo |
@@ -41,7 +41,7 @@ declaración de buenas intenciones.
 | **RNF-009** | Cabeceras de seguridad | P0 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-010** | Latencia | P1 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-011** | Los specs son la fuente de verdad | P0 | — | — | 4 | — | 🟡 parcial |
-| **RNF-012** | Logs sin datos sensibles | P0 | — | — | 4 | — | 🟡 parcial |
+| **RNF-012** | Logs sin datos sensibles | P0 | — | — | 3 | — | 🟡 parcial |
 
 **Resumen:** 32 requisitos · 12 completos · 6 parciales · 7 sin cubrir · 7 diferidos (semana 3).
 

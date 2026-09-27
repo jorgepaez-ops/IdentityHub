@@ -11,9 +11,8 @@ import (
 )
 
 // CreateInvitationTokenParams contains an invitation-purpose token hash
-// (T5, RF-001/RF-002). It shares the verification_tokens table with
-// CreateVerificationTokenParams but is always written with purpose
-// 'invitation', never 'email_verification'.
+// (T5, RF-001/RF-002). It is always written with purpose 'invitation', never
+// 'email_verification'.
 type CreateInvitationTokenParams struct {
 	UserID    uuid.UUID
 	TokenHash []byte
@@ -33,7 +32,7 @@ type EmployeeCreationWriter interface {
 
 // WithinEmployeeCreationTransaction runs every employee-creation write in one
 // PostgreSQL transaction. A publisher-confirm failure returned by fn rolls it
-// back, exactly like WithinRegistrationTransaction.
+// back, preserving the all-or-nothing employee creation invariant.
 func (s *Store) WithinEmployeeCreationTransaction(ctx context.Context, fn func(EmployeeCreationWriter) error) error {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {

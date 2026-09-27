@@ -55,35 +55,27 @@ SELECT $1, id, $3
 FROM roles
 WHERE name = $2;
 
--- name: CreateVerificationToken :exec
-INSERT INTO verification_tokens (user_id, token_hash, purpose, expires_at)
-VALUES ($1, $2, 'email_verification', $3);
-
--- name: ConsumeEmailVerificationToken :one
-WITH consumed AS (
-    UPDATE verification_tokens
-    SET used_at = now()
-    WHERE token_hash = $1
-      AND purpose = 'email_verification'
-      AND used_at IS NULL
-      AND expires_at > now()
-    RETURNING user_id
-)
-UPDATE users
-SET status = 'active', updated_at = now()
-WHERE id = (SELECT user_id FROM consumed)
-  AND status = 'pending_verification'
-RETURNING *;
-
 -- name: CreateInvitationToken :exec
 INSERT INTO verification_tokens (user_id, token_hash, purpose, expires_at)
 VALUES ($1, $2, 'invitation', $3);
 
+-- name: InvitationTokenIsUsable :one
+-- This cheap read prevents password hashing for invalid public invitation
+-- tokens. ConsumeInvitationToken remains the atomic source of truth.
+SELECT EXISTS (
+    SELECT 1
+    FROM verification_tokens
+    WHERE token_hash = $1
+      AND purpose = 'invitation'
+      AND used_at IS NULL
+      AND expires_at > now()
+) AS token_is_usable;
+
 -- name: ConsumeInvitationToken :one
 -- Consumes a one-time invitation token and, in the same statement, sets the
 -- password the invitee just chose and activates the account (T5, RF-002).
--- Shares the verification_tokens table with ConsumeEmailVerificationToken but
--- never accepts the other purpose's token (invariant 7).
+-- Shares the verification_tokens table with other token purposes but never
+-- accepts a token whose purpose is not invitation (invariant 7).
 WITH consumed AS (
     UPDATE verification_tokens
     SET used_at = now()
