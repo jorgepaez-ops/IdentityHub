@@ -1094,6 +1094,51 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 - Alcance: subir `golang.org/x/crypto` a 0.56.0 o superior y `google.golang.org/protobuf` a 1.33.0 o superior mediante `go get` y `go mod tidy`. Para GO-2026-5932, identificar el subpaquete e importaciones afectadas y su alcanzabilidad; después decidir con el usuario entre eliminarlo o documentar y aceptar el riesgo.
 - Criterios: `osv-scanner` v2.6.0 con `--all-vulns` termina en 0 o deja únicamente un riesgo aceptado y documentado; `govulncheck` limpio; `make test` y `make lint` en verde.
 - Verificación: `osv-scanner --recursive --all-vulns`; `cd backend && govulncheck ./...`; `make test`; `make lint`.
+- **Trabajo hecho 2026-09-26 (Claude, pendiente commit y confirmación en CI):** `golang.org/x/crypto`
+  0.55.0 → 0.56.0 (corrige GO-2026-6354 y GO-2026-6355) y `google.golang.org/protobuf` 1.31.0 →
+  1.36.12 (corrige GO-2024-2611), ambos con `go get` + `go mod tidy` desde `backend/`. `protobuf`
+  llega como indirecta de `github.com/prometheus/client_golang` (`go mod why -m`:
+  `internal/observability` → `prometheus/client_golang` → `protobuf/proto`; también la piden
+  `prometheus/client_model` y `prometheus/common`); como ya estaba fijada explícita en `go.mod`, se
+  subió directo sin tocar `client_golang`. GO-2026-5932 (`x/crypto/openpgp` y subpaquetes, sin
+  versión corregida): confirmado con `go list -deps ./...` que ningún paquete propio ni dependencia
+  lo importa; osv-scanner y govulncheck lo marcan no alcanzable — riesgo aceptado y documentado en
+  la ficha VULN-028 e ignorado solo a él en `backend/osv-scanner.toml`
+  (`ignoreUntil = 2026-12-25`, ~90 días). Efecto colateral no evitable: `x/crypto` >= 0.56.0 declara
+  `go 1.26.0` en su propio `go.mod`, así que la directiva `go` del módulo subió de 1.25.0 a 1.26.0
+  (MVS).
+  **Seguimiento 2026-09-26, mismo día (autorizado por el usuario):** el primer cierre dejó
+  `backend/Dockerfile` y `GO_VERSION` de `ci.yml` sin tocar (fuera del alcance original de T34b) y
+  dependiendo de `GOTOOLCHAIN=auto` para descargar un toolchain 1.26.0 al vuelo. El orquestador
+  probó `docker build` de la imagen `api`/`worker` y confirmó que rompe: la imagen oficial
+  `golang` fija `GOTOOLCHAIN=local`, así que no hay descarga automática dentro del build, y
+  descargarla ahí además habría roto el endurecimiento de imagen fijada por digest de T27. El
+  usuario autorizó mover el proyecto a Go 1.26 de una vez (ver Q11, amendment 2026-09-26) y se
+  completó: `backend/Dockerfile` → `golang:1.26-bookworm` fijada por digest
+  (`sha256:a688600ca24f8a4d3ca77f95b0dd40704a9fc787c826660eb7ba0b641b8b175d`, re-verificado con
+  `docker buildx imagetools inspect golang:1.26-bookworm`, resuelve a `1.26.8-bookworm`);
+  `ci.yml` → `GO_VERSION: "1.26"` y comentarios de Q11/golangci-lint/osv-scanner actualizados;
+  comentario de cabecera de `go.mod` corregido (ya no dice que depende de `GOTOOLCHAIN=auto`).
+  `scheduled-scan.yml` sigue en `go-version: "1.25"` — no se tocó (no estaba en el alcance pedido
+  por el orquestador) y queda anotado como hallazgo pendiente. `baseline-scan.yml` sigue en
+  `golang:1.22-bullseye` a propósito (analiza el tag de la línea base vulnerable, VULN-008, no el
+  código actual) — no se toca.
+  Verificación observada: `docker run ... osv-scanner-action:v2.6.0 --recursive --all-vulns ./`
+  desde la raíz → exit 0, "No issues found", `GO-2026-5932 has been filtered out` (único filtrado).
+  `cd backend && govulncheck ./...` → "No vulnerabilities found" en el código propio (1 vuln no
+  alcanzable en módulos requeridos, la aceptada). `make test` → todos los paquetes Go en verde
+  (`go test -race`) y frontend en verde. `make lint` → `go vet` 0 issues, `golangci-lint` 0 issues,
+  `eslint` en verde. `gofmt -l backend` sin salida. `python3 scripts/traceability.py --check` →
+  matriz al día. `docker build --target api` y `--target worker` sobre `backend/Dockerfile`
+  (`golang:1.26-bookworm`) → ambos en verde. `docker buildx imagetools inspect
+  golang:1.26-bookworm` → confirma el digest `sha256:a688600c...` (`1.26.8-bookworm`). `make
+  build` (las tres imágenes) y `make scan-image` (Trivy 0.56.2, `--severity HIGH,CRITICAL
+  --ignore-unfixed`) → `identity-hub-api`, `identity-hub-worker` e `identity-hub-web` en 0
+  hallazgos HIGH/CRITICAL cada una. `make up` → stack completo saludable; `curl
+  http://localhost:8081/healthz` → `200`, `{"status":"ok","version":"0.1.0-baseline"}`; `make
+  down` limpio. Frontend (`frontend/Dockerfile`, base `node`) no se reconstruyó aparte porque no
+  depende de Go: ya se reconstruyó dentro de `make build`/`make up` sin cambios de código y con
+  Trivy limpio.
 - Commit: —
 - Evidencia (`Usuario`):  - [ ] VULN-028  - [ ] VULN-029 ("antes" capturado en el informe, run 36281691237; falta el "después")
 
@@ -1199,7 +1244,7 @@ Todas resueltas por el usuario el 2026-09-19 (las que no traen cambio se aceptar
 - **Q8 · Gitleaks e historial.** Decisión: opción (a), `.gitleaksignore` por huella exacta limitado a los 12 hallazgos conocidos de la línea base, cada entrada con su VULN y justificación; opciones (b) y (c) descartadas; Codex lo implementa cuando el usuario entregue la lista de huellas del run de T0.2, fecha 2026-09-19, afecta a: T0.2, T31.
 - **Q9 · Ids.** Decisión: `VULN-020` se queda como el hallazgo de chi `RealIP`; ids nuevos desde VULN-024: VULN-024 = endurecimiento de contenedores del compose (su comentario hoy dice VULN-020), VULN-025 = axios/lodash, VULN-026 = `golang.org/x/text` GO-2026-5970; los ids únicos ya usados en comentarios (003, 004, 006 a 019) se conservan y T0.5 crea sus fichas; un id solo se asigna al crear su ficha, nunca se inventa en un comentario; el comentario del compose NO se renumera antes del push de la línea base (se documenta la equivalencia en T0.5 y se corrige en T30), fecha 2026-09-19, afecta a: T0.5, T24, T25, T30, T36, "Registro de evidencia".
 - **Q10 · Visibilidad del repo.** Decisión: público, `git@github.com:jorgepaez-ops/IdentityHub.git`; code scanning y subida de SARIF disponibles; comprobación previa al push de que las credenciales sembradas no son reales ni reutilizadas, fecha 2026-09-19, afecta a: T0.1, T0.2, "Protocolo de evidencia".
-- **Q11 · Directiva `go` y `GO_VERSION`.** Decisión: parar y preguntar antes de subirla si un aviso lo exige; no subirla sin aprobación, fecha 2026-09-19, afecta a: T1, T24.
+- **Q11 · Directiva `go` y `GO_VERSION`.** Decisión: parar y preguntar antes de subirla si un aviso lo exige; no subirla sin aprobación, fecha 2026-09-19, afecta a: T1, T24. **Amendment (2026-09-26, T34b):** `golang.org/x/crypto` >= 0.56.0 (VULN-028) declara `go 1.26.0` en su propio `go.mod`, así que `go get` habría subido la directiva de forma inevitable (MVS); Q11 se activó y el usuario autorizó la subida. La directiva `go` de `backend/go.mod`, `GO_VERSION` de `ci.yml` y la imagen base de `backend/Dockerfile` pasan de 1.25 a **1.26** (`golang:1.26-bookworm`, fijada por digest, re-verificada con `docker buildx imagetools inspect`). No se agregó línea `toolchain`. `scheduled-scan.yml` sigue en `go-version: "1.25"` (no se tocó en T34b, fuera del alcance explícito de este cambio; queda como hallazgo para revisar) y `baseline-scan.yml` sigue en `golang:1.22-bullseye` a propósito (analiza la línea base sembrada, VULN-008, no el código actual).
 - **Q12 · Puertos en desarrollo.** Decisión: mantener `db` y `broker` publicados en desarrollo y tratarlo en `docker-compose.prod.yml` (semana 3), fecha 2026-09-19, afecta a: T30.
 - **Q13 · CIDR de `TRUSTED_PROXIES`.** Decisión: fijar una subred en la red por defecto del compose y usarla como valor, fecha 2026-09-19, afecta a: T21, T6.
 - **Q14 · Alcance.** Decisión: RF-013, RF-014, RF-015, RF-016, RF-018 y RF-019 fuera de esta feature y al backlog de semana 3; se muestran como "diferido" (no olvidados) en la matriz de trazabilidad y T13 rechaza con un error claro las cuentas con MFA activado, fecha 2026-09-19, afecta a: T13, T34.

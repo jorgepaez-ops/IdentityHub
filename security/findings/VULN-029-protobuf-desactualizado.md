@@ -3,9 +3,9 @@
 | | |
 |---|---|
 | **Severidad** | HIGH (CVSS 3.1: 7.5; no alcanzable según análisis de llamadas) |
-| **Estado** | abierto |
+| **Estado** | remediado (T34b) |
 | **Detectado por** | osv-scanner v2.6.0 (`ci.yml`, job `5 · Dependencias vulnerables`, paso `osv-scanner`) |
-| **Componente** | `backend/go.mod`: `google.golang.org/protobuf@v1.31.0` (indirecta) |
+| **Componente** | `backend/go.mod`: `google.golang.org/protobuf@v1.31.0` → `v1.36.12` (T34b, indirecta) |
 | **Avisos** | GO-2024-2611 / GHSA-8r3f-844c-mc37 (CVE-2024-24786), corregido en 1.33.0 |
 | **Amenaza** | AM-009 (dependencia comprometida en la cadena de suministro) |
 | **Sembrada** | no — hallazgo nuevo detectado al actualizar el escáner |
@@ -35,5 +35,15 @@ usos; mantenerla corregida cumple AM-009 y evita arrastrar esa deuda a futuras v
 
 ## Remediación
 
-T34b debe actualizar `google.golang.org/protobuf` a 1.33.0 o superior mediante `go get` y
-`go mod tidy`, y confirmar con osv-scanner v2.6.0 y govulncheck que el aviso desaparece.
+T34b actualizó `google.golang.org/protobuf` de 1.31.0 a 1.36.12 (última versión estable
+disponible al cerrar la tarea, muy por encima del mínimo 1.33.0) mediante `go get` +
+`go mod tidy`, y confirmó con osv-scanner v2.6.0 (`--recursive --all-vulns`) y `govulncheck` que
+el aviso ya no aparece.
+
+La dependencia que arrastra `protobuf` como indirecta es `github.com/prometheus/client_golang`
+(confirmado con `go mod why -m google.golang.org/protobuf`: la cadena es
+`internal/observability` → `prometheus/client_golang` → `google.golang.org/protobuf/proto`;
+`prometheus/client_model` y `prometheus/common` también la requieren en la misma versión). Como
+`google.golang.org/protobuf` ya aparecía fijada explícitamente en `backend/go.mod` (indirecta),
+se subió directamente con `go get google.golang.org/protobuf@v1.36.12` sin tocar
+`prometheus/client_golang`.
