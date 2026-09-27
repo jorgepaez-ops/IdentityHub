@@ -18,29 +18,29 @@ import (
 
 	"github.com/jorgepaez/identity-hub/internal/auth/admin"
 	"github.com/jorgepaez/identity-hub/internal/auth/auditlog"
+	"github.com/jorgepaez/identity-hub/internal/auth/employee"
+	"github.com/jorgepaez/identity-hub/internal/auth/invitation"
 	"github.com/jorgepaez/identity-hub/internal/auth/login"
 	"github.com/jorgepaez/identity-hub/internal/auth/logout"
 	"github.com/jorgepaez/identity-hub/internal/auth/refresh"
-	"github.com/jorgepaez/identity-hub/internal/auth/registration"
 	"github.com/jorgepaez/identity-hub/internal/auth/token"
-	"github.com/jorgepaez/identity-hub/internal/auth/verification"
 )
 
 type Server struct {
-	logger         *slog.Logger
-	version        string
-	deps           map[string]Checker
-	tokens         *token.Service
-	registration   registration.Registrar
-	login          login.Authenticator
-	refreshTTL     time.Duration
-	verification   verification.Verifier
-	currentUsers   currentUserRepository
-	refresh        refresh.Refresher
-	logout         logout.Revoker
-	adminUsers     admin.Manager
-	auditLog       auditlog.Reader
-	trustedProxies []netip.Prefix
+	logger           *slog.Logger
+	version          string
+	deps             map[string]Checker
+	tokens           *token.Service
+	employeeCreation employee.Creator
+	invitationAccept invitation.Acceptor
+	login            login.Authenticator
+	refreshTTL       time.Duration
+	currentUsers     currentUserRepository
+	refresh          refresh.Refresher
+	logout           logout.Revoker
+	adminUsers       admin.Manager
+	auditLog         auditlog.Reader
+	trustedProxies   []netip.Prefix
 }
 
 func NewServer(logger *slog.Logger, version string, deps map[string]Checker) *Server {
@@ -49,17 +49,24 @@ func NewServer(logger *slog.Logger, version string, deps map[string]Checker) *Se
 
 func (s *Server) SetTokenService(tokens *token.Service) { s.tokens = tokens }
 
-// SetRegistrationService is used by composition and focused handler tests.
-func (s *Server) SetRegistrationService(service registration.Registrar) { s.registration = service }
+// SetEmployeeCreationService is used by composition and focused handler tests
+// (T5, RF-001). It replaces the week-2 SetRegistrationService: D9 retired
+// public self-registration, so only an admin-driven employee creation
+// service is wired into the Server now.
+func (s *Server) SetEmployeeCreationService(service employee.Creator) { s.employeeCreation = service }
+
+// SetInvitationAcceptanceService is used by composition and focused handler
+// tests (T5, RF-002). It replaces the week-2 SetEmailVerificationService:
+// accepting the invitation now does what email verification used to.
+func (s *Server) SetInvitationAcceptanceService(service invitation.Acceptor) {
+	s.invitationAccept = service
+}
 
 // SetLoginService is used by composition and focused handler tests.
 func (s *Server) SetLoginService(service login.Authenticator, refreshTTL time.Duration) {
 	s.login = service
 	s.refreshTTL = refreshTTL
 }
-
-// SetEmailVerificationService is used by composition and focused handler tests.
-func (s *Server) SetEmailVerificationService(service verification.Verifier) { s.verification = service }
 
 // SetCurrentUserRepository is used by composition and focused profile tests.
 func (s *Server) SetCurrentUserRepository(repository currentUserRepository) {
@@ -150,9 +157,17 @@ func (s *Server) UpdateUser(w http.ResponseWriter, r *http.Request, userID UserI
 		s.updateUser(w, request, userID)
 	}))).ServeHTTP(w, r)
 }
-func (s *Server) CreateEmployee(w http.ResponseWriter, r *http.Request) { s.notImplemented(w) }
+func (s *Server) CreateEmployee(w http.ResponseWriter, r *http.Request) {
+	RequireAuth(s.tokens)(RequireRole(s.currentUsers, "admin")(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		s.createEmployee(w, request)
+	}))).ServeHTTP(w, r)
+}
+
+// AcceptInvitation is unauthenticated (security: [] in openapi.yaml): the
+// invitation token itself, not a bearer token, proves the caller may set
+// this account's password (RF-002).
 func (s *Server) AcceptInvitation(w http.ResponseWriter, r *http.Request) {
-	s.notImplemented(w)
+	s.acceptInvitation(w, r)
 }
 func (s *Server) ResendMfaCode(w http.ResponseWriter, r *http.Request) { s.notImplemented(w) }
 func (s *Server) AuthorizeClient(w http.ResponseWriter, r *http.Request, params AuthorizeClientParams) {

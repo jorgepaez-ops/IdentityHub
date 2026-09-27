@@ -61,6 +61,7 @@ type TokenPurpose string
 const (
 	TokenPurposeEmailVerification TokenPurpose = "email_verification"
 	TokenPurposePasswordReset     TokenPurpose = "password_reset"
+	TokenPurposeInvitation        TokenPurpose = "invitation"
 )
 
 func (e *TokenPurpose) Scan(src interface{}) error {

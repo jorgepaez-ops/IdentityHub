@@ -19,13 +19,13 @@ import (
 	"github.com/jorgepaez/identity-hub/internal/api"
 	"github.com/jorgepaez/identity-hub/internal/auth/admin"
 	"github.com/jorgepaez/identity-hub/internal/auth/auditlog"
+	"github.com/jorgepaez/identity-hub/internal/auth/employee"
+	"github.com/jorgepaez/identity-hub/internal/auth/invitation"
 	"github.com/jorgepaez/identity-hub/internal/auth/login"
 	"github.com/jorgepaez/identity-hub/internal/auth/logout"
 	"github.com/jorgepaez/identity-hub/internal/auth/password"
 	"github.com/jorgepaez/identity-hub/internal/auth/refresh"
-	"github.com/jorgepaez/identity-hub/internal/auth/registration"
 	"github.com/jorgepaez/identity-hub/internal/auth/token"
-	"github.com/jorgepaez/identity-hub/internal/auth/verification"
 	"github.com/jorgepaez/identity-hub/internal/config"
 	"github.com/jorgepaez/identity-hub/internal/events"
 	"github.com/jorgepaez/identity-hub/internal/observability"
@@ -113,8 +113,8 @@ func run() error {
 	}
 	password.Configure(cfg.Argon2)
 
-	registrationService := registration.New(db, broker, passwordHasher{}, rand.Reader, time.Now)
-	verificationService := verification.New(db, broker)
+	employeeService := employee.New(db, broker, passwordHasher{}, rand.Reader, time.Now)
+	invitationService := invitation.New(db, broker, passwordHasher{})
 	loginService := login.New(db, tokens, cfg.RefreshTTL, login.LockoutConfig{
 		AccountMaxFailures: cfg.LoginAccountMaxFailures,
 		IPMaxFailures:      cfg.LoginIPMaxFailures,
@@ -128,9 +128,9 @@ func run() error {
 		"broker":   brokerChecker{broker},
 	})
 	server.SetTokenService(tokens)
-	server.SetRegistrationService(registrationService)
+	server.SetEmployeeCreationService(employeeService)
+	server.SetInvitationAcceptanceService(invitationService)
 	server.SetLoginService(loginService, cfg.RefreshTTL)
-	server.SetEmailVerificationService(verificationService)
 	server.SetRefreshService(refreshService)
 	server.SetLogoutService(logout.New(db))
 	server.SetAdminUserService(admin.New(db))

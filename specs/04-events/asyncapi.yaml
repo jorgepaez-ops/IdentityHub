@@ -36,6 +36,14 @@ channels:
       operationId: publishUserRegistered
       message: { $ref: '#/components/messages/UserRegistered' }
 
+  user.invited:
+    description: |
+      Un admin dio de alta a un empleado (T5, RF-001/D6/D9); hay que enviar la
+      invitación con el enlace para definir la contraseña.
+    publish:
+      operationId: publishUserInvited
+      message: { $ref: '#/components/messages/UserInvited' }
+
   user.email_verified:
     description: La cuenta quedó activa; correo de bienvenida.
     publish:
@@ -83,6 +91,26 @@ components:
                   displayName:       { type: string }
                   verificationToken: { type: string, description: 'Token en claro: solo viaja por el broker, nunca se registra en logs' }
                   expiresAt:         { type: string, format: date-time }
+
+    UserInvited:
+      name: UserInvited
+      title: Empleado invitado
+      contentType: application/json
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/Envelope'
+          - type: object
+            required: [data]
+            properties:
+              data:
+                type: object
+                required: [userId, email, displayName, invitationToken, expiresAt]
+                properties:
+                  userId:          { type: string, format: uuid }
+                  email:           { type: string, format: email }
+                  displayName:     { type: string }
+                  invitationToken: { type: string, description: 'Token en claro: solo viaja por el broker, nunca se registra en logs' }
+                  expiresAt:       { type: string, format: date-time }
 
     EmailVerified:
       name: EmailVerified

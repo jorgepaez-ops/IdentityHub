@@ -17,6 +17,7 @@ import (
 // AsyncAPI y se usan como routing key en el exchange topic.
 const (
 	TypeUserRegistered         = "user.registered"
+	TypeUserInvited            = "user.invited"
 	TypeEmailVerified          = "user.email_verified"
 	TypePasswordResetRequested = "user.password_reset_requested"
 	TypeRefreshReuseDetected   = "security.refresh_reuse_detected"
@@ -60,6 +61,20 @@ type UserRegistered struct {
 		DisplayName       string    `json:"displayName"`
 		VerificationToken string    `json:"verificationToken"`
 		ExpiresAt         time.Time `json:"expiresAt"`
+	} `json:"data"`
+}
+
+// UserInvited is published when an administrator creates an employee account
+// (T5, RF-001/RF-012, D6/D9). The worker renders InvitationToken into the
+// account's set-password link; it never reaches logs (RNF-012).
+type UserInvited struct {
+	Envelope
+	Data struct {
+		UserID          uuid.UUID `json:"userId"`
+		Email           string    `json:"email"`
+		DisplayName     string    `json:"displayName"`
+		InvitationToken string    `json:"invitationToken"`
+		ExpiresAt       time.Time `json:"expiresAt"`
 	} `json:"data"`
 }
 

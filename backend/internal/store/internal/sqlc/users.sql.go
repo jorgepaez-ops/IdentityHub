@@ -68,6 +68,68 @@ func (q *Queries) ConsumeEmailVerificationToken(ctx context.Context, tokenHash [
 	return i, err
 }
 
+const consumeInvitationToken = `-- name: ConsumeInvitationToken :one
+WITH consumed AS (
+    UPDATE verification_tokens
+    SET used_at = now()
+    WHERE token_hash = $1
+      AND purpose = 'invitation'
+      AND used_at IS NULL
+      AND expires_at > now()
+    RETURNING user_id
+)
+UPDATE users
+SET password_hash = $2, status = 'active', updated_at = now()
+WHERE id = (SELECT user_id FROM consumed)
+  AND status = 'pending_verification'
+RETURNING id, email, password_hash, display_name, status, mfa_enabled, mfa_secret_enc, failed_login_count, locked_until, last_login_at, created_at, updated_at
+`
+
+type ConsumeInvitationTokenParams struct {
+	TokenHash    []byte
+	PasswordHash string
+}
+
+// Consumes a one-time invitation token and, in the same statement, sets the
+// password the invitee just chose and activates the account (T5, RF-002).
+// Shares the verification_tokens table with ConsumeEmailVerificationToken but
+// never accepts the other purpose's token (invariant 7).
+func (q *Queries) ConsumeInvitationToken(ctx context.Context, arg ConsumeInvitationTokenParams) (User, error) {
+	row := q.db.QueryRow(ctx, consumeInvitationToken, arg.TokenHash, arg.PasswordHash)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.PasswordHash,
+		&i.DisplayName,
+		&i.Status,
+		&i.MfaEnabled,
+		&i.MfaSecretEnc,
+		&i.FailedLoginCount,
+		&i.LockedUntil,
+		&i.LastLoginAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const createInvitationToken = `-- name: CreateInvitationToken :exec
+INSERT INTO verification_tokens (user_id, token_hash, purpose, expires_at)
+VALUES ($1, $2, 'invitation', $3)
+`
+
+type CreateInvitationTokenParams struct {
+	UserID    uuid.UUID
+	TokenHash []byte
+	ExpiresAt pgtype.Timestamptz
+}
+
+func (q *Queries) CreateInvitationToken(ctx context.Context, arg CreateInvitationTokenParams) error {
+	_, err := q.db.Exec(ctx, createInvitationToken, arg.UserID, arg.TokenHash, arg.ExpiresAt)
+	return err
+}
+
 const createRefreshToken = `-- name: CreateRefreshToken :exec
 INSERT INTO refresh_tokens (user_id, token_hash, family_id, ip, user_agent, expires_at)
 VALUES ($1, $2, $3, $4, $5, $6)

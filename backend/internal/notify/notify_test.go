@@ -27,6 +27,26 @@ func TestRF012_PlantillaDeRegistroIncluyeElEnlaceDeVerificacion(t *testing.T) {
 	}
 }
 
+func TestRF001_PlantillaDeInvitacionIncluyeElEnlaceDeAceptacion(t *testing.T) {
+	message, err := Render(events.TypeUserInvited, "https://id.example", []byte(`{
+		"data": {
+			"email": "ana@example.com",
+			"displayName": "Ana",
+			"invitationToken": "token-con-espacio"
+		}
+	}`))
+	if err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+
+	if message.To != "ana@example.com" {
+		t.Errorf("To = %q, want ana@example.com", message.To)
+	}
+	if !strings.Contains(message.Body, "https://id.example/invitations/accept?token=token-con-espacio") {
+		t.Errorf("invitation message does not contain acceptance URL: %q", message.Body)
+	}
+}
+
 func TestRF012_LosAvisosDeSeguridadNoIncluyenSecretos(t *testing.T) {
 	cases := []struct {
 		name      string

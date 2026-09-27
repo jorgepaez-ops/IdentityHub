@@ -10,8 +10,8 @@ declaración de buenas intenciones.
 
 | Requisito | Título | Pri | Operaciones de la API | Escenarios | Pruebas Go | E2E | Estado |
 |---|---|---|---|---|---|---|---|
-| **RF-001** | Alta de empleados por administración | P0 | `createEmployee` | 3 | 11 | — | ✅ completo |
-| **RF-002** | Aceptación de invitación y verificación de correo | P0 | `acceptInvitation` | 3 | 9 | — | ✅ completo |
+| **RF-001** | Alta de empleados por administración | P0 | `createEmployee` | 3 | 28 | — | ✅ completo |
+| **RF-002** | Aceptación de invitación y verificación de correo | P0 | `acceptInvitation` | 3 | 17 | — | ✅ completo |
 | **RF-003** | Inicio de sesión | P0 | `login` | 2 | 10 | — | ✅ completo |
 | **RF-004** | Emisión y validación de JWT | P0 | `getJwks` | 1 | 8 | — | ✅ completo |
 | **RF-005** | Renovación de sesión | P0 | `refreshSession` | 1 | 7 | — | ✅ completo |
@@ -21,7 +21,7 @@ declaración de buenas intenciones.
 | **RF-009** | Control de acceso por roles | P0 | — | 5 | 20 | — | ✅ completo |
 | **RF-010** | Administración de usuarios | P0 | `listUsers`, `getUser`, `updateUser` | 3 | 12 | — | ✅ completo |
 | **RF-011** | Registro de auditoría | P0 | `listAuditLog` | 1 | 9 | — | ✅ completo |
-| **RF-012** | Notificaciones asíncronas | P0 | — | 1 | 8 | — | ✅ completo |
+| **RF-012** | Notificaciones asíncronas | P0 | — | 1 | 9 | — | ✅ completo |
 | **RF-013** | Segundo factor obligatorio por correo | P1 | — | 1 | — | — | ⏳ diferido (semana 3) |
 | **RF-014** | Inicio de sesión con segundo factor | P1 | `verifyMfa`, `resendMfaCode` | 3 | — | — | ⏳ diferido (semana 3) |
 | **RF-015** | Restablecimiento de contraseña | P1 | `requestPasswordReset`, `confirmPasswordReset` | — | — | — | ⏳ diferido (semana 3) |
@@ -41,7 +41,7 @@ declaración de buenas intenciones.
 | **RNF-009** | Cabeceras de seguridad | P0 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-010** | Latencia | P1 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-011** | Los specs son la fuente de verdad | P0 | — | — | 4 | — | 🟡 parcial |
-| **RNF-012** | Logs sin datos sensibles | P0 | — | — | 3 | — | 🟡 parcial |
+| **RNF-012** | Logs sin datos sensibles | P0 | — | — | 4 | — | 🟡 parcial |
 
 **Resumen:** 32 requisitos · 12 completos · 6 parciales · 7 sin cubrir · 7 diferidos (semana 3).
 

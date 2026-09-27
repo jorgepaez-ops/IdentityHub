@@ -64,6 +64,7 @@ func TestRF012_ElSobreSerializadoRespetaElContrato(t *testing.T) {
 func TestRF012_LosTiposDeEventoCoincidenConLosCanalesDelSpec(t *testing.T) {
 	esperados := map[string]string{
 		TypeUserRegistered:         "user.registered",
+		TypeUserInvited:            "user.invited",
 		TypeEmailVerified:          "user.email_verified",
 		TypePasswordResetRequested: "user.password_reset_requested",
 		TypeRefreshReuseDetected:   "security.refresh_reuse_detected",

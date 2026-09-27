@@ -75,6 +75,30 @@ WHERE id = (SELECT user_id FROM consumed)
   AND status = 'pending_verification'
 RETURNING *;
 
+-- name: CreateInvitationToken :exec
+INSERT INTO verification_tokens (user_id, token_hash, purpose, expires_at)
+VALUES ($1, $2, 'invitation', $3);
+
+-- name: ConsumeInvitationToken :one
+-- Consumes a one-time invitation token and, in the same statement, sets the
+-- password the invitee just chose and activates the account (T5, RF-002).
+-- Shares the verification_tokens table with ConsumeEmailVerificationToken but
+-- never accepts the other purpose's token (invariant 7).
+WITH consumed AS (
+    UPDATE verification_tokens
+    SET used_at = now()
+    WHERE token_hash = $1
+      AND purpose = 'invitation'
+      AND used_at IS NULL
+      AND expires_at > now()
+    RETURNING user_id
+)
+UPDATE users
+SET password_hash = $2, status = 'active', updated_at = now()
+WHERE id = (SELECT user_id FROM consumed)
+  AND status = 'pending_verification'
+RETURNING *;
+
 -- name: GetLoginUserByEmail :one
 SELECT id, email, password_hash, status, locked_until, mfa_enabled
 FROM users
