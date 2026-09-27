@@ -45,6 +45,13 @@ volver a acordarse.
   mano y el job `secrets` de CI (que sí corre en cada push/PR). No asumir que el pre-commit de
   gitleaks protege nada hasta que alguien corra `pre-commit install` y se verifique.
 
+- **Copias " 2" de iCloud.** El repo vive en `~/Documents`, sincronizado con iCloud (decisión del
+  usuario, no se mueve). El 2026-09-27 aparecieron ~135 copias `* 2.*` sin seguimiento (p. ej.
+  `gen 2.go`) que rompían `go build` por símbolos duplicados. Al arrancar cada sesión, correr
+  `find . -path ./.git -prune -o -path '*/node_modules' -prune -o -name "* 2*" -print`; si aparecen,
+  comparar cada una con su original (`cmp`) y borrar solo las idénticas. **Avisar siempre al usuario
+  qué se borró** (lista o conteo) y cuáles quedaron sin borrar y por qué; nunca borrar en silencio.
+
 ## Engram: sesiones colgadas
 
 - **Causa principal: cada tarea delegada a Codex abre su propia sesión en Engram** (el ID es el
