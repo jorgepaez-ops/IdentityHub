@@ -1,0 +1,33 @@
+{
+  "vuln": "VULN-029",
+  "gate": [
+    "osv-scanner v2.6.0 (ci.yml, job 5, paso osv-scanner, --recursive --all-vulns)"
+  ],
+  "antes": {
+    "commit_linea_base": null,
+    "commit_main": "9820635527e10651dbd5b8d1c9b6c07623f91e06",
+    "workflow": "CI",
+    "run_id": "36281691237",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36281691237",
+    "artefacto": null,
+    "captura": "informe Desktop §VULN-029 antes",
+    "hallazgos": [
+      "google.golang.org/protobuf@v1.31.0 (indirecta): GO-2024-2611 / GHSA-8r3f-844c-mc37 (CVE-2024-24786), CVSS 3.1 7.5 AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H, fixed in 1.33.0"
+    ],
+    "observacion": "CI sobre feat/idp-semana-2, activado con workflow_dispatch. osv-scanner v2.6.0 informó el aviso como no llamado; govulncheck indicó que no es alcanzable. La versión v1.9.0 no tenía análisis de llamadas y lo ocultaba entre aproximadamente 44 avisos de la biblioteca estándar. Job id 108514612968, paso osv-scanner, exit code 1; capturas confirmadas por el usuario (Claude Desktop, 2026-09-26)."
+  },
+  "remediacion": {
+    "tarea": "T34b",
+    "commit": null,
+    "ficha": "security/findings/VULN-029-protobuf-desactualizado.md"
+  },
+  "despues": {
+    "commit": null,
+    "workflow": null,
+    "run_id": null,
+    "run_url": null,
+    "captura": null,
+    "hallazgos": null,
+    "observacion": null
+  }
+}

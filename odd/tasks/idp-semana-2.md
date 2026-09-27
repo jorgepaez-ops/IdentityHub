@@ -190,6 +190,8 @@ los archivos sembrados y fichas). Celdas vacías = aún no conocidas.
 | VULN-024 | Sin endurecimiento de contenedores (en el comentario del compose figura como VULN-020) | Ninguno hoy (Trivy config solo cubre los Dockerfiles, no el compose) | run 35476102444 (no detectado) / sin captura | `824be7d` | local (`docker inspect`, sin gate) | T30 |
 | VULN-025 | axios 0.21.1 / lodash 4.17.15 | npm audit (baseline-scan), osv-scanner (solo en `ci.yml`) | run 35476102444 / informe §3 | `534f13e` | run 36259385478 (npm audit: 15, sin axios/lodash) | T25 |
 | VULN-026 | `golang.org/x/text` (GO-2026-5970) | govulncheck | run 35476102444 / informe §3 | `001a489` | run 36259385478 (govulncheck: "No vulnerabilities found") | T24 |
+| VULN-028 | `golang.org/x/crypto` 0.55.0 (GO-2026-6354, GO-2026-6355, GO-2026-5932) | osv-scanner v2.6.0 (`ci.yml`, job `5 · Dependencias vulnerables`) | run 36281691237 / informe Desktop | — | — | T34b |
+| VULN-029 | `google.golang.org/protobuf` 1.31.0 (GO-2024-2611) | osv-scanner v2.6.0 (`ci.yml`, job `5 · Dependencias vulnerables`) | run 36281691237 / informe Desktop | — | — | T34b |
 
 Nota (Q9): `VULN-020` queda como el hallazgo de chi `RealIP`. VULN-024 a VULN-026 se asignan al
 crear sus fichas (T0.5); las fichas de 003, 004 y 006 a 019 también las crea T0.5, conservando sus
@@ -1087,14 +1089,23 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 - Commit: d149e59
 - Evidencia (`Usuario`):  - [ ] VULN-027
 
+### T34b — Dependencias Go desactualizadas (VULN-028 y VULN-029)
+- [ ] Estado · Ejecutor: `Claude` (`go get` y `go mod tidy` necesitan red) · Cubre: AM-009 · Remedia: VULN-028, VULN-029 · Bloquea a: T35
+- Alcance: subir `golang.org/x/crypto` a 0.56.0 o superior y `google.golang.org/protobuf` a 1.33.0 o superior mediante `go get` y `go mod tidy`. Para GO-2026-5932, identificar el subpaquete e importaciones afectadas y su alcanzabilidad; después decidir con el usuario entre eliminarlo o documentar y aceptar el riesgo.
+- Criterios: `osv-scanner` v2.6.0 con `--all-vulns` termina en 0 o deja únicamente un riesgo aceptado y documentado; `govulncheck` limpio; `make test` y `make lint` en verde.
+- Verificación: `osv-scanner --recursive --all-vulns`; `cd backend && govulncheck ./...`; `make test`; `make lint`.
+- Commit: —
+- Evidencia (`Usuario`):  - [ ] VULN-028  - [ ] VULN-029 ("antes" capturado en el informe, run 36281691237; falta el "después")
+
 ### T35 — CI en verde y evidencia "después"
-- [ ] Estado · Ejecutor: `Usuario` con Claude Desktop (PR, run, capturas en el informe) y `Claude` (completa los `evidencia.json`) · Cubre: todos los VULN de la Fase 3 · Bloqueada por: T34a
+- [ ] Estado · Ejecutor: `Usuario` con Claude Desktop (PR, run, capturas en el informe) y `Claude` (completa los `evidencia.json`) · Cubre: todos los VULN de la Fase 3 · Bloqueada por: T34a, T34b
 - Abrir PR (o `workflow_dispatch`) con la rama; `CI` en verde. Registrar run ID/URL "después" en
   el "Registro de evidencia" y, como texto, en cada `evidencia.json` (`despues`, lo completa Claude con los
   datos que entrega Desktop); las capturas "después" van al informe externo (sin secretos). Prompt de Desktop
   para esta captura: el "prompt después" que Claude entrega al usuario al cerrar la Fase 3.
-- Verificación: `python3 -m json.tool` valida los 26 `evidencia.json` y ninguno deja `despues.run_url` en `null`
+- Verificación: `python3 -m json.tool` valida los 29 `evidencia.json` y ninguno deja `despues.run_url` en `null`
   sin nota; Actions muestra `CI` en verde sobre el SHA final; el usuario confirma las capturas en el informe.
+- **Progreso 2026-09-26.** El run 36280742280 falló en los jobs 3, 5 y 6. El commit `6c1f6f2` corrigió el job 6 (`NODE_VERSION` 24) y el job 3 (dos falsos positivos de Gitleaks). El commit `9820635` actualizó osv-scanner a v2.6.0, fijado por SHA del tag, con `--all-vulns`; el run 36281691237 es la evidencia "antes" de VULN-028 y VULN-029.
 - Commit: —
 
 ### T36 — Fichas actualizadas
@@ -1124,8 +1135,8 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 | 1 — Contrato ejecutable | T1a, T1 a T3 (4) | 4 (T1a, T1, T2, T3) |
 | 2 — Núcleo del IdP | T4 a T22 y T14a (20) | 20 (T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T14a, T15, T16, T17, T18, T19, T20, T21, T22) |
 | 3 — Remediación | T23 a T32 (10) | 10 (T23 a T32) |
-| 4 — Cierre | T33 a T38 y T34a (7) | 3 (T33, T34, T34a) |
-| **Total** | **46** | **40** |
+| 4 — Cierre | T33 a T38 y T34a, T34b (8) | 3 (T33, T34, T34a) |
+| **Total** | **47** | **40** |
 
 Tareas nuevas respecto a la versión anterior (43): `T1a` (enmienda OpenAPI, cookie) y `T14a`
 (enmienda ADR 0005, sin ventana de gracia). Los ids existentes no cambian.
@@ -1432,4 +1443,3 @@ Formato por tarea (3 a 5 líneas):
 - Qué cambió: PR #2 (Fase 3) mergeado a `main` (`53f093c`). Al planear T35 ("CI en verde"), se confirmó que los 15 hallazgos de `npm audit` que T25 dejó fuera de alcance no tienen arreglo sin salto de versión mayor en 4 paquetes; el usuario decidió migrarlos antes de T35 (asignado VULN-027, hallazgo no previsto, igual que VULN-020) en vez de aceptarlos como excepción permanente. `vite` 5→8, `vitest`/`@vitest/coverage-v8` 1→5, `@vitejs/plugin-react` 4→6, `@typescript-eslint/parser`/`eslint-plugin` 6→8 (ESLint se quedó en 8.57, no subió a 9/10), `react-router-dom` 6→7, `openapi-typescript` 6→7. Único cambio de código: `vite.config.ts` importa `defineConfig` de `vitest/config`.
 - Comandos y resultado observado: cada paquete verificado por separado (build/lint/typecheck/test) antes de seguir. `npm audit`: 15→0. `make gen` sin drift. `make up` con ciclo real registro→verificación→login por Nginx en verde, cabeceras de RNF-009 intactas. `make test`/`make lint`/traceability en verde.
 - Dudas abiertas: ninguna. Falta confirmar el mismo resultado en CI cuando se abra el PR de T35.
-

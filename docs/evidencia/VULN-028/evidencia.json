@@ -1,0 +1,33 @@
+{
+  "vuln": "VULN-028",
+  "gate": [
+    "osv-scanner v2.6.0 (ci.yml, job 5, paso osv-scanner, --recursive --all-vulns)"
+  ],
+  "antes": {
+    "commit_linea_base": null,
+    "commit_main": "9820635527e10651dbd5b8d1c9b6c07623f91e06",
+    "workflow": "CI",
+    "run_id": "36281691237",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36281691237",
+    "artefacto": null,
+    "captura": "informe Desktop §VULN-028 antes",
+    "hallazgos": [
+      "golang.org/x/crypto@v0.55.0: GO-2026-6354 (CVE-2026-78662), fixed in 0.56.0; GO-2026-6355 (CVE-2026-56855), fixed in 0.56.0; GO-2026-5932, sin versión corregida porque el subpaquete afectado es inseguro por diseño y no mantenido"
+    ],
+    "observacion": "CI sobre feat/idp-semana-2, activado con workflow_dispatch. osv-scanner v2.6.0 informó los tres avisos como no llamados; govulncheck indicó que no son alcanzables. La versión v1.9.0 no tenía análisis de llamadas y los ocultaba entre aproximadamente 44 avisos de la biblioteca estándar. Job id 108514612968, paso osv-scanner, exit code 1; capturas confirmadas por el usuario (Claude Desktop, 2026-09-26)."
+  },
+  "remediacion": {
+    "tarea": "T34b",
+    "commit": null,
+    "ficha": "security/findings/VULN-028-x-crypto-desactualizado.md"
+  },
+  "despues": {
+    "commit": null,
+    "workflow": null,
+    "run_id": null,
+    "run_url": null,
+    "captura": null,
+    "hallazgos": null,
+    "observacion": null
+  }
+}
