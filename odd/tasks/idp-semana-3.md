@@ -167,6 +167,12 @@ dinámico de clientes, consentimiento, `id_token`), TOTP/WebAuthn, correo real p
   ya queda verificado con la invitación (D9), no hay paso de "activar el segundo factor": RF-013 se
   reduce a la política y RF-014 al desafío en el login.
 
+- **D12 · Reenvío de invitación (2026-09-27).** Un admin puede reenviar la invitación de una cuenta
+  `pending_verification`: `POST /api/v1/admin/users/{userId}/invitation` anula los tokens de
+  invitación anteriores, emite uno nuevo de 24 h y queda auditado. Sin esto, una invitación vencida
+  o perdida deja la cuenta bloqueada para siempre (hallazgo R4 de la revisión nativa de T5). Va en
+  T6 (mismo mecanismo de token) con enmienda al spec; la consola (T12) muestra la acción.
+
 ## Preguntas abiertas
 
 Ninguna: P1 a P4 resueltas en D8 a D11.
@@ -288,14 +294,34 @@ Ninguna: P1 a P4 resueltas en D8 a D11.
 - Commit: `fde38cb`, `4670436`
 
 ### T5 — Alta de empleados por admin e invitación por correo
-- [ ] Estado · Ejecutor: `Codex` · Depende de: T3, T4
+- [x] Estado · Ejecutor: `Sonnet` (Codex sin cuota) · Depende de: T3, T4
 - `POST /api/v1/admin/users` (solo admin, auditado), token de invitación de un solo uso con
   vencimiento, plantilla del worker, endpoint para definir la contraseña con el token.
-- Commit: —
+- Hecho (2026-09-27, `28293dd`). Paquetes `internal/auth/employee` e `internal/auth/invitation`,
+  handlers compuestos en `Routes()`, migración `000005` (valor `invitation` en `token_purpose`,
+  reutiliza `verification_tokens`; `password_reset` ya existía para T6; la bajada reconstruye el
+  enum y descarta tokens de invitación, probada con filas), consumo atómico del token con
+  activación en un solo `UPDATE`, evento `user.invited` agregado a `specs/04-events/asyncapi.yaml`
+  (faltaba), la aceptación reutiliza `user.email_verified`, enlace `/invitations/accept?token=…`
+  (decisión de ruta para T12). `verify_email.go` y el cableado de registro/verificación salieron
+  de `server.go` y `main.go`.
+  - Verificación de Claude: unitarias, lint, `make gen` sin deriva; la primera corrida de
+    integración falló en `TestRF002_AceptarPersisteHashArgon2idYActivaLaCuenta` y
+    `TestRF006_DosRenovacionesConcurrentesUnaGana`; tres corridas completas más con `-race`
+    salieron en verde: intermitentes, sumadas a T10.
+  - Revisión nativa: **aprobada** con 14 observaciones informativas. A corregir (T5-fix, Codex):
+    Argon2id se calcula antes de validar el token en un endpoint sin autenticación (DoS barato);
+    la prueba de token vencido es vacía (el doble falla siempre); paquetes
+    `internal/auth/registration` y `verification` huérfanos. Nuevo alcance: reenvío de invitación
+    (D12, va en T6). Se acepta sin cambio la publicación antes del commit (compromiso de la
+    ADR 0006).
+- Commit: `28293dd`
 
 ### T6 — RF-015 Restablecimiento de contraseña
 - [ ] Estado · Ejecutor: `Codex` · Depende de: T5 (reutiliza el mecanismo de token)
 - Respuesta no enumerable, token de una hora, revocación de las sesiones anteriores al cambiar.
+- Incluye D12: `POST /api/v1/admin/users/{userId}/invitation` (reenvío), con enmienda al spec
+  (requisito, OpenAPI y escenario) antes de implementarlo.
 - Commit: —
 
 ### T7 — RF-013/014 MFA obligatorio por correo
@@ -320,6 +346,9 @@ Ninguna: P1 a P4 resueltas en D8 a D11.
 
 ### T10 — Pendientes chicos de la semana 2
 - [ ] Estado · Ejecutor: `Codex`
+- Integración intermitente: `TestRF002_AceptarPersisteHashArgon2idYActivaLaCuenta` y
+  `TestRF006_DosRenovacionesConcurrentesUnaGana` fallaron una vez en T5 (pasaron en tres corridas
+  más); investigar junto con la de `TestRF001_UsersAceptaArgon2idYRechazaMD5`.
 - `handleBindingError` responde en texto plano y no en RFC 7807 (hallado por GGA en T3);
   `POST /api/v1/auth/login` con `{}` responde 500 en vez de 400; `/readyz` devuelve
   `err.Error()` por dependencia (puede filtrar host/usuario/base); investigar la intermitencia de
@@ -388,14 +417,14 @@ Ninguna: P1 a P4 resueltas en D8 a D11.
 | Fase | Tareas | Hechas |
 |---|---|---|
 | 0 — Enmiendas de spec y decisiones | T1 a T3 (3) | 3 (T1 a T3) |
-| 1 — Backend | T4 a T10 (7) | 1 (T4) |
+| 1 — Backend | T4 a T10 (7) | 2 (T4, T5) |
 | 2 — Dominios locales y frontend | T11 a T13 (3) | 0 |
 | 3 — Verificación, DAST y cierre | T14 a T17 (4) | 0 |
-| **Total** | **17** | **4** |
+| **Total** | **17** | **5** |
 
 ## Siguiente paso
 
-T5: alta de empleados e invitación (Sonnet hasta que el usuario avise que Codex tiene cuota).
+T5-fix (Codex): Argon2 tras validar el token, prueba real de vencimiento, borrar paquetes huérfanos. Luego T6 con D12.
 
 ## Cambios de spec propuestos
 
