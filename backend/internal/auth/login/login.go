@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jorgepaez/identity-hub/internal/auth/password"
+	"github.com/jorgepaez/identity-hub/internal/auth/roles"
 	"github.com/jorgepaez/identity-hub/internal/auth/token"
 )
 
@@ -238,11 +239,14 @@ func (s *Service) Login(ctx context.Context, input Input) (Result, error) {
 				return fmt.Errorf("rehash password: %w", err)
 			}
 		}
-		roles, err := writer.ListRolesForUser(ctx, user.ID)
+		userRoles, err := writer.ListRolesForUser(ctx, user.ID)
 		if err != nil {
 			return fmt.Errorf("list user roles: %w", err)
 		}
-		accessToken, err := s.tokens.Issue(user.ID.String(), roles)
+		// The Hub console access token is a directory-scoped token (D8, RF-009):
+		// an application role such as contabilidad.senior must never appear in
+		// its roles claim, even though the account keeps it in the database.
+		accessToken, err := s.tokens.Issue(user.ID.String(), roles.Directory(userRoles))
 		if err != nil {
 			return fmt.Errorf("issue access token: %w", err)
 		}

@@ -142,4 +142,67 @@ func (w loginWriter) InsertAuditEvent(_ context.Context, event login.AuditEvent)
 	return w.repositoryStub.InsertAuditEvent(context.Background(), AuditEvent{ActorUserID: event.ActorUserID, Action: event.Action})
 }
 
+func TestRF009_UpdateUserAceptaRolesDeNegocioDeContabilidad(t *testing.T) {
+	actorID, targetID := uuid.New(), uuid.New()
+	repository := &repositoryStub{
+		users: map[uuid.UUID]User{
+			actorID:  {ID: actorID, Status: StatusActive},
+			targetID: {ID: targetID, Status: StatusActive},
+		},
+		roles: map[uuid.UUID][]string{actorID: {"admin"}, targetID: {"user"}},
+	}
+	newRoles := []string{"user", "contabilidad.senior"}
+	updated, err := New(repository).UpdateUser(context.Background(), UpdateInput{ActorUserID: actorID, UserID: targetID, Roles: &newRoles})
+	if err != nil {
+		t.Fatalf("UpdateUser() error=%v, want nil", err)
+	}
+	if !testHasRole(updated.Roles, "contabilidad.senior") {
+		t.Fatalf("updated.Roles=%v, want contabilidad.senior included", updated.Roles)
+	}
+	if !testHasRole(repository.roles[targetID], "contabilidad.senior") {
+		t.Fatalf("persisted roles=%v, want contabilidad.senior included", repository.roles[targetID])
+	}
+}
+
+func TestRF010_AdminNoPuedeAsignarseRolesASiMismo(t *testing.T) {
+	adminID := uuid.New()
+	repository := &repositoryStub{
+		users: map[uuid.UUID]User{adminID: {ID: adminID, Status: StatusActive}},
+		roles: map[uuid.UUID][]string{adminID: {"admin"}},
+	}
+	requested := []string{"user", "admin", "contabilidad.senior"}
+	_, err := New(repository).UpdateUser(context.Background(), UpdateInput{ActorUserID: adminID, UserID: adminID, Roles: &requested})
+	if !errors.Is(err, ErrSelfRoleAssignment) {
+		t.Fatalf("UpdateUser() error=%v, want ErrSelfRoleAssignment", err)
+	}
+	if testHasRole(repository.roles[adminID], "contabilidad.senior") {
+		t.Fatalf("roles=%v, self-assignment must not have been persisted", repository.roles[adminID])
+	}
+	if len(repository.audits) != 1 || repository.audits[0].Action != "role_assignment_rejected" || repository.audits[0].ActorUserID == nil || *repository.audits[0].ActorUserID != adminID {
+		t.Fatalf("audits=%+v, want one role_assignment_rejected event actored by %s", repository.audits, adminID)
+	}
+}
+
+func TestRF009_UpdateUserRequiereMantenerElRolBaseUser(t *testing.T) {
+	actorID, targetID := uuid.New(), uuid.New()
+	repository := &repositoryStub{
+		users: map[uuid.UUID]User{
+			actorID:  {ID: actorID, Status: StatusActive},
+			targetID: {ID: targetID, Status: StatusActive},
+		},
+		roles: map[uuid.UUID][]string{actorID: {"admin"}, targetID: {"user"}},
+	}
+	requested := []string{"contabilidad.senior"}
+	_, err := New(repository).UpdateUser(context.Background(), UpdateInput{ActorUserID: actorID, UserID: targetID, Roles: &requested})
+	if !errors.Is(err, ErrBaseRoleRequired) {
+		t.Fatalf("UpdateUser() error=%v, want ErrBaseRoleRequired", err)
+	}
+	if !testHasRole(repository.roles[targetID], "user") || testHasRole(repository.roles[targetID], "contabilidad.senior") {
+		t.Fatalf("roles=%v, the base role removal must not have been persisted", repository.roles[targetID])
+	}
+	if len(repository.audits) != 0 {
+		t.Fatalf("audits=%+v, want none: this is a static request validation, like ErrInvalidRole", repository.audits)
+	}
+}
+
 func statusPtr(value Status) *Status { return &value }

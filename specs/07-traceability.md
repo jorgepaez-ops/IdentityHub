@@ -18,8 +18,8 @@ declaración de buenas intenciones.
 | **RF-006** | Detección de reuso de refresh token | P0 | — | 1 | 5 | — | ✅ completo |
 | **RF-007** | Cierre de sesión | P0 | `logout` | 1 | 8 | — | ✅ completo |
 | **RF-008** | Perfil propio | P0 | `getCurrentUser`, `updateCurrentUser` | — | 7 | — | 🟡 parcial |
-| **RF-009** | Control de acceso por roles | P0 | — | 4 | 5 | — | ✅ completo |
-| **RF-010** | Administración de usuarios | P0 | `listUsers`, `getUser`, `updateUser` | 3 | 8 | — | ✅ completo |
+| **RF-009** | Control de acceso por roles | P0 | — | 5 | 19 | — | ✅ completo |
+| **RF-010** | Administración de usuarios | P0 | `listUsers`, `getUser`, `updateUser` | 3 | 11 | — | ✅ completo |
 | **RF-011** | Registro de auditoría | P0 | `listAuditLog` | 1 | 9 | — | ✅ completo |
 | **RF-012** | Notificaciones asíncronas | P0 | — | 1 | 8 | — | ✅ completo |
 | **RF-013** | Segundo factor obligatorio por correo | P1 | — | 1 | — | — | ⏳ diferido (semana 3) |
@@ -74,6 +74,7 @@ columnas de prueba · *parcial* = una sola · *sin cubrir* = ninguna · *diferid
   - control-de-acceso.feature — Un usuario corriente no accede a la administración
   - control-de-acceso.feature — Añadir el rol admin al token no concede privilegios
   - control-de-acceso.feature — Un empleado sin rol de aplicación no accede a Contabilidad
+  - control-de-acceso.feature — El rol base "user" no se puede quitar
 - **RF-010**
   - control-de-acceso.feature — Un administrador deshabilita una cuenta
   - control-de-acceso.feature — Un administrador no puede deshabilitarse a sí mismo

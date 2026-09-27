@@ -45,6 +45,14 @@ Característica: Control de acceso por roles
     Entonces recibo una respuesta 400
     Y se registra un evento de auditoría "role_assignment_rejected"
 
+  @RF-009 @p1
+  Escenario: El rol base "user" no se puede quitar
+    Dado que inicié sesión con una cuenta de rol "admin"
+    Y existe otra cuenta con los roles "user" y "contabilidad.analista"
+    Cuando le asigno solo el rol "contabilidad.senior", sin "user"
+    Entonces recibo una respuesta 400
+    Y la cuenta conserva sus roles anteriores
+
   @RF-011 @AM-010 @p0
   Escenario: El registro de auditoría no se puede alterar
     Dado que existen eventos en el registro de auditoría

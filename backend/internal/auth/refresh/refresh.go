@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jorgepaez/identity-hub/internal/auth/roles"
 	"github.com/jorgepaez/identity-hub/internal/auth/token"
 )
 
@@ -147,11 +148,13 @@ func (s *Service) Refresh(ctx context.Context, input Input) (Result, error) {
 		}
 		switch rotation.Status {
 		case RotationSucceeded:
-			roles, err := writer.ListRolesForUser(ctx, rotation.UserID)
+			userRoles, err := writer.ListRolesForUser(ctx, rotation.UserID)
 			if err != nil {
 				return fmt.Errorf("list user roles: %w", err)
 			}
-			accessToken, err := s.tokens.Issue(rotation.UserID.String(), roles)
+			// The refresh cookie renews the Hub console's own directory-scoped
+			// token (D8, RF-009): an application role must not reappear here.
+			accessToken, err := s.tokens.Issue(rotation.UserID.String(), roles.Directory(userRoles))
 			if err != nil {
 				return fmt.Errorf("issue access token: %w", err)
 			}

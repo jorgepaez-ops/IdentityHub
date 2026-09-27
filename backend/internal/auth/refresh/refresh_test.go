@@ -78,6 +78,26 @@ func TestRF005_RenovarEmiteParDistintoEInvalidaElAnterior(t *testing.T) {
 	}
 }
 
+func TestRF009_TokenRenovadoSoloContieneRolesDeDirectorio(t *testing.T) {
+	signer, err := token.New(make([]byte, 32), "https://issuer.test", "identity-hub", time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	userID, familyID := uuid.New(), uuid.New()
+	repo := &repositoryStub{rotation: Rotation{Status: RotationSucceeded, UserID: userID, FamilyID: familyID, Roles: []string{"user", "contabilidad.analista"}}}
+	result, err := New(repo, signer, time.Hour).Refresh(context.Background(), Input{RefreshToken: base64.RawURLEncoding.EncodeToString([]byte("old-refresh-token"))})
+	if err != nil {
+		t.Fatalf("Refresh: %v", err)
+	}
+	claims, err := signer.Validate(result.AccessToken)
+	if err != nil {
+		t.Fatalf("Validate(access token): %v", err)
+	}
+	if len(claims.Roles) != 1 || claims.Roles[0] != "user" {
+		t.Fatalf("roles claim = %v, want only [user] (D8, RF-009): the Hub refresh cookie renews a directory-scoped token", claims.Roles)
+	}
+}
+
 func TestRF006_ReusoDeTokenRotadoRevocaLaFamilia(t *testing.T) {
 	signer, err := token.New(make([]byte, 32), "https://issuer.test", "identity-hub", time.Now)
 	if err != nil {

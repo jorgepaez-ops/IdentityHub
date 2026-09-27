@@ -176,6 +176,38 @@ func TestRF003_AM004EmailInexistenteYPasswordIncorrectoCompartenError(t *testing
 	}
 }
 
+func TestRF009_TokenDeConsolaSoloContieneRolesDeDirectorio(t *testing.T) {
+	hash, err := password.Hash("correct horse battery")
+	if err != nil {
+		t.Fatal(err)
+	}
+	signer, err := token.New(make([]byte, 32), "https://issuer.test", "identity-hub", time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := uuid.New()
+	repository := &repositoryStub{
+		user:  User{ID: id, Email: "senior@example.com", PasswordHash: hash, Status: StatusActive},
+		roles: []string{"user", "contabilidad.senior"},
+	}
+	result, err := New(repository, signer, time.Hour).Login(context.Background(), Input{Email: "senior@example.com", Password: "correct horse battery"})
+	if err != nil {
+		t.Fatalf("Login() error = %v", err)
+	}
+	claims, err := signer.Validate(result.AccessToken)
+	if err != nil {
+		t.Fatalf("Validate(access token): %v", err)
+	}
+	for _, role := range claims.Roles {
+		if role == "contabilidad.senior" {
+			t.Fatalf("roles claim = %v, must not carry an application role (D8, RF-009)", claims.Roles)
+		}
+	}
+	if len(claims.Roles) != 1 || claims.Roles[0] != "user" {
+		t.Fatalf("roles claim = %v, want only [user]", claims.Roles)
+	}
+}
+
 func TestRF017_SeisFallosDevuelven423(t *testing.T) {
 	hash, err := password.Hash("correct horse battery")
 	if err != nil {
