@@ -12,6 +12,41 @@ retomar el trabajo no exija reconstruir el contexto desde cero.
 
 ---
 
+## 2026-09-27 · Semana 2 (cierre) — Núcleo del IdP, remediación y evidencia "después"
+
+Cierra las fases 0 a 3. El detalle por tarea y la evidencia trazable permanecen en
+`odd/tasks/idp-semana-2.md`; esta entrada concentra el estado que necesita quien retome el proyecto.
+
+### Hecho
+
+- Fases 0 a 3 completas: contrato ejecutable, núcleo del IdP, remediación y evidencia "después". Hay 29 fichas: 27 remediadas, VULN-019 parcial y VULN-028 como riesgo aceptado.
+- Las seis métricas medidas pasaron de 64 a 0 CVE corregibles en imágenes, 12 a 0 hallazgos de secretos, 6 a 0 dependencias alcanzables, 3 a 0 contenedores de aplicación como root, 0 a 5 cabeceras Nginx y 0 a 3 imágenes de aplicación fijadas por digest.
+- Los runs finales 36283211113 y 36284740966 terminaron en verde; las mediciones se hicieron en `feat/idp-semana-2` antes del merge a `main`.
+
+### Decisiones tomadas sobre la marcha
+
+- GO-2026-5932 queda aceptada como VULN-028: el módulo sigue requerido, pero no es alcanzable y permanece filtrado en `backend/osv-scanner.toml` hasta 2026-12-25.
+- La actualización de osv-scanner de v1.9 a v2.6 reveló VULN-028 y VULN-029, antes ocultas por el análisis; remediarlas exigió subir el proyecto a Go 1.26.
+
+### Hallazgos
+
+- El sandbox de Codex no tenía red ni Docker; Claude ejecutó directamente las verificaciones que dependían de esos recursos.
+- El hook de Gitleaks está declarado, pero nunca se instaló; solo corre `gga run`.
+- T14 y T15 probaron handlers con `httptest` sin componerlos en `Server.Routes`; dos tareas parecían completas mientras el router real seguía devolviendo 501/400. La corrección se verificó contra las rutas reales.
+
+### Estado
+
+- Fase 4: 45/47 tareas al escribir esta entrada. T37 está en curso; T38 queda pendiente del tag, cuyo nombre decide el usuario.
+- VULN-019 sigue parcial: Mailpit, migrate y cuatro imágenes de observabilidad permanecen fuera de la actualización. La evidencia "después" quedó registrada en las fichas y el informe de seguridad.
+
+### Siguiente paso
+
+1. Cerrar T37 y crear el tag de T38 con el nombre que decida el usuario.
+2. Abrir la PR de fase 4 hacia `main`; solo después se medirá el estado de `main`.
+3. Iniciar la semana 3 con ZAP/DAST.
+
+---
+
 ## 2026-09-20 · Semana 2 (inicio) — Evidencia "antes", hallazgos del pipeline y reestructuración
 
 Cubre el 2026-09-19 y el 2026-09-20. Seguimiento fino por tarea en `odd/tasks/idp-semana-2.md`;
