@@ -14,9 +14,11 @@ import (
 	generated "github.com/jorgepaez/identity-hub/internal/store/internal/sqlc"
 )
 
-// WithinTransaction serializes challenge creation and its immutable audit
-// record. The challenge secret itself is never persisted.
-func (s *Store) WithinTransaction(ctx context.Context, fn func(mfa.Writer) error) error {
+// WithinMFATransaction runs one MFA step (issue, verify or resend) in a single
+// transaction: challenge rows, their audit records, lockout bookkeeping and,
+// on verification, the refresh session. The challenge secret is never
+// persisted, and the callback must publish nothing: events go out after commit.
+func (s *Store) WithinMFATransaction(ctx context.Context, fn func(mfa.Writer) error) error {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("begin mfa transaction: %w", err)
@@ -33,10 +35,33 @@ func (s *Store) WithinTransaction(ctx context.Context, fn func(mfa.Writer) error
 
 type mfaWriter struct{ queries *generated.Queries }
 
+func (w *mfaWriter) LockChallengeIssuance(ctx context.Context, userID uuid.UUID) error {
+	if err := w.queries.LockMfaChallengeIssuance(ctx, userID); err != nil {
+		return fmt.Errorf("lock mfa challenge issuance: %w", err)
+	}
+	return nil
+}
+
+func (w *mfaWriter) CountChallengesSince(ctx context.Context, userID uuid.UUID, since time.Time) (int, error) {
+	count, err := w.queries.CountMfaChallengesSince(ctx, generated.CountMfaChallengesSinceParams{UserID: userID, CreatedAt: pgtype.Timestamptz{Time: since, Valid: true}})
+	if err != nil {
+		return 0, fmt.Errorf("count mfa challenges: %w", err)
+	}
+	return int(count), nil
+}
+
+func (w *mfaWriter) SupersedeOpenChallenges(ctx context.Context, userID uuid.UUID) error {
+	if err := w.queries.SupersedeOpenMfaChallenges(ctx, userID); err != nil {
+		return fmt.Errorf("supersede mfa challenges: %w", err)
+	}
+	return nil
+}
+
 func (w *mfaWriter) CreateChallenge(ctx context.Context, p mfa.CreateParams) error {
 	if err := w.queries.CreateMfaChallenge(ctx, generated.CreateMfaChallengeParams{
 		UserID: p.UserID, TokenHash: p.TokenHash, CodeHash: p.CodeHash,
-		ExpiresAt: pgtype.Timestamptz{Time: p.ExpiresAt, Valid: true}, AttemptsLeft: int32(mfa.MaxAttempts),
+		ExpiresAt: pgtype.Timestamptz{Time: p.ExpiresAt, Valid: true}, AttemptsLeft: p.AttemptsLeft,
+		CreatedAt: pgtype.Timestamptz{Time: p.SentAt, Valid: true},
 	}); err != nil {
 		return fmt.Errorf("create mfa challenge: %w", err)
 	}
@@ -67,8 +92,8 @@ func (w *mfaWriter) RejectChallenge(ctx context.Context, id uuid.UUID) (int, err
 	}
 	return int(remaining), nil
 }
-func (w *mfaWriter) ResendChallenge(ctx context.Context, id uuid.UUID, codeHash []byte) error {
-	if err := w.queries.ResendMfaChallenge(ctx, generated.ResendMfaChallengeParams{ID: id, CodeHash: codeHash}); err != nil {
+func (w *mfaWriter) ResendChallenge(ctx context.Context, id uuid.UUID, codeHash []byte, sentAt time.Time) error {
+	if err := w.queries.ResendMfaChallenge(ctx, generated.ResendMfaChallengeParams{ID: id, CodeHash: codeHash, LastSentAt: pgtype.Timestamptz{Time: sentAt, Valid: true}}); err != nil {
 		return fmt.Errorf("resend mfa challenge: %w", err)
 	}
 	return nil

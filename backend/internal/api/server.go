@@ -40,7 +40,7 @@ type Server struct {
 	passwordReset    passwordreset.HandlerService
 	login            login.Authenticator
 	mfa              mfa.Authenticator
-	refreshTTL       time.Duration
+	mfaRefreshTTL    time.Duration
 	currentUsers     currentUserRepository
 	refresh          refresh.Refresher
 	logout           logout.Revoker
@@ -75,13 +75,14 @@ func (s *Server) SetPasswordResetService(service passwordreset.HandlerService) {
 	s.passwordReset = service
 }
 
-// SetLoginService is used by composition and focused handler tests.
-func (s *Server) SetLoginService(service login.Authenticator, refreshTTL time.Duration) {
-	s.login = service
-	s.refreshTTL = refreshTTL
-}
+// SetLoginService is used by composition and focused handler tests. The
+// password step issues no session, so it needs no refresh lifetime.
+func (s *Server) SetLoginService(service login.Authenticator) { s.login = service }
+
+// SetMFAService wires the second step, which issues the session; refreshTTL is
+// the lifetime of the refresh cookie it sets.
 func (s *Server) SetMFAService(service mfa.Authenticator, refreshTTL time.Duration) {
-	s.mfa, s.refreshTTL = service, refreshTTL
+	s.mfa, s.mfaRefreshTTL = service, refreshTTL
 }
 
 // SetCurrentUserRepository is used by composition and focused profile tests.

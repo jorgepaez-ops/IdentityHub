@@ -10,6 +10,10 @@ import (
 
 const refreshCookieName = "refresh_token"
 
+// sessionCookieMaxAge is the zero MaxAge that omits the attribute, leaving a
+// browser-session cookie (see refreshCookie).
+const sessionCookieMaxAge = 0
+
 // RefreshSession rotates the refresh token presented in the refresh_token
 // cookie. A missing or malformed cookie never reaches this method: the
 // generated router rejects it earlier through handleBindingError, which
@@ -29,7 +33,7 @@ func (s *Server) RefreshSession(w http.ResponseWriter, r *http.Request, params R
 		writeProblem(w, http.StatusInternalServerError, "refresh-failed", "Internal Server Error", "The session could not be refreshed.")
 		return
 	}
-	http.SetCookie(w, refreshCookie(result.RefreshToken, 0))
+	http.SetCookie(w, refreshCookie(result.RefreshToken, sessionCookieMaxAge))
 	writeJSON(w, http.StatusOK, TokenPair{AccessToken: result.AccessToken, TokenType: TokenPairTokenType(result.TokenType), ExpiresIn: result.ExpiresIn})
 }
 

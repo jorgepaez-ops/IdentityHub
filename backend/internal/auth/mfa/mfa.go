@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"math/big"
 	"net/netip"
 	"time"
@@ -23,12 +24,25 @@ import (
 )
 
 const (
-	ChallengeTTL       = 5 * time.Minute
-	MaxAttempts        = 5
-	ResendInterval     = time.Minute
+	ChallengeTTL   = 5 * time.Minute
+	MaxAttempts    = 5
+	ResendInterval = time.Minute
+	// IssuanceWindow and MaxIssuancesPerWindow cap how many challenges (and
+	// mails) one account can trigger by logging in repeatedly. The window is
+	// its own constant rather than the configurable RF-017 failure window: that
+	// one is tuned for wrong credentials, this one bounds successful ones.
+	IssuanceWindow        = 15 * time.Minute
+	MaxIssuancesPerWindow = 5
+	// StatusActive is the only account status that may verify or resend a code.
+	StatusActive       = "active"
 	challengeExpiresIn = int(ChallengeTTL / time.Second)
-	codeSpace          = 1000000
+	// codeDigits is the code length; the length check, the code space and the
+	// zero-padded format all derive from it.
+	codeDigits = 6
 )
+
+// codeSpace is 10^codeDigits, the number of distinct codes.
+var codeSpace = new(big.Int).Exp(big.NewInt(10), big.NewInt(codeDigits), nil)
 
 type User struct {
 	ID          uuid.UUID
@@ -47,7 +61,10 @@ type CreateParams struct {
 	TokenHash    []byte
 	CodeHash     []byte
 	ExpiresAt    time.Time
-	AttemptsLeft int
+	AttemptsLeft int32
+	// SentAt is the service-clock time recorded as both created_at and
+	// last_sent_at, so the window queries and the resend comparison share it.
+	SentAt time.Time
 }
 
 type AuditEvent struct {
@@ -95,14 +112,29 @@ var (
 	ErrChallengeInvalid = fmt.Errorf("mfa challenge is unavailable")
 	ErrCodeInvalid      = fmt.Errorf("mfa code is invalid")
 	ErrResendTooSoon    = fmt.Errorf("mfa resend is rate limited")
+	// ErrIssuanceLimited means the account already received
+	// MaxIssuancesPerWindow challenges within IssuanceWindow.
+	ErrIssuanceLimited = fmt.Errorf("mfa challenge issuance is rate limited")
+	// ErrDeliveryUnavailable means the challenge or resend was stored but its
+	// code could not be published after the commit (D16). The unused challenge
+	// simply expires.
+	ErrDeliveryUnavailable = fmt.Errorf("mfa code delivery is unavailable")
 )
 
 type Writer interface {
+	// LockChallengeIssuance serializes concurrent issuance for one account so
+	// the per-window limit cannot be overshot.
+	LockChallengeIssuance(context.Context, uuid.UUID) error
+	CountChallengesSince(context.Context, uuid.UUID, time.Time) (int, error)
+	// SupersedeOpenChallenges marks the account's open challenges as used.
+	SupersedeOpenChallenges(context.Context, uuid.UUID) error
 	CreateChallenge(context.Context, CreateParams) error
 	GetChallengeForUpdate(context.Context, []byte) (StoredChallenge, error)
 	ConsumeChallenge(context.Context, uuid.UUID) error
 	RejectChallenge(context.Context, uuid.UUID) (int, error)
-	ResendChallenge(context.Context, uuid.UUID, []byte) error
+	// ResendChallenge stores the new code hash; sentAt comes from the service
+	// clock, the same one the resend window is measured with.
+	ResendChallenge(context.Context, uuid.UUID, []byte, time.Time) error
 	ListRolesForUser(context.Context, uuid.UUID) ([]string, error)
 	CreateRefreshToken(context.Context, RefreshToken) error
 	InsertAuditEvent(context.Context, AuditEvent) error
@@ -112,7 +144,7 @@ type Writer interface {
 }
 
 type Repository interface {
-	WithinTransaction(context.Context, func(Writer) error) error
+	WithinMFATransaction(context.Context, func(Writer) error) error
 }
 
 type Publisher interface {
@@ -135,6 +167,14 @@ type Service struct {
 	tokens     *token.Service
 	refreshTTL time.Duration
 	lockout    lockout.Config
+	logger     *slog.Logger
+}
+
+// WithLogger sets where publication failures that must not change the client
+// response are reported. Nil disables logging.
+func (s *Service) WithLogger(logger *slog.Logger) *Service {
+	s.logger = logger
+	return s
 }
 
 func (s *Service) WithTokenService(tokens *token.Service, refreshTTL time.Duration) *Service {
@@ -167,7 +207,7 @@ func (s *Service) Verify(ctx context.Context, input VerifyInput) (Result, error)
 	if err != nil {
 		return Result{}, ErrChallengeInvalid
 	}
-	if len(input.Code) != 6 {
+	if len(input.Code) != codeDigits {
 		return Result{}, ErrCodeInvalid
 	}
 	for _, c := range input.Code {
@@ -180,7 +220,7 @@ func (s *Service) Verify(ctx context.Context, input VerifyInput) (Result, error)
 	var result Result
 	var verificationErr error
 	var lockEvent *events.AccountLocked
-	err = s.repository.WithinTransaction(ctx, func(w Writer) error {
+	err = s.repository.WithinMFATransaction(ctx, func(w Writer) error {
 		challenge, err := w.GetChallengeForUpdate(ctx, tokenHash[:])
 		if err != nil {
 			return challengeLookupError(err)
@@ -190,7 +230,7 @@ func (s *Service) Verify(ctx context.Context, input VerifyInput) (Result, error)
 			return ErrChallengeInvalid
 		}
 		// A locked or otherwise inactive account no longer verifies open challenges.
-		if challenge.User.Status != "active" {
+		if challenge.User.Status != StatusActive {
 			return ErrChallengeInvalid
 		}
 		if subtle.ConstantTimeCompare(challenge.CodeHash, codeHash) != 1 {
@@ -239,8 +279,12 @@ func (s *Service) Verify(ctx context.Context, input VerifyInput) (Result, error)
 	}
 	if lockEvent != nil {
 		if err := s.publisher.Publish(ctx, events.TypeAccountLocked, *lockEvent); err != nil {
-			// The lock is already committed and audited; surface the failed
-			// notification the way login.Service does.
+			// The lock is already committed and audited; the client still gets
+			// the 401, so the failed notification is logged here (same shape as
+			// the login publisher) and joined the way login.Service does.
+			if s.logger != nil {
+				s.logger.Warn("security event could not be published", "event_type", events.TypeAccountLocked, "user_id", lockEvent.Data.UserID, "error", err)
+			}
 			return Result{}, errors.Join(verificationErr, fmt.Errorf("publish account locked event: %w", err))
 		}
 	}
@@ -291,40 +335,62 @@ func (s *Service) Resend(ctx context.Context, encodedToken string) error {
 		return ErrChallengeInvalid
 	}
 	tokenHash := sha256.Sum256(raw)
-	return s.repository.WithinTransaction(ctx, func(w Writer) error {
+	var event events.MfaChallengeIssued
+	if err := s.repository.WithinMFATransaction(ctx, func(w Writer) error {
 		challenge, err := w.GetChallengeForUpdate(ctx, tokenHash[:])
 		if err != nil {
 			return challengeLookupError(err)
 		}
-		if challenge.Used || !s.now().Before(challenge.ExpiresAt) || challenge.User.Status != "active" {
+		// One clock reading serves the expiry check, the window comparison and
+		// the stored last_sent_at.
+		now := s.now()
+		if challenge.Used || !now.Before(challenge.ExpiresAt) || challenge.User.Status != StatusActive {
 			return ErrChallengeInvalid
 		}
-		if s.now().Sub(challenge.LastSentAt) < ResendInterval {
+		if now.Sub(challenge.LastSentAt) < ResendInterval {
 			return ErrResendTooSoon
 		}
 		code, err := generateCode(s.random)
 		if err != nil {
 			return fmt.Errorf("generate mfa resend code: %w", err)
 		}
-		if err := w.ResendChallenge(ctx, challenge.ID, hashCode(raw, code)); err != nil {
+		if err := w.ResendChallenge(ctx, challenge.ID, hashCode(raw, code), now); err != nil {
 			return fmt.Errorf("resend mfa challenge: %w", err)
 		}
 		if err := w.InsertAuditEvent(ctx, AuditEvent{ActorUserID: challenge.User.ID, Action: "mfa_code_resent"}); err != nil {
 			return fmt.Errorf("audit mfa resend: %w", err)
 		}
-		event := events.MfaChallengeIssued{Envelope: events.NewEnvelope(events.TypeMfaChallengeIssued, "")}
-		event.Data.UserID, event.Data.Email, event.Data.DisplayName, event.Data.Code, event.Data.ExpiresAt = challenge.User.ID, challenge.User.Email, challenge.User.DisplayName, code, challenge.ExpiresAt
-		if err := s.publisher.Publish(ctx, events.TypeMfaChallengeIssued, event); err != nil {
-			return fmt.Errorf("publish mfa resend: %w", err)
-		}
+		event = challengeEvent(challenge.User, code, challenge.ExpiresAt)
 		return nil
-	})
+	}); err != nil {
+		return err
+	}
+	return s.publishCode(ctx, event)
+}
+
+// publishCode sends the code once the transaction that stored it has
+// committed (D16): a broker outage or a rolled-back commit can then neither
+// hold a database connection nor mail a code for a challenge that does not
+// exist. A failure leaves the stored challenge to expire on its own.
+func (s *Service) publishCode(ctx context.Context, event events.MfaChallengeIssued) error {
+	if err := s.publisher.Publish(ctx, events.TypeMfaChallengeIssued, event); err != nil {
+		return fmt.Errorf("%w: publish mfa code: %w", ErrDeliveryUnavailable, err)
+	}
+	return nil
+}
+
+func challengeEvent(user User, code string, expiresAt time.Time) events.MfaChallengeIssued {
+	event := events.MfaChallengeIssued{Envelope: events.NewEnvelope(events.TypeMfaChallengeIssued, "")}
+	event.Data.UserID, event.Data.Email, event.Data.DisplayName, event.Data.Code, event.Data.ExpiresAt = user.ID, user.Email, user.DisplayName, code, expiresAt
+	return event
 }
 
 // Issue records only hashes, then publishes the raw code solely for worker
-// delivery. The public token is URL-safe and likewise never persisted; the code
-// hash is keyed with it, so database read access alone cannot enumerate the
-// six-digit space.
+// delivery once the transaction has committed (D16). The public token is
+// URL-safe and likewise never persisted; the code hash is keyed with it, so
+// database read access alone cannot enumerate the six-digit space. A new
+// challenge supersedes the account's open ones, and at most
+// MaxIssuancesPerWindow may be issued per IssuanceWindow.
 func (s *Service) Issue(ctx context.Context, user User) (Challenge, error) {
 	if s.repository == nil || s.publisher == nil {
 		return Challenge{}, fmt.Errorf("mfa service is unavailable")
@@ -338,21 +404,33 @@ func (s *Service) Issue(ctx context.Context, user User) (Challenge, error) {
 		return Challenge{}, fmt.Errorf("generate mfa code: %w", err)
 	}
 	tokenHash, codeHash := sha256.Sum256(rawToken), hashCode(rawToken, code)
-	expiresAt := s.now().UTC().Add(ChallengeTTL)
-	if err := s.repository.WithinTransaction(ctx, func(w Writer) error {
-		if err := w.CreateChallenge(ctx, CreateParams{UserID: user.ID, TokenHash: tokenHash[:], CodeHash: codeHash, ExpiresAt: expiresAt, AttemptsLeft: MaxAttempts}); err != nil {
+	now := s.now().UTC()
+	expiresAt := now.Add(ChallengeTTL)
+	if err := s.repository.WithinMFATransaction(ctx, func(w Writer) error {
+		if err := w.LockChallengeIssuance(ctx, user.ID); err != nil {
+			return fmt.Errorf("lock mfa issuance: %w", err)
+		}
+		issued, err := w.CountChallengesSince(ctx, user.ID, now.Add(-IssuanceWindow))
+		if err != nil {
+			return fmt.Errorf("count mfa challenges: %w", err)
+		}
+		if issued >= MaxIssuancesPerWindow {
+			return ErrIssuanceLimited
+		}
+		if err := w.SupersedeOpenChallenges(ctx, user.ID); err != nil {
+			return fmt.Errorf("supersede mfa challenges: %w", err)
+		}
+		if err := w.CreateChallenge(ctx, CreateParams{UserID: user.ID, TokenHash: tokenHash[:], CodeHash: codeHash, ExpiresAt: expiresAt, AttemptsLeft: MaxAttempts, SentAt: now}); err != nil {
 			return fmt.Errorf("create mfa challenge: %w", err)
 		}
 		if err := w.InsertAuditEvent(ctx, AuditEvent{ActorUserID: user.ID, Action: "mfa_challenge_issued"}); err != nil {
 			return fmt.Errorf("audit mfa challenge issued: %w", err)
 		}
-		event := events.MfaChallengeIssued{Envelope: events.NewEnvelope(events.TypeMfaChallengeIssued, "")}
-		event.Data.UserID, event.Data.Email, event.Data.DisplayName, event.Data.Code, event.Data.ExpiresAt = user.ID, user.Email, user.DisplayName, code, expiresAt
-		if err := s.publisher.Publish(ctx, events.TypeMfaChallengeIssued, event); err != nil {
-			return fmt.Errorf("publish mfa challenge: %w", err)
-		}
 		return nil
 	}); err != nil {
+		return Challenge{}, err
+	}
+	if err := s.publishCode(ctx, challengeEvent(user, code, expiresAt)); err != nil {
 		return Challenge{}, err
 	}
 	return Challenge{Token: base64.RawURLEncoding.EncodeToString(rawToken), ExpiresIn: challengeExpiresIn}, nil
@@ -370,11 +448,11 @@ func challengeLookupError(err error) error {
 // generateCode draws a uniformly distributed six-digit code by rejection
 // sampling (crypto/rand.Int), avoiding the modulo bias of reducing a uint32.
 func generateCode(random io.Reader) (string, error) {
-	n, err := rand.Int(random, big.NewInt(codeSpace))
+	n, err := rand.Int(random, codeSpace)
 	if err != nil {
 		return "", fmt.Errorf("draw mfa code: %w", err)
 	}
-	return fmt.Sprintf("%06d", n.Int64()), nil
+	return fmt.Sprintf("%0*d", codeDigits, n.Int64()), nil
 }
 
 // hashCode is HMAC-SHA256 keyed with the raw challenge token, which only the

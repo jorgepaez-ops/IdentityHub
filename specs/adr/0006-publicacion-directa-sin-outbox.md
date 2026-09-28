@@ -28,3 +28,22 @@ No se implementa outbox transaccional en esta entrega.
   presupuesto, no por desconocimiento: con un mes, un outbox a medio hacer es
   peor que una publicación directa bien instrumentada. Queda como el primer
   candidato de trabajo futuro.
+
+## Enmienda D16 · 2026-09-28 · restablecimiento y MFA
+
+Dos flujos de la semana 3 publican **después** de confirmar la transacción, no antes, y no
+revierten nada si el broker falla:
+
+- **Aviso de restablecimiento completado (D14).** El restablecimiento ya está confirmado
+  (contraseña cambiada, sesiones revocadas, desbloqueo de D13 si aplica). Si falla la publicación
+  del aviso, `POST /auth/password-reset/confirm` sigue respondiendo `204` y el fallo queda en el log
+  estructurado con el id del usuario (sin secretos). Se acepta que un aviso pueda perderse.
+- **Código MFA (RF-014), al emitir el desafío y al reenviarlo.** Si falla la publicación tras el
+  `COMMIT`, `POST /auth/login` (o el reenvío) responde `503` con `application/problem+json`; el
+  desafío no usado vence solo a los 5 minutos y el cliente puede reintentar.
+
+Motivo: publicar dentro de la transacción acopla la recuperación de cuentas (incluido el
+desbloqueo) a la disponibilidad del broker, retiene una conexión de la base mientras el broker es
+lento y puede enviar un aviso de un cambio que luego se revierte. El resto de los flujos (registro,
+invitación) conserva la decisión original de publicar con confirmación y revertir. El outbox
+transaccional sigue descartado por tamaño y sigue siendo la mejora posible.

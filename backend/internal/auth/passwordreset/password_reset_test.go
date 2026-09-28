@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
+	"strings"
 	"testing"
 	"time"
 
@@ -33,6 +35,7 @@ type resetFakeRepository struct {
 	precheckErr         error
 	writer              *resetFakeWriter
 	requestTransactions int
+	inConfirmation      bool
 }
 type resetFakeWriter struct {
 	consumes, revocations int
@@ -53,6 +56,8 @@ func (r *resetFakeRepository) WithinPasswordResetRequestTransaction(_ context.Co
 	return fn(r.writer)
 }
 func (r *resetFakeRepository) WithinPasswordResetConfirmationTransaction(_ context.Context, fn func(store.PasswordResetConfirmationWriter) error) error {
+	r.inConfirmation = true
+	defer func() { r.inConfirmation = false }()
 	return fn(r.writer)
 }
 func (w *resetFakeWriter) CreatePasswordResetTokenForEmail(_ context.Context, email string, params store.CreatePasswordResetTokenParams) (bool, error) {
@@ -86,12 +91,18 @@ func (h *resetFakeHasher) Hash(string) (string, error) { h.calls++; return "$arg
 type resetFakePublisher struct {
 	events int
 	event  any
+	err    error
+	// onPublish observes the moment of publication.
+	onPublish func()
 }
 
 func (p *resetFakePublisher) Publish(_ context.Context, _ string, event any) error {
+	if p.onPublish != nil {
+		p.onPublish()
+	}
 	p.events++
 	p.event = event
-	return nil
+	return p.err
 }
 
 func TestRF015_SolicitudNoEnumeraYHaceTrabajoComparable(t *testing.T) {
@@ -305,5 +316,54 @@ func TestRF015_AuditoriaFallidaNoSeIgnora(t *testing.T) {
 	err := New(repo, &resetFakePublisher{}, &resetFakeHasher{}, bytes.NewReader(make([]byte, 32)), nil).Confirm(context.Background(), base64.RawURLEncoding.EncodeToString(raw), "correct horse battery")
 	if err == nil {
 		t.Fatal("want an error when the audit insert fails")
+	}
+}
+
+// D16: the D14 alert leaves only after the reset has committed, and a broker
+// failure at that point neither undoes the reset nor changes its result.
+func TestRF015_ElAvisoDeRestablecimientoSePublicaDespuesDelCommit(t *testing.T) {
+	raw := []byte("valid-password-reset-token")
+	repo := &resetFakeRepository{usable: true, writer: &resetFakeWriter{unlocked: true}}
+	var openAtPublish []bool
+	publisher := &resetFakePublisher{onPublish: func() { openAtPublish = append(openAtPublish, repo.inConfirmation) }}
+	err := New(repo, publisher, &resetFakeHasher{}, bytes.NewReader(make([]byte, 32)), nil).Confirm(context.Background(), base64.RawURLEncoding.EncodeToString(raw), "correct horse battery")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(openAtPublish) != 1 || openAtPublish[0] {
+		t.Fatalf("transaction open at publish = %v, want one publish after commit", openAtPublish)
+	}
+	event, ok := publisher.event.(events.PasswordResetCompleted)
+	if !ok || !event.Data.Unlocked || event.Data.UserID == uuid.Nil {
+		t.Fatalf("published event=%+v", publisher.event)
+	}
+}
+
+func TestRF015_FallaPublicarElAvisoNoDeshaceElRestablecimientoYQuedaEnElLog(t *testing.T) {
+	raw := []byte("valid-password-reset-token")
+	writer := &resetFakeWriter{}
+	repo := &resetFakeRepository{usable: true, writer: writer}
+	var logs bytes.Buffer
+	service := New(repo, &resetFakePublisher{err: errors.New("broker unavailable")}, &resetFakeHasher{}, bytes.NewReader(make([]byte, 32)), nil).WithLogger(slog.New(slog.NewTextHandler(&logs, nil)))
+
+	if err := service.Confirm(context.Background(), base64.RawURLEncoding.EncodeToString(raw), "correct horse battery"); err != nil {
+		t.Fatalf("Confirm() = %v, want success: the reset is already committed", err)
+	}
+	if writer.consumes != 1 || len(writer.auditEvents) != 1 {
+		t.Fatalf("consumes=%d audits=%d, want the reset kept", writer.consumes, len(writer.auditEvents))
+	}
+	line := logs.String()
+	if !strings.Contains(line, "user_id=") || !strings.Contains(line, "broker unavailable") || strings.Contains(line, "correct horse battery") {
+		t.Fatalf("log=%q, want the user id and the error, no secrets", line)
+	}
+}
+
+func TestRF015_SinCommitNoSePublicaElAviso(t *testing.T) {
+	writer := &resetFakeWriter{auditErr: errors.New("audit unavailable")}
+	publisher := &resetFakePublisher{}
+	repo := &resetFakeRepository{usable: true, writer: writer}
+	err := New(repo, publisher, &resetFakeHasher{}, bytes.NewReader(make([]byte, 32)), nil).Confirm(context.Background(), base64.RawURLEncoding.EncodeToString([]byte("valid-password-reset-token")), "correct horse battery")
+	if err == nil || publisher.events != 0 {
+		t.Fatalf("err=%v published=%d, want a failed reset that mails nothing", err, publisher.events)
 	}
 }

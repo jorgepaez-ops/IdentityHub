@@ -176,6 +176,22 @@ func (q *Queries) ConsumePasswordResetTokenAndRevokeSessions(ctx context.Context
 	return i, err
 }
 
+const countMfaChallengesSince = `-- name: CountMfaChallengesSince :one
+SELECT count(*) FROM mfa_challenges WHERE user_id = $1 AND created_at >= $2
+`
+
+type CountMfaChallengesSinceParams struct {
+	UserID    uuid.UUID
+	CreatedAt pgtype.Timestamptz
+}
+
+func (q *Queries) CountMfaChallengesSince(ctx context.Context, arg CountMfaChallengesSinceParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countMfaChallengesSince, arg.UserID, arg.CreatedAt)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createInvitationToken = `-- name: CreateInvitationToken :exec
 INSERT INTO verification_tokens (user_id, token_hash, purpose, expires_at)
 VALUES ($1, $2, 'invitation', $3)
@@ -193,8 +209,8 @@ func (q *Queries) CreateInvitationToken(ctx context.Context, arg CreateInvitatio
 }
 
 const createMfaChallenge = `-- name: CreateMfaChallenge :exec
-INSERT INTO mfa_challenges (user_id, token_hash, code_hash, expires_at, attempts_left)
-VALUES ($1, $2, $3, $4, $5)
+INSERT INTO mfa_challenges (user_id, token_hash, code_hash, expires_at, attempts_left, created_at, last_sent_at)
+VALUES ($1, $2, $3, $4, $5, $6, $6)
 `
 
 type CreateMfaChallengeParams struct {
@@ -203,8 +219,11 @@ type CreateMfaChallengeParams struct {
 	CodeHash     []byte
 	ExpiresAt    pgtype.Timestamptz
 	AttemptsLeft int32
+	CreatedAt    pgtype.Timestamptz
 }
 
+// $6 is the service clock, stored as both created_at and last_sent_at so the
+// issuance window and the resend window use the same time source as the code.
 func (q *Queries) CreateMfaChallenge(ctx context.Context, arg CreateMfaChallengeParams) error {
 	_, err := q.db.Exec(ctx, createMfaChallenge,
 		arg.UserID,
@@ -212,6 +231,7 @@ func (q *Queries) CreateMfaChallenge(ctx context.Context, arg CreateMfaChallenge
 		arg.CodeHash,
 		arg.ExpiresAt,
 		arg.AttemptsLeft,
+		arg.CreatedAt,
 	)
 	return err
 }
@@ -626,6 +646,17 @@ func (q *Queries) LockLoginUser(ctx context.Context, arg LockLoginUserParams) er
 	return err
 }
 
+const lockMfaChallengeIssuance = `-- name: LockMfaChallengeIssuance :exec
+SELECT pg_advisory_xact_lock(hashtextextended($1::uuid::text, 0))
+`
+
+// Serializes concurrent issuance for one account (transaction-scoped advisory
+// lock, so it never contends with the row locks Verify takes).
+func (q *Queries) LockMfaChallengeIssuance(ctx context.Context, dollar_1 uuid.UUID) error {
+	_, err := q.db.Exec(ctx, lockMfaChallengeIssuance, dollar_1)
+	return err
+}
+
 const passwordResetTokenIsUsable = `-- name: PasswordResetTokenIsUsable :one
 SELECT EXISTS (
     SELECT 1
@@ -662,17 +693,18 @@ func (q *Queries) RejectMfaChallenge(ctx context.Context, id uuid.UUID) (int32, 
 
 const resendMfaChallenge = `-- name: ResendMfaChallenge :exec
 UPDATE mfa_challenges
-SET code_hash = $2, last_sent_at = now()
+SET code_hash = $2, last_sent_at = $3
 WHERE id = $1 AND used_at IS NULL
 `
 
 type ResendMfaChallengeParams struct {
-	ID       uuid.UUID
-	CodeHash []byte
+	ID         uuid.UUID
+	CodeHash   []byte
+	LastSentAt pgtype.Timestamptz
 }
 
 func (q *Queries) ResendMfaChallenge(ctx context.Context, arg ResendMfaChallengeParams) error {
-	_, err := q.db.Exec(ctx, resendMfaChallenge, arg.ID, arg.CodeHash)
+	_, err := q.db.Exec(ctx, resendMfaChallenge, arg.ID, arg.CodeHash, arg.LastSentAt)
 	return err
 }
 
@@ -770,6 +802,18 @@ func (q *Queries) RotateRefreshToken(ctx context.Context, arg RotateRefreshToken
 		&i.Rotated,
 	)
 	return i, err
+}
+
+const supersedeOpenMfaChallenges = `-- name: SupersedeOpenMfaChallenges :exec
+UPDATE mfa_challenges SET used_at = now()
+WHERE user_id = $1 AND used_at IS NULL
+`
+
+// A new challenge replaces the account's open ones; marking them used makes
+// them fail verification exactly like a consumed challenge.
+func (q *Queries) SupersedeOpenMfaChallenges(ctx context.Context, userID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, supersedeOpenMfaChallenges, userID)
+	return err
 }
 
 const unlockLoginUser = `-- name: UnlockLoginUser :exec

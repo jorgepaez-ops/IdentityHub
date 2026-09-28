@@ -13,7 +13,6 @@ import (
 	"github.com/jorgepaez/identity-hub/internal/auth/lockout"
 	"github.com/jorgepaez/identity-hub/internal/auth/mfa"
 	"github.com/jorgepaez/identity-hub/internal/auth/password"
-	"github.com/jorgepaez/identity-hub/internal/auth/token"
 )
 
 var (
@@ -36,7 +35,6 @@ type User struct {
 	PasswordHash string
 	Status       Status
 	LockedUntil  *time.Time
-	MFAEnabled   bool
 }
 
 type Input struct {
@@ -51,15 +49,6 @@ type Input struct {
 type Result struct {
 	MfaToken  string
 	ExpiresIn int
-}
-
-type RefreshToken struct {
-	UserID    uuid.UUID
-	TokenHash []byte
-	FamilyID  uuid.UUID
-	IP        *netip.Addr
-	UserAgent *string
-	ExpiresAt time.Time
 }
 
 type AuditEvent struct {
@@ -90,9 +79,7 @@ type Writer interface {
 	CountLoginFailuresByIP(context.Context, netip.Addr, time.Time) (int64, error)
 	LockLoginUser(context.Context, uuid.UUID, time.Time) error
 	UnlockLoginUser(context.Context, uuid.UUID) error
-	ListRolesForUser(context.Context, uuid.UUID) ([]string, error)
 	UpdatePasswordHash(context.Context, uuid.UUID, string) error
-	CreateRefreshToken(context.Context, RefreshToken) error
 	InsertAuditEvent(context.Context, AuditEvent) error
 }
 
@@ -106,8 +93,6 @@ type Authenticator interface {
 
 type Service struct {
 	repository Repository
-	tokens     *token.Service
-	refreshTTL time.Duration
 	lockout    LockoutConfig
 	publisher  EventPublisher
 	mfa        mfa.Issuer
@@ -130,17 +115,18 @@ type LockoutConfig = lockout.Config
 
 // New creates the login service. The optional lockout configuration retains
 // compatibility with existing callers while allowing composition to inject the
-// environment-derived policy.
-func New(repository Repository, tokens *token.Service, refreshTTL time.Duration, policies ...LockoutConfig) *Service {
+// environment-derived policy. Sessions are issued by the mfa package, so this
+// service needs no token signer or refresh lifetime.
+func New(repository Repository, policies ...LockoutConfig) *Service {
 	policy := lockout.Default()
 	if len(policies) == 1 {
 		policy = policies[0]
 	}
-	return &Service{repository: repository, tokens: tokens, refreshTTL: refreshTTL, lockout: policy, now: time.Now}
+	return &Service{repository: repository, lockout: policy, now: time.Now}
 }
 
 func (s *Service) Login(ctx context.Context, input Input) (Result, error) {
-	if s.repository == nil || s.tokens == nil || s.mfa == nil || s.refreshTTL <= 0 || !s.lockout.Valid() {
+	if s.repository == nil || s.mfa == nil || !s.lockout.Valid() {
 		return Result{}, fmt.Errorf("login service is unavailable")
 	}
 	var authenticationErr error

@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -45,6 +46,14 @@ type Service struct {
 	hasher     Hasher
 	random     io.Reader
 	now        func() time.Time
+	logger     *slog.Logger
+}
+
+// WithLogger sets where a failed post-commit alert (D16) is reported. Nil
+// disables logging.
+func (s *Service) WithLogger(logger *slog.Logger) *Service {
+	s.logger = logger
+	return s
 }
 
 func New(repository Repository, publisher Publisher, hasher Hasher, random io.Reader, now func() time.Time) *Service {
@@ -103,8 +112,11 @@ func (s *Service) Confirm(ctx context.Context, token, newPassword string) error 
 	if err != nil {
 		return fmt.Errorf("hash password: %w", err)
 	}
-	return s.repository.WithinPasswordResetConfirmationTransaction(ctx, func(writer store.PasswordResetConfirmationWriter) error {
-		user, unlocked, err := writer.ConsumePasswordResetTokenAndRevokeSessions(ctx, store.ConsumePasswordResetTokenParams{TokenHash: tokenHash[:], PasswordHash: passwordHash})
+	var user store.User
+	var unlocked bool
+	if err := s.repository.WithinPasswordResetConfirmationTransaction(ctx, func(writer store.PasswordResetConfirmationWriter) error {
+		var err error
+		user, unlocked, err = writer.ConsumePasswordResetTokenAndRevokeSessions(ctx, store.ConsumePasswordResetTokenParams{TokenHash: tokenHash[:], PasswordHash: passwordHash})
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return ErrTokenInvalid
@@ -131,15 +143,22 @@ func (s *Service) Confirm(ctx context.Context, token, newPassword string) error 
 		}); err != nil {
 			return fmt.Errorf("record password reset completed audit: %w", err)
 		}
-		// D14: deliver this alert for every completed reset, not just when D13
-		// also unlocks the account. It contains no credential material.
-		event := events.PasswordResetCompleted{Envelope: events.NewEnvelope(events.TypePasswordResetCompleted, "")}
-		event.Data.UserID, event.Data.Email, event.Data.DisplayName, event.Data.Unlocked = user.ID, user.Email, user.DisplayName, unlocked
-		if err := s.publisher.Publish(ctx, events.TypePasswordResetCompleted, event); err != nil {
-			return fmt.Errorf("%w: %w", ErrPublish, err)
-		}
 		return nil
-	})
+	}); err != nil {
+		return err
+	}
+	// D14: deliver this alert for every completed reset, not just when D13
+	// also unlocks the account. It contains no credential material.
+	// D16: it goes out only after the commit. The reset is already durable, so
+	// a broker failure is logged and the caller still gets success: failing
+	// here would block account recovery (including the D13 unlock) on the
+	// broker, and a retry would find the token consumed.
+	event := events.PasswordResetCompleted{Envelope: events.NewEnvelope(events.TypePasswordResetCompleted, "")}
+	event.Data.UserID, event.Data.Email, event.Data.DisplayName, event.Data.Unlocked = user.ID, user.Email, user.DisplayName, unlocked
+	if err := s.publisher.Publish(ctx, events.TypePasswordResetCompleted, event); err != nil && s.logger != nil {
+		s.logger.Error("password reset completed alert could not be published", "event_type", events.TypePasswordResetCompleted, "user_id", user.ID, "error", err)
+	}
+	return nil
 }
 
 type InvalidInputError struct{ Field, Detail string }

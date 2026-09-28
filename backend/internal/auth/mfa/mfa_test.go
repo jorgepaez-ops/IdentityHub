@@ -7,12 +7,16 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
+	"log/slog"
 	"net/netip"
+	"reflect"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jorgepaez/identity-hub/internal/auth/lockout"
+	"github.com/jorgepaez/identity-hub/internal/auth/roles"
 	"github.com/jorgepaez/identity-hub/internal/auth/token"
 	"github.com/jorgepaez/identity-hub/internal/events"
 )
@@ -52,6 +56,11 @@ func activeChallenge(code string, attempts int) StoredChallenge {
 func newVerifier(t *testing.T, repo *memoryRepository, publisher *fakePublisher) *Service {
 	t.Helper()
 	return New(repo, publisher, bytes.NewReader(bytes.Repeat([]byte{9}, 64)), time.Now).WithTokenService(newSigner(t), time.Hour)
+}
+
+func newVerifierAt(t *testing.T, repo *memoryRepository, publisher *fakePublisher, now time.Time) *Service {
+	t.Helper()
+	return New(repo, publisher, bytes.NewReader(bytes.Repeat([]byte{9}, 64)), func() time.Time { return now }).WithTokenService(newSigner(t), time.Hour)
 }
 
 func TestRF014_EmiteDesafioDeCincoMinutosYGuardaSoloHashes(t *testing.T) {
@@ -295,13 +304,30 @@ type memoryRepository struct {
 	lockedUntil      time.Time
 	lastLoginUpdated bool
 	getErr           error
+	roles            []string
+	inTransaction    bool
+	recentChallenges int
+	supersededUsers  []uuid.UUID
+	createdCalls     int
+	resentAt         time.Time
 }
 
-func (r *memoryRepository) WithinTransaction(_ context.Context, fn func(Writer) error) error {
+func (r *memoryRepository) WithinMFATransaction(_ context.Context, fn func(Writer) error) error {
+	r.inTransaction = true
+	defer func() { r.inTransaction = false }()
 	return fn(r)
+}
+func (r *memoryRepository) LockChallengeIssuance(context.Context, uuid.UUID) error { return nil }
+func (r *memoryRepository) CountChallengesSince(context.Context, uuid.UUID, time.Time) (int, error) {
+	return r.recentChallenges, nil
+}
+func (r *memoryRepository) SupersedeOpenChallenges(_ context.Context, userID uuid.UUID) error {
+	r.supersededUsers = append(r.supersededUsers, userID)
+	return nil
 }
 func (r *memoryRepository) CreateChallenge(_ context.Context, p CreateParams) error {
 	r.created = p
+	r.createdCalls++
 	return nil
 }
 func (r *memoryRepository) GetChallengeForUpdate(context.Context, []byte) (StoredChallenge, error) {
@@ -325,11 +351,14 @@ func (r *memoryRepository) RejectChallenge(context.Context, uuid.UUID) (int, err
 	}
 	return r.challenge.AttemptsLeft, nil
 }
-func (r *memoryRepository) ResendChallenge(_ context.Context, _ uuid.UUID, codeHash []byte) error {
-	r.resentHash = codeHash
+func (r *memoryRepository) ResendChallenge(_ context.Context, _ uuid.UUID, codeHash []byte, sentAt time.Time) error {
+	r.resentHash, r.resentAt = codeHash, sentAt
 	return nil
 }
 func (r *memoryRepository) ListRolesForUser(context.Context, uuid.UUID) ([]string, error) {
+	if r.roles != nil {
+		return r.roles, nil
+	}
 	return []string{"user"}, nil
 }
 func (r *memoryRepository) CreateRefreshToken(_ context.Context, refresh RefreshToken) error {
@@ -372,9 +401,21 @@ func (r *memoryRepository) audit(action string) (AuditEvent, bool) {
 	return AuditEvent{}, false
 }
 
-type fakePublisher struct{ published []any }
+type fakePublisher struct {
+	published []any
+	err       error
+	// onPublish observes the moment of publication, e.g. whether the
+	// repository transaction is still open.
+	onPublish func()
+}
 
 func (p *fakePublisher) Publish(_ context.Context, _ string, payload any) error {
+	if p.onPublish != nil {
+		p.onPublish()
+	}
+	if p.err != nil {
+		return p.err
+	}
 	p.published = append(p.published, payload)
 	return nil
 }
@@ -398,4 +439,142 @@ func (p *fakePublisher) locked() []events.AccountLocked {
 		}
 	}
 	return out
+}
+
+func TestRF014_ElCodigoSePublicaDespuesDelCommitAlEmitirYReenviar(t *testing.T) {
+	repo := &memoryRepository{challenge: activeChallenge("123456", MaxAttempts)}
+	var openAtPublish []bool
+	publisher := &fakePublisher{onPublish: func() { openAtPublish = append(openAtPublish, repo.inTransaction) }}
+	service := newVerifier(t, repo, publisher)
+
+	if _, err := service.Issue(context.Background(), User{ID: uuid.New(), Email: "ada@example.test"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := service.Resend(context.Background(), encodedToken()); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(openAtPublish, []bool{false, false}) {
+		t.Fatalf("transaction open at publish (issue, resend) = %v, want both false (D16)", openAtPublish)
+	}
+}
+
+func TestRF014_FallaPublicarElCodigoDespuesDelCommitDaErrorDeEntrega(t *testing.T) {
+	brokerErr := errors.New("broker unavailable")
+	repo := &memoryRepository{challenge: activeChallenge("123456", MaxAttempts)}
+	service := newVerifier(t, repo, &fakePublisher{err: brokerErr})
+
+	_, issueErr := service.Issue(context.Background(), User{ID: uuid.New(), Email: "ada@example.test"})
+	if !errors.Is(issueErr, ErrDeliveryUnavailable) || !errors.Is(issueErr, brokerErr) || repo.createdCalls != 1 {
+		t.Fatalf("issue err=%v created=%d, want ErrDeliveryUnavailable wrapping the broker error after the challenge was stored", issueErr, repo.createdCalls)
+	}
+	resendErr := service.Resend(context.Background(), encodedToken())
+	if !errors.Is(resendErr, ErrDeliveryUnavailable) || !errors.Is(resendErr, brokerErr) || repo.resentHash == nil {
+		t.Fatalf("resend err=%v resent=%x, want ErrDeliveryUnavailable after the resend was stored", resendErr, repo.resentHash)
+	}
+}
+
+func TestRF014_EmitirUnDesafioAnulaLosAbiertosDeLaCuenta(t *testing.T) {
+	repo := &memoryRepository{}
+	user := User{ID: uuid.New(), Email: "ada@example.test"}
+	if _, err := newVerifier(t, repo, &fakePublisher{}).Issue(context.Background(), user); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(repo.supersededUsers, []uuid.UUID{user.ID}) || repo.createdCalls != 1 {
+		t.Fatalf("superseded=%v created=%d, want the account's open challenges superseded once", repo.supersededUsers, repo.createdCalls)
+	}
+}
+
+func TestRF014_LaEmisionEstaLimitadaACincoDesafiosPorVentana(t *testing.T) {
+	user := User{ID: uuid.New(), Email: "ada@example.test"}
+	repo := &memoryRepository{recentChallenges: MaxIssuancesPerWindow - 1}
+	publisher := &fakePublisher{}
+	if _, err := newVerifier(t, repo, publisher).Issue(context.Background(), user); err != nil {
+		t.Fatalf("issue below the limit: %v", err)
+	}
+
+	repo = &memoryRepository{recentChallenges: MaxIssuancesPerWindow}
+	publisher = &fakePublisher{}
+	_, err := newVerifier(t, repo, publisher).Issue(context.Background(), user)
+	if !errors.Is(err, ErrIssuanceLimited) {
+		t.Fatalf("err=%v, want ErrIssuanceLimited", err)
+	}
+	if repo.createdCalls != 0 || len(repo.supersededUsers) != 0 || len(publisher.published) != 0 {
+		t.Fatalf("limited issue created=%d superseded=%v published=%d, want nothing", repo.createdCalls, repo.supersededUsers, len(publisher.published))
+	}
+}
+
+func TestRF017_FallaPublicarAccountLockedDesdeVerifyQuedaEnElLog(t *testing.T) {
+	var logs bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&logs, nil))
+	repo := &memoryRepository{challenge: activeChallenge("123456", MaxAttempts), priorFailures: 1}
+	publisher := &fakePublisher{err: errors.New("broker unavailable")}
+	service := newVerifier(t, repo, publisher).WithLogger(logger).WithLockout(lockout.Config{AccountMaxFailures: 2, IPMaxFailures: 20, FailureWindow: time.Hour, LockoutDuration: 30 * time.Minute})
+
+	_, err := service.Verify(context.Background(), VerifyInput{Token: encodedToken(), Code: "999999"})
+	if !errors.Is(err, ErrCodeInvalid) {
+		t.Fatalf("err=%v, want the client-facing ErrCodeInvalid preserved", err)
+	}
+	line := logs.String()
+	if !strings.Contains(line, "user_id="+repo.challenge.User.ID.String()) || !strings.Contains(line, "event_type="+events.TypeAccountLocked) || !strings.Contains(line, "broker unavailable") {
+		t.Fatalf("log=%q, want event type, user id and error", line)
+	}
+}
+
+func TestRF009_ElAccessTokenDeMFASoloLlevaRolesDeDirectorio(t *testing.T) {
+	repo := &memoryRepository{
+		challenge: activeChallenge("123456", MaxAttempts),
+		roles:     []string{roles.User, roles.ContabilidadSenior},
+	}
+	signer := newSigner(t)
+	service := New(repo, &fakePublisher{}, bytes.NewReader(bytes.Repeat([]byte{9}, 64)), time.Now).WithTokenService(signer, time.Hour)
+	result, err := service.Verify(context.Background(), VerifyInput{Token: encodedToken(), Code: "123456"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	claims, err := signer.Validate(result.AccessToken)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(claims.Roles, []string{roles.User}) {
+		t.Fatalf("roles claim=%v, want only directory roles (D8): %v", claims.Roles, []string{roles.User})
+	}
+}
+
+func TestRF014_VerificarRechazaUnDesafioVencido(t *testing.T) {
+	now := time.Date(2026, 9, 28, 12, 0, 0, 0, time.UTC)
+	challenge := activeChallenge("123456", MaxAttempts)
+	challenge.ExpiresAt = now.Add(-time.Second)
+	repo := &memoryRepository{challenge: challenge}
+	_, err := newVerifierAt(t, repo, &fakePublisher{}, now).Verify(context.Background(), VerifyInput{Token: encodedToken(), Code: "123456"})
+	if !errors.Is(err, ErrChallengeInvalid) || repo.consumed || len(repo.audits) != 0 {
+		t.Fatalf("err=%v consumed=%t audits=%d, want an expired challenge rejected untouched", err, repo.consumed, len(repo.audits))
+	}
+	// The boundary itself is expired: the challenge is valid strictly before ExpiresAt.
+	challenge.ExpiresAt = now
+	repo = &memoryRepository{challenge: challenge}
+	if _, err := newVerifierAt(t, repo, &fakePublisher{}, now).Verify(context.Background(), VerifyInput{Token: encodedToken(), Code: "123456"}); !errors.Is(err, ErrChallengeInvalid) {
+		t.Fatalf("at ExpiresAt err=%v, want ErrChallengeInvalid", err)
+	}
+}
+
+func TestRF014_ElReenvioRespetaLaVentanaDe60SegundosConElRelojDelServicio(t *testing.T) {
+	now := time.Date(2026, 9, 28, 12, 0, 0, 0, time.UTC)
+	within := activeChallenge("123456", MaxAttempts)
+	within.ExpiresAt, within.LastSentAt = now.Add(time.Minute), now.Add(-ResendInterval+time.Second)
+	repo := &memoryRepository{challenge: within}
+	publisher := &fakePublisher{}
+	if err := newVerifierAt(t, repo, publisher, now).Resend(context.Background(), encodedToken()); !errors.Is(err, ErrResendTooSoon) || repo.resentHash != nil || len(publisher.published) != 0 {
+		t.Fatalf("within the window err=%v resent=%x published=%d", err, repo.resentHash, len(publisher.published))
+	}
+
+	due := within
+	due.LastSentAt = now.Add(-ResendInterval)
+	repo = &memoryRepository{challenge: due}
+	if err := newVerifierAt(t, repo, &fakePublisher{}, now).Resend(context.Background(), encodedToken()); err != nil {
+		t.Fatalf("at the 60 second boundary: %v", err)
+	}
+	// last_sent_at must come from the same clock the window is measured with.
+	if !repo.resentAt.Equal(now) {
+		t.Fatalf("resent at %v, want the service clock %v", repo.resentAt, now)
+	}
 }

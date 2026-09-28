@@ -126,9 +126,25 @@ UPDATE users
 SET last_login_at = now()
 WHERE id = $1;
 
+-- name: LockMfaChallengeIssuance :exec
+-- Serializes concurrent issuance for one account (transaction-scoped advisory
+-- lock, so it never contends with the row locks Verify takes).
+SELECT pg_advisory_xact_lock(hashtextextended($1::uuid::text, 0));
+
+-- name: CountMfaChallengesSince :one
+SELECT count(*) FROM mfa_challenges WHERE user_id = $1 AND created_at >= $2;
+
+-- name: SupersedeOpenMfaChallenges :exec
+-- A new challenge replaces the account's open ones; marking them used makes
+-- them fail verification exactly like a consumed challenge.
+UPDATE mfa_challenges SET used_at = now()
+WHERE user_id = $1 AND used_at IS NULL;
+
 -- name: CreateMfaChallenge :exec
-INSERT INTO mfa_challenges (user_id, token_hash, code_hash, expires_at, attempts_left)
-VALUES ($1, $2, $3, $4, $5);
+-- $6 is the service clock, stored as both created_at and last_sent_at so the
+-- issuance window and the resend window use the same time source as the code.
+INSERT INTO mfa_challenges (user_id, token_hash, code_hash, expires_at, attempts_left, created_at, last_sent_at)
+VALUES ($1, $2, $3, $4, $5, $6, $6);
 
 -- name: GetMfaChallengeForUpdate :one
 SELECT c.id, c.user_id, c.code_hash, c.expires_at, c.attempts_left, c.last_sent_at, c.used_at,
@@ -151,7 +167,7 @@ RETURNING attempts_left;
 
 -- name: ResendMfaChallenge :exec
 UPDATE mfa_challenges
-SET code_hash = $2, last_sent_at = now()
+SET code_hash = $2, last_sent_at = $3
 WHERE id = $1 AND used_at IS NULL;
 
 -- name: CreateRefreshToken :exec

@@ -63,7 +63,7 @@ type Session struct {
 func New(repository *store.Store, signer *token.Service, policy lockout.Config) *Session {
 	mailbox := &Mailbox{}
 	mfaService := mfa.New(repository, mailbox, nil, time.Now).WithTokenService(signer, time.Hour).WithLockout(policy)
-	loginService := login.New(repository, signer, time.Hour, policy).WithMFA(mfaService)
+	loginService := login.New(repository, policy).WithMFA(mfaService)
 	return &Session{Login: loginService, MFA: mfaService, Mailbox: mailbox}
 }
 

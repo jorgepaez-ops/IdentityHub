@@ -11,15 +11,12 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jorgepaez/identity-hub/internal/auth/mfa"
 	"github.com/jorgepaez/identity-hub/internal/auth/password"
-	"github.com/jorgepaez/identity-hub/internal/auth/token"
 	"github.com/jorgepaez/identity-hub/internal/config"
 )
 
 type repositoryStub struct {
 	user      User
 	lookupErr error
-	roles     []string
-	refresh   RefreshToken
 	audits    []AuditEvent
 	rehashed  []string
 }
@@ -32,8 +29,8 @@ func (i testMFAIssuer) Issue(_ context.Context, user mfa.User) (mfa.Challenge, e
 	}
 	return mfa.Challenge{Token: "mfa-token", ExpiresIn: 300}, nil
 }
-func withMFA(repository Repository, signer *token.Service, ttl time.Duration) *Service {
-	return New(repository, signer, ttl).WithMFA(testMFAIssuer{})
+func withMFA(repository Repository) *Service {
+	return New(repository).WithMFA(testMFAIssuer{})
 }
 
 func (r *repositoryStub) WithinLoginTransaction(_ context.Context, fn func(Writer) error) error {
@@ -74,13 +71,6 @@ func (r *repositoryStub) UnlockLoginUser(_ context.Context, userID uuid.UUID) er
 	}
 	return nil
 }
-func (r *repositoryStub) ListRolesForUser(context.Context, uuid.UUID) ([]string, error) {
-	return r.roles, nil
-}
-func (r *repositoryStub) CreateRefreshToken(_ context.Context, value RefreshToken) error {
-	r.refresh = value
-	return nil
-}
 func (r *repositoryStub) UpdatePasswordHash(_ context.Context, _ uuid.UUID, hash string) error {
 	r.rehashed = append(r.rehashed, hash)
 	return nil
@@ -90,18 +80,14 @@ func (r *repositoryStub) InsertAuditEvent(_ context.Context, event AuditEvent) e
 	return nil
 }
 
-func TestRF003_LoginCorrectoEmiteTokensYGuardaRefresh(t *testing.T) {
+func TestRF003_LoginCorrectoDevuelveDesafioMFASinSesion(t *testing.T) {
 	hash, err := password.Hash("correct horse battery")
 	if err != nil {
 		t.Fatal(err)
 	}
-	signer, err := token.New(make([]byte, 32), "https://issuer.test", "identity-hub", time.Now)
-	if err != nil {
-		t.Fatal(err)
-	}
 	id := uuid.New()
-	repository := &repositoryStub{user: User{ID: id, Email: "ada@example.com", PasswordHash: hash, Status: StatusActive}, roles: []string{"user"}}
-	service := withMFA(repository, signer, 720*time.Hour)
+	repository := &repositoryStub{user: User{ID: id, Email: "ada@example.com", PasswordHash: hash, Status: StatusActive}}
+	service := withMFA(repository)
 
 	result, err := service.Login(context.Background(), Input{Email: "ada@example.com", Password: "correct horse battery"})
 	if err != nil {
@@ -110,7 +96,7 @@ func TestRF003_LoginCorrectoEmiteTokensYGuardaRefresh(t *testing.T) {
 	if result.MfaToken == "" || result.ExpiresIn != 300 {
 		t.Fatalf("result = %+v", result)
 	}
-	if repository.refresh.FamilyID != uuid.Nil || len(repository.audits) != 0 {
+	if len(repository.audits) != 0 {
 		t.Fatalf("audits = %+v", repository.audits)
 	}
 	if len(repository.rehashed) != 0 {
@@ -123,14 +109,10 @@ func TestRF013_CuentaConMFAIniciaDesafioSinTokens(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	signer, err := token.New(make([]byte, 32), "https://issuer.test", "identity-hub", time.Now)
-	if err != nil {
-		t.Fatal(err)
-	}
-	repository := &repositoryStub{user: User{ID: uuid.New(), PasswordHash: hash, Status: StatusActive, MFAEnabled: true}}
-	result, err := withMFA(repository, signer, time.Hour).Login(context.Background(), Input{Password: "correct horse battery"})
-	if err != nil || result.MfaToken == "" || repository.refresh.FamilyID != uuid.Nil {
-		t.Fatalf("result=%+v err=%v refresh=%+v", result, err, repository.refresh)
+	repository := &repositoryStub{user: User{ID: uuid.New(), PasswordHash: hash, Status: StatusActive}}
+	result, err := withMFA(repository).Login(context.Background(), Input{Password: "correct horse battery"})
+	if err != nil || result.MfaToken == "" {
+		t.Fatalf("result=%+v err=%v", result, err)
 	}
 	if len(repository.audits) != 0 {
 		t.Fatalf("audits=%+v", repository.audits)
@@ -142,12 +124,8 @@ func TestRF003_CuentaSinVerificarNoEntra(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	signer, err := token.New(make([]byte, 32), "https://issuer.test", "identity-hub", time.Now)
-	if err != nil {
-		t.Fatal(err)
-	}
 	repository := &repositoryStub{user: User{ID: uuid.New(), PasswordHash: hash, Status: "pending_verification"}}
-	result, err := withMFA(repository, signer, time.Hour).Login(context.Background(), Input{Password: "correct horse battery"})
+	result, err := withMFA(repository).Login(context.Background(), Input{Password: "correct horse battery"})
 	if !errors.Is(err, ErrInvalidCredentials) || result.MfaToken != "" {
 		t.Fatalf("result=%+v err=%v", result, err)
 	}
@@ -161,13 +139,9 @@ func TestRF003_LoginFallidoQuedaEnAuditoria(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	signer, err := token.New(make([]byte, 32), "https://issuer.test", "identity-hub", time.Now)
-	if err != nil {
-		t.Fatal(err)
-	}
 	id := uuid.New()
 	repository := &repositoryStub{user: User{ID: id, PasswordHash: hash, Status: StatusActive}}
-	_, err = withMFA(repository, signer, time.Hour).Login(context.Background(), Input{Password: "wrong password"})
+	_, err = withMFA(repository).Login(context.Background(), Input{Password: "wrong password"})
 	if !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("Login() error = %v, want invalid credentials", err)
 	}
@@ -181,39 +155,12 @@ func TestRF003_AM004EmailInexistenteYPasswordIncorrectoCompartenError(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	signer, err := token.New(make([]byte, 32), "https://issuer.test", "identity-hub", time.Now)
-	if err != nil {
-		t.Fatal(err)
-	}
 	unknown := &repositoryStub{lookupErr: pgx.ErrNoRows}
 	wrongPassword := &repositoryStub{user: User{ID: uuid.New(), PasswordHash: hash, Status: StatusActive}}
-	_, unknownErr := withMFA(unknown, signer, time.Hour).Login(context.Background(), Input{Email: "missing@example.com", Password: "wrong password"})
-	_, wrongPasswordErr := withMFA(wrongPassword, signer, time.Hour).Login(context.Background(), Input{Email: "known@example.com", Password: "wrong password"})
+	_, unknownErr := withMFA(unknown).Login(context.Background(), Input{Email: "missing@example.com", Password: "wrong password"})
+	_, wrongPasswordErr := withMFA(wrongPassword).Login(context.Background(), Input{Email: "known@example.com", Password: "wrong password"})
 	if !errors.Is(unknownErr, ErrInvalidCredentials) || !errors.Is(wrongPasswordErr, ErrInvalidCredentials) || unknownErr.Error() != wrongPasswordErr.Error() {
 		t.Fatalf("unknown=%v wrong-password=%v", unknownErr, wrongPasswordErr)
-	}
-}
-
-func TestRF009_TokenDeConsolaSoloContieneRolesDeDirectorio(t *testing.T) {
-	hash, err := password.Hash("correct horse battery")
-	if err != nil {
-		t.Fatal(err)
-	}
-	signer, err := token.New(make([]byte, 32), "https://issuer.test", "identity-hub", time.Now)
-	if err != nil {
-		t.Fatal(err)
-	}
-	id := uuid.New()
-	repository := &repositoryStub{
-		user:  User{ID: id, Email: "senior@example.com", PasswordHash: hash, Status: StatusActive},
-		roles: []string{"user", "contabilidad.senior"},
-	}
-	result, err := withMFA(repository, signer, time.Hour).Login(context.Background(), Input{Email: "senior@example.com", Password: "correct horse battery"})
-	if err != nil {
-		t.Fatalf("Login() error = %v", err)
-	}
-	if result.MfaToken == "" {
-		t.Fatalf("result=%+v", result)
 	}
 }
 
@@ -222,12 +169,8 @@ func TestRF017_SeisFallosDevuelven423(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	signer, err := token.New(make([]byte, 32), "https://issuer.test", "identity-hub", time.Now)
-	if err != nil {
-		t.Fatal(err)
-	}
-	repository := &repositoryStub{user: User{ID: uuid.New(), Email: "ada@example.com", PasswordHash: hash, Status: StatusActive}, roles: []string{"user"}}
-	service := withMFA(repository, signer, time.Hour)
+	repository := &repositoryStub{user: User{ID: uuid.New(), Email: "ada@example.com", PasswordHash: hash, Status: StatusActive}}
+	service := withMFA(repository)
 
 	for attempt := 1; attempt <= 5; attempt++ {
 		if _, err := service.Login(context.Background(), Input{Email: "ada@example.com", Password: "wrong password"}); !errors.Is(err, ErrInvalidCredentials) {
@@ -244,14 +187,10 @@ func TestRF013_LoginPasaNombreYCorreoAlDesafioMFA(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	signer, err := token.New(make([]byte, 32), "https://issuer.test", "identity-hub", time.Now)
-	if err != nil {
-		t.Fatal(err)
-	}
 	id := uuid.New()
 	repository := &repositoryStub{user: User{ID: id, Email: "ada@example.com", DisplayName: "Ada Lovelace", PasswordHash: hash, Status: StatusActive}}
 	var issued []mfa.User
-	service := New(repository, signer, time.Hour).WithMFA(testMFAIssuer{issued: &issued})
+	service := New(repository).WithMFA(testMFAIssuer{issued: &issued})
 	if _, err := service.Login(context.Background(), Input{Email: "ada@example.com", Password: "correct horse battery"}); err != nil {
 		t.Fatal(err)
 	}
@@ -267,12 +206,8 @@ func TestRF013_LoginSoloReescribeElHashObsoletoYNoRegistraExito(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	signer, err := token.New(make([]byte, 32), "https://issuer.test", "identity-hub", time.Now)
-	if err != nil {
-		t.Fatal(err)
-	}
 	repository := &repositoryStub{user: User{ID: uuid.New(), Email: "ada@example.com", PasswordHash: weakHash, Status: StatusActive}}
-	if _, err := withMFA(repository, signer, time.Hour).Login(context.Background(), Input{Email: "ada@example.com", Password: "correct horse battery"}); err != nil {
+	if _, err := withMFA(repository).Login(context.Background(), Input{Email: "ada@example.com", Password: "correct horse battery"}); err != nil {
 		t.Fatal(err)
 	}
 	if len(repository.rehashed) != 1 || repository.rehashed[0] == weakHash {

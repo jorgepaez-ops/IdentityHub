@@ -6,12 +6,13 @@ import (
 	"net/http"
 
 	"github.com/jorgepaez/identity-hub/internal/auth/login"
+	"github.com/jorgepaez/identity-hub/internal/auth/mfa"
 )
 
 // Login verifies the password and starts the mandatory email MFA challenge
 // (D11). No session exists until POST /auth/mfa/verify accepts the code.
 func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
-	if s.login == nil || s.refreshTTL <= 0 {
+	if s.login == nil {
 		writeProblem(w, http.StatusServiceUnavailable, "login-unavailable", "Service Unavailable", "Login is temporarily unavailable.")
 		return
 	}
@@ -30,6 +31,10 @@ func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusLocked, "login-locked", "Locked", "Login is temporarily unavailable. Please try again later.")
 	case errors.Is(err, login.ErrInvalidCredentials):
 		writeProblem(w, http.StatusUnauthorized, "invalid-credentials", "Unauthorized", "Invalid email or password.")
+	case errors.Is(err, mfa.ErrIssuanceLimited):
+		writeProblem(w, http.StatusTooManyRequests, "mfa-challenge-rate-limited", "Too Many Requests", "Too many verification codes were requested. Please try again later.")
+	case errors.Is(err, mfa.ErrDeliveryUnavailable):
+		writeProblem(w, http.StatusServiceUnavailable, "mfa-delivery-unavailable", "Service Unavailable", "The verification code could not be sent. Please try again.")
 	default:
 		writeProblem(w, http.StatusInternalServerError, "login-failed", "Internal Server Error", "Login could not be completed.")
 	}

@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
@@ -15,7 +16,6 @@ import (
 	"github.com/jorgepaez/identity-hub/internal/auth/login"
 	"github.com/jorgepaez/identity-hub/internal/auth/mfa"
 	"github.com/jorgepaez/identity-hub/internal/auth/password"
-	"github.com/jorgepaez/identity-hub/internal/auth/token"
 )
 
 type loginStub struct {
@@ -45,7 +45,7 @@ func (s loginStub) Login(context.Context, login.Input) (login.Result, error) { r
 
 func TestRF013_LoginCorrectoDevuelveDesafioMFAyNoCookie(t *testing.T) {
 	server := NewServer(nil, "test", nil)
-	server.SetLoginService(loginStub{result: login.Result{MfaToken: "short-lived-token", ExpiresIn: 300}}, time.Hour)
+	server.SetLoginService(loginStub{result: login.Result{MfaToken: "short-lived-token", ExpiresIn: 300}})
 	response := httptest.NewRecorder()
 	server.Login(response, httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", strings.NewReader(`{"email":"ada@example.com","password":"correct horse battery"}`)))
 	if response.Code != http.StatusAccepted || len(response.Result().Cookies()) != 0 || !strings.Contains(response.Body.String(), "mfaToken") {
@@ -116,7 +116,7 @@ func TestRF014_CamposMFAObligatoriosVaciosDevuelven400(t *testing.T) {
 
 func TestRF003_PasswordIncorrectoDevuelve401Generico(t *testing.T) {
 	server := NewServer(nil, "test", nil)
-	server.SetLoginService(loginStub{err: login.ErrInvalidCredentials}, time.Hour)
+	server.SetLoginService(loginStub{err: login.ErrInvalidCredentials})
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", strings.NewReader(`{"email":"ada@example.com","password":"wrong"}`))
 	server.Login(response, request)
@@ -147,13 +147,7 @@ func (*realLoginRepositoryStub) LockLoginUser(context.Context, uuid.UUID, time.T
 	return nil
 }
 func (*realLoginRepositoryStub) UnlockLoginUser(context.Context, uuid.UUID) error { return nil }
-func (*realLoginRepositoryStub) ListRolesForUser(context.Context, uuid.UUID) ([]string, error) {
-	return []string{"user"}, nil
-}
 func (*realLoginRepositoryStub) UpdatePasswordHash(context.Context, uuid.UUID, string) error {
-	return nil
-}
-func (*realLoginRepositoryStub) CreateRefreshToken(context.Context, login.RefreshToken) error {
 	return nil
 }
 func (s *realLoginRepositoryStub) InsertAuditEvent(_ context.Context, event login.AuditEvent) error {
@@ -163,10 +157,6 @@ func (s *realLoginRepositoryStub) InsertAuditEvent(_ context.Context, event logi
 
 func TestRF003_AM004EmailInexistenteYPasswordIncorrectoDevuelvenElMismoMensaje(t *testing.T) {
 	hash, err := password.Hash("correct horse battery")
-	if err != nil {
-		t.Fatal(err)
-	}
-	signer, err := token.New(make([]byte, 32), "https://issuer.test", "identity-hub", time.Now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,7 +171,7 @@ func TestRF003_AM004EmailInexistenteYPasswordIncorrectoDevuelvenElMismoMensaje(t
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			server := NewServer(nil, "test", nil)
-			server.SetLoginService(login.New(testCase.repo, signer, time.Hour).WithMFA(mfaIssuerStub{}), time.Hour)
+			server.SetLoginService(login.New(testCase.repo).WithMFA(mfaIssuerStub{}))
 			response := httptest.NewRecorder()
 			request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", strings.NewReader(`{"email":"ada@example.com","password":"wrong password"}`))
 			server.Login(response, request)
@@ -200,7 +190,7 @@ func TestRF017_BloqueoDevuelve423SinRevelarSuOrigen(t *testing.T) {
 	responses := make([]string, 0, 2)
 	for _, err := range []error{login.ErrAccountLocked, login.ErrIPRateLimited} {
 		server := NewServer(nil, "test", nil)
-		server.SetLoginService(loginStub{err: err}, time.Hour)
+		server.SetLoginService(loginStub{err: err})
 		response := httptest.NewRecorder()
 		request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", strings.NewReader(`{"email":"ada@example.com","password":"correct horse battery"}`))
 		server.Login(response, request)
@@ -249,7 +239,7 @@ func rf017RouteRequest(header string) *http.Request {
 func TestRF017_BloqueoNoSeEvitaFalsificandoXForwardedFor(t *testing.T) {
 	authenticator := &rf017RouteAuthenticator{threshold: 5, counts: make(map[string]int)}
 	server := NewServer(nil, "test", nil)
-	server.SetLoginService(authenticator, time.Hour)
+	server.SetLoginService(authenticator)
 	handler := server.Routes()
 	for attempt := 1; attempt <= 6; attempt++ {
 		response := httptest.NewRecorder()
@@ -273,7 +263,7 @@ func TestRF017_RotarXForwardedForNoEvadeElLimitePorIP(t *testing.T) {
 	t.Run("untrusted peer", func(t *testing.T) {
 		authenticator := &rf017RouteAuthenticator{byIP: true, threshold: 2, counts: make(map[string]int)}
 		server := NewServer(nil, "test", nil)
-		server.SetLoginService(authenticator, time.Hour)
+		server.SetLoginService(authenticator)
 		handler := server.Routes()
 		for attempt := 1; attempt <= 3; attempt++ {
 			response := httptest.NewRecorder()
@@ -290,7 +280,7 @@ func TestRF017_RotarXForwardedForNoEvadeElLimitePorIP(t *testing.T) {
 	t.Run("trusted proxy separates clients", func(t *testing.T) {
 		authenticator := &rf017RouteAuthenticator{byIP: true, threshold: 2, counts: make(map[string]int)}
 		server := NewServer(nil, "test", nil)
-		server.SetLoginService(authenticator, time.Hour)
+		server.SetLoginService(authenticator)
 		server.SetTrustedProxies([]netip.Prefix{netip.MustParsePrefix("203.0.113.0/24")})
 		handler := server.Routes()
 		for _, header := range []string{"198.51.100.1", "198.51.100.2", "198.51.100.1"} {
@@ -311,4 +301,35 @@ func TestRF017_RotarXForwardedForNoEvadeElLimitePorIP(t *testing.T) {
 			t.Fatalf("independent client-2 status = %d, want 401", response.Code)
 		}
 	})
+}
+
+func TestRF014_LaEmisionLimitadaDeLoginDevuelve429ProblemJSON(t *testing.T) {
+	server := NewServer(nil, "test", nil)
+	server.SetLoginService(loginStub{err: fmt.Errorf("issue mfa challenge: %w", mfa.ErrIssuanceLimited)})
+	response := httptest.NewRecorder()
+	server.Login(response, httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", strings.NewReader(`{"email":"ada@example.com","password":"correct horse battery"}`)))
+	if response.Code != http.StatusTooManyRequests || !strings.HasPrefix(response.Header().Get("Content-Type"), "application/problem+json") {
+		t.Fatalf("status=%d content-type=%q body=%s, want 429 problem+json", response.Code, response.Header().Get("Content-Type"), response.Body.String())
+	}
+}
+
+func TestRF014_FalloDeEntregaDelCodigoDevuelve503ProblemJSON(t *testing.T) {
+	deliveryErr := fmt.Errorf("issue mfa challenge: %w", mfa.ErrDeliveryUnavailable)
+	server := NewServer(nil, "test", nil)
+	server.SetLoginService(loginStub{err: deliveryErr})
+	server.SetMFAService(&mfaStub{resendErr: deliveryErr}, time.Hour)
+	for name, call := range map[string]func(http.ResponseWriter){
+		"login": func(w http.ResponseWriter) {
+			server.Login(w, httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", strings.NewReader(`{"email":"ada@example.com","password":"correct horse battery"}`)))
+		},
+		"resend": func(w http.ResponseWriter) {
+			server.ResendMfaCode(w, httptest.NewRequest(http.MethodPost, "/api/v1/auth/mfa/resend", strings.NewReader(`{"mfaToken":"challenge"}`)))
+		},
+	} {
+		response := httptest.NewRecorder()
+		call(response)
+		if response.Code != http.StatusServiceUnavailable || !strings.HasPrefix(response.Header().Get("Content-Type"), "application/problem+json") {
+			t.Fatalf("%s: status=%d content-type=%q body=%s, want 503 problem+json", name, response.Code, response.Header().Get("Content-Type"), response.Body.String())
+		}
+	}
 }

@@ -452,7 +452,7 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 - Commit: `1bacc20`
 
 ### T7-fix — Observaciones de la revisión nativa de T7
-- [ ] Estado · Ejecutor: `Sonnet` (Codex sin cuota hasta las 19:23) · Depende de: T7
+- [x] Estado · Ejecutor: `Sonnet` (Codex sin cuota hasta las 19:23) · Depende de: T7
 - D16: aviso de D14 y código MFA publicados después del commit; enmienda a la ADR 0006.
 - Límite de emisión: cada login nuevo anula los desafíos abiertos de la cuenta y hay un tope de 5
   desafíos por cuenta cada 15 min (429). La purga de desafíos vencidos queda para después.
@@ -463,6 +463,19 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 - Menores: dependencias muertas en `login.Service`, `refreshTTL` compartido entre setters, largo
   del código y `"active"` como constantes, nombre del `WithinTransaction` del store MFA, `0` con
   nombre en `refreshCookie`.
+- Hecho por Sonnet (delegación directa, 2+ archivos no triviales), revisado por Claude. Ventana de
+  emisión con constantes propias (`IssuanceWindow`, `MaxIssuancesPerWindow`), no la del bloqueo,
+  que es configurable y pensada para credenciales erróneas; un `pg_advisory_xact_lock` por usuario
+  evita superar el tope con logins concurrentes. `last_sent_at` y `created_at` salen del reloj del
+  servicio. `login.New` ya no recibe el servicio de tokens ni el TTL. Las pruebas de roles de
+  directorio y de vencimiento cubren comportamiento existente: se probaron mutando `mfa.go`.
+  `make gen` regeneró `frontend/src/api/schema.d.ts`, que estaba desactualizado.
+  - Verificación de Claude: unitarias, lint 0, `go vet -tags=integration`, trazabilidad al día e
+    integración completa con PostgreSQL real en verde (76,4%).
+  - Quedan anotados: el 6.º desafío rechazado no se audita (el callback se revierte, solo da 429);
+    si un reenvío confirma pero falla la publicación, el código anterior ya no sirve y hay que
+    esperar 60 s para reenviar; con la contraseña, alguien puede agotar el tope de 5 desafíos y
+    dejar al titular 15 min sin entrar (mismo compromiso que el bloqueo de RF-017).
 - Commit: —
 
 ### T8 — RF-016 Sesiones activas
@@ -558,7 +571,7 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 
 ## Siguiente paso
 
-T7-fix (Sonnet); luego T8 (sesiones activas, Codex).
+Revisión nativa de T7-fix; luego T8 (sesiones activas, Codex).
 
 ## Cambios de spec propuestos
 

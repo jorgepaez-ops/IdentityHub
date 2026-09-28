@@ -17,7 +17,6 @@ import (
 	"github.com/jorgepaez/identity-hub/internal/auth/login"
 	"github.com/jorgepaez/identity-hub/internal/auth/mfa"
 	"github.com/jorgepaez/identity-hub/internal/auth/password"
-	"github.com/jorgepaez/identity-hub/internal/auth/token"
 	"github.com/jorgepaez/identity-hub/internal/store"
 	"github.com/jorgepaez/identity-hub/internal/testdb"
 )
@@ -140,11 +139,7 @@ func TestRF015_SolicitudAusenteNoPersisteTokenUtil(t *testing.T) {
 
 func newIntegrationLoginService(t *testing.T, repository *store.Store) *login.Service {
 	t.Helper()
-	signer, err := token.New(make([]byte, 32), "https://issuer.test", "identity-hub", time.Now)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return login.New(repository, signer, time.Hour).WithMFA(integrationMFAIssuer{})
+	return login.New(repository).WithMFA(integrationMFAIssuer{})
 }
 
 // D13: a reset completed on a locked account (RF-017) reactivates it and the

@@ -126,8 +126,8 @@ func run() error {
 		FailureWindow:      cfg.LoginFailureWindow,
 		LockoutDuration:    cfg.LoginLockoutDuration,
 	}
-	mfaService := mfa.New(db, broker, rand.Reader, time.Now).WithTokenService(tokens, cfg.RefreshTTL).WithLockout(lockoutPolicy)
-	loginService := login.New(db, tokens, cfg.RefreshTTL, lockoutPolicy).WithEventPublisher(loginSecurityEventPublisher{users: db, publisher: broker, logger: logger}).WithMFA(mfaService)
+	mfaService := mfa.New(db, broker, rand.Reader, time.Now).WithTokenService(tokens, cfg.RefreshTTL).WithLockout(lockoutPolicy).WithLogger(logger)
+	loginService := login.New(db, lockoutPolicy).WithEventPublisher(loginSecurityEventPublisher{users: db, publisher: broker, logger: logger}).WithMFA(mfaService)
 	refreshService := refresh.New(db, tokens, cfg.RefreshTTL).WithEventPublisher(refreshSecurityEventPublisher{users: db, publisher: broker, logger: logger})
 
 	server := api.NewServer(logger, cfg.Version, map[string]api.Checker{
@@ -138,8 +138,8 @@ func run() error {
 	server.SetEmployeeCreationService(employeeService)
 	server.SetInvitationAcceptanceService(invitationService)
 	server.SetInvitationResendService(invitationresend.New(db, broker, rand.Reader, time.Now))
-	server.SetPasswordResetService(passwordreset.New(db, broker, passwordHasher{}, rand.Reader, time.Now))
-	server.SetLoginService(loginService, cfg.RefreshTTL)
+	server.SetPasswordResetService(passwordreset.New(db, broker, passwordHasher{}, rand.Reader, time.Now).WithLogger(logger))
+	server.SetLoginService(loginService)
 	server.SetMFAService(mfaService, cfg.RefreshTTL)
 	server.SetRefreshService(refreshService)
 	server.SetLogoutService(logout.New(db))

@@ -91,6 +91,9 @@ export interface paths {
          * Iniciar sesión con correo y contraseña
          * @description Una contraseña correcta siempre devuelve `202` con un `mfaToken` temporal y
          *     envía por correo un código de 6 dígitos. No crea sesión hasta completar MFA.
+         *     Cada desafío nuevo anula los abiertos de la cuenta; se emiten como máximo 5 por cuenta
+         *     cada 15 minutos (`429` al superarlo). El código se publica tras confirmar la transacción:
+         *     si el broker falla, responde `503` y el desafío no usado vence solo (ADR 0006, D16).
          */
         post: operations["login"];
         delete?: never;
@@ -127,7 +130,7 @@ export interface paths {
         put?: never;
         /**
          * Reenviar el código del desafío MFA
-         * @description Anula el código anterior, conserva el desafío y limita la frecuencia de envío.
+         * @description Anula el código anterior, conserva el desafío y permite un envío cada 60 segundos.
          */
         post: operations["resendMfaCode"];
         delete?: never;
@@ -777,7 +780,24 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            429: components["responses"]["TooManyRequests"];
+            /** @description Límite de peticiones excedido, o ya se emitieron 5 desafíos MFA para la cuenta en 15 minutos */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No se pudo enviar el código MFA; el desafío no usado vence solo */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     verifyMfa: {
@@ -831,6 +851,15 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             429: components["responses"]["TooManyRequests"];
+            /** @description No se pudo enviar el código MFA; el desafío no usado vence solo */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     refreshSession: {
@@ -929,7 +958,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Contraseña actualizada y sesiones revocadas */
+            /** @description Contraseña actualizada y sesiones revocadas; el aviso por correo se publica tras confirmar y un fallo del broker no cambia el resultado (D16) */
             204: {
                 headers: {
                     [name: string]: unknown;

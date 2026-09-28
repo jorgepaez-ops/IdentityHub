@@ -197,3 +197,130 @@ func TestRF017_RechazosMFACuentanParaElLimitePorIP(t *testing.T) {
 		t.Fatalf("login after two rejected codes from one IP = %v, want ErrIPRateLimited", err)
 	}
 }
+
+func newIntegrationService(t *testing.T, repository *store.Store, now func() time.Time) *mfa.Service {
+	t.Helper()
+	return mfa.New(repository, publisher{}, nil, now).WithTokenService(newSigner(t), time.Hour)
+}
+
+func TestRF014_CreateChallengeGuardaLosIntentosRecibidosEnPostgres(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test requires a PostgreSQL server")
+	}
+	pool := testdb.New(t)
+	repository, err := store.NewWithPool(pool)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	userID := newActiveUser(t, pool, repository, "mfa-attempts@example.test")
+	hash := bytes.Repeat([]byte{3}, sha256.Size)
+	if err := repository.WithinMFATransaction(ctx, func(w mfa.Writer) error {
+		return w.CreateChallenge(ctx, mfa.CreateParams{UserID: userID, TokenHash: hash, CodeHash: hash, ExpiresAt: time.Now().Add(time.Minute), AttemptsLeft: 3, SentAt: time.Now()})
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var attempts int
+	if err := pool.QueryRow(ctx, `SELECT attempts_left FROM mfa_challenges WHERE user_id = $1`, userID).Scan(&attempts); err != nil {
+		t.Fatal(err)
+	}
+	if attempts != 3 {
+		t.Fatalf("attempts_left = %d, want the 3 passed in", attempts)
+	}
+}
+
+func TestRF014_UnDesafioNuevoAnulaLosAbiertosYLaEmisionTieneTope(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test requires a PostgreSQL server")
+	}
+	pool := testdb.New(t)
+	repository, err := store.NewWithPool(pool)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	user := mfa.User{ID: newActiveUser(t, pool, repository, "mfa-limit@example.test"), Email: "mfa-limit@example.test"}
+	service := newIntegrationService(t, repository, time.Now)
+
+	var first mfa.Challenge
+	for issued := 1; issued <= mfa.MaxIssuancesPerWindow; issued++ {
+		challenge, err := service.Issue(ctx, user)
+		if err != nil {
+			t.Fatalf("issue %d: %v", issued, err)
+		}
+		if issued == 1 {
+			first = challenge
+		}
+	}
+	if _, err := service.Issue(ctx, user); !errors.Is(err, mfa.ErrIssuanceLimited) {
+		t.Fatalf("issue beyond the limit = %v, want ErrIssuanceLimited", err)
+	}
+	var total, open int
+	if err := pool.QueryRow(ctx, `SELECT count(*), count(*) FILTER (WHERE used_at IS NULL) FROM mfa_challenges WHERE user_id = $1`, user.ID).Scan(&total, &open); err != nil {
+		t.Fatal(err)
+	}
+	if total != mfa.MaxIssuancesPerWindow || open != 1 {
+		t.Fatalf("challenges total=%d open=%d, want %d total and only the latest open", total, open, mfa.MaxIssuancesPerWindow)
+	}
+	// The superseded first challenge no longer verifies, even with its own code.
+	if _, err := service.Verify(ctx, mfa.VerifyInput{Token: first.Token, Code: "000000"}); !errors.Is(err, mfa.ErrChallengeInvalid) {
+		t.Fatalf("verify on a superseded challenge = %v, want ErrChallengeInvalid", err)
+	}
+}
+
+func TestRF014_LaEmisionFueraDeLaVentanaNoCuenta(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test requires a PostgreSQL server")
+	}
+	pool := testdb.New(t)
+	repository, err := store.NewWithPool(pool)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	user := mfa.User{ID: newActiveUser(t, pool, repository, "mfa-window@example.test"), Email: "mfa-window@example.test"}
+	past := time.Now().Add(-2 * mfa.IssuanceWindow)
+	for issued := 0; issued < mfa.MaxIssuancesPerWindow; issued++ {
+		if _, err := newIntegrationService(t, repository, func() time.Time { return past }).Issue(ctx, user); err != nil {
+			t.Fatalf("old issue %d: %v", issued, err)
+		}
+	}
+	if _, err := newIntegrationService(t, repository, time.Now).Issue(ctx, user); err != nil {
+		t.Fatalf("issue after the window elapsed: %v", err)
+	}
+}
+
+func TestRF014_ElReenvioGuardaLastSentAtConElRelojDelServicio(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test requires a PostgreSQL server")
+	}
+	pool := testdb.New(t)
+	repository, err := store.NewWithPool(pool)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	userID := newActiveUser(t, pool, repository, "mfa-resend@example.test")
+	start := time.Now().UTC().Truncate(time.Microsecond)
+	challenge, err := newIntegrationService(t, repository, func() time.Time { return start }).Issue(ctx, mfa.User{ID: userID, Email: "mfa-resend@example.test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sentAt time.Time
+	if err := pool.QueryRow(ctx, `SELECT last_sent_at FROM mfa_challenges WHERE user_id = $1`, userID).Scan(&sentAt); err != nil {
+		t.Fatal(err)
+	}
+	if !sentAt.Equal(start) {
+		t.Fatalf("last_sent_at after issue = %v, want the service clock %v", sentAt, start)
+	}
+	later := start.Add(mfa.ResendInterval + time.Second)
+	if err := newIntegrationService(t, repository, func() time.Time { return later }).Resend(ctx, challenge.Token); err != nil {
+		t.Fatal(err)
+	}
+	if err := pool.QueryRow(ctx, `SELECT last_sent_at FROM mfa_challenges WHERE user_id = $1`, userID).Scan(&sentAt); err != nil {
+		t.Fatal(err)
+	}
+	if !sentAt.Equal(later) {
+		t.Fatalf("last_sent_at after resend = %v, want the service clock %v", sentAt, later)
+	}
+}

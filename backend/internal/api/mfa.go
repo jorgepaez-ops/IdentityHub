@@ -9,7 +9,7 @@ import (
 )
 
 func (s *Server) verifyMfa(w http.ResponseWriter, r *http.Request) {
-	if s.mfa == nil || s.refreshTTL <= 0 {
+	if s.mfa == nil || s.mfaRefreshTTL <= 0 {
 		writeProblem(w, http.StatusServiceUnavailable, "mfa-unavailable", "Service Unavailable", "MFA is temporarily unavailable.")
 		return
 	}
@@ -36,7 +36,7 @@ func (s *Server) verifyMfa(w http.ResponseWriter, r *http.Request) {
 	})
 	if err == nil {
 		// Persist the session across browser restarts, as the pre-MFA login did.
-		http.SetCookie(w, refreshCookie(result.RefreshToken, int(s.refreshTTL.Seconds())))
+		http.SetCookie(w, refreshCookie(result.RefreshToken, int(s.mfaRefreshTTL.Seconds())))
 		writeJSON(w, http.StatusOK, TokenPair{AccessToken: result.AccessToken, TokenType: TokenPairTokenType(result.TokenType), ExpiresIn: result.ExpiresIn})
 		return
 	}
@@ -71,6 +71,8 @@ func (s *Server) resendMfaCode(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusTooManyRequests, "mfa-resend-rate-limited", "Too Many Requests", "Please wait before requesting another code.")
 	case errors.Is(err, mfa.ErrChallengeInvalid):
 		writeUnauthorized(w)
+	case errors.Is(err, mfa.ErrDeliveryUnavailable):
+		writeProblem(w, http.StatusServiceUnavailable, "mfa-delivery-unavailable", "Service Unavailable", "The verification code could not be sent. Please try again.")
 	default:
 		writeProblem(w, http.StatusInternalServerError, "mfa-resend-failed", "Internal Server Error", "The MFA code could not be resent.")
 	}

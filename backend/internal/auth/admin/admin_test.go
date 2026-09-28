@@ -11,7 +11,6 @@ import (
 	"github.com/jorgepaez/identity-hub/internal/auth/login"
 	"github.com/jorgepaez/identity-hub/internal/auth/mfa"
 	"github.com/jorgepaez/identity-hub/internal/auth/password"
-	"github.com/jorgepaez/identity-hub/internal/auth/token"
 )
 
 type repositoryStub struct {
@@ -100,11 +99,7 @@ func TestRF010_AdminDeshabilitaYElUsuarioNoEntra(t *testing.T) {
 	if len(repository.audits) != 1 || repository.audits[0].Action != "user_disabled" || repository.audits[0].ActorUserID == nil || *repository.audits[0].ActorUserID != actorID {
 		t.Fatalf("audits=%+v", repository.audits)
 	}
-	signer, err := token.New(make([]byte, 32), "https://issuer.test", "identity-hub", time.Now)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = login.New(loginRepository{repository}, signer, time.Hour).WithMFA(adminMFAIssuer{}).Login(context.Background(), login.Input{Email: "user@example.com", Password: "correct horse battery"})
+	_, err = login.New(loginRepository{repository}).WithMFA(adminMFAIssuer{}).Login(context.Background(), login.Input{Email: "user@example.com", Password: "correct horse battery"})
 	if !errors.Is(err, login.ErrInvalidCredentials) {
 		t.Fatalf("disabled user login error=%v", err)
 	}
@@ -132,8 +127,7 @@ func (w loginWriter) GetLoginUserByEmail(_ context.Context, email string) (login
 	}
 	return login.User{}, errors.New("not found")
 }
-func (w loginWriter) UpdatePasswordHash(context.Context, uuid.UUID, string) error  { return nil }
-func (w loginWriter) CreateRefreshToken(context.Context, login.RefreshToken) error { return nil }
+func (w loginWriter) UpdatePasswordHash(context.Context, uuid.UUID, string) error { return nil }
 func (w loginWriter) CountLoginFailuresByAccount(context.Context, uuid.UUID, time.Time) (int64, error) {
 	return 0, nil
 }
@@ -142,9 +136,6 @@ func (w loginWriter) CountLoginFailuresByIP(context.Context, netip.Addr, time.Ti
 }
 func (w loginWriter) LockLoginUser(context.Context, uuid.UUID, time.Time) error { return nil }
 func (w loginWriter) UnlockLoginUser(context.Context, uuid.UUID) error          { return nil }
-func (w loginWriter) ListRolesForUser(ctx context.Context, id uuid.UUID) ([]string, error) {
-	return w.repositoryStub.ListRolesForUser(ctx, id)
-}
 func (w loginWriter) InsertAuditEvent(_ context.Context, event login.AuditEvent) error {
 	return w.repositoryStub.InsertAuditEvent(context.Background(), AuditEvent{ActorUserID: event.ActorUserID, Action: event.Action})
 }

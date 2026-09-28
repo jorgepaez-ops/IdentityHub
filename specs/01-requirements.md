@@ -145,6 +145,12 @@ La contraseña correcta inicia un desafío, pero no crea una sesión.
 
 > **Enmienda T3 · 2026-09-27 · ADR 0010:** se concreta el desafío MFA por correo.
 
+> **Enmienda T7-fix · 2026-09-28 · D16:** el código se publica después de confirmar la transacción
+> (ADR 0006, Enmienda D16), al emitir y al reenviar. Si el broker falla en ese punto, el login (o
+> el reenvío) responde `503` y el desafío no usado vence solo. Cada desafío nuevo anula los
+> desafíos abiertos de la cuenta y se emiten como máximo **5 desafíos por cuenta cada 15 minutos**;
+> el sexto responde `429` (`application/problem+json`) sin crear desafío ni enviar correo.
+
 > **Enmienda T7 · 2026-09-28 · D15:** se fijan los límites de 5 minutos, 5 intentos y 60 segundos.
 > El código se guarda como HMAC-SHA256 con clave en el token del desafío, y el éxito del inicio de
 > sesión (`login_succeeded`, `last_login_at`) se registra al aceptar el código, no al verificar la contraseña.
@@ -168,6 +174,10 @@ Quien olvida su contraseña la restablece por correo.
 
 > **Enmienda T7 · 2026-09-28 · D14:** todo restablecimiento completado envía un aviso de contraseña
 > cambiada y sesiones cerradas; indica el desbloqueo solo cuando aplica.
+
+> **Enmienda T7-fix · 2026-09-28 · D16:** el aviso se publica después de confirmar el
+> restablecimiento. Si el broker falla, el restablecimiento se mantiene, `confirm` responde `204` y
+> el fallo queda en el log (ADR 0006, Enmienda D16).
 
 ### RF-016 — Sesiones activas · P1
 El titular ve sus sesiones y puede revocarlas individualmente.
