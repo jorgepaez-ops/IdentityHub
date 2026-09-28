@@ -325,11 +325,34 @@ Ninguna: P1 a P4 resueltas en D8 a D11.
 - Commit: `28293dd`, `8b7d5b3`
 
 ### T6 — RF-015 Restablecimiento de contraseña
-- [ ] Estado · Ejecutor: `Codex` · Depende de: T5 (reutiliza el mecanismo de token)
+- [x] Estado · Ejecutor: `Codex` · Depende de: T5 (reutiliza el mecanismo de token)
 - Respuesta no enumerable, token de una hora, revocación de las sesiones anteriores al cambiar.
 - Incluye D12: `POST /api/v1/admin/users/{userId}/invitation` (reenvío), con enmienda al spec
   (requisito, OpenAPI y escenario) antes de implementarlo.
-- Commit: —
+- Hecho (2026-09-28, Codex; revisión de Claude). Paquetes `internal/auth/passwordreset` e
+  `internal/auth/invitationresend`, handlers compuestos en `Routes()`. La solicitud hace siempre
+  el mismo `INSERT … SELECT` y publica en ambos caminos (AM-004); el evento lleva `accountExists`
+  solo por el broker y el worker no envía correo si la cuenta no existe. La confirmación valida el
+  token antes de Argon2id y, en una sola sentencia, cambia la contraseña, consume el token, anula
+  los demás tokens de restablecimiento del usuario y revoca todas las sesiones (AM-005). Reenvío:
+  solo admin, solo `pending_verification` (si no, 409), anula invitaciones previas, token de 24 h,
+  auditado. Enmiendas en requisitos, OpenAPI, AsyncAPI, amenazas y dos `.feature`.
+  - Revisión de Claude antes de commitear (corregido por Codex): se enviaban correos de
+    restablecimiento a direcciones no registradas (relé de spam), los tokens hermanos seguían
+    vivos tras el cambio, y una prueba de integración era intermitente (hash de refresh token
+    derivado del byte bajo de `UnixNano`, colisionaba en macOS).
+  - Verificación de Claude: unitarias, lint 0, integración completa dos veces en verde (75,7%),
+    paquetes nuevos con `-count=10` en verde.
+  - Revisión nativa (alto, 34 archivos, 1641 líneas, 4 lentes): **aprobada** y acusada
+    (`review-c911d7b3f0b34000`) con 14 observaciones informativas. Se acepta sin cambio la
+    publicación antes del commit en ambos flujos (mismo compromiso de la ADR 0006 que en T5).
+    A corregir (T6-fix): matriz de trazabilidad con RF-015 aún "diferido"; rama de saludo
+    personalizado muerta en la plantilla de restablecimiento; nombre y mensaje engañosos de la
+    prueba de "sin estado de cuenta"; rama muerta de `ErrTokenInvalid` al consumir; renombrar
+    `ErrInvalidInput` a algo como `ErrTokenRequired`; límites de contraseña como constante
+    compartida con la invitación; log al descartar eventos sin `accountExists`; pruebas de los
+    códigos HTTP sin cubrir (reenvío 204/404/503/500, confirmación 204/400/500).
+- Commit: `7d8b2a6`
 
 ### T7 — RF-013/014 MFA obligatorio por correo
 - [ ] Estado · Ejecutor: `Codex` · Depende de: T3
@@ -424,14 +447,14 @@ Ninguna: P1 a P4 resueltas en D8 a D11.
 | Fase | Tareas | Hechas |
 |---|---|---|
 | 0 — Enmiendas de spec y decisiones | T1 a T3 (3) | 3 (T1 a T3) |
-| 1 — Backend | T4 a T10 (7) | 2 (T4, T5) |
+| 1 — Backend | T4 a T10 (7) | 3 (T4 a T6) |
 | 2 — Dominios locales y frontend | T11 a T13 (3) | 0 |
 | 3 — Verificación, DAST y cierre | T14 a T17 (4) | 0 |
-| **Total** | **17** | **5** |
+| **Total** | **17** | **6** |
 
 ## Siguiente paso
 
-T6 (Codex) con D12 (reenvío de invitación).
+T6-fix (Codex): observaciones de la revisión nativa de T6. Luego T7 (MFA por correo).
 
 ## Cambios de spec propuestos
 
