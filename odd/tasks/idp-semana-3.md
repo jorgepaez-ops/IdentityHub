@@ -377,7 +377,7 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 - Commit: `7d8b2a6`, `1ceed6e`
 
 ### T7 — RF-013/014 MFA obligatorio por correo
-- [ ] Estado · Ejecutor: `Codex` · Depende de: T3
+- [x] Estado · Ejecutor: `Codex` · Depende de: T3
 - Política D11: todo login exige el código. Desafío `202` con `mfa_token` temporal, código de 6
   dígitos enviado por el worker, vencimiento corto, un solo uso, límite de intentos y auditoría; sin
   paso de activación. Quitar el rechazo explícito de cuentas con MFA de la semana 2.
@@ -386,6 +386,48 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 - Observaciones menores de T6-fix (ver T6): `FOR UPDATE` en `previous_user`; constante o comentario
   que una `password_reset_completed` en Go y SQL; "12 to 128" derivado de las constantes; pruebas
   de integración que lean la metadata `unlocked` y la auditoría en la cuenta deshabilitada.
+- Handoff Codex (2026-09-28, sin commit): MFA obligatorio completo: desafío 202 sin cookie,
+  token/código SHA-256, comparación constante, consumo único, expiración 5 min, 5 intentos y
+  reenvío cada 60 s; `verifyMfa` emite el par normal y la cookie refresh. La verificación lleva
+  la IP resuelta por el middleware `ClientIP` y el `User-Agent` a `CreateRefreshToken`; no lee
+  cabeceras de reenvío directamente. Añadidos migración `000006`, SQLc, eventos/correos MFA y de
+  restablecimiento completado (D14), `FOR UPDATE` de `previous_user`, detalle de contraseña
+  derivado de constantes y aserciones PostgreSQL para auditorías `unlocked=true/false` de D13.
+  RED observado: `GOCACHE=/tmp/identity-hub-go-build go test ./internal/auth/mfa -run
+  TestRF014_VerificacionConservaIPConfiableYAgenteEnLaSesionRefresh -count=1` falló al no existir
+  `VerifyInput` ni los campos IP/User-Agent de la sesión. GREEN: el mismo escenario y
+  `go test ./internal/auth/mfa ./internal/api -count=1` pasaron. `make test-go`, `make lint`,
+  `go vet -tags=integration ./...` y trazabilidad pasaron. No se ejecutó PostgreSQL/Docker:
+  `mfa_integration_test.go` está presente y `git check-ignore` confirmó que no está ignorado.
+  Codex se quedó sin cuota al cerrar (reanuda 19:23); consultó D15 antes de empezar.
+- Revisión de Claude (corregido por Sonnet, delegación directa: 2+ archivos no triviales): el
+  código MFA se podía adivinar por fuerza bruta, porque el bloqueo de RF-017 solo se evaluaba al
+  fallar la contraseña y con la contraseña correcta se pedían desafíos sin límite (5 intentos cada
+  uno); el límite por IP no contaba códigos rechazados y el intento que agotaba el desafío no
+  contaba. Ahora cada código rechazado cuenta, la verificación bloquea al umbral con la misma
+  política (paquete `lockout` compartido) y el límite por IP los incluye. Además: código guardado
+  como HMAC-SHA256 con el token crudo como clave; `login_succeeded` y `last_login_at` al aceptar
+  el código, no al validar la contraseña; fuera la rama muerta del login y `ErrMFAUnavailable`;
+  código sin sesgo (`crypto/rand.Int`); `token.AccessTokenExpiresIn` compartido; reenvío rechaza
+  cuentas no activas; nombre en el desafío; comentarios cruzados Go/`audit.sql`. Las pruebas de
+  integración de login, logout, refresh y auditlog fallaban (construían `login.New` sin MFA):
+  pasan a iniciar sesión por el flujo real con el helper `testsession`.
+  - Claude (inline, TDD): la cookie refresh de `verifyMfa` perdía `MaxAge` (el login anterior lo
+    ponía); RED/GREEN en `TestRF014_VerificarMFAEntregaTokensYCookieRefresh`.
+  - GGA (pre-commit) bloqueó el commit: `Verify`/`Resend` convertían todo error del store en
+    `ErrChallengeInvalid` (una caída de la base daba 401). Claude (inline, TDD): el store traduce
+    solo `pgx.ErrNoRows`; el resto se envuelve y da 500. RED/GREEN en
+    `TestRF014_FalloDeAlmacenamientoNoSeConfundeConDesafioInvalido`.
+  - Verificación de Claude: unitarias, lint 0, `go vet -tags=integration`, integración completa con
+    PostgreSQL real en verde (75,6%); `mfa` y `passwordreset` con `-race -count=3` y `login` con `-race -count=2` en verde (`login`
+    tarda ~5 min por corrida con `-race`; con `-count=3` supera el timeout por defecto de 10 min).
+    Ojo: sin `TEST_DATABASE_URL` las pruebas de base se saltan y `make test-integration` sale 0
+    (56,4%); una primera verificación de Claude cayó en eso.
+  - Quedan para después (fuera de alcance, sin id): `login.Service` aún recibe token/TTL y su
+    `Writer` expone métodos que ya no usa; `RefreshToken` y `MFAEnabled` sin uso en `login`;
+    `accountLockedNotification` en `cmd/api` duplica `events.AccountLocked`; `POST /auth/refresh`
+    reemite la cookie sin `MaxAge` (previo a T7); carrera `duplicate key pg_authid_rolname_index` al
+    crear roles en la migración 000002 con paquetes en paralelo (vista una vez por Sonnet).
 - Commit: —
 
 ### T8 — RF-016 Sesiones activas
@@ -474,14 +516,14 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 | Fase | Tareas | Hechas |
 |---|---|---|
 | 0 — Enmiendas de spec y decisiones | T1 a T3 (3) | 3 (T1 a T3) |
-| 1 — Backend | T4 a T10 (7) | 3 (T4 a T6) |
+| 1 — Backend | T4 a T10 (7) | 4 (T4 a T7) |
 | 2 — Dominios locales y frontend | T11 a T13 (3) | 0 |
 | 3 — Verificación, DAST y cierre | T14 a T17 (4) | 0 |
-| **Total** | **17** | **6** |
+| **Total** | **17** | **7** |
 
 ## Siguiente paso
 
-T7 (Codex, desde las 12:38): MFA por correo, más las 5 observaciones menores de T6-fix.
+Revisión nativa de T7; luego T8 (sesiones activas, Codex).
 
 ## Cambios de spec propuestos
 

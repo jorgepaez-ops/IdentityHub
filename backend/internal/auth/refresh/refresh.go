@@ -22,8 +22,6 @@ var (
 	ErrRefreshReuse        = errors.New("refresh token reuse detected")
 )
 
-const accessTokenExpiresIn = 900
-
 type RotationStatus string
 
 const (
@@ -158,7 +156,7 @@ func (s *Service) Refresh(ctx context.Context, input Input) (Result, error) {
 			if err != nil {
 				return fmt.Errorf("issue access token: %w", err)
 			}
-			result = Result{AccessToken: accessToken, RefreshToken: base64.RawURLEncoding.EncodeToString(raw), TokenType: "Bearer", ExpiresIn: accessTokenExpiresIn}
+			result = Result{AccessToken: accessToken, RefreshToken: base64.RawURLEncoding.EncodeToString(raw), TokenType: "Bearer", ExpiresIn: token.AccessTokenExpiresIn}
 			return nil
 		case RotationReused:
 			revokedCount, err := writer.RevokeRefreshFamily(ctx, rotation.FamilyID)

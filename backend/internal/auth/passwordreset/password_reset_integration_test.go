@@ -15,6 +15,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jorgepaez/identity-hub/internal/auth/login"
+	"github.com/jorgepaez/identity-hub/internal/auth/mfa"
 	"github.com/jorgepaez/identity-hub/internal/auth/password"
 	"github.com/jorgepaez/identity-hub/internal/auth/token"
 	"github.com/jorgepaez/identity-hub/internal/store"
@@ -28,6 +29,12 @@ func (integrationPublisher) Publish(context.Context, string, any) error { return
 type integrationHasher struct{}
 
 func (integrationHasher) Hash(value string) (string, error) { return password.Hash(value) }
+
+type integrationMFAIssuer struct{}
+
+func (integrationMFAIssuer) Issue(context.Context, mfa.User) (mfa.Challenge, error) {
+	return mfa.Challenge{Token: "integration-mfa-challenge", ExpiresIn: 300}, nil
+}
 
 func TestRF015_RestablecimientoRevocaTodasLasSesiones(t *testing.T) {
 	if testing.Short() {
@@ -137,7 +144,7 @@ func newIntegrationLoginService(t *testing.T, repository *store.Store) *login.Se
 	if err != nil {
 		t.Fatal(err)
 	}
-	return login.New(repository, signer, time.Hour)
+	return login.New(repository, signer, time.Hour).WithMFA(integrationMFAIssuer{})
 }
 
 // D13: a reset completed on a locked account (RF-017) reactivates it and the
@@ -183,14 +190,21 @@ func TestRF015_D13_RestablecerDesbloqueaYPermiteEntrarConLaNuevaContrasena(t *te
 	if auditCount != 1 {
 		t.Fatalf("password_reset_completed audits=%d want 1", auditCount)
 	}
+	var unlocked string
+	if err := pool.QueryRow(ctx, `SELECT metadata ->> 'unlocked' FROM audit_log WHERE actor_user_id=$1 AND action='password_reset_completed'`, user.ID).Scan(&unlocked); err != nil {
+		t.Fatal(err)
+	}
+	if unlocked != "true" {
+		t.Fatalf("locked-account reset audit unlocked=%q, want true", unlocked)
+	}
 
 	loginService := newIntegrationLoginService(t, repository)
 	result, err := loginService.Login(ctx, login.Input{Email: user.Email, Password: "correct horse battery"})
 	if err != nil {
 		t.Fatalf("Login after reset: %v", err)
 	}
-	if result.AccessToken == "" {
-		t.Fatal("Login after reset returned no access token")
+	if result.MfaToken == "" {
+		t.Fatal("Login after reset returned no MFA challenge")
 	}
 }
 
@@ -230,6 +244,20 @@ func TestRF015_D13_RestablecerNoReactivaCuentaDeshabilitada(t *testing.T) {
 	}
 	if !strings.HasPrefix(passwordHash, "$argon2id$") || passwordHash == "$argon2id$placeholder" {
 		t.Fatalf("password hash was not updated: %q", passwordHash)
+	}
+	var auditCount int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM audit_log WHERE actor_user_id=$1 AND action='password_reset_completed'`, user.ID).Scan(&auditCount); err != nil {
+		t.Fatal(err)
+	}
+	if auditCount != 1 {
+		t.Fatalf("password_reset_completed audits=%d want 1", auditCount)
+	}
+	var unlocked string
+	if err := pool.QueryRow(ctx, `SELECT metadata ->> 'unlocked' FROM audit_log WHERE actor_user_id=$1 AND action='password_reset_completed'`, user.ID).Scan(&unlocked); err != nil {
+		t.Fatal(err)
+	}
+	if unlocked != "false" {
+		t.Fatalf("disabled-account reset audit unlocked=%q, want false", unlocked)
 	}
 }
 

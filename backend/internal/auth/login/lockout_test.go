@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jorgepaez/identity-hub/internal/auth/mfa"
 	"github.com/jorgepaez/identity-hub/internal/auth/password"
 	"github.com/jorgepaez/identity-hub/internal/auth/token"
 )
@@ -69,7 +70,7 @@ func (r *lockoutRepository) UnlockLoginUser(_ context.Context, userID uuid.UUID)
 func (r *lockoutRepository) ListRolesForUser(context.Context, uuid.UUID) ([]string, error) {
 	return []string{"user"}, nil
 }
-func (r *lockoutRepository) UpdateLoginSuccess(context.Context, uuid.UUID, string) error { return nil }
+func (r *lockoutRepository) UpdatePasswordHash(context.Context, uuid.UUID, string) error { return nil }
 func (r *lockoutRepository) CreateRefreshToken(context.Context, RefreshToken) error      { return nil }
 func (r *lockoutRepository) InsertAuditEvent(_ context.Context, event AuditEvent) error {
 	r.audits = append(r.audits, event)
@@ -82,7 +83,13 @@ func newLockoutService(t *testing.T, repository Repository, policy LockoutConfig
 	if err != nil {
 		t.Fatal(err)
 	}
-	return New(repository, signer, time.Hour, policy)
+	return New(repository, signer, time.Hour, policy).WithMFA(lockoutMFAIssuer{})
+}
+
+type lockoutMFAIssuer struct{}
+
+func (lockoutMFAIssuer) Issue(context.Context, mfa.User) (mfa.Challenge, error) {
+	return mfa.Challenge{Token: "lockout-test-challenge", ExpiresIn: 300}, nil
 }
 
 type stubSecurityEventPublisher struct{ events []SecurityEvent }

@@ -22,8 +22,10 @@ import (
 	"github.com/jorgepaez/identity-hub/internal/auth/employee"
 	"github.com/jorgepaez/identity-hub/internal/auth/invitation"
 	"github.com/jorgepaez/identity-hub/internal/auth/invitationresend"
+	"github.com/jorgepaez/identity-hub/internal/auth/lockout"
 	"github.com/jorgepaez/identity-hub/internal/auth/login"
 	"github.com/jorgepaez/identity-hub/internal/auth/logout"
+	"github.com/jorgepaez/identity-hub/internal/auth/mfa"
 	"github.com/jorgepaez/identity-hub/internal/auth/password"
 	"github.com/jorgepaez/identity-hub/internal/auth/passwordreset"
 	"github.com/jorgepaez/identity-hub/internal/auth/refresh"
@@ -117,12 +119,15 @@ func run() error {
 
 	employeeService := employee.New(db, broker, passwordHasher{}, rand.Reader, time.Now)
 	invitationService := invitation.New(db, broker, passwordHasher{})
-	loginService := login.New(db, tokens, cfg.RefreshTTL, login.LockoutConfig{
+	// One RF-017 policy for both the password and the MFA-code steps.
+	lockoutPolicy := lockout.Config{
 		AccountMaxFailures: cfg.LoginAccountMaxFailures,
 		IPMaxFailures:      cfg.LoginIPMaxFailures,
 		FailureWindow:      cfg.LoginFailureWindow,
 		LockoutDuration:    cfg.LoginLockoutDuration,
-	}).WithEventPublisher(loginSecurityEventPublisher{users: db, publisher: broker, logger: logger})
+	}
+	mfaService := mfa.New(db, broker, rand.Reader, time.Now).WithTokenService(tokens, cfg.RefreshTTL).WithLockout(lockoutPolicy)
+	loginService := login.New(db, tokens, cfg.RefreshTTL, lockoutPolicy).WithEventPublisher(loginSecurityEventPublisher{users: db, publisher: broker, logger: logger}).WithMFA(mfaService)
 	refreshService := refresh.New(db, tokens, cfg.RefreshTTL).WithEventPublisher(refreshSecurityEventPublisher{users: db, publisher: broker, logger: logger})
 
 	server := api.NewServer(logger, cfg.Version, map[string]api.Checker{
@@ -135,6 +140,7 @@ func run() error {
 	server.SetInvitationResendService(invitationresend.New(db, broker, rand.Reader, time.Now))
 	server.SetPasswordResetService(passwordreset.New(db, broker, passwordHasher{}, rand.Reader, time.Now))
 	server.SetLoginService(loginService, cfg.RefreshTTL)
+	server.SetMFAService(mfaService, cfg.RefreshTTL)
 	server.SetRefreshService(refreshService)
 	server.SetLogoutService(logout.New(db))
 	server.SetAdminUserService(admin.New(db))

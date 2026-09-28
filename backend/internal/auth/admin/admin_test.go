@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jorgepaez/identity-hub/internal/auth/login"
+	"github.com/jorgepaez/identity-hub/internal/auth/mfa"
 	"github.com/jorgepaez/identity-hub/internal/auth/password"
 	"github.com/jorgepaez/identity-hub/internal/auth/token"
 )
@@ -103,10 +104,16 @@ func TestRF010_AdminDeshabilitaYElUsuarioNoEntra(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = login.New(loginRepository{repository}, signer, time.Hour).Login(context.Background(), login.Input{Email: "user@example.com", Password: "correct horse battery"})
+	_, err = login.New(loginRepository{repository}, signer, time.Hour).WithMFA(adminMFAIssuer{}).Login(context.Background(), login.Input{Email: "user@example.com", Password: "correct horse battery"})
 	if !errors.Is(err, login.ErrInvalidCredentials) {
 		t.Fatalf("disabled user login error=%v", err)
 	}
+}
+
+type adminMFAIssuer struct{}
+
+func (adminMFAIssuer) Issue(context.Context, mfa.User) (mfa.Challenge, error) {
+	return mfa.Challenge{Token: "admin-test-challenge", ExpiresIn: 300}, nil
 }
 
 type loginRepository struct{ *repositoryStub }
@@ -125,7 +132,7 @@ func (w loginWriter) GetLoginUserByEmail(_ context.Context, email string) (login
 	}
 	return login.User{}, errors.New("not found")
 }
-func (w loginWriter) UpdateLoginSuccess(context.Context, uuid.UUID, string) error  { return nil }
+func (w loginWriter) UpdatePasswordHash(context.Context, uuid.UUID, string) error  { return nil }
 func (w loginWriter) CreateRefreshToken(context.Context, login.RefreshToken) error { return nil }
 func (w loginWriter) CountLoginFailuresByAccount(context.Context, uuid.UUID, time.Time) (int64, error) {
 	return 0, nil

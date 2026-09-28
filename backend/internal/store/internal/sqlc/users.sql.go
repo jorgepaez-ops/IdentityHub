@@ -77,6 +77,16 @@ func (q *Queries) ConsumeInvitationToken(ctx context.Context, arg ConsumeInvitat
 	return i, err
 }
 
+const consumeMfaChallenge = `-- name: ConsumeMfaChallenge :exec
+UPDATE mfa_challenges SET used_at = now()
+WHERE id = $1 AND used_at IS NULL
+`
+
+func (q *Queries) ConsumeMfaChallenge(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, consumeMfaChallenge, id)
+	return err
+}
+
 const consumePasswordResetTokenAndRevokeSessions = `-- name: ConsumePasswordResetTokenAndRevokeSessions :one
 WITH consumed AS (
     UPDATE verification_tokens
@@ -95,7 +105,7 @@ WITH consumed AS (
       AND id <> (SELECT id FROM consumed)
     RETURNING id
 ), previous_user AS (
-    SELECT id, status FROM users WHERE id = (SELECT user_id FROM consumed)
+    SELECT id, status FROM users WHERE id = (SELECT user_id FROM consumed) FOR UPDATE
 ), updated_user AS (
     UPDATE users
     SET password_hash = $2,
@@ -179,6 +189,30 @@ type CreateInvitationTokenParams struct {
 
 func (q *Queries) CreateInvitationToken(ctx context.Context, arg CreateInvitationTokenParams) error {
 	_, err := q.db.Exec(ctx, createInvitationToken, arg.UserID, arg.TokenHash, arg.ExpiresAt)
+	return err
+}
+
+const createMfaChallenge = `-- name: CreateMfaChallenge :exec
+INSERT INTO mfa_challenges (user_id, token_hash, code_hash, expires_at, attempts_left)
+VALUES ($1, $2, $3, $4, $5)
+`
+
+type CreateMfaChallengeParams struct {
+	UserID       uuid.UUID
+	TokenHash    []byte
+	CodeHash     []byte
+	ExpiresAt    pgtype.Timestamptz
+	AttemptsLeft int32
+}
+
+func (q *Queries) CreateMfaChallenge(ctx context.Context, arg CreateMfaChallengeParams) error {
+	_, err := q.db.Exec(ctx, createMfaChallenge,
+		arg.UserID,
+		arg.TokenHash,
+		arg.CodeHash,
+		arg.ExpiresAt,
+		arg.AttemptsLeft,
+	)
 	return err
 }
 
@@ -278,7 +312,7 @@ func (q *Queries) DeleteUserRoles(ctx context.Context, userID uuid.UUID) error {
 }
 
 const getLoginUserByEmail = `-- name: GetLoginUserByEmail :one
-SELECT id, email, password_hash, status, locked_until, mfa_enabled
+SELECT id, email, display_name, password_hash, status, locked_until, mfa_enabled
 FROM users
 WHERE email = $1
 FOR UPDATE
@@ -287,6 +321,7 @@ FOR UPDATE
 type GetLoginUserByEmailRow struct {
 	ID           uuid.UUID
 	Email        string
+	DisplayName  string
 	PasswordHash string
 	Status       UserStatus
 	LockedUntil  pgtype.Timestamptz
@@ -299,10 +334,51 @@ func (q *Queries) GetLoginUserByEmail(ctx context.Context, email string) (GetLog
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
+		&i.DisplayName,
 		&i.PasswordHash,
 		&i.Status,
 		&i.LockedUntil,
 		&i.MfaEnabled,
+	)
+	return i, err
+}
+
+const getMfaChallengeForUpdate = `-- name: GetMfaChallengeForUpdate :one
+SELECT c.id, c.user_id, c.code_hash, c.expires_at, c.attempts_left, c.last_sent_at, c.used_at,
+       u.email, u.display_name, u.status
+FROM mfa_challenges c
+JOIN users u ON u.id = c.user_id
+WHERE c.token_hash = $1
+FOR UPDATE OF c, u
+`
+
+type GetMfaChallengeForUpdateRow struct {
+	ID           uuid.UUID
+	UserID       uuid.UUID
+	CodeHash     []byte
+	ExpiresAt    pgtype.Timestamptz
+	AttemptsLeft int32
+	LastSentAt   pgtype.Timestamptz
+	UsedAt       pgtype.Timestamptz
+	Email        string
+	DisplayName  string
+	Status       UserStatus
+}
+
+func (q *Queries) GetMfaChallengeForUpdate(ctx context.Context, tokenHash []byte) (GetMfaChallengeForUpdateRow, error) {
+	row := q.db.QueryRow(ctx, getMfaChallengeForUpdate, tokenHash)
+	var i GetMfaChallengeForUpdateRow
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.CodeHash,
+		&i.ExpiresAt,
+		&i.AttemptsLeft,
+		&i.LastSentAt,
+		&i.UsedAt,
+		&i.Email,
+		&i.DisplayName,
+		&i.Status,
 	)
 	return i, err
 }
@@ -569,6 +645,37 @@ func (q *Queries) PasswordResetTokenIsUsable(ctx context.Context, tokenHash []by
 	return token_is_usable, err
 }
 
+const rejectMfaChallenge = `-- name: RejectMfaChallenge :one
+UPDATE mfa_challenges
+SET attempts_left = attempts_left - 1,
+    used_at = CASE WHEN attempts_left = 1 THEN now() ELSE used_at END
+WHERE id = $1 AND used_at IS NULL AND attempts_left > 0
+RETURNING attempts_left
+`
+
+func (q *Queries) RejectMfaChallenge(ctx context.Context, id uuid.UUID) (int32, error) {
+	row := q.db.QueryRow(ctx, rejectMfaChallenge, id)
+	var attempts_left int32
+	err := row.Scan(&attempts_left)
+	return attempts_left, err
+}
+
+const resendMfaChallenge = `-- name: ResendMfaChallenge :exec
+UPDATE mfa_challenges
+SET code_hash = $2, last_sent_at = now()
+WHERE id = $1 AND used_at IS NULL
+`
+
+type ResendMfaChallengeParams struct {
+	ID       uuid.UUID
+	CodeHash []byte
+}
+
+func (q *Queries) ResendMfaChallenge(ctx context.Context, arg ResendMfaChallengeParams) error {
+	_, err := q.db.Exec(ctx, resendMfaChallenge, arg.ID, arg.CodeHash)
+	return err
+}
+
 const revokeRefreshFamily = `-- name: RevokeRefreshFamily :one
 WITH revoked AS (
     UPDATE refresh_tokens
@@ -740,19 +847,31 @@ func (q *Queries) UpdateDisplayName(ctx context.Context, arg UpdateDisplayNamePa
 	return i, err
 }
 
-const updateLoginSuccess = `-- name: UpdateLoginSuccess :exec
+const updateLastLogin = `-- name: UpdateLastLogin :exec
 UPDATE users
-SET password_hash = $2,
-    last_login_at = now()
+SET last_login_at = now()
 WHERE id = $1
 `
 
-type UpdateLoginSuccessParams struct {
+// Recorded only when the MFA code is accepted (D11), not at password check.
+func (q *Queries) UpdateLastLogin(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, updateLastLogin, id)
+	return err
+}
+
+const updatePasswordHash = `-- name: UpdatePasswordHash :exec
+UPDATE users
+SET password_hash = $2
+WHERE id = $1
+`
+
+type UpdatePasswordHashParams struct {
 	ID           uuid.UUID
 	PasswordHash string
 }
 
-func (q *Queries) UpdateLoginSuccess(ctx context.Context, arg UpdateLoginSuccessParams) error {
-	_, err := q.db.Exec(ctx, updateLoginSuccess, arg.ID, arg.PasswordHash)
+// Transparent Argon2id rehash after a verified password (RF-003).
+func (q *Queries) UpdatePasswordHash(ctx context.Context, arg UpdatePasswordHashParams) error {
+	_, err := q.db.Exec(ctx, updatePasswordHash, arg.ID, arg.PasswordHash)
 	return err
 }

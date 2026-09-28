@@ -24,6 +24,8 @@ type payload struct {
 		VerificationToken string `json:"verificationToken"`
 		InvitationToken   string `json:"invitationToken"`
 		ResetToken        string `json:"resetToken"`
+		Code              string `json:"code"`
+		Unlocked          bool   `json:"unlocked"`
 	} `json:"data"`
 }
 
@@ -74,6 +76,19 @@ func Render(eventType, publicBaseURL string, body []byte) (Message, error) {
 		// events.go): the request only ever knows the email, so a
 		// personalized greeting here would be permanently dead code.
 		message.Body = fmt.Sprintf("Hello there,\n\nReset your password: %s\n", resetURL)
+	case events.TypePasswordResetCompleted:
+		message.Subject = "Security alert: your Identity Hub password changed"
+		message.Body = "Your password changed and your active sessions were closed."
+		if event.Data.Unlocked {
+			message.Body += " Your account was also unlocked."
+		}
+		message.Body += "\n"
+	case events.TypeMfaChallengeIssued:
+		if event.Data.Code == "" {
+			return Message{}, fmt.Errorf("event %s has no code", eventType)
+		}
+		message.Subject = "Your Identity Hub sign-in code"
+		message.Body = fmt.Sprintf("Use this one-time code to finish signing in: %s\n", event.Data.Code)
 	case events.TypeRefreshReuseDetected:
 		message.Subject = "Security alert: refresh token reuse detected"
 		message.Body = "A refresh token reuse attempt was detected. Your active sessions were revoked as a precaution.\n"

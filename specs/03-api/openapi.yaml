@@ -186,7 +186,7 @@ paths:
       operationId: resendMfaCode
       tags: [auth]
       summary: Reenviar el código del desafío MFA
-      description: Anula el código anterior, conserva el desafío y limita la frecuencia de envío.
+      description: Anula el código anterior, conserva el desafío y permite un envío cada 60 segundos.
       x-requirement: RF-014
       security: []
       requestBody:

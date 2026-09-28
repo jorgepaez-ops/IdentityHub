@@ -85,7 +85,7 @@ func (s *Service) Confirm(ctx context.Context, token, newPassword string) error 
 		return ErrTokenRequired
 	}
 	if n := utf8.RuneCountInString(newPassword); n < password.AccountPasswordMinRunes || n > password.AccountPasswordMaxRunes {
-		return &InvalidInputError{Field: "password", Detail: "must contain 12 to 128 characters"}
+		return &InvalidInputError{Field: "password", Detail: fmt.Sprintf("must contain %d to %d characters", password.AccountPasswordMinRunes, password.AccountPasswordMaxRunes)}
 	}
 	raw, err := base64.RawURLEncoding.DecodeString(token)
 	if err != nil {
@@ -121,13 +121,22 @@ func (s *Service) Confirm(ctx context.Context, token, newPassword string) error 
 		}
 		resourceType, resourceID := "user", user.ID.String()
 		if _, err := writer.InsertAuditEvent(ctx, store.InsertAuditEventParams{
-			ActorUserID:  &user.ID,
+			ActorUserID: &user.ID,
+			// Must remain identical to the literal in the CountLoginFailuresByAccount
+			// query (db/queries/audit.sql): the D13 reset boundary depends on it.
 			Action:       "password_reset_completed",
 			ResourceType: &resourceType,
 			ResourceID:   &resourceID,
 			Metadata:     metadata,
 		}); err != nil {
 			return fmt.Errorf("record password reset completed audit: %w", err)
+		}
+		// D14: deliver this alert for every completed reset, not just when D13
+		// also unlocks the account. It contains no credential material.
+		event := events.PasswordResetCompleted{Envelope: events.NewEnvelope(events.TypePasswordResetCompleted, "")}
+		event.Data.UserID, event.Data.Email, event.Data.DisplayName, event.Data.Unlocked = user.ID, user.Email, user.DisplayName, unlocked
+		if err := s.publisher.Publish(ctx, events.TypePasswordResetCompleted, event); err != nil {
+			return fmt.Errorf("%w: %w", ErrPublish, err)
 		}
 		return nil
 	})

@@ -109,3 +109,22 @@ func TestRF015_PlantillaDeRestablecimientoIncluyeElEnlaceYSaludoNeutral(t *testi
 		t.Fatalf("reset message has no neutral greeting: %q", message.Body)
 	}
 }
+
+func TestRF014_PlantillaMFAIncluyeSoloElCodigo(t *testing.T) {
+	message, err := Render(events.TypeMfaChallengeIssued, "https://id.example", []byte(`{"data":{"email":"ada@example.com","code":"123456","token":"secret-token"}}`))
+	if err != nil || !strings.Contains(message.Body, "123456") || strings.Contains(message.Body, "secret-token") {
+		t.Fatalf("message=%+v err=%v", message, err)
+	}
+}
+
+func TestRF015_AvisoDeRestablecimientoMencionaDesbloqueoSoloCuandoAplica(t *testing.T) {
+	for _, tc := range []struct {
+		unlocked bool
+		want     bool
+	}{{true, true}, {false, false}} {
+		message, err := Render(events.TypePasswordResetCompleted, "https://id.example", []byte(`{"data":{"email":"ada@example.com","unlocked":`+map[bool]string{true: "true", false: "false"}[tc.unlocked]+`}}`))
+		if err != nil || strings.Contains(message.Body, "unlocked") != tc.want {
+			t.Fatalf("unlocked=%t message=%q err=%v", tc.unlocked, message.Body, err)
+		}
+	}
+}

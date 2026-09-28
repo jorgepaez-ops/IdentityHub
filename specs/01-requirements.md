@@ -133,14 +133,21 @@ Toda cuenta usa como segundo factor un código de un solo uso enviado al correo 
 ### RF-014 — Inicio de sesión con segundo factor · P1
 La contraseña correcta inicia un desafío, pero no crea una sesión.
 - El login devuelve `202` con un `mfaToken` temporal y envía un código de 6 dígitos generado con
-  `crypto/rand`, guardado solo como hash, de vida corta y de un solo uso.
-- Cada desafío limita intentos; agotarlos lo anula y cuenta para RF-017.
+  `crypto/rand`, guardado solo como hash, de vida de **5 minutos** y de un solo uso.
+- Cada desafío admite como máximo **5 intentos** y el reenvío se permite una vez cada **60 segundos**.
+- Cada desafío limita intentos; agotarlos lo anula. **Cada código rechazado** (también el que agota
+  el desafío) cuenta como un intento fallido para RF-017, de modo que adivinar códigos a través de
+  desafíos sucesivos bloquea la cuenta igual que adivinar la contraseña.
 - El reenvío está limitado por frecuencia, anula el código anterior y queda auditado.
 - Desafío, fallos, reenvío, agotamiento y acierto quedan auditados.
 - **Aceptación:** un código válido devuelve `200`, el access token y la cookie refresh; reutilizarlo
   falla, y el código anterior falla después de un reenvío.
 
 > **Enmienda T3 · 2026-09-27 · ADR 0010:** se concreta el desafío MFA por correo.
+
+> **Enmienda T7 · 2026-09-28 · D15:** se fijan los límites de 5 minutos, 5 intentos y 60 segundos.
+> El código se guarda como HMAC-SHA256 con clave en el token del desafío, y el éxito del inicio de
+> sesión (`login_succeeded`, `last_login_at`) se registra al aceptar el código, no al verificar la contraseña.
 
 ### RF-015 — Restablecimiento de contraseña · P1
 Quien olvida su contraseña la restablece por correo.
@@ -159,6 +166,9 @@ Quien olvida su contraseña la restablece por correo.
 > después no vuelve a bloquear la cuenta. Queda auditado como `password_reset_completed`, con
 > metadatos que indican si desbloqueó la cuenta.
 
+> **Enmienda T7 · 2026-09-28 · D14:** todo restablecimiento completado envía un aviso de contraseña
+> cambiada y sesiones cerradas; indica el desbloqueo solo cuando aplica.
+
 ### RF-016 — Sesiones activas · P1
 El titular ve sus sesiones y puede revocarlas individualmente.
 - Se muestran IP, user-agent, creación y último uso.
@@ -167,6 +177,8 @@ El titular ve sus sesiones y puede revocarlas individualmente.
 ### RF-017 — Bloqueo por fuerza bruta · P1
 Tras 5 intentos fallidos en 15 minutos, la cuenta se bloquea 15 minutos.
 - El bloqueo se registra en auditoría y se notifica al titular.
+- Cuentan como fallo tanto la contraseña incorrecta (`login_failed`) como el código MFA rechazado
+  (`mfa_code_rejected`), con el mismo umbral y ventana; el límite por IP cuenta ambos.
 - **Aceptación:** seis intentos fallidos devuelven `423 Locked`; la contraseña correcta también
   falla mientras dure el bloqueo.
 

@@ -56,6 +56,18 @@ channels:
       operationId: publishPasswordResetRequested
       message: { $ref: '#/components/messages/PasswordResetRequested' }
 
+  user.password_reset_completed:
+    description: Restablecimiento completado; avisa del cambio y cierre de sesiones (D14).
+    publish:
+      operationId: publishPasswordResetCompleted
+      message: { $ref: '#/components/messages/PasswordResetCompleted' }
+
+  security.mfa_challenge_issued:
+    description: Código MFA de un solo uso para entrega por correo (RF-014).
+    publish:
+      operationId: publishMfaChallengeIssued
+      message: { $ref: '#/components/messages/MfaChallengeIssued' }
+
   security.refresh_reuse_detected:
     description: |
       Se presentó un refresh token ya rotado (RF-006). Se revocó la familia de
@@ -147,6 +159,43 @@ components:
                   expiresAt:     { type: string, format: date-time }
                   accountExists: { type: boolean, description: Solo para el worker de notificaciones; nunca se expone por HTTP. }
 
+    PasswordResetCompleted:
+      name: PasswordResetCompleted
+      contentType: application/json
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/Envelope'
+          - type: object
+            required: [data]
+            properties:
+              data:
+                type: object
+                required: [userId, email, displayName, unlocked]
+                properties:
+                  userId: { type: string, format: uuid }
+                  email: { type: string, format: email }
+                  displayName: { type: string }
+                  unlocked: { type: boolean }
+
+    MfaChallengeIssued:
+      name: MfaChallengeIssued
+      contentType: application/json
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/Envelope'
+          - type: object
+            required: [data]
+            properties:
+              data:
+                type: object
+                required: [userId, email, displayName, code, expiresAt]
+                properties:
+                  userId: { type: string, format: uuid }
+                  email: { type: string, format: email }
+                  displayName: { type: string }
+                  code: { type: string, pattern: '^[0-9]{6}$' }
+                  expiresAt: { type: string, format: date-time }
+
     RefreshReuseDetected:
       name: RefreshReuseDetected
       contentType: application/json
@@ -182,6 +231,7 @@ components:
                 properties:
                   userId:         { type: string, format: uuid }
                   email:          { type: string, format: email }
+                  displayName:    { type: string }
                   lockedUntil:    { type: string, format: date-time }
                   failedAttempts: { type: integer }
                   ip:             { type: string }

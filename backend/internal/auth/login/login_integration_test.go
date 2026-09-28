@@ -7,14 +7,17 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
+	"net/netip"
 	"testing"
 	"time"
 
+	"github.com/jorgepaez/identity-hub/internal/auth/lockout"
 	"github.com/jorgepaez/identity-hub/internal/auth/login"
 	"github.com/jorgepaez/identity-hub/internal/auth/password"
 	"github.com/jorgepaez/identity-hub/internal/auth/token"
 	"github.com/jorgepaez/identity-hub/internal/store"
 	"github.com/jorgepaez/identity-hub/internal/testdb"
+	"github.com/jorgepaez/identity-hub/internal/testsession"
 )
 
 func TestRF003_LoginPersisteRefreshTokenYAuditoriaEnPostgres(t *testing.T) {
@@ -44,11 +47,30 @@ func TestRF003_LoginPersisteRefreshTokenYAuditoriaEnPostgres(t *testing.T) {
 	if err != nil {
 		t.Fatalf("token.New: %v", err)
 	}
-	service := login.New(repository, signer, time.Hour)
+	session := testsession.New(repository, signer, lockout.Default())
+	ip := netip.MustParseAddr("203.0.113.20")
+	userAgent := "Identity Hub integration"
+	input := login.Input{Email: "login-integration@example.test", Password: "correct horse battery", IP: &ip, UserAgent: &userAgent}
 
-	result, err := service.Login(ctx, login.Input{Email: "login-integration@example.test", Password: "correct horse battery"})
-	if err != nil {
+	// The password step alone is not a login: no success audit, no last_login_at.
+	if _, err := session.Login.Login(ctx, input); err != nil {
 		t.Fatalf("Login: %v", err)
+	}
+	var lastLoginAt *time.Time
+	if err := pool.QueryRow(ctx, `SELECT last_login_at FROM users WHERE id = $1`, user.ID).Scan(&lastLoginAt); err != nil {
+		t.Fatalf("read last_login_at: %v", err)
+	}
+	var succeededBeforeCode int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM audit_log WHERE actor_user_id = $1 AND action = 'login_succeeded'`, user.ID).Scan(&succeededBeforeCode); err != nil {
+		t.Fatalf("read audit log: %v", err)
+	}
+	if lastLoginAt != nil || succeededBeforeCode != 0 {
+		t.Fatalf("password step recorded a login: last_login_at=%v login_succeeded=%d", lastLoginAt, succeededBeforeCode)
+	}
+
+	result, err := session.SignIn(ctx, input)
+	if err != nil {
+		t.Fatalf("SignIn: %v", err)
 	}
 	if result.AccessToken == "" || result.RefreshToken == "" {
 		t.Fatalf("result = %+v", result)
@@ -67,7 +89,7 @@ func TestRF003_LoginPersisteRefreshTokenYAuditoriaEnPostgres(t *testing.T) {
 		t.Error("stored refresh token hash does not match SHA-256(refreshToken)")
 	}
 
-	var lastLoginAt *time.Time
+	lastLoginAt = nil
 	if err := pool.QueryRow(ctx, `SELECT last_login_at FROM users WHERE id = $1`, user.ID).Scan(&lastLoginAt); err != nil {
 		t.Fatalf("read last_login_at: %v", err)
 	}
@@ -76,11 +98,13 @@ func TestRF003_LoginPersisteRefreshTokenYAuditoriaEnPostgres(t *testing.T) {
 	}
 
 	var auditCount int
-	if err := pool.QueryRow(ctx, `SELECT count(*) FROM audit_log WHERE actor_user_id = $1 AND action = 'login_succeeded'`, user.ID).Scan(&auditCount); err != nil {
+	var auditIPText string
+	var auditUserAgent string
+	if err := pool.QueryRow(ctx, `SELECT count(*), max(host(ip)::text), max(user_agent) FROM audit_log WHERE actor_user_id = $1 AND action = 'login_succeeded'`, user.ID).Scan(&auditCount, &auditIPText, &auditUserAgent); err != nil {
 		t.Fatalf("read audit log: %v", err)
 	}
-	if auditCount != 1 {
-		t.Errorf("audit login_succeeded count = %d, want 1", auditCount)
+	if auditCount != 1 || auditIPText != ip.String() || auditUserAgent != userAgent {
+		t.Errorf("login_succeeded audit = count %d ip %q user-agent %q", auditCount, auditIPText, auditUserAgent)
 	}
 }
 
@@ -109,7 +133,7 @@ func TestRF017_BloqueoSePersisteEnPostgres(t *testing.T) {
 	if err != nil {
 		t.Fatalf("token.New: %v", err)
 	}
-	service := login.New(repository, signer, time.Hour, login.LockoutConfig{AccountMaxFailures: 1, IPMaxFailures: 20, FailureWindow: 15 * time.Minute, LockoutDuration: 15 * time.Minute})
+	service := testsession.New(repository, signer, lockout.Config{AccountMaxFailures: 1, IPMaxFailures: 20, FailureWindow: 15 * time.Minute, LockoutDuration: 15 * time.Minute}).Login
 	if _, err := service.Login(ctx, login.Input{Email: user.Email, Password: "wrong password"}); !errors.Is(err, login.ErrInvalidCredentials) {
 		t.Fatalf("failed login error = %v", err)
 	}

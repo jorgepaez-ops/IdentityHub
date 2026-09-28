@@ -3,9 +3,6 @@ package login
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/netip"
@@ -13,25 +10,16 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jorgepaez/identity-hub/internal/auth/lockout"
+	"github.com/jorgepaez/identity-hub/internal/auth/mfa"
 	"github.com/jorgepaez/identity-hub/internal/auth/password"
-	"github.com/jorgepaez/identity-hub/internal/auth/roles"
 	"github.com/jorgepaez/identity-hub/internal/auth/token"
 )
 
 var (
 	ErrInvalidCredentials = errors.New("invalid credentials")
-	ErrMFAUnavailable     = errors.New("multi-factor authentication is not supported")
 	ErrAccountLocked      = errors.New("account is locked")
 	ErrIPRateLimited      = errors.New("login IP is rate limited")
-)
-
-const accessTokenExpiresIn = 900
-
-const (
-	defaultAccountMaxFailures = 5
-	defaultIPMaxFailures      = 20
-	defaultFailureWindow      = 15 * time.Minute
-	defaultLockoutDuration    = 15 * time.Minute
 )
 
 type Status string
@@ -44,6 +32,7 @@ const (
 type User struct {
 	ID           uuid.UUID
 	Email        string
+	DisplayName  string
 	PasswordHash string
 	Status       Status
 	LockedUntil  *time.Time
@@ -57,11 +46,11 @@ type Input struct {
 	UserAgent *string
 }
 
+// Result is always an MFA challenge: no session exists until the code is
+// verified (D11).
 type Result struct {
-	AccessToken  string
-	RefreshToken string
-	TokenType    string
-	ExpiresIn    int
+	MfaToken  string
+	ExpiresIn int
 }
 
 type RefreshToken struct {
@@ -102,7 +91,7 @@ type Writer interface {
 	LockLoginUser(context.Context, uuid.UUID, time.Time) error
 	UnlockLoginUser(context.Context, uuid.UUID) error
 	ListRolesForUser(context.Context, uuid.UUID) ([]string, error)
-	UpdateLoginSuccess(context.Context, uuid.UUID, string) error
+	UpdatePasswordHash(context.Context, uuid.UUID, string) error
 	CreateRefreshToken(context.Context, RefreshToken) error
 	InsertAuditEvent(context.Context, AuditEvent) error
 }
@@ -121,8 +110,12 @@ type Service struct {
 	refreshTTL time.Duration
 	lockout    LockoutConfig
 	publisher  EventPublisher
+	mfa        mfa.Issuer
 	now        func() time.Time
 }
+
+// WithMFA makes email MFA mandatory after password verification (D11).
+func (s *Service) WithMFA(issuer mfa.Issuer) *Service { s.mfa = issuer; return s }
 
 // WithEventPublisher wires the broker publisher used to notify
 // security.account_locked, mirroring refresh.Service.WithEventPublisher.
@@ -132,40 +125,27 @@ func (s *Service) WithEventPublisher(publisher EventPublisher) *Service {
 }
 
 // LockoutConfig controls the independent account and IP sliding-window limits.
-type LockoutConfig struct {
-	AccountMaxFailures int
-	IPMaxFailures      int
-	FailureWindow      time.Duration
-	LockoutDuration    time.Duration
-}
-
-func defaultLockoutConfig() LockoutConfig {
-	return LockoutConfig{
-		AccountMaxFailures: defaultAccountMaxFailures,
-		IPMaxFailures:      defaultIPMaxFailures,
-		FailureWindow:      defaultFailureWindow,
-		LockoutDuration:    defaultLockoutDuration,
-	}
-}
+// It is shared with the MFA verification step so both enforce one policy.
+type LockoutConfig = lockout.Config
 
 // New creates the login service. The optional lockout configuration retains
 // compatibility with existing callers while allowing composition to inject the
 // environment-derived policy.
-func New(repository Repository, tokens *token.Service, refreshTTL time.Duration, lockout ...LockoutConfig) *Service {
-	policy := defaultLockoutConfig()
-	if len(lockout) == 1 {
-		policy = lockout[0]
+func New(repository Repository, tokens *token.Service, refreshTTL time.Duration, policies ...LockoutConfig) *Service {
+	policy := lockout.Default()
+	if len(policies) == 1 {
+		policy = policies[0]
 	}
 	return &Service{repository: repository, tokens: tokens, refreshTTL: refreshTTL, lockout: policy, now: time.Now}
 }
 
 func (s *Service) Login(ctx context.Context, input Input) (Result, error) {
-	if s.repository == nil || s.tokens == nil || s.refreshTTL <= 0 || !s.lockout.valid() {
+	if s.repository == nil || s.tokens == nil || s.mfa == nil || s.refreshTTL <= 0 || !s.lockout.Valid() {
 		return Result{}, fmt.Errorf("login service is unavailable")
 	}
-	var result Result
 	var authenticationErr error
 	var lockEvent *SecurityEvent
+	var mfaUser mfa.User
 	err := s.repository.WithinLoginTransaction(ctx, func(writer Writer) error {
 		now := s.now()
 		if input.IP != nil {
@@ -214,57 +194,24 @@ func (s *Service) Login(ctx context.Context, input Input) (Result, error) {
 			if err != nil {
 				return err
 			}
-			if lock.locked {
-				lockEvent = &SecurityEvent{Type: "security.account_locked", UserID: user.ID, IP: input.IP, LockedUntil: lock.lockedUntil, FailedAttempts: lock.failedAttempts}
+			if lock.Locked {
+				lockEvent = &SecurityEvent{Type: "security.account_locked", UserID: user.ID, IP: input.IP, LockedUntil: lock.LockedUntil, FailedAttempts: lock.FailedAttempts}
 			}
 			authenticationErr = ErrInvalidCredentials
 			return nil
 		}
-		if user.MFAEnabled {
-			lock, err := s.recordAccountFailure(ctx, writer, user, input, "mfa_not_supported", now)
-			if err != nil {
-				return err
-			}
-			if lock.locked {
-				lockEvent = &SecurityEvent{Type: "security.account_locked", UserID: user.ID, IP: input.IP, LockedUntil: lock.lockedUntil, FailedAttempts: lock.failedAttempts}
-			}
-			authenticationErr = ErrMFAUnavailable
-			return nil
-		}
-
-		updatedHash := user.PasswordHash
+		// Success bookkeeping (audit, last_login_at) waits for the MFA code (D11);
+		// only the transparent rehash belongs to the password step.
 		if password.NeedsRehash(user.PasswordHash) {
-			updatedHash, err = password.Hash(input.Password)
+			updatedHash, err := password.Hash(input.Password)
 			if err != nil {
 				return fmt.Errorf("rehash password: %w", err)
 			}
+			if err := writer.UpdatePasswordHash(ctx, user.ID, updatedHash); err != nil {
+				return fmt.Errorf("update password hash: %w", err)
+			}
 		}
-		userRoles, err := writer.ListRolesForUser(ctx, user.ID)
-		if err != nil {
-			return fmt.Errorf("list user roles: %w", err)
-		}
-		// The Hub console access token is a directory-scoped token (D8, RF-009):
-		// an application role such as contabilidad.senior must never appear in
-		// its roles claim, even though the account keeps it in the database.
-		accessToken, err := s.tokens.Issue(user.ID.String(), roles.Directory(userRoles))
-		if err != nil {
-			return fmt.Errorf("issue access token: %w", err)
-		}
-		refreshRaw := make([]byte, 32)
-		if _, err := rand.Read(refreshRaw); err != nil {
-			return fmt.Errorf("generate refresh token: %w", err)
-		}
-		refreshHash := sha256.Sum256(refreshRaw)
-		if err := writer.UpdateLoginSuccess(ctx, user.ID, updatedHash); err != nil {
-			return fmt.Errorf("update login success: %w", err)
-		}
-		if err := writer.CreateRefreshToken(ctx, RefreshToken{UserID: user.ID, TokenHash: refreshHash[:], FamilyID: uuid.New(), IP: input.IP, UserAgent: input.UserAgent, ExpiresAt: s.now().Add(s.refreshTTL)}); err != nil {
-			return fmt.Errorf("create refresh token: %w", err)
-		}
-		if err := writer.InsertAuditEvent(ctx, AuditEvent{ActorUserID: &user.ID, Action: "login_succeeded", IP: input.IP, UserAgent: input.UserAgent}); err != nil {
-			return fmt.Errorf("record successful login audit: %w", err)
-		}
-		result = Result{AccessToken: accessToken, RefreshToken: base64.RawURLEncoding.EncodeToString(refreshRaw), TokenType: "Bearer", ExpiresIn: accessTokenExpiresIn}
+		mfaUser = mfa.User{ID: user.ID, Email: user.Email, DisplayName: user.DisplayName}
 		return nil
 	})
 	if err != nil {
@@ -281,49 +228,32 @@ func (s *Service) Login(ctx context.Context, input Input) (Result, error) {
 	if authenticationErr != nil {
 		return Result{}, authenticationErr
 	}
-	return result, nil
-}
-
-// lockResult carries the details security.account_locked needs, so the
-// caller can publish an event that actually matches the AsyncAPI contract
-// (specs/04-events/asyncapi.yaml requires lockedUntil and failedAttempts)
-// instead of placeholder zero values.
-type lockResult struct {
-	locked         bool
-	lockedUntil    time.Time
-	failedAttempts int
+	challenge, err := s.mfa.Issue(ctx, mfaUser)
+	if err != nil {
+		return Result{}, fmt.Errorf("issue mfa challenge: %w", err)
+	}
+	return Result{MfaToken: challenge.Token, ExpiresIn: challenge.ExpiresIn}, nil
 }
 
 // recordAccountFailure records the failed attempt and, once it reaches the
 // threshold, locks the account and audits account_locked in the same
 // transaction. It reports whether the account was just locked, so the caller
 // can publish security.account_locked after the transaction commits.
-func (s *Service) recordAccountFailure(ctx context.Context, writer Writer, user User, input Input, reason string, now time.Time) (lockResult, error) {
+func (s *Service) recordAccountFailure(ctx context.Context, writer Writer, user User, input Input, reason string, now time.Time) (lockout.Outcome, error) {
 	if err := s.recordFailure(ctx, writer, &user.ID, input, reason); err != nil {
-		return lockResult{}, err
+		return lockout.Outcome{}, err
 	}
 	if user.Status != StatusActive {
-		return lockResult{}, nil
+		return lockout.Outcome{}, nil
 	}
-	failures, err := writer.CountLoginFailuresByAccount(ctx, user.ID, now.Add(-s.lockout.FailureWindow))
-	if err != nil {
-		return lockResult{}, fmt.Errorf("count login failures by account: %w", err)
-	}
-	if failures < int64(s.lockout.AccountMaxFailures) {
-		return lockResult{}, nil
-	}
-	lockedUntil := now.Add(s.lockout.LockoutDuration)
-	if err := writer.LockLoginUser(ctx, user.ID, lockedUntil); err != nil {
-		return lockResult{}, fmt.Errorf("lock login user: %w", err)
+	outcome, err := s.lockout.EvaluateAccount(ctx, writer, user.ID, now)
+	if err != nil || !outcome.Locked {
+		return outcome, err
 	}
 	if err := writer.InsertAuditEvent(ctx, AuditEvent{ActorUserID: &user.ID, Action: "account_locked", Reason: reason, IP: input.IP, UserAgent: input.UserAgent}); err != nil {
-		return lockResult{}, fmt.Errorf("record account locked audit: %w", err)
+		return lockout.Outcome{}, fmt.Errorf("record account locked audit: %w", err)
 	}
-	return lockResult{locked: true, lockedUntil: lockedUntil, failedAttempts: int(failures)}, nil
-}
-
-func (c LockoutConfig) valid() bool {
-	return c.AccountMaxFailures > 0 && c.IPMaxFailures > 0 && c.FailureWindow > 0 && c.LockoutDuration > 0
+	return outcome, nil
 }
 
 func (s *Service) recordFailure(ctx context.Context, writer Writer, actorID *uuid.UUID, input Input, reason string) error {

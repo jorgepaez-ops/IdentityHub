@@ -13,11 +13,13 @@ import (
 
 	"github.com/jorgepaez/identity-hub/internal/api"
 	"github.com/jorgepaez/identity-hub/internal/auth/auditlog"
+	"github.com/jorgepaez/identity-hub/internal/auth/lockout"
 	"github.com/jorgepaez/identity-hub/internal/auth/login"
 	"github.com/jorgepaez/identity-hub/internal/auth/password"
 	"github.com/jorgepaez/identity-hub/internal/auth/token"
 	"github.com/jorgepaez/identity-hub/internal/store"
 	"github.com/jorgepaez/identity-hub/internal/testdb"
+	"github.com/jorgepaez/identity-hub/internal/testsession"
 )
 
 func TestRF011_UnLoginFallidoCreaUnaFila(t *testing.T) {
@@ -56,7 +58,7 @@ func TestRF011_UnLoginFallidoCreaUnaFila(t *testing.T) {
 	if err != nil {
 		t.Fatalf("token.New: %v", err)
 	}
-	if _, err := login.New(repository, tokens, time.Hour).Login(ctx, login.Input{Email: failedUser.Email, Password: "wrong password"}); !errors.Is(err, login.ErrInvalidCredentials) {
+	if _, err := testsession.New(repository, tokens, lockout.Default()).Login.Login(ctx, login.Input{Email: failedUser.Email, Password: "wrong password"}); !errors.Is(err, login.ErrInvalidCredentials) {
 		t.Fatalf("failed login error=%v, want invalid credentials", err)
 	}
 

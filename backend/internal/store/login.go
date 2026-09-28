@@ -13,8 +13,8 @@ import (
 	generated "github.com/jorgepaez/identity-hub/internal/store/internal/sqlc"
 )
 
-// WithinLoginTransaction groups password rehashing, session issuance, and its
-// audit event. A failed login audit is also committed as the callback returns
+// WithinLoginTransaction groups the password check, its transparent rehash and
+// the failure audit/lockout bookkeeping. A failed login audit is also committed as the callback returns
 // the domain authentication error only after the audit insert succeeds.
 func (s *Store) WithinLoginTransaction(ctx context.Context, fn func(login.Writer) error) error {
 	tx, err := s.pool.Begin(ctx)
@@ -38,7 +38,7 @@ func (w *loginWriter) GetLoginUserByEmail(ctx context.Context, email string) (lo
 	if err != nil {
 		return login.User{}, fmt.Errorf("get login user by email: %w", err)
 	}
-	return login.User{ID: row.ID, Email: row.Email, PasswordHash: row.PasswordHash, Status: login.Status(row.Status), LockedUntil: optionalTime(row.LockedUntil), MFAEnabled: row.MfaEnabled}, nil
+	return login.User{ID: row.ID, Email: row.Email, DisplayName: row.DisplayName, PasswordHash: row.PasswordHash, Status: login.Status(row.Status), LockedUntil: optionalTime(row.LockedUntil), MFAEnabled: row.MfaEnabled}, nil
 }
 
 func (w *loginWriter) CountLoginFailuresByAccount(ctx context.Context, userID uuid.UUID, since time.Time) (int64, error) {
@@ -79,9 +79,9 @@ func (w *loginWriter) ListRolesForUser(ctx context.Context, userID uuid.UUID) ([
 	return roles, nil
 }
 
-func (w *loginWriter) UpdateLoginSuccess(ctx context.Context, userID uuid.UUID, passwordHash string) error {
-	if err := w.queries.UpdateLoginSuccess(ctx, generated.UpdateLoginSuccessParams{ID: userID, PasswordHash: passwordHash}); err != nil {
-		return fmt.Errorf("update login success: %w", err)
+func (w *loginWriter) UpdatePasswordHash(ctx context.Context, userID uuid.UUID, passwordHash string) error {
+	if err := w.queries.UpdatePasswordHash(ctx, generated.UpdatePasswordHashParams{ID: userID, PasswordHash: passwordHash}); err != nil {
+		return fmt.Errorf("update password hash: %w", err)
 	}
 	return nil
 }

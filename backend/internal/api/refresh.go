@@ -29,12 +29,13 @@ func (s *Server) RefreshSession(w http.ResponseWriter, r *http.Request, params R
 		writeProblem(w, http.StatusInternalServerError, "refresh-failed", "Internal Server Error", "The session could not be refreshed.")
 		return
 	}
-	http.SetCookie(w, refreshCookie(result.RefreshToken))
+	http.SetCookie(w, refreshCookie(result.RefreshToken, 0))
 	writeJSON(w, http.StatusOK, TokenPair{AccessToken: result.AccessToken, TokenType: TokenPairTokenType(result.TokenType), ExpiresIn: result.ExpiresIn})
 }
 
-func refreshCookie(value string) *http.Cookie {
-	return &http.Cookie{Name: refreshCookieName, Value: value, Path: "/api/v1/auth", HttpOnly: true, Secure: true, SameSite: http.SameSiteStrictMode}
+// refreshCookie builds the refresh cookie; maxAge 0 leaves it a browser-session cookie.
+func refreshCookie(value string, maxAge int) *http.Cookie {
+	return &http.Cookie{Name: refreshCookieName, Value: value, Path: "/api/v1/auth", MaxAge: maxAge, HttpOnly: true, Secure: true, SameSite: http.SameSiteStrictMode}
 }
 
 func clearRefreshCookie(w http.ResponseWriter) {

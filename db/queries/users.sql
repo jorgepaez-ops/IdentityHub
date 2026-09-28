@@ -92,7 +92,7 @@ WHERE id = (SELECT user_id FROM consumed)
 RETURNING *;
 
 -- name: GetLoginUserByEmail :one
-SELECT id, email, password_hash, status, locked_until, mfa_enabled
+SELECT id, email, display_name, password_hash, status, locked_until, mfa_enabled
 FROM users
 WHERE email = $1
 FOR UPDATE;
@@ -114,11 +114,45 @@ JOIN roles ON roles.id = user_roles.role_id
 WHERE user_roles.user_id = $1
 ORDER BY roles.name;
 
--- name: UpdateLoginSuccess :exec
+-- name: UpdatePasswordHash :exec
+-- Transparent Argon2id rehash after a verified password (RF-003).
 UPDATE users
-SET password_hash = $2,
-    last_login_at = now()
+SET password_hash = $2
 WHERE id = $1;
+
+-- name: UpdateLastLogin :exec
+-- Recorded only when the MFA code is accepted (D11), not at password check.
+UPDATE users
+SET last_login_at = now()
+WHERE id = $1;
+
+-- name: CreateMfaChallenge :exec
+INSERT INTO mfa_challenges (user_id, token_hash, code_hash, expires_at, attempts_left)
+VALUES ($1, $2, $3, $4, $5);
+
+-- name: GetMfaChallengeForUpdate :one
+SELECT c.id, c.user_id, c.code_hash, c.expires_at, c.attempts_left, c.last_sent_at, c.used_at,
+       u.email, u.display_name, u.status
+FROM mfa_challenges c
+JOIN users u ON u.id = c.user_id
+WHERE c.token_hash = $1
+FOR UPDATE OF c, u;
+
+-- name: ConsumeMfaChallenge :exec
+UPDATE mfa_challenges SET used_at = now()
+WHERE id = $1 AND used_at IS NULL;
+
+-- name: RejectMfaChallenge :one
+UPDATE mfa_challenges
+SET attempts_left = attempts_left - 1,
+    used_at = CASE WHEN attempts_left = 1 THEN now() ELSE used_at END
+WHERE id = $1 AND used_at IS NULL AND attempts_left > 0
+RETURNING attempts_left;
+
+-- name: ResendMfaChallenge :exec
+UPDATE mfa_challenges
+SET code_hash = $2, last_sent_at = now()
+WHERE id = $1 AND used_at IS NULL;
 
 -- name: CreateRefreshToken :exec
 INSERT INTO refresh_tokens (user_id, token_hash, family_id, ip, user_agent, expires_at)
@@ -224,7 +258,7 @@ WITH consumed AS (
       AND id <> (SELECT id FROM consumed)
     RETURNING id
 ), previous_user AS (
-    SELECT id, status FROM users WHERE id = (SELECT user_id FROM consumed)
+    SELECT id, status FROM users WHERE id = (SELECT user_id FROM consumed) FOR UPDATE
 ), updated_user AS (
     UPDATE users
     SET password_hash = $2,

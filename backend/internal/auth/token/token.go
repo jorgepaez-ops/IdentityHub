@@ -14,6 +14,10 @@ import (
 
 const accessTokenTTL = 15 * time.Minute
 
+// AccessTokenExpiresIn is the access token lifetime in seconds, as reported in
+// the `expiresIn` field of every token response.
+const AccessTokenExpiresIn = int(accessTokenTTL / time.Second)
+
 type Clock func() time.Time
 
 type Claims struct {

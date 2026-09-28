@@ -9,12 +9,14 @@ import (
 
 	"errors"
 
+	"github.com/jorgepaez/identity-hub/internal/auth/lockout"
 	"github.com/jorgepaez/identity-hub/internal/auth/login"
 	"github.com/jorgepaez/identity-hub/internal/auth/password"
 	"github.com/jorgepaez/identity-hub/internal/auth/refresh"
 	"github.com/jorgepaez/identity-hub/internal/auth/token"
 	"github.com/jorgepaez/identity-hub/internal/store"
 	"github.com/jorgepaez/identity-hub/internal/testdb"
+	"github.com/jorgepaez/identity-hub/internal/testsession"
 )
 
 func TestRF006_DosRenovacionesConcurrentesUnaGana(t *testing.T) {
@@ -42,7 +44,7 @@ func TestRF006_DosRenovacionesConcurrentesUnaGana(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	loginResult, err := login.New(repository, signer, time.Hour).Login(ctx, login.Input{Email: user.Email, Password: "correct horse battery"})
+	loginResult, err := testsession.New(repository, signer, lockout.Default()).SignIn(ctx, login.Input{Email: user.Email, Password: "correct horse battery"})
 	if err != nil {
 		t.Fatalf("Login: %v", err)
 	}

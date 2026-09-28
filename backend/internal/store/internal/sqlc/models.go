@@ -155,6 +155,18 @@ type AuditLog struct {
 	CreatedAt    pgtype.Timestamptz
 }
 
+type MfaChallenge struct {
+	ID           uuid.UUID
+	UserID       uuid.UUID
+	TokenHash    []byte
+	CodeHash     []byte
+	ExpiresAt    pgtype.Timestamptz
+	AttemptsLeft int32
+	LastSentAt   pgtype.Timestamptz
+	UsedAt       pgtype.Timestamptz
+	CreatedAt    pgtype.Timestamptz
+}
+
 type RecoveryCode struct {
 	ID        uuid.UUID
 	UserID    uuid.UUID

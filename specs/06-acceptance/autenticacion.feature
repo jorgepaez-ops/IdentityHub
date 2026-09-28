@@ -26,6 +26,12 @@ Característica: Autenticación y emisión de tokens
     Entonces recibo una respuesta 202 y un código nuevo en Mailpit
     Y el código anterior ya no completa el desafío
 
+  @RF-014 @p1
+  Escenario: El reenvío respeta la ventana mínima
+    Dado que inicié un desafío MFA hace menos de 60 segundos
+    Cuando solicito reenviar el código
+    Entonces recibo una respuesta 429
+
   @RF-014 @RF-017 @AM-001 @p1
   Escenario: Agotar los intentos MFA anula el desafío
     Dado que inicié un desafío MFA
@@ -33,6 +39,13 @@ Característica: Autenticación y emisión de tokens
     Entonces el "mfaToken" deja de ser válido
     Y los fallos cuentan para el bloqueo de la cuenta
     Y se registra un evento de auditoría "mfa_challenge_exhausted"
+
+  @RF-014 @RF-017 @AM-001 @p1
+  Escenario: Adivinar códigos MFA en desafíos sucesivos bloquea la cuenta
+    Dado que conozco la contraseña de "ana@example.com"
+    Cuando inicio varios desafíos MFA y presento códigos incorrectos hasta alcanzar el umbral de RF-017
+    Entonces la cuenta queda bloqueada y se registra "account_locked"
+    Y un código correcto en un desafío posterior es rechazado
 
   @RF-003 @AM-004 @p0
   Escenario: Contraseña incorrecta

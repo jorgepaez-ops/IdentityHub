@@ -12,7 +12,7 @@ declaración de buenas intenciones.
 |---|---|---|---|---|---|---|---|
 | **RF-001** | Alta de empleados por administración | P0 | `createEmployee`, `resendInvitation` | 4 | 34 | — | ✅ completo |
 | **RF-002** | Aceptación de invitación y verificación de correo | P0 | `acceptInvitation` | 4 | 16 | — | ✅ completo |
-| **RF-003** | Inicio de sesión | P0 | `login` | 2 | 10 | — | ✅ completo |
+| **RF-003** | Inicio de sesión | P0 | `login` | 2 | 9 | — | ✅ completo |
 | **RF-004** | Emisión y validación de JWT | P0 | `getJwks` | 1 | 8 | — | ✅ completo |
 | **RF-005** | Renovación de sesión | P0 | `refreshSession` | 1 | 7 | — | ✅ completo |
 | **RF-006** | Detección de reuso de refresh token | P0 | — | 1 | 5 | — | ✅ completo |
@@ -22,11 +22,11 @@ declaración de buenas intenciones.
 | **RF-010** | Administración de usuarios | P0 | `listUsers`, `getUser`, `updateUser` | 3 | 12 | — | ✅ completo |
 | **RF-011** | Registro de auditoría | P0 | `listAuditLog` | 1 | 9 | — | ✅ completo |
 | **RF-012** | Notificaciones asíncronas | P0 | — | 1 | 9 | — | ✅ completo |
-| **RF-013** | Segundo factor obligatorio por correo | P1 | — | 1 | — | — | ⏳ diferido (semana 3) |
-| **RF-014** | Inicio de sesión con segundo factor | P1 | `verifyMfa`, `resendMfaCode` | 3 | — | — | ⏳ diferido (semana 3) |
-| **RF-015** | Restablecimiento de contraseña | P1 | `requestPasswordReset`, `confirmPasswordReset` | 3 | 28 | — | ✅ completo |
+| **RF-013** | Segundo factor obligatorio por correo | P1 | — | 1 | 4 | — | ✅ completo |
+| **RF-014** | Inicio de sesión con segundo factor | P1 | `verifyMfa`, `resendMfaCode` | 5 | 15 | — | ✅ completo |
+| **RF-015** | Restablecimiento de contraseña | P1 | `requestPasswordReset`, `confirmPasswordReset` | 3 | 29 | — | ✅ completo |
 | **RF-016** | Sesiones activas | P1 | `listSessions`, `revokeSession` | 1 | — | — | ⏳ diferido (semana 3) |
-| **RF-017** | Bloqueo por fuerza bruta | P1 | — | 3 | 14 | — | ✅ completo |
+| **RF-017** | Bloqueo por fuerza bruta | P1 | — | 4 | 20 | — | ✅ completo |
 | **RF-018** | Claves de servicio | P2 | — | — | — | — | ⏳ diferido (semana 3) |
 | **RF-019** | Exportación del audit log | P2 | — | — | — | — | ⏳ diferido (semana 3) |
 | **RF-020** | Autorización de aplicaciones cliente | P1 | `authorizeClient`, `exchangeAuthorizationCode` | 10 | — | — | ⏳ diferido (semana 3) |
@@ -43,7 +43,7 @@ declaración de buenas intenciones.
 | **RNF-011** | Los specs son la fuente de verdad | P0 | — | — | 4 | — | 🟡 parcial |
 | **RNF-012** | Logs sin datos sensibles | P0 | — | — | 3 | — | 🟡 parcial |
 
-**Resumen:** 32 requisitos · 13 completos · 6 parciales · 7 sin cubrir · 6 diferidos (semana 3).
+**Resumen:** 32 requisitos · 15 completos · 6 parciales · 7 sin cubrir · 4 diferidos (semana 3).
 
 Leyenda de estado: *completo* = verificado por al menos dos de las tres
 columnas de prueba · *parcial* = una sola · *sin cubrir* = ninguna · *diferido (semana 3)* = backlog de semana 3 por decisión Q14.
@@ -90,7 +90,9 @@ columnas de prueba · *parcial* = una sola · *sin cubrir* = ninguna · *diferid
 - **RF-014**
   - autenticacion.feature — Todo inicio de sesión exige MFA por correo
   - autenticacion.feature — Reenviar el código invalida el anterior
+  - autenticacion.feature — El reenvío respeta la ventana mínima
   - autenticacion.feature — Agotar los intentos MFA anula el desafío
+  - autenticacion.feature — Adivinar códigos MFA en desafíos sucesivos bloquea la cuenta
 - **RF-015**
   - restablecimiento-contrasena.feature — La solicitud no enumera cuentas
   - restablecimiento-contrasena.feature — Restablecer revoca las sesiones anteriores
@@ -99,6 +101,7 @@ columnas de prueba · *parcial* = una sola · *sin cubrir* = ninguna · *diferid
   - rotacion-de-sesion.feature — Revocar una sesión concreta desde otro dispositivo
 - **RF-017**
   - autenticacion.feature — Agotar los intentos MFA anula el desafío
+  - autenticacion.feature — Adivinar códigos MFA en desafíos sucesivos bloquea la cuenta
   - autenticacion.feature — Bloqueo tras intentos fallidos repetidos
   - restablecimiento-contrasena.feature — Restablecer desbloquea la cuenta sin que un fallo la vuelva a bloquear
 - **RF-020**

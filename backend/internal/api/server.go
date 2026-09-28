@@ -23,6 +23,7 @@ import (
 	"github.com/jorgepaez/identity-hub/internal/auth/invitationresend"
 	"github.com/jorgepaez/identity-hub/internal/auth/login"
 	"github.com/jorgepaez/identity-hub/internal/auth/logout"
+	"github.com/jorgepaez/identity-hub/internal/auth/mfa"
 	"github.com/jorgepaez/identity-hub/internal/auth/passwordreset"
 	"github.com/jorgepaez/identity-hub/internal/auth/refresh"
 	"github.com/jorgepaez/identity-hub/internal/auth/token"
@@ -38,6 +39,7 @@ type Server struct {
 	invitationResend invitationresend.Resender
 	passwordReset    passwordreset.HandlerService
 	login            login.Authenticator
+	mfa              mfa.Authenticator
 	refreshTTL       time.Duration
 	currentUsers     currentUserRepository
 	refresh          refresh.Refresher
@@ -77,6 +79,9 @@ func (s *Server) SetPasswordResetService(service passwordreset.HandlerService) {
 func (s *Server) SetLoginService(service login.Authenticator, refreshTTL time.Duration) {
 	s.login = service
 	s.refreshTTL = refreshTTL
+}
+func (s *Server) SetMFAService(service mfa.Authenticator, refreshTTL time.Duration) {
+	s.mfa, s.refreshTTL = service, refreshTTL
 }
 
 // SetCurrentUserRepository is used by composition and focused profile tests.
@@ -185,14 +190,14 @@ func (s *Server) ResendInvitation(w http.ResponseWriter, r *http.Request, userID
 func (s *Server) AcceptInvitation(w http.ResponseWriter, r *http.Request) {
 	s.acceptInvitation(w, r)
 }
-func (s *Server) ResendMfaCode(w http.ResponseWriter, r *http.Request) { s.notImplemented(w) }
+func (s *Server) ResendMfaCode(w http.ResponseWriter, r *http.Request) { s.resendMfaCode(w, r) }
 func (s *Server) AuthorizeClient(w http.ResponseWriter, r *http.Request, params AuthorizeClientParams) {
 	s.notImplemented(w)
 }
 func (s *Server) ExchangeAuthorizationCode(w http.ResponseWriter, r *http.Request) {
 	s.notImplemented(w)
 }
-func (s *Server) VerifyMfa(w http.ResponseWriter, r *http.Request) { s.notImplemented(w) }
+func (s *Server) VerifyMfa(w http.ResponseWriter, r *http.Request) { s.verifyMfa(w, r) }
 func (s *Server) ConfirmPasswordReset(w http.ResponseWriter, r *http.Request) {
 	s.confirmPasswordReset(w, r)
 }
