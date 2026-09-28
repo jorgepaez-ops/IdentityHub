@@ -181,10 +181,14 @@ dinámico de clientes, consentimiento, `id_token`), TOTP/WebAuthn, correo real p
   correo al titular avisando que su contraseña cambió (y que se cerraron sus sesiones); si además
   desbloqueó la cuenta (D13), el correo lo dice. Se envía siempre, no solo al desbloquear: si
   alguien tomó el control del buzón y cambió la contraseña, el dueño se entera. Va en T7.
+- **D15 · Parámetros del desafío MFA (2026-09-28).** El código (y su `mfa_token`) vence a los
+  **5 minutos**, admite **5 intentos** por desafío y el reenvío se permite cada **60 segundos**.
+  RF-014 y la ADR 0010 pedían vida corta y límites sin fijar números; NIST SP 800-63B admite hasta
+  10 minutos para códigos por canal externo. Consultado por Codex al empezar T7.
 
 ## Preguntas abiertas
 
-Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, del usuario al cerrar T6.
+Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, del usuario al cerrar T6; D15, consulta de Codex en T7.
 
 ---
 
@@ -377,6 +381,7 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 - Política D11: todo login exige el código. Desafío `202` con `mfa_token` temporal, código de 6
   dígitos enviado por el worker, vencimiento corto, un solo uso, límite de intentos y auditoría; sin
   paso de activación. Quitar el rechazo explícito de cuentas con MFA de la semana 2.
+- D15: 5 min de vigencia, 5 intentos, reenvío cada 60 s.
 - D14: correo de aviso en todo restablecimiento completado, con línea condicional si desbloqueó.
 - Observaciones menores de T6-fix (ver T6): `FOR UPDATE` en `previous_user`; constante o comentario
   que una `password_reset_completed` en Go y SQL; "12 to 128" derivado de las constantes; pruebas
