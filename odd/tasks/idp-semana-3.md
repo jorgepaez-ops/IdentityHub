@@ -357,7 +357,16 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones.
     `ErrInvalidInput` a algo como `ErrTokenRequired`; límites de contraseña como constante
     compartida con la invitación; log al descartar eventos sin `accountExists`; pruebas de los
     códigos HTTP sin cubrir (reenvío 204/404/503/500, confirmación 204/400/500).
-- Commit: `7d8b2a6`
+  - T6-fix (2026-09-28, Sonnet por falta de cuota de Codex, `1ceed6e`): D13 y las observaciones
+    anteriores. Verificación de Claude: unitarias, lint 0, trazabilidad al día, integración de
+    `passwordreset`, `login` y `store` con `-race` en verde. Revisión nativa (alto, 21 archivos,
+    579 líneas, 4 lentes): **aprobada** y acusada (`review-c986c308fd926a89`) con 5 observaciones
+    menores que van con T7: `previous_user` sin `FOR UPDATE` puede dar `unlocked` falso si un login
+    concurrente bloquea la cuenta en medio (R4); la acción `password_reset_completed` repetida como
+    literal en Go y SQL sin constante ni comentario que las una (R2); el detalle "12 to 128" sigue
+    escrito a mano junto a las constantes (R2); las pruebas de integración no leen la metadata
+    `unlocked` ni el registro de auditoría en la cuenta deshabilitada (R3).
+- Commit: `7d8b2a6`, `1ceed6e`
 
 ### T7 — RF-013/014 MFA obligatorio por correo
 - [ ] Estado · Ejecutor: `Codex` · Depende de: T3
@@ -459,7 +468,7 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones.
 
 ## Siguiente paso
 
-T6-fix (Codex): observaciones de la revisión nativa de T6 y D13. Luego T7 (MFA por correo).
+T7 (Codex, desde las 12:38): MFA por correo, más las 5 observaciones menores de T6-fix.
 
 ## Cambios de spec propuestos
 
