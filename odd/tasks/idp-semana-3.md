@@ -172,10 +172,15 @@ dinámico de clientes, consentimiento, `id_token`), TOTP/WebAuthn, correo real p
   invitación anteriores, emite uno nuevo de 24 h y queda auditado. Sin esto, una invitación vencida
   o perdida deja la cuenta bloqueada para siempre (hallazgo R4 de la revisión nativa de T5). Va en
   T6 (mismo mecanismo de token) con enmienda al spec; la consola (T12) muestra la acción.
+- **D13 · El restablecimiento desbloquea (2026-09-28).** Un restablecimiento completado pasa una
+  cuenta `locked` (RF-017) a `active` y el conteo de intentos fallidos ignora los anteriores al
+  restablecimiento. El bloqueo frena la adivinanza de contraseña; el restablecimiento exige
+  controlar el correo, un factor distinto, así que desbloquear no agrega exposición y evita
+  depender de soporte. Queda auditado aparte. No reactiva cuentas deshabilitadas ni pendientes.
 
 ## Preguntas abiertas
 
-Ninguna: P1 a P4 resueltas en D8 a D11.
+Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones.
 
 ---
 
@@ -454,7 +459,7 @@ Ninguna: P1 a P4 resueltas en D8 a D11.
 
 ## Siguiente paso
 
-T6-fix (Codex): observaciones de la revisión nativa de T6. Luego T7 (MFA por correo).
+T6-fix (Codex): observaciones de la revisión nativa de T6 y D13. Luego T7 (MFA por correo).
 
 ## Cambios de spec propuestos
 
