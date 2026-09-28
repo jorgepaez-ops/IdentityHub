@@ -20,11 +20,25 @@ VALUES (
 RETURNING *;
 
 -- name: CountLoginFailuresByAccount :one
+-- D13: failures recorded before the account's latest completed password
+-- reset no longer count, so a single wrong attempt right after a reset does
+-- not immediately re-lock the account. The IP-based sibling query below is
+-- unaffected on purpose: RF-017 keeps limiting guessing from one IP
+-- regardless of which account last reset its password.
 SELECT count(*)::bigint
-FROM audit_log
-WHERE actor_user_id = $1
-  AND action = 'login_failed'
-  AND created_at >= $2;
+FROM audit_log AS failures
+WHERE failures.actor_user_id = $1
+  AND failures.action = 'login_failed'
+  AND failures.created_at >= $2
+  AND failures.created_at > COALESCE(
+        (SELECT resets.created_at
+         FROM audit_log AS resets
+         WHERE resets.actor_user_id = $1
+           AND resets.action = 'password_reset_completed'
+         ORDER BY resets.created_at DESC
+         LIMIT 1),
+        '-infinity'::timestamptz
+      );
 
 -- name: CountLoginFailuresByIP :one
 SELECT count(*)::bigint

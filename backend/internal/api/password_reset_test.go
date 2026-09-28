@@ -64,3 +64,43 @@ func TestRF015_SolicitudMantiene202CuandoFallaLaEntrega(t *testing.T) {
 		t.Fatalf("status=%d body=%q, want 202 empty", r.Code, r.Body.String())
 	}
 }
+
+func TestRF015_ConfirmacionCorrectaDevuelve204(t *testing.T) {
+	s := NewServer(nil, "test", nil)
+	s.SetPasswordResetService(&passwordResetStub{})
+	r := httptest.NewRecorder()
+	s.Routes().ServeHTTP(r, httptest.NewRequest(http.MethodPost, "/api/v1/auth/password-reset/confirm", strings.NewReader(`{"token":"valid-token","password":"correct horse battery"}`)))
+	if r.Code != http.StatusNoContent {
+		t.Fatalf("status=%d body=%s", r.Code, r.Body.String())
+	}
+}
+
+func TestRF015_ConfirmacionConTokenVacioDevuelve400(t *testing.T) {
+	s := NewServer(nil, "test", nil)
+	s.SetPasswordResetService(&passwordResetStub{confirmErr: passwordreset.ErrTokenRequired})
+	r := httptest.NewRecorder()
+	s.Routes().ServeHTTP(r, httptest.NewRequest(http.MethodPost, "/api/v1/auth/password-reset/confirm", strings.NewReader(`{"token":"","password":"correct horse battery"}`)))
+	if r.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d body=%s", r.Code, r.Body.String())
+	}
+}
+
+func TestRF015_ConfirmacionConContrasenaInvalidaDevuelve400(t *testing.T) {
+	s := NewServer(nil, "test", nil)
+	s.SetPasswordResetService(&passwordResetStub{confirmErr: &passwordreset.InvalidInputError{Field: "password", Detail: "must contain 12 to 128 characters"}})
+	r := httptest.NewRecorder()
+	s.Routes().ServeHTTP(r, httptest.NewRequest(http.MethodPost, "/api/v1/auth/password-reset/confirm", strings.NewReader(`{"token":"valid-token","password":"short"}`)))
+	if r.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d body=%s", r.Code, r.Body.String())
+	}
+}
+
+func TestRF015_ConfirmacionConErrorInesperadoDevuelve500(t *testing.T) {
+	s := NewServer(nil, "test", nil)
+	s.SetPasswordResetService(&passwordResetStub{confirmErr: errors.New("database unavailable")})
+	r := httptest.NewRecorder()
+	s.Routes().ServeHTTP(r, httptest.NewRequest(http.MethodPost, "/api/v1/auth/password-reset/confirm", strings.NewReader(`{"token":"valid-token","password":"correct horse battery"}`)))
+	if r.Code != http.StatusInternalServerError {
+		t.Fatalf("status=%d body=%s", r.Code, r.Body.String())
+	}
+}

@@ -40,6 +40,9 @@ type resetFakeWriter struct {
 	consumeErr            error
 	createForEmailCalls   int
 	createForEmail        string
+	unlocked              bool
+	auditEvents           []store.InsertAuditEventParams
+	auditErr              error
 }
 
 func (r *resetFakeRepository) PasswordResetTokenIsUsable(context.Context, []byte) (bool, error) {
@@ -59,13 +62,21 @@ func (w *resetFakeWriter) CreatePasswordResetTokenForEmail(_ context.Context, em
 	return email != "absent@example.test", nil
 }
 
-func (w *resetFakeWriter) ConsumePasswordResetTokenAndRevokeSessions(context.Context, store.ConsumePasswordResetTokenParams) (store.User, error) {
+func (w *resetFakeWriter) ConsumePasswordResetTokenAndRevokeSessions(context.Context, store.ConsumePasswordResetTokenParams) (store.User, bool, error) {
 	w.consumes++
 	if w.consumeErr != nil {
-		return store.User{}, w.consumeErr
+		return store.User{}, false, w.consumeErr
 	}
 	w.revocations++
-	return store.User{ID: uuid.New()}, nil
+	return store.User{ID: uuid.New()}, w.unlocked, nil
+}
+
+func (w *resetFakeWriter) InsertAuditEvent(_ context.Context, params store.InsertAuditEventParams) (store.AuditEvent, error) {
+	w.auditEvents = append(w.auditEvents, params)
+	if w.auditErr != nil {
+		return store.AuditEvent{}, w.auditErr
+	}
+	return store.AuditEvent{Action: params.Action}, nil
 }
 
 type resetFakeHasher struct{ calls int }
@@ -218,7 +229,10 @@ func TestRF015_SolicitudGuardaSoloHashYVenceEnUnaHora(t *testing.T) {
 	}
 }
 
-func TestRF015_SolicitudNoIncluyeIdentidadDeCuentaEnEvento(t *testing.T) {
+// The published event deliberately carries accountExists (a state bit) so the
+// worker can skip SMTP for a missing account (AM-004); what it must never
+// carry is the user's identity, so this only checks for that.
+func TestRF015_SolicitudNoIncluyeElUserIdEnElEvento(t *testing.T) {
 	raw := bytes.Repeat([]byte{6}, 32)
 	publisher := &resetFakePublisher{}
 	repo := &resetFakeRepository{writer: &resetFakeWriter{}}
@@ -229,9 +243,67 @@ func TestRF015_SolicitudNoIncluyeIdentidadDeCuentaEnEvento(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, forbidden := range []string{`"found"`, `"userId"`} {
-		if bytes.Contains(payload, []byte(forbidden)) {
-			t.Fatalf("event leaks account state/identity: %s", payload)
-		}
+	if bytes.Contains(payload, []byte(`"userId"`)) {
+		t.Fatalf("event leaks the user id: %s", payload)
+	}
+}
+
+func TestRF015_TokenVacioDevuelveErrTokenRequired(t *testing.T) {
+	repo := &resetFakeRepository{writer: &resetFakeWriter{}}
+	err := New(repo, &resetFakePublisher{}, &resetFakeHasher{}, bytes.NewReader(make([]byte, 32)), nil).Confirm(context.Background(), "  ", "correct horse battery")
+	if !errors.Is(err, ErrTokenRequired) {
+		t.Fatalf("err=%v want ErrTokenRequired", err)
+	}
+}
+
+// D13: every completed reset records password_reset_completed on the acting
+// user, with metadata reporting whether it also cleared an RF-017 lockout.
+func TestRF015_ConfirmarRegistraAuditoriaConEstadoDeDesbloqueo(t *testing.T) {
+	raw := []byte("valid-password-reset-token")
+	cases := []struct {
+		name     string
+		unlocked bool
+	}{
+		{"cuenta bloqueada", true},
+		{"cuenta activa", false},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			writer := &resetFakeWriter{unlocked: tt.unlocked}
+			repo := &resetFakeRepository{usable: true, writer: writer}
+			err := New(repo, &resetFakePublisher{}, &resetFakeHasher{}, bytes.NewReader(make([]byte, 32)), nil).Confirm(context.Background(), base64.RawURLEncoding.EncodeToString(raw), "correct horse battery")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(writer.auditEvents) != 1 {
+				t.Fatalf("audit events=%d want 1", len(writer.auditEvents))
+			}
+			event := writer.auditEvents[0]
+			if event.Action != "password_reset_completed" {
+				t.Fatalf("action=%q want password_reset_completed", event.Action)
+			}
+			if event.ResourceType == nil || *event.ResourceType != "user" {
+				t.Fatalf("resourceType=%v want user", event.ResourceType)
+			}
+			var metadata struct {
+				Unlocked bool `json:"unlocked"`
+			}
+			if err := json.Unmarshal(event.Metadata, &metadata); err != nil {
+				t.Fatalf("unmarshal metadata: %v", err)
+			}
+			if metadata.Unlocked != tt.unlocked {
+				t.Fatalf("metadata unlocked=%t want %t", metadata.Unlocked, tt.unlocked)
+			}
+		})
+	}
+}
+
+func TestRF015_AuditoriaFallidaNoSeIgnora(t *testing.T) {
+	raw := []byte("valid-password-reset-token")
+	writer := &resetFakeWriter{auditErr: errors.New("audit unavailable")}
+	repo := &resetFakeRepository{usable: true, writer: writer}
+	err := New(repo, &resetFakePublisher{}, &resetFakeHasher{}, bytes.NewReader(make([]byte, 32)), nil).Confirm(context.Background(), base64.RawURLEncoding.EncodeToString(raw), "correct horse battery")
+	if err == nil {
+		t.Fatal("want an error when the audit insert fails")
 	}
 }

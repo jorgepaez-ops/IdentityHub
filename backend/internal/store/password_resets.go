@@ -28,7 +28,10 @@ type PasswordResetRequestWriter interface {
 }
 
 type PasswordResetConfirmationWriter interface {
-	ConsumePasswordResetTokenAndRevokeSessions(context.Context, ConsumePasswordResetTokenParams) (User, error)
+	// ConsumePasswordResetTokenAndRevokeSessions reports the updated user and
+	// whether the reset just cleared a lockout (D13), so the caller can audit it.
+	ConsumePasswordResetTokenAndRevokeSessions(context.Context, ConsumePasswordResetTokenParams) (User, bool, error)
+	InsertAuditEvent(context.Context, InsertAuditEventParams) (AuditEvent, error)
 }
 
 func (s *Store) PasswordResetTokenIsUsable(ctx context.Context, tokenHash []byte) (bool, error) {
@@ -81,10 +84,18 @@ func (w *passwordResetRequestWriter) CreatePasswordResetTokenForEmail(ctx contex
 
 type passwordResetConfirmationWriter struct{ queries *generated.Queries }
 
-func (w *passwordResetConfirmationWriter) ConsumePasswordResetTokenAndRevokeSessions(ctx context.Context, params ConsumePasswordResetTokenParams) (User, error) {
+func (w *passwordResetConfirmationWriter) ConsumePasswordResetTokenAndRevokeSessions(ctx context.Context, params ConsumePasswordResetTokenParams) (User, bool, error) {
 	user, err := w.queries.ConsumePasswordResetTokenAndRevokeSessions(ctx, generated.ConsumePasswordResetTokenAndRevokeSessionsParams{TokenHash: params.TokenHash, PasswordHash: params.PasswordHash})
 	if err != nil {
-		return User{}, fmt.Errorf("consume password reset token and revoke sessions: %w", err)
+		return User{}, false, fmt.Errorf("consume password reset token and revoke sessions: %w", err)
 	}
-	return User{ID: user.ID, Email: user.Email, PasswordHash: user.PasswordHash, DisplayName: user.DisplayName, Status: string(user.Status), MFAEnabled: user.MfaEnabled, LastLoginAt: optionalTime(user.LastLoginAt), CreatedAt: user.CreatedAt.Time}, nil
+	return User{ID: user.ID, Email: user.Email, PasswordHash: user.PasswordHash, DisplayName: user.DisplayName, Status: string(user.Status), MFAEnabled: user.MfaEnabled, LastLoginAt: optionalTime(user.LastLoginAt), CreatedAt: user.CreatedAt.Time}, user.Unlocked, nil
+}
+
+func (w *passwordResetConfirmationWriter) InsertAuditEvent(ctx context.Context, params InsertAuditEventParams) (AuditEvent, error) {
+	event, err := w.queries.InsertAuditEvent(ctx, generated.InsertAuditEventParams{ActorUserID: nullableUUID(params.ActorUserID), Action: params.Action, ResourceType: nullableText(params.ResourceType), ResourceID: nullableText(params.ResourceID), Ip: copyAddr(params.IP), UserAgent: nullableText(params.UserAgent), Metadata: params.Metadata})
+	if err != nil {
+		return AuditEvent{}, fmt.Errorf("insert password reset completed audit: %w", err)
+	}
+	return auditEventFromGenerated(event), nil
 }

@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -15,14 +16,15 @@ import (
 	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jorgepaez/identity-hub/internal/auth/password"
 	"github.com/jorgepaez/identity-hub/internal/events"
 	"github.com/jorgepaez/identity-hub/internal/store"
 )
 
 var (
-	ErrTokenInvalid = errors.New("password reset token is invalid")
-	ErrInvalidInput = errors.New("password reset token is required")
-	ErrPublish      = errors.New("publish password reset event")
+	ErrTokenInvalid  = errors.New("password reset token is invalid")
+	ErrTokenRequired = errors.New("password reset token is required")
+	ErrPublish       = errors.New("publish password reset event")
 )
 
 const resetTTL = time.Hour
@@ -78,11 +80,11 @@ func (s *Service) Request(ctx context.Context, email string) error {
 	})
 }
 
-func (s *Service) Confirm(ctx context.Context, token, password string) error {
+func (s *Service) Confirm(ctx context.Context, token, newPassword string) error {
 	if strings.TrimSpace(token) == "" {
-		return ErrInvalidInput
+		return ErrTokenRequired
 	}
-	if utf8.RuneCountInString(password) < 12 || utf8.RuneCountInString(password) > 128 {
+	if n := utf8.RuneCountInString(newPassword); n < password.AccountPasswordMinRunes || n > password.AccountPasswordMaxRunes {
 		return &InvalidInputError{Field: "password", Detail: "must contain 12 to 128 characters"}
 	}
 	raw, err := base64.RawURLEncoding.DecodeString(token)
@@ -97,17 +99,35 @@ func (s *Service) Confirm(ctx context.Context, token, password string) error {
 	if !usable {
 		return ErrTokenInvalid
 	}
-	passwordHash, err := s.hasher.Hash(password)
+	passwordHash, err := s.hasher.Hash(newPassword)
 	if err != nil {
 		return fmt.Errorf("hash password: %w", err)
 	}
 	return s.repository.WithinPasswordResetConfirmationTransaction(ctx, func(writer store.PasswordResetConfirmationWriter) error {
-		_, err := writer.ConsumePasswordResetTokenAndRevokeSessions(ctx, store.ConsumePasswordResetTokenParams{TokenHash: tokenHash[:], PasswordHash: passwordHash})
-		if errors.Is(err, pgx.ErrNoRows) || errors.Is(err, ErrTokenInvalid) {
-			return ErrTokenInvalid
-		}
+		user, unlocked, err := writer.ConsumePasswordResetTokenAndRevokeSessions(ctx, store.ConsumePasswordResetTokenParams{TokenHash: tokenHash[:], PasswordHash: passwordHash})
 		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return ErrTokenInvalid
+			}
 			return fmt.Errorf("consume password reset token: %w", err)
+		}
+		// D13: every completed reset is audited, with whether it also lifted
+		// an RF-017 lockout, regardless of the account's previous status.
+		metadata, err := json.Marshal(struct {
+			Unlocked bool `json:"unlocked"`
+		}{Unlocked: unlocked})
+		if err != nil {
+			return fmt.Errorf("marshal password reset completed metadata: %w", err)
+		}
+		resourceType, resourceID := "user", user.ID.String()
+		if _, err := writer.InsertAuditEvent(ctx, store.InsertAuditEventParams{
+			ActorUserID:  &user.ID,
+			Action:       "password_reset_completed",
+			ResourceType: &resourceType,
+			ResourceID:   &resourceID,
+			Metadata:     metadata,
+		}); err != nil {
+			return fmt.Errorf("record password reset completed audit: %w", err)
 		}
 		return nil
 	})

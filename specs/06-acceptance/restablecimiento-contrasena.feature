@@ -19,3 +19,12 @@ Característica: Restablecimiento de contraseña
     Entonces recibo una respuesta 204
     Y las sesiones anteriores ya no pueden renovar su token
     Y no puedo usar de nuevo el enlace
+
+  @RF-015 @RF-017 @p1
+  Escenario: Restablecer desbloquea la cuenta sin que un fallo la vuelva a bloquear
+    Dado que mi cuenta está bloqueada por intentos fallidos
+    Cuando fijo una contraseña nueva con el enlace de restablecimiento
+    Entonces mi cuenta pasa a estar activa
+    Y puedo iniciar sesión con la contraseña nueva
+    Cuando fallo un inicio de sesión con la contraseña nueva
+    Entonces mi cuenta no queda bloqueada de nuevo

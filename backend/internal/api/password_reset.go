@@ -44,7 +44,7 @@ func (s *Server) confirmPasswordReset(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case err == nil:
 		w.WriteHeader(http.StatusNoContent)
-	case errors.Is(err, passwordreset.ErrInvalidInput):
+	case errors.Is(err, passwordreset.ErrTokenRequired):
 		writeValidationProblem(w, "token", "must not be empty")
 	case errors.As(err, &invalid):
 		writeValidationProblem(w, invalid.Field, invalid.Detail)

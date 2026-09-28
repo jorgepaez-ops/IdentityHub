@@ -191,3 +191,38 @@ func TestRF015_EntregaDeCuentaAusenteNoEnviaCorreo(t *testing.T) {
 		t.Fatal("SMTP transport was called for a missing account")
 	}
 }
+
+// The anti-enumeration skip (AM-004) must still leave a trace for operators,
+// but never the email address or the reset token (RNF-012).
+func TestRF015_EntregaDeCuentaAusenteRegistraElDescarteSinDatosSensibles(t *testing.T) {
+	event := events.PasswordResetRequested{Envelope: events.NewEnvelope(events.TypePasswordResetRequested, "")}
+	event.Data.Email = "absent-log@example.test"
+	event.Data.ResetToken = "non-consumable-token-for-log"
+	event.Data.AccountExists = false
+	body, err := json.Marshal(event)
+	if err != nil {
+		t.Fatalf("marshal event: %v", err)
+	}
+	var logBuf bytes.Buffer
+	w := &worker{
+		logger: slog.New(slog.NewTextHandler(&logBuf, nil)),
+		cfg:    &config.Config{SMTPHost: "smtp.test", SMTPPort: 2525, SMTPFrom: "sender@example.test", PublicBaseURL: "https://identity.example.test"},
+		sendMail: func(string, smtp.Auth, string, []string, []byte) error {
+			t.Fatal("SMTP transport was called for a missing account")
+			return nil
+		},
+	}
+	if err := w.deliver(context.Background(), event.Envelope, body); err != nil {
+		t.Fatalf("deliver() error = %v", err)
+	}
+	logged := logBuf.String()
+	if logged == "" {
+		t.Fatal("skipping a missing-account reset left no trace in the logs")
+	}
+	if strings.Contains(logged, event.Data.Email) {
+		t.Fatalf("skip log leaked the email address: %s", logged)
+	}
+	if strings.Contains(logged, event.Data.ResetToken) {
+		t.Fatalf("skip log leaked the reset token: %s", logged)
+	}
+}

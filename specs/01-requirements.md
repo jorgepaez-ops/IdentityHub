@@ -152,6 +152,13 @@ Quien olvida su contraseña la restablece por correo.
 > **Enmienda T3 · 2026-09-27 · D6:** comparte con la invitación el mecanismo de token de cuenta
 > hasheado, expirable y de un solo uso, manteniendo propósitos y vigencias independientes.
 
+> **Enmienda T6-fix · 2026-09-28 · D13:** un restablecimiento completado sobre una cuenta
+> `locked` (RF-017) la pasa a `active` y limpia su bloqueo en la misma sentencia; no reactiva
+> cuentas `disabled` ni `pending_verification`. Los intentos fallidos anteriores al
+> restablecimiento dejan de contar para el conteo de bloqueo de RF-017, así que un solo fallo justo
+> después no vuelve a bloquear la cuenta. Queda auditado como `password_reset_completed`, con
+> metadatos que indican si desbloqueó la cuenta.
+
 ### RF-016 — Sesiones activas · P1
 El titular ve sus sesiones y puede revocarlas individualmente.
 - Se muestran IP, user-agent, creación y último uso.

@@ -15,6 +15,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jorgepaez/identity-hub/internal/auth/password"
 	"github.com/jorgepaez/identity-hub/internal/events"
 	"github.com/jorgepaez/identity-hub/internal/store"
 )
@@ -65,7 +66,7 @@ func (s *Service) Accept(ctx context.Context, input Input) error {
 	if strings.TrimSpace(input.Token) == "" {
 		return ErrInvalidInput
 	}
-	if utf8.RuneCountInString(input.Password) < 12 || utf8.RuneCountInString(input.Password) > 128 {
+	if n := utf8.RuneCountInString(input.Password); n < password.AccountPasswordMinRunes || n > password.AccountPasswordMaxRunes {
 		return &InvalidInputError{Field: "password", Detail: "must contain 12 to 128 characters"}
 	}
 	// employee.Service emits the raw token bytes base64url-encoded (see

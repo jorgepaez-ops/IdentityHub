@@ -70,11 +70,10 @@ func Render(eventType, publicBaseURL string, body []byte) (Message, error) {
 			return Message{}, err
 		}
 		message.Subject = "Reset your Identity Hub password"
-		greeting := "Hello there"
-		if displayName := strings.TrimSpace(event.Data.DisplayName); displayName != "" {
-			greeting = "Hello " + displayName
-		}
-		message.Body = fmt.Sprintf("%s,\n\nReset your password: %s\n", greeting, resetURL)
+		// events.PasswordResetRequested never carries a display name (see
+		// events.go): the request only ever knows the email, so a
+		// personalized greeting here would be permanently dead code.
+		message.Body = fmt.Sprintf("Hello there,\n\nReset your password: %s\n", resetURL)
 	case events.TypeRefreshReuseDetected:
 		message.Subject = "Security alert: refresh token reuse detected"
 		message.Body = "A refresh token reuse attempt was detected. Your active sessions were revoked as a precaution.\n"

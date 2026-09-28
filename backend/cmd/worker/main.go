@@ -174,6 +174,13 @@ func (w *worker) deliver(ctx context.Context, env events.Envelope, body []byte) 
 			return fmt.Errorf("decode password reset notification: %w", err)
 		}
 		if !event.Data.AccountExists {
+			// Anti-enumeration rule (AM-004): silently drop the email for a
+			// reset request on an account that does not exist, but still
+			// leave an operational trace without the email or token
+			// (RNF-012 forbids logging either).
+			if w.logger != nil {
+				w.logger.Info("password reset event skipped: account does not exist", "event_type", env.EventType, "event_id", env.EventID.String())
+			}
 			return nil
 		}
 	}

@@ -201,7 +201,12 @@ SELECT EXISTS (
 -- name: ConsumePasswordResetTokenAndRevokeSessions :one
 -- The password update, one-time token consumption, and all-session revocation
 -- share one statement so no transaction can expose the new password with an
--- old active refresh token (RF-015 / AM-005).
+-- old active refresh token (RF-015 / AM-005). D13: a locked account (RF-017)
+-- is reactivated in the same statement, because controlling the mailbox is a
+-- different factor than the password being guessed, so unlocking here adds
+-- no exposure; disabled and pending_verification accounts are left as-is.
+-- `unlocked` reports whether this reset just cleared a lockout, for the
+-- caller's audit metadata.
 WITH consumed AS (
     UPDATE verification_tokens
     SET used_at = now()
@@ -218,10 +223,15 @@ WITH consumed AS (
       AND used_at IS NULL
       AND id <> (SELECT id FROM consumed)
     RETURNING id
+), previous_user AS (
+    SELECT id, status FROM users WHERE id = (SELECT user_id FROM consumed)
 ), updated_user AS (
     UPDATE users
-    SET password_hash = $2, updated_at = now()
-    WHERE id = (SELECT user_id FROM consumed)
+    SET password_hash = $2,
+        updated_at = now(),
+        status = CASE WHEN status = 'locked' THEN 'active' ELSE status END,
+        locked_until = CASE WHEN status = 'locked' THEN NULL ELSE locked_until END
+    WHERE id = (SELECT id FROM previous_user)
     RETURNING *
 ), revoked AS (
     UPDATE refresh_tokens
@@ -230,7 +240,9 @@ WITH consumed AS (
       AND status <> 'revoked'
     RETURNING id
 )
-SELECT * FROM updated_user;
+SELECT updated_user.*, (previous_user.status = 'locked') AS unlocked
+FROM updated_user
+JOIN previous_user ON previous_user.id = updated_user.id;
 
 -- name: InvalidateInvitationTokens :exec
 UPDATE verification_tokens

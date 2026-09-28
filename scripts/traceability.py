@@ -32,7 +32,6 @@ RF_TAG = re.compile(r"\b((?:RNF|RF)-\d{3})\b")
 DEFERRED = {
     "RF-013": "Backlog de semana 3 por decisión Q14.",
     "RF-014": "Backlog de semana 3 por decisión Q14.",
-    "RF-015": "Backlog de semana 3 por decisión Q14.",
     "RF-016": "Backlog de semana 3 por decisión Q14.",
     "RF-018": "Backlog de semana 3 por decisión Q14.",
     "RF-019": "Backlog de semana 3 por decisión Q14.",
