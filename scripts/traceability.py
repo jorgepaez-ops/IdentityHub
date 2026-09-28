@@ -30,8 +30,6 @@ RF_TAG = re.compile(r"\b((?:RNF|RF)-\d{3})\b")
 # Requisitos pendientes de implementación. T3 define sus contratos, pero la matriz los
 # mantiene diferidos hasta que sus tareas de backend/frontend queden cerradas.
 DEFERRED = {
-    "RF-013": "Backlog de semana 3 por decisión Q14.",
-    "RF-014": "Backlog de semana 3 por decisión Q14.",
     "RF-016": "Backlog de semana 3 por decisión Q14.",
     "RF-018": "Backlog de semana 3 por decisión Q14.",
     "RF-019": "Backlog de semana 3 por decisión Q14.",

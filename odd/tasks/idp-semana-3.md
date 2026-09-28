@@ -428,7 +428,21 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
     `accountLockedNotification` en `cmd/api` duplica `events.AccountLocked`; `POST /auth/refresh`
     reemite la cookie sin `MaxAge` (previo a T7); carrera `duplicate key pg_authid_rolname_index` al
     crear roles en la migración 000002 con paquetes en paralelo (vista una vez por Sonnet).
-- Commit: —
+  - Revisión nativa (alto, 44 archivos, 2405 líneas con código generado, 4 lentes): **aprobada** y
+    acusada (`review-4f42750c40a59712`) con 16 observaciones informativas. Las que valen una
+    T7-fix: `Issue` no tiene límite (con la contraseña correcta se crean desafíos y correos sin
+    tope, se saltea el reenvío de 60 s y `mfa_challenges` crece sin purga); el aviso de D14 y el
+    código MFA se publican dentro de la transacción (con el broker caído falla todo
+    restablecimiento, incluido el desbloqueo de D13; con el broker lento se agota el pool; si el
+    commit falla, el correo ya salió); si falla publicar `security.account_locked` desde `Verify`
+    no se registra en el log; se perdió la prueba de que el access token solo lleva roles de
+    directorio (D8, RF-009); faltan pruebas de vencimiento del desafío y de la ventana de reenvío en
+    el servicio (además `last_sent_at` usa el reloj de la base y la comparación el del servicio);
+    `CreateChallenge` del store ignora `AttemptsLeft`. Menores: dependencias muertas en
+    `login.Service`, `refreshTTL` compartido entre `SetLoginService` y `SetMFAService`, largo del
+    código y `"active"` como literales, nombre genérico de `WithinTransaction` en el store MFA,
+    `0` sin nombre en `refreshCookie`.
+- Commit: `1bacc20`
 
 ### T8 — RF-016 Sesiones activas
 - [ ] Estado · Ejecutor: `Codex` · Depende de: T3
@@ -523,7 +537,7 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 
 ## Siguiente paso
 
-Revisión nativa de T7; luego T8 (sesiones activas, Codex).
+T7-fix (observaciones de la revisión nativa, ver T7); luego T8 (sesiones activas, Codex).
 
 ## Cambios de spec propuestos
 
