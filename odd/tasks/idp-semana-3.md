@@ -185,10 +185,17 @@ dinámico de clientes, consentimiento, `id_token`), TOTP/WebAuthn, correo real p
   **5 minutos**, admite **5 intentos** por desafío y el reenvío se permite cada **60 segundos**.
   RF-014 y la ADR 0010 pedían vida corta y límites sin fijar números; NIST SP 800-63B admite hasta
   10 minutos para códigos por canal externo. Consultado por Codex al empezar T7.
+- **D16 · Publicar después del commit en restablecimiento y MFA (2026-09-28).** El aviso de D14 y el
+  código MFA se publican después de confirmar la transacción. Si falla el aviso de D14, el
+  restablecimiento se mantiene y el fallo queda en el log con el id del usuario; si falla el código
+  MFA, el login responde 503 y el desafío vence solo. Evita que una caída del broker impida
+  recuperar cuentas (incluido el desbloqueo de D13), que un broker lento retenga conexiones y que se
+  envíe un aviso de un cambio revertido. Costo aceptado: un aviso puede perderse. Enmienda la
+  ADR 0006 para estos dos flujos; el outbox transaccional se descarta por tamaño (mejora posible).
 
 ## Preguntas abiertas
 
-Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, del usuario al cerrar T6; D15, consulta de Codex en T7.
+Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, del usuario al cerrar T6; D15, consulta de Codex en T7; D16, de la revisión nativa de T7.
 
 ---
 
@@ -444,6 +451,20 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
     `0` sin nombre en `refreshCookie`.
 - Commit: `1bacc20`
 
+### T7-fix — Observaciones de la revisión nativa de T7
+- [ ] Estado · Ejecutor: `Sonnet` (Codex sin cuota hasta las 19:23) · Depende de: T7
+- D16: aviso de D14 y código MFA publicados después del commit; enmienda a la ADR 0006.
+- Límite de emisión: cada login nuevo anula los desafíos abiertos de la cuenta y hay un tope de 5
+  desafíos por cuenta cada 15 min (429). La purga de desafíos vencidos queda para después.
+- Log al fallar la publicación de `security.account_locked` desde `Verify`; `CreateChallenge` del
+  store respeta `AttemptsLeft`.
+- Pruebas: roles de directorio en el access token (D8, RF-009), vencimiento del desafío y ventana
+  de reenvío en el servicio (misma fuente de reloj para `last_sent_at` y la comparación).
+- Menores: dependencias muertas en `login.Service`, `refreshTTL` compartido entre setters, largo
+  del código y `"active"` como constantes, nombre del `WithinTransaction` del store MFA, `0` con
+  nombre en `refreshCookie`.
+- Commit: —
+
 ### T8 — RF-016 Sesiones activas
 - [ ] Estado · Ejecutor: `Codex` · Depende de: T3
 - Listar sesiones (IP, user-agent, creación, último uso) y revocar una concreta.
@@ -537,7 +558,7 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 
 ## Siguiente paso
 
-T7-fix (observaciones de la revisión nativa, ver T7); luego T8 (sesiones activas, Codex).
+T7-fix (Sonnet); luego T8 (sesiones activas, Codex).
 
 ## Cambios de spec propuestos
 
