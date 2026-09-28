@@ -47,3 +47,11 @@ Característica: Alta de empleados y aceptación de invitación
     Dado que la invitación para "ana@example.com" sigue pendiente
     Cuando inicio sesión con "ana@example.com" y cualquier contraseña
     Entonces recibo una respuesta 401
+
+  @RF-001 @RF-002 @p0
+  Escenario: Un admin reenvía una invitación pendiente
+    Dado que existe una cuenta pendiente cuya invitación venció
+    Cuando reenvío la invitación de esa cuenta
+    Entonces recibo una respuesta 204
+    Y la invitación anterior ya no se puede aceptar
+    Y se encola una nueva invitación por 24 horas

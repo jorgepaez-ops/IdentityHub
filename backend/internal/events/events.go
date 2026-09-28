@@ -90,10 +90,10 @@ type EmailVerified struct {
 type PasswordResetRequested struct {
 	Envelope
 	Data struct {
-		UserID     uuid.UUID `json:"userId"`
-		Email      string    `json:"email"`
-		ResetToken string    `json:"resetToken"`
-		ExpiresAt  time.Time `json:"expiresAt"`
+		Email         string    `json:"email"`
+		ResetToken    string    `json:"resetToken"`
+		ExpiresAt     time.Time `json:"expiresAt"`
+		AccountExists bool      `json:"accountExists"`
 	} `json:"data"`
 }
 

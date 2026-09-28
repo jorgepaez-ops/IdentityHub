@@ -173,3 +173,68 @@ UPDATE users
 SET display_name = $2
 WHERE id = $1
 RETURNING *;
+
+-- name: CreatePasswordResetTokenForEmail :one
+-- The same INSERT ... SELECT statement runs for every request. It stores a
+-- hash-only one-hour token only when the normalized email has a user row;
+-- callers pass the boolean only to the broker event, never to HTTP responses.
+WITH inserted AS (
+    INSERT INTO verification_tokens (user_id, token_hash, purpose, expires_at)
+    SELECT id, $2, 'password_reset', $3
+    FROM users
+    WHERE email = $1
+    RETURNING user_id
+)
+SELECT EXISTS (SELECT 1 FROM inserted) AS token_created;
+
+-- name: PasswordResetTokenIsUsable :one
+-- Cheap precheck before Argon2id. The consuming statement below is authoritative.
+SELECT EXISTS (
+    SELECT 1
+    FROM verification_tokens
+    WHERE token_hash = $1
+      AND purpose = 'password_reset'
+      AND used_at IS NULL
+      AND expires_at > now()
+) AS token_is_usable;
+
+-- name: ConsumePasswordResetTokenAndRevokeSessions :one
+-- The password update, one-time token consumption, and all-session revocation
+-- share one statement so no transaction can expose the new password with an
+-- old active refresh token (RF-015 / AM-005).
+WITH consumed AS (
+    UPDATE verification_tokens
+    SET used_at = now()
+    WHERE verification_tokens.token_hash = $1
+      AND verification_tokens.purpose = 'password_reset'
+      AND verification_tokens.used_at IS NULL
+      AND verification_tokens.expires_at > now()
+    RETURNING verification_tokens.id, verification_tokens.user_id
+), invalidated_reset_tokens AS (
+    UPDATE verification_tokens
+    SET used_at = now()
+    WHERE user_id = (SELECT user_id FROM consumed)
+      AND purpose = 'password_reset'
+      AND used_at IS NULL
+      AND id <> (SELECT id FROM consumed)
+    RETURNING id
+), updated_user AS (
+    UPDATE users
+    SET password_hash = $2, updated_at = now()
+    WHERE id = (SELECT user_id FROM consumed)
+    RETURNING *
+), revoked AS (
+    UPDATE refresh_tokens
+    SET status = 'revoked'
+    WHERE user_id = (SELECT id FROM updated_user)
+      AND status <> 'revoked'
+    RETURNING id
+)
+SELECT * FROM updated_user;
+
+-- name: InvalidateInvitationTokens :exec
+UPDATE verification_tokens
+SET used_at = now()
+WHERE user_id = $1
+  AND purpose = 'invitation'
+  AND used_at IS NULL;

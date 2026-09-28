@@ -266,7 +266,13 @@ paths:
             schema: { $ref: '#/components/schemas/EmailRequest' }
       responses:
         '202': { description: 'Si la cuenta existe, se envió el correo' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503':
+          description: El servicio de restablecimiento no está disponible
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
 
   /api/v1/auth/password-reset/confirm:
     post:
@@ -516,6 +522,26 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/admin/users/{userId}/invitation:
+    post:
+      operationId: resendInvitation
+      tags: [admin]
+      summary: Reenviar la invitación de una cuenta pendiente
+      description: Anula invitaciones anteriores y envía un enlace nuevo que vence en 24 horas.
+      x-requirement: RF-001
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '204': { description: Invitación reenviada }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: La cuenta no está pendiente de verificación
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
 
   /api/v1/admin/audit-log:
     get:

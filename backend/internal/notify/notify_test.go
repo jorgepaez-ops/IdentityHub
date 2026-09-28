@@ -85,3 +85,37 @@ func TestRF012_LosAvisosDeSeguridadNoIncluyenSecretos(t *testing.T) {
 		})
 	}
 }
+
+func TestRF015_PlantillaDeRestablecimientoIncluyeElEnlace(t *testing.T) {
+	message, err := Render(events.TypePasswordResetRequested, "https://id.example", []byte(`{
+		"data": {
+			"email": "ada@example.com",
+			"displayName": "Ada",
+			"resetToken": "reset-token"
+		}
+	}`))
+	if err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	if message.To != "ada@example.com" {
+		t.Errorf("To = %q", message.To)
+	}
+	if !strings.Contains(message.Body, "https://id.example/password-reset?token=reset-token") {
+		t.Fatalf("reset message does not contain reset URL: %q", message.Body)
+	}
+}
+
+func TestRF015_PlantillaDeRestablecimientoUsaSaludoNeutralSinNombre(t *testing.T) {
+	message, err := Render(events.TypePasswordResetRequested, "https://id.example", []byte(`{
+		"data": {
+			"email": "ada@example.com",
+			"resetToken": "reset-token"
+		}
+	}`))
+	if err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	if !strings.Contains(message.Body, "Hello there,") {
+		t.Fatalf("reset message has no neutral greeting: %q", message.Body)
+	}
+}

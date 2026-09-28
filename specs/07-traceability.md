@@ -10,8 +10,8 @@ declaración de buenas intenciones.
 
 | Requisito | Título | Pri | Operaciones de la API | Escenarios | Pruebas Go | E2E | Estado |
 |---|---|---|---|---|---|---|---|
-| **RF-001** | Alta de empleados por administración | P0 | `createEmployee` | 3 | 23 | — | ✅ completo |
-| **RF-002** | Aceptación de invitación y verificación de correo | P0 | `acceptInvitation` | 3 | 15 | — | ✅ completo |
+| **RF-001** | Alta de empleados por administración | P0 | `createEmployee`, `resendInvitation` | 4 | 30 | — | ✅ completo |
+| **RF-002** | Aceptación de invitación y verificación de correo | P0 | `acceptInvitation` | 4 | 16 | — | ✅ completo |
 | **RF-003** | Inicio de sesión | P0 | `login` | 2 | 10 | — | ✅ completo |
 | **RF-004** | Emisión y validación de JWT | P0 | `getJwks` | 1 | 8 | — | ✅ completo |
 | **RF-005** | Renovación de sesión | P0 | `refreshSession` | 1 | 7 | — | ✅ completo |
@@ -24,7 +24,7 @@ declaración de buenas intenciones.
 | **RF-012** | Notificaciones asíncronas | P0 | — | 1 | 9 | — | ✅ completo |
 | **RF-013** | Segundo factor obligatorio por correo | P1 | — | 1 | — | — | ⏳ diferido (semana 3) |
 | **RF-014** | Inicio de sesión con segundo factor | P1 | `verifyMfa`, `resendMfaCode` | 3 | — | — | ⏳ diferido (semana 3) |
-| **RF-015** | Restablecimiento de contraseña | P1 | `requestPasswordReset`, `confirmPasswordReset` | — | — | — | ⏳ diferido (semana 3) |
+| **RF-015** | Restablecimiento de contraseña | P1 | `requestPasswordReset`, `confirmPasswordReset` | 2 | 18 | — | ⏳ diferido (semana 3) |
 | **RF-016** | Sesiones activas | P1 | `listSessions`, `revokeSession` | 1 | — | — | ⏳ diferido (semana 3) |
 | **RF-017** | Bloqueo por fuerza bruta | P1 | — | 2 | 14 | — | ✅ completo |
 | **RF-018** | Claves de servicio | P2 | — | — | — | — | ⏳ diferido (semana 3) |
@@ -54,10 +54,12 @@ columnas de prueba · *parcial* = una sola · *sin cubrir* = ninguna · *diferid
   - registro-y-verificacion.feature — Alta administrativa con datos válidos
   - registro-y-verificacion.feature — El autorregistro público no está disponible
   - registro-y-verificacion.feature — Un correo no puede darse de alta dos veces
+  - registro-y-verificacion.feature — Un admin reenvía una invitación pendiente
 - **RF-002**
   - registro-y-verificacion.feature — Aceptar la invitación verifica el correo y fija la contraseña
   - registro-y-verificacion.feature — La invitación es de un solo uso
   - registro-y-verificacion.feature — Una cuenta que no aceptó la invitación no puede iniciar sesión
+  - registro-y-verificacion.feature — Un admin reenvía una invitación pendiente
 - **RF-003**
   - autenticacion.feature — Todo inicio de sesión exige MFA por correo
   - autenticacion.feature — Contraseña incorrecta
@@ -89,6 +91,9 @@ columnas de prueba · *parcial* = una sola · *sin cubrir* = ninguna · *diferid
   - autenticacion.feature — Todo inicio de sesión exige MFA por correo
   - autenticacion.feature — Reenviar el código invalida el anterior
   - autenticacion.feature — Agotar los intentos MFA anula el desafío
+- **RF-015**
+  - restablecimiento-contrasena.feature — La solicitud no enumera cuentas
+  - restablecimiento-contrasena.feature — Restablecer revoca las sesiones anteriores
 - **RF-016**
   - rotacion-de-sesion.feature — Revocar una sesión concreta desde otro dispositivo
 - **RF-017**

@@ -78,7 +78,7 @@ func (s *Service) Accept(ctx context.Context, input Input) error {
 	tokenHash := sha256.Sum256(raw)
 	usable, err := s.repository.InvitationTokenIsUsable(ctx, tokenHash[:])
 	if err != nil {
-		return fmt.Errorf("check invitation token: %w", err)
+		return err
 	}
 	if !usable {
 		return ErrTokenInvalid

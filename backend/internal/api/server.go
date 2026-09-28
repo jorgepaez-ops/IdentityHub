@@ -20,8 +20,10 @@ import (
 	"github.com/jorgepaez/identity-hub/internal/auth/auditlog"
 	"github.com/jorgepaez/identity-hub/internal/auth/employee"
 	"github.com/jorgepaez/identity-hub/internal/auth/invitation"
+	"github.com/jorgepaez/identity-hub/internal/auth/invitationresend"
 	"github.com/jorgepaez/identity-hub/internal/auth/login"
 	"github.com/jorgepaez/identity-hub/internal/auth/logout"
+	"github.com/jorgepaez/identity-hub/internal/auth/passwordreset"
 	"github.com/jorgepaez/identity-hub/internal/auth/refresh"
 	"github.com/jorgepaez/identity-hub/internal/auth/token"
 )
@@ -33,6 +35,8 @@ type Server struct {
 	tokens           *token.Service
 	employeeCreation employee.Creator
 	invitationAccept invitation.Acceptor
+	invitationResend invitationresend.Resender
+	passwordReset    passwordreset.HandlerService
 	login            login.Authenticator
 	refreshTTL       time.Duration
 	currentUsers     currentUserRepository
@@ -60,6 +64,13 @@ func (s *Server) SetEmployeeCreationService(service employee.Creator) { s.employ
 // accepting the invitation now does what email verification used to.
 func (s *Server) SetInvitationAcceptanceService(service invitation.Acceptor) {
 	s.invitationAccept = service
+}
+
+func (s *Server) SetInvitationResendService(service invitationresend.Resender) {
+	s.invitationResend = service
+}
+func (s *Server) SetPasswordResetService(service passwordreset.HandlerService) {
+	s.passwordReset = service
 }
 
 // SetLoginService is used by composition and focused handler tests.
@@ -162,6 +173,11 @@ func (s *Server) CreateEmployee(w http.ResponseWriter, r *http.Request) {
 		s.createEmployee(w, request)
 	}))).ServeHTTP(w, r)
 }
+func (s *Server) ResendInvitation(w http.ResponseWriter, r *http.Request, userID UserId) {
+	RequireAuth(s.tokens)(RequireRole(s.currentUsers, "admin")(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		s.resendInvitation(w, request, userID)
+	}))).ServeHTTP(w, r)
+}
 
 // AcceptInvitation is unauthenticated (security: [] in openapi.yaml): the
 // invitation token itself, not a bearer token, proves the caller may set
@@ -176,9 +192,13 @@ func (s *Server) AuthorizeClient(w http.ResponseWriter, r *http.Request, params 
 func (s *Server) ExchangeAuthorizationCode(w http.ResponseWriter, r *http.Request) {
 	s.notImplemented(w)
 }
-func (s *Server) VerifyMfa(w http.ResponseWriter, r *http.Request)            { s.notImplemented(w) }
-func (s *Server) ConfirmPasswordReset(w http.ResponseWriter, r *http.Request) { s.notImplemented(w) }
-func (s *Server) RequestPasswordReset(w http.ResponseWriter, r *http.Request) { s.notImplemented(w) }
+func (s *Server) VerifyMfa(w http.ResponseWriter, r *http.Request) { s.notImplemented(w) }
+func (s *Server) ConfirmPasswordReset(w http.ResponseWriter, r *http.Request) {
+	s.confirmPasswordReset(w, r)
+}
+func (s *Server) RequestPasswordReset(w http.ResponseWriter, r *http.Request) {
+	s.requestPasswordReset(w, r)
+}
 
 func (s *Server) ListSessions(w http.ResponseWriter, r *http.Request) { s.notImplemented(w) }
 func (s *Server) RevokeSession(w http.ResponseWriter, r *http.Request, sessionID SessionId) {

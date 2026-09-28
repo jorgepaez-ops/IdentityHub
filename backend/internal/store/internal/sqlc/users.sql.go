@@ -77,6 +77,81 @@ func (q *Queries) ConsumeInvitationToken(ctx context.Context, arg ConsumeInvitat
 	return i, err
 }
 
+const consumePasswordResetTokenAndRevokeSessions = `-- name: ConsumePasswordResetTokenAndRevokeSessions :one
+WITH consumed AS (
+    UPDATE verification_tokens
+    SET used_at = now()
+    WHERE verification_tokens.token_hash = $1
+      AND verification_tokens.purpose = 'password_reset'
+      AND verification_tokens.used_at IS NULL
+      AND verification_tokens.expires_at > now()
+    RETURNING verification_tokens.id, verification_tokens.user_id
+), invalidated_reset_tokens AS (
+    UPDATE verification_tokens
+    SET used_at = now()
+    WHERE user_id = (SELECT user_id FROM consumed)
+      AND purpose = 'password_reset'
+      AND used_at IS NULL
+      AND id <> (SELECT id FROM consumed)
+    RETURNING id
+), updated_user AS (
+    UPDATE users
+    SET password_hash = $2, updated_at = now()
+    WHERE id = (SELECT user_id FROM consumed)
+    RETURNING id, email, password_hash, display_name, status, mfa_enabled, mfa_secret_enc, failed_login_count, locked_until, last_login_at, created_at, updated_at
+), revoked AS (
+    UPDATE refresh_tokens
+    SET status = 'revoked'
+    WHERE user_id = (SELECT id FROM updated_user)
+      AND status <> 'revoked'
+    RETURNING id
+)
+SELECT id, email, password_hash, display_name, status, mfa_enabled, mfa_secret_enc, failed_login_count, locked_until, last_login_at, created_at, updated_at FROM updated_user
+`
+
+type ConsumePasswordResetTokenAndRevokeSessionsParams struct {
+	TokenHash    []byte
+	PasswordHash string
+}
+
+type ConsumePasswordResetTokenAndRevokeSessionsRow struct {
+	ID               uuid.UUID
+	Email            string
+	PasswordHash     string
+	DisplayName      string
+	Status           UserStatus
+	MfaEnabled       bool
+	MfaSecretEnc     []byte
+	FailedLoginCount int32
+	LockedUntil      pgtype.Timestamptz
+	LastLoginAt      pgtype.Timestamptz
+	CreatedAt        pgtype.Timestamptz
+	UpdatedAt        pgtype.Timestamptz
+}
+
+// The password update, one-time token consumption, and all-session revocation
+// share one statement so no transaction can expose the new password with an
+// old active refresh token (RF-015 / AM-005).
+func (q *Queries) ConsumePasswordResetTokenAndRevokeSessions(ctx context.Context, arg ConsumePasswordResetTokenAndRevokeSessionsParams) (ConsumePasswordResetTokenAndRevokeSessionsRow, error) {
+	row := q.db.QueryRow(ctx, consumePasswordResetTokenAndRevokeSessions, arg.TokenHash, arg.PasswordHash)
+	var i ConsumePasswordResetTokenAndRevokeSessionsRow
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.PasswordHash,
+		&i.DisplayName,
+		&i.Status,
+		&i.MfaEnabled,
+		&i.MfaSecretEnc,
+		&i.FailedLoginCount,
+		&i.LockedUntil,
+		&i.LastLoginAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const createInvitationToken = `-- name: CreateInvitationToken :exec
 INSERT INTO verification_tokens (user_id, token_hash, purpose, expires_at)
 VALUES ($1, $2, 'invitation', $3)
@@ -91,6 +166,33 @@ type CreateInvitationTokenParams struct {
 func (q *Queries) CreateInvitationToken(ctx context.Context, arg CreateInvitationTokenParams) error {
 	_, err := q.db.Exec(ctx, createInvitationToken, arg.UserID, arg.TokenHash, arg.ExpiresAt)
 	return err
+}
+
+const createPasswordResetTokenForEmail = `-- name: CreatePasswordResetTokenForEmail :one
+WITH inserted AS (
+    INSERT INTO verification_tokens (user_id, token_hash, purpose, expires_at)
+    SELECT id, $2, 'password_reset', $3
+    FROM users
+    WHERE email = $1
+    RETURNING user_id
+)
+SELECT EXISTS (SELECT 1 FROM inserted) AS token_created
+`
+
+type CreatePasswordResetTokenForEmailParams struct {
+	Email     string
+	TokenHash []byte
+	ExpiresAt pgtype.Timestamptz
+}
+
+// The same INSERT ... SELECT statement runs for every request. It stores a
+// hash-only one-hour token only when the normalized email has a user row;
+// callers pass the boolean only to the broker event, never to HTTP responses.
+func (q *Queries) CreatePasswordResetTokenForEmail(ctx context.Context, arg CreatePasswordResetTokenForEmailParams) (bool, error) {
+	row := q.db.QueryRow(ctx, createPasswordResetTokenForEmail, arg.Email, arg.TokenHash, arg.ExpiresAt)
+	var token_created bool
+	err := row.Scan(&token_created)
+	return token_created, err
 }
 
 const createRefreshToken = `-- name: CreateRefreshToken :exec
@@ -270,6 +372,19 @@ func (q *Queries) GetUserByIDForUpdate(ctx context.Context, id uuid.UUID) (User,
 	return i, err
 }
 
+const invalidateInvitationTokens = `-- name: InvalidateInvitationTokens :exec
+UPDATE verification_tokens
+SET used_at = now()
+WHERE user_id = $1
+  AND purpose = 'invitation'
+  AND used_at IS NULL
+`
+
+func (q *Queries) InvalidateInvitationTokens(ctx context.Context, userID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, invalidateInvitationTokens, userID)
+	return err
+}
+
 const invitationTokenIsUsable = `-- name: InvitationTokenIsUsable :one
 SELECT EXISTS (
     SELECT 1
@@ -419,6 +534,25 @@ type LockLoginUserParams struct {
 func (q *Queries) LockLoginUser(ctx context.Context, arg LockLoginUserParams) error {
 	_, err := q.db.Exec(ctx, lockLoginUser, arg.ID, arg.LockedUntil)
 	return err
+}
+
+const passwordResetTokenIsUsable = `-- name: PasswordResetTokenIsUsable :one
+SELECT EXISTS (
+    SELECT 1
+    FROM verification_tokens
+    WHERE token_hash = $1
+      AND purpose = 'password_reset'
+      AND used_at IS NULL
+      AND expires_at > now()
+) AS token_is_usable
+`
+
+// Cheap precheck before Argon2id. The consuming statement below is authoritative.
+func (q *Queries) PasswordResetTokenIsUsable(ctx context.Context, tokenHash []byte) (bool, error) {
+	row := q.db.QueryRow(ctx, passwordResetTokenIsUsable, tokenHash)
+	var token_is_usable bool
+	err := row.Scan(&token_is_usable)
+	return token_is_usable, err
 }
 
 const revokeRefreshFamily = `-- name: RevokeRefreshFamily :one

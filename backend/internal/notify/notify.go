@@ -23,6 +23,7 @@ type payload struct {
 		DisplayName       string `json:"displayName"`
 		VerificationToken string `json:"verificationToken"`
 		InvitationToken   string `json:"invitationToken"`
+		ResetToken        string `json:"resetToken"`
 	} `json:"data"`
 }
 
@@ -60,6 +61,20 @@ func Render(eventType, publicBaseURL string, body []byte) (Message, error) {
 		}
 		message.Subject = "You have been invited to Identity Hub"
 		message.Body = fmt.Sprintf("Hello %s,\n\nSet your password to accept your invitation: %s\n", event.Data.DisplayName, acceptanceURL)
+	case events.TypePasswordResetRequested:
+		if event.Data.ResetToken == "" {
+			return Message{}, fmt.Errorf("event %s has no reset token", eventType)
+		}
+		resetURL, err := accountLinkURL(publicBaseURL, "/password-reset", event.Data.ResetToken)
+		if err != nil {
+			return Message{}, err
+		}
+		message.Subject = "Reset your Identity Hub password"
+		greeting := "Hello there"
+		if displayName := strings.TrimSpace(event.Data.DisplayName); displayName != "" {
+			greeting = "Hello " + displayName
+		}
+		message.Body = fmt.Sprintf("%s,\n\nReset your password: %s\n", greeting, resetURL)
 	case events.TypeRefreshReuseDetected:
 		message.Subject = "Security alert: refresh token reuse detected"
 		message.Body = "A refresh token reuse attempt was detected. Your active sessions were revoked as a precaution.\n"

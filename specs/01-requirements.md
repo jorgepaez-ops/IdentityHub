@@ -17,12 +17,17 @@ su contraseña.
 - El alta pública está cerrada; solo un `admin` autenticado puede crear cuentas.
 - Toda cuenta recibe el rol base `user` y puede recibir roles de aplicación autorizados.
 - La cuenta nace en estado `pending_verification` y se envía una invitación asíncrona al correo.
+- Un `admin` puede reenviar la invitación solo mientras la cuenta siga en `pending_verification`:
+  anula los enlaces anteriores, emite uno nuevo de 24 h y registra la acción en auditoría.
 - Un correo ya registrado devuelve `409` sin exponer más información de la cuenta existente.
 - **Aceptación:** el alta devuelve `201`, registra al administrador como actor y encola la
   invitación; la cuenta no puede iniciar sesión antes de aceptarla.
 
 > **Enmienda T3 · 2026-09-27 · D6/D9:** se retira el autorregistro y se sustituye por alta
 > administrativa con invitación.
+
+> **Enmienda T6 · 2026-09-28 · D12:** el reenvío evita que una invitación perdida o vencida
+> deje una cuenta pendiente sin una vía de activación.
 
 ### RF-002 — Aceptación de invitación y verificación de correo · P0
 El empleado demuestra que controla el correo al aceptar la invitación y definir su contraseña.

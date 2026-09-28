@@ -426,6 +426,9 @@ type ServerInterface interface {
 	// Cambiar el estado o los roles de una cuenta
 	// (PATCH /api/v1/admin/users/{userId})
 	UpdateUser(w http.ResponseWriter, r *http.Request, userId UserId)
+	// Reenviar la invitación de una cuenta pendiente
+	// (POST /api/v1/admin/users/{userId}/invitation)
+	ResendInvitation(w http.ResponseWriter, r *http.Request, userId UserId)
 	// Aceptar una invitación y definir la contraseña
 	// (POST /api/v1/auth/invitations/accept)
 	AcceptInvitation(w http.ResponseWriter, r *http.Request)
@@ -513,6 +516,12 @@ func (_ Unimplemented) GetUser(w http.ResponseWriter, r *http.Request, userId Us
 // Cambiar el estado o los roles de una cuenta
 // (PATCH /api/v1/admin/users/{userId})
 func (_ Unimplemented) UpdateUser(w http.ResponseWriter, r *http.Request, userId UserId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Reenviar la invitación de una cuenta pendiente
+// (POST /api/v1/admin/users/{userId}/invitation)
+func (_ Unimplemented) ResendInvitation(w http.ResponseWriter, r *http.Request, userId UserId) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -830,6 +839,37 @@ func (siw *ServerInterfaceWrapper) UpdateUser(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateUser(w, r, userId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ResendInvitation operation middleware
+func (siw *ServerInterfaceWrapper) ResendInvitation(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "userId" -------------
+	var userId UserId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", chi.URLParam(r, "userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ResendInvitation(w, r, userId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1369,6 +1409,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Patch(options.BaseURL+"/api/v1/admin/users/{userId}", wrapper.UpdateUser)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/admin/users/{userId}/invitation", wrapper.ResendInvitation)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/v1/auth/invitations/accept", wrapper.AcceptInvitation)

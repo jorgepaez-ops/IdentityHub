@@ -168,6 +168,15 @@ func (w *worker) handle(ctx context.Context, d amqp.Delivery) {
 // deliver arma el correo específico del tipo de evento y lo envía por SMTP.
 // Nunca registra el cuerpo bruto porque algunos eventos llevan tokens en claro.
 func (w *worker) deliver(ctx context.Context, env events.Envelope, body []byte) error {
+	if env.EventType == events.TypePasswordResetRequested {
+		var event events.PasswordResetRequested
+		if err := json.Unmarshal(body, &event); err != nil {
+			return fmt.Errorf("decode password reset notification: %w", err)
+		}
+		if !event.Data.AccountExists {
+			return nil
+		}
+	}
 	message, err := notify.Render(env.EventType, w.cfg.PublicBaseURL, body)
 	if err != nil {
 		return fmt.Errorf("renderizando la notificación: %w", err)

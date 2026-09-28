@@ -166,3 +166,28 @@ func TestRNF005_DeliveryStopsBeforeSMTPWhenContextIsCanceled(t *testing.T) {
 		t.Fatal("SMTP transport was called after cancellation")
 	}
 }
+
+func TestRF015_EntregaDeCuentaAusenteNoEnviaCorreo(t *testing.T) {
+	event := events.PasswordResetRequested{Envelope: events.NewEnvelope(events.TypePasswordResetRequested, "")}
+	event.Data.Email = "absent@example.test"
+	event.Data.ResetToken = "non-consumable-token"
+	event.Data.AccountExists = false
+	body, err := json.Marshal(event)
+	if err != nil {
+		t.Fatalf("marshal event: %v", err)
+	}
+	called := false
+	w := &worker{
+		cfg: &config.Config{SMTPHost: "smtp.test", SMTPPort: 2525, SMTPFrom: "sender@example.test", PublicBaseURL: "https://identity.example.test"},
+		sendMail: func(string, smtp.Auth, string, []string, []byte) error {
+			called = true
+			return nil
+		},
+	}
+	if err := w.deliver(context.Background(), event.Envelope, body); err != nil {
+		t.Fatalf("deliver() error = %v", err)
+	}
+	if called {
+		t.Fatal("SMTP transport was called for a missing account")
+	}
+}

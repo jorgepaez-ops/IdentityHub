@@ -42,7 +42,7 @@ mitigación sin gate se degrada en cuanto alguien la borre sin darse cuenta.
 | AM-001 | Fuerza bruta sobre contraseñas | Argon2id (coste alto), bloqueo tras 5 fallos, `limit_req` en Nginx sobre `/auth/*` | `test-unit` verifica el bloqueo; ZAP comprueba el rate limit | RF-017 |
 | AM-002 | Robo de refresh token y uso paralelo | Rotación obligatoria + detección de reuso que revoca la familia | `test-integration` `TestRF006_...` | RF-005, RF-006 |
 | AM-003 | Falsificación de JWT con `alg: none` o cambio a HS256 usando la clave pública como secreto | Validación explícita: solo se acepta `EdDSA`; se rechaza cualquier otro `alg` antes de verificar la firma | `test-unit` con tokens hostiles; Semgrep regla `jwt-none-algorithm` | RF-004 |
-| AM-004 | Enumeración de cuentas por mensajes o tiempos de respuesta distintos | Respuestas y códigos idénticos para correo existente e inexistente; comparación de contraseña en tiempo constante y hash señuelo cuando el usuario no existe | `test-unit` compara respuestas; escenario Gherkin dedicado | RF-001, RF-015 |
+| AM-004 | Enumeración de cuentas por mensajes o tiempos de respuesta distintos | Respuestas y códigos idénticos para correo existente e inexistente; comparación de contraseña en tiempo constante y hash señuelo cuando el usuario no existe. Ambos caminos publican el evento de restablecimiento; el campo interno `accountExists` hace que el worker omita SMTP cuando no hay cuenta, sin exponerlo por HTTP. | `test-unit` compara respuestas; escenario Gherkin dedicado | RF-001, RF-015 |
 | AM-005 | Fijación de sesión tras cambiar la contraseña | El restablecimiento revoca todas las sesiones activas | `test-integration` | RF-015 |
 
 ### Tampering — manipulación

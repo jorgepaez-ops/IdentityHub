@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -188,5 +189,19 @@ func TestRNF012_AceptarNoIncluyeElTokenEnElEvento(t *testing.T) {
 	}
 	if event.EventType != events.TypeEmailVerified {
 		t.Fatalf("EventType = %q, want %q", event.EventType, events.TypeEmailVerified)
+	}
+}
+
+func TestRF002_ErrorDePrevalidacionSeEnvuelveUnaVez(t *testing.T) {
+	cause := errors.New("database unavailable")
+	repo := &fakeRepository{writer: &fakeWriter{}, invitationCheckErr: fmt.Errorf("check invitation token: %w", cause)}
+	err := New(repo, &fakePublisher{}, &fakeHasher{}).Accept(context.Background(), Input{
+		Token: base64.RawURLEncoding.EncodeToString([]byte("invitation-token")), Password: "correct horse battery",
+	})
+	if !errors.Is(err, cause) {
+		t.Fatalf("Accept() error = %v, want wrapped cause", err)
+	}
+	if got, want := err.Error(), "check invitation token: database unavailable"; got != want {
+		t.Fatalf("error = %q, want %q", got, want)
 	}
 }

@@ -140,12 +140,12 @@ components:
             properties:
               data:
                 type: object
-                required: [userId, email, resetToken, expiresAt]
+                required: [email, resetToken, expiresAt, accountExists]
                 properties:
-                  userId:     { type: string, format: uuid }
-                  email:      { type: string, format: email }
-                  resetToken: { type: string }
-                  expiresAt:  { type: string, format: date-time }
+                  email:         { type: string, format: email }
+                  resetToken:    { type: string }
+                  expiresAt:     { type: string, format: date-time }
+                  accountExists: { type: boolean, description: Solo para el worker de notificaciones; nunca se expone por HTTP. }
 
     RefreshReuseDetected:
       name: RefreshReuseDetected

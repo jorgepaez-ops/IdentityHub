@@ -21,8 +21,6 @@ func TestRNF005_DeferredContractOperationsReturnProblemNotImplemented(t *testing
 	}{
 		{name: "verify MFA", method: http.MethodPost, path: "/api/v1/auth/mfa/verify"},
 		{name: "resend MFA", method: http.MethodPost, path: "/api/v1/auth/mfa/resend"},
-		{name: "confirm password reset", method: http.MethodPost, path: "/api/v1/auth/password-reset/confirm"},
-		{name: "request password reset", method: http.MethodPost, path: "/api/v1/auth/password-reset/request"},
 		{name: "exchange authorization code", method: http.MethodPost, path: "/oauth/token"},
 		{name: "list sessions", method: http.MethodGet, path: "/api/v1/me/sessions"},
 		{name: "revoke session", method: http.MethodDelete, path: "/api/v1/me/sessions/" + sessionID.String()},

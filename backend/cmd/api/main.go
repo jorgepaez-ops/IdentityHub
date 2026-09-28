@@ -21,9 +21,11 @@ import (
 	"github.com/jorgepaez/identity-hub/internal/auth/auditlog"
 	"github.com/jorgepaez/identity-hub/internal/auth/employee"
 	"github.com/jorgepaez/identity-hub/internal/auth/invitation"
+	"github.com/jorgepaez/identity-hub/internal/auth/invitationresend"
 	"github.com/jorgepaez/identity-hub/internal/auth/login"
 	"github.com/jorgepaez/identity-hub/internal/auth/logout"
 	"github.com/jorgepaez/identity-hub/internal/auth/password"
+	"github.com/jorgepaez/identity-hub/internal/auth/passwordreset"
 	"github.com/jorgepaez/identity-hub/internal/auth/refresh"
 	"github.com/jorgepaez/identity-hub/internal/auth/token"
 	"github.com/jorgepaez/identity-hub/internal/config"
@@ -130,6 +132,8 @@ func run() error {
 	server.SetTokenService(tokens)
 	server.SetEmployeeCreationService(employeeService)
 	server.SetInvitationAcceptanceService(invitationService)
+	server.SetInvitationResendService(invitationresend.New(db, broker, rand.Reader, time.Now))
+	server.SetPasswordResetService(passwordreset.New(db, broker, passwordHasher{}, rand.Reader, time.Now))
 	server.SetLoginService(loginService, cfg.RefreshTTL)
 	server.SetRefreshService(refreshService)
 	server.SetLogoutService(logout.New(db))
