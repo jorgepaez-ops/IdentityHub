@@ -315,7 +315,14 @@ Ninguna: P1 a P4 resueltas en D8 a D11.
     `internal/auth/registration` y `verification` huérfanos. Nuevo alcance: reenvío de invitación
     (D12, va en T6). Se acepta sin cambio la publicación antes del commit (compromiso de la
     ADR 0006).
-- Commit: `28293dd`
+  - T5-fix (2026-09-27, Codex, `8b7d5b3`): prevalidación barata del token antes de Argon2id,
+    prueba de integración real de token vencido (410 y la cuenta sigue pendiente), borrado de
+    `registration`/`verification` y sus queries. Unitarias, lint e integración en verde.
+    Revisión nativa (alto, 16 archivos, 906 líneas, 4 lentes): **aprobada**, acusada el
+    2026-09-28 (`review-5d47886d5c3f9228`). Observaciones informativas: el error de la
+    prevalidación queda envuelto dos veces (`invitation.go:81`, R2) y su rama de error no tiene
+    prueba (`invitation.go:79-82`, R3).
+- Commit: `28293dd`, `8b7d5b3`
 
 ### T6 — RF-015 Restablecimiento de contraseña
 - [ ] Estado · Ejecutor: `Codex` · Depende de: T5 (reutiliza el mecanismo de token)
@@ -424,7 +431,7 @@ Ninguna: P1 a P4 resueltas en D8 a D11.
 
 ## Siguiente paso
 
-T5-fix (Codex): Argon2 tras validar el token, prueba real de vencimiento, borrar paquetes huérfanos. Luego T6 con D12.
+T6 (Codex) con D12 (reenvío de invitación).
 
 ## Cambios de spec propuestos
 
