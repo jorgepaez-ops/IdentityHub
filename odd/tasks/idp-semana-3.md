@@ -490,6 +490,12 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 ### T8 — RF-016 Sesiones activas
 - [ ] Estado · Ejecutor: `Codex` · Depende de: T3
 - Listar sesiones (IP, user-agent, creación, último uso) y revocar una concreta.
+- Con T8 (decisión del usuario, 2026-09-28), observaciones de la revisión nativa de T7-fix: un
+  desafío cuyo código no se pudo publicar no cuenta para el tope de emisión (anularlo o
+  excluirlo); un reenvío que falla al publicar no adelanta `last_sent_at` (documentarlo en la
+  ADR 0006 y OpenAPI); prueba con el `login.Service` real y un emisor que devuelva
+  `ErrIssuanceLimited`/`ErrDeliveryUnavailable` hasta el 429/503; `SupersedeOpenMfaChallenges` con el
+  reloj del servicio; comentario de la prueba de desafío anulado ajustado a lo que prueba.
 - Commit: —
 
 ### T9 — Autorización para aplicaciones cliente (authorization code + PKCE)
@@ -580,7 +586,7 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 
 ## Siguiente paso
 
-T8 (sesiones activas, Codex). Pendiente de decidir si las observaciones de la revisión de T7-fix van en una T7-fix2 o junto con T8.
+T8 (sesiones activas, Codex), con las observaciones de la revisión de T7-fix.
 
 ## Cambios de spec propuestos
 
