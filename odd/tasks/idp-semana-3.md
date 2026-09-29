@@ -502,7 +502,17 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
   completa con PostgreSQL real en verde (74,3%). Queda anotado: el access token de una sesión
   revocada sigue valiendo hasta su vencimiento (15 min, JWT sin estado); `make gen` usa
   openapi-typescript 7.13.0 frente al 6.7.6 que documenta `AGENTS.md`.
-- Commit: —
+- Revisión nativa (alto, 24 archivos, 922 líneas, 4 lentes): **aprobada** y acusada
+  (`review-5dbfa7da1c845f4b`) con 12 observaciones informativas. Para una T8-fix: la compensación
+  tras un fallo de publicación (borrar el desafío o restaurar el reenvío) corre con el mismo
+  contexto de la petición, así que si el fallo fue por cancelación o timeout la compensación
+  también falla (usar un contexto desacoplado con plazo propio); `RestoreResend` descarta
+  `RowsAffected` y no deja rastro si no restauró nada; faltan pruebas HTTP de 404/500/503 en
+  sesiones y de integración de la compensación en PostgreSQL; comentario de `CreateMfaChallenge`
+  con los `$n` corridos. Menores: parámetros sin nombre en `RestoreResend`, guardas duplicadas en
+  los handlers de sesiones, parámetros sin uso en `testSessionToken`, y si el broker acepta pero
+  responde error, el correo sale sin cobrar el tope.
+- Commit: `f537243`
 
 ### T9 — Autorización para aplicaciones cliente (authorization code + PKCE)
 - [ ] Estado · Ejecutor: `Codex` (con revisión reforzada de Claude) · Depende de: T3, T7
@@ -592,7 +602,7 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 
 ## Siguiente paso
 
-Revisión nativa de T8; luego T9 (authorization code + PKCE, Codex con revisión reforzada).
+T8-fix (observaciones de la revisión nativa de T8, ver T8; ejecutor por decidir); luego T9 (authorization code + PKCE, Codex con revisión reforzada).
 
 ## Cambios de spec propuestos
 
