@@ -476,7 +476,16 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
     si un reenvío confirma pero falla la publicación, el código anterior ya no sirve y hay que
     esperar 60 s para reenviar; con la contraseña, alguien puede agotar el tope de 5 desafíos y
     dejar al titular 15 min sin entrar (mismo compromiso que el bloqueo de RF-017).
-- Commit: —
+  - Revisión nativa (alto, 28 archivos, 1083 líneas, 4 lentes): **aprobada** y acusada
+    (`review-97ada3d05cfd27fc`) con 8 observaciones informativas. Para una tarea futura: los
+    desafíos cuyo código no se pudo publicar cuentan para el tope, así que 5 reintentos durante una
+    caída del broker dejan al usuario 15 min en 429 (no contar o anular esos desafíos); en un
+    reenvío que falla al publicar, no adelantar `last_sent_at` para permitir reintentar ya, y
+    documentarlo en la ADR y OpenAPI; ninguna prueba ejercita el `login.Service` real con un emisor
+    que devuelva `ErrIssuanceLimited`/`ErrDeliveryUnavailable` (solo stubs del handler). Menores:
+    `SupersedeOpenMfaChallenges` usa el `now()` de la base; el comentario de la prueba de
+    integración de desafío anulado promete más de lo que prueba.
+- Commit: `4b63728`
 
 ### T8 — RF-016 Sesiones activas
 - [ ] Estado · Ejecutor: `Codex` · Depende de: T3
@@ -571,7 +580,7 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 
 ## Siguiente paso
 
-Revisión nativa de T7-fix; luego T8 (sesiones activas, Codex).
+T8 (sesiones activas, Codex). Pendiente de decidir si las observaciones de la revisión de T7-fix van en una T7-fix2 o junto con T8.
 
 ## Cambios de spec propuestos
 
