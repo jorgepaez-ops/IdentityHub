@@ -135,16 +135,21 @@ SELECT pg_advisory_xact_lock(hashtextextended($1::uuid::text, 0));
 SELECT count(*) FROM mfa_challenges WHERE user_id = $1 AND created_at >= $2;
 
 -- name: SupersedeOpenMfaChallenges :exec
--- A new challenge replaces the account's open ones; marking them used makes
--- them fail verification exactly like a consumed challenge.
-UPDATE mfa_challenges SET used_at = now()
+-- A new challenge replaces the account's open ones with the service clock,
+-- keeping deterministic tests and all MFA timestamps on one source of time.
+UPDATE mfa_challenges SET used_at = $2
 WHERE user_id = $1 AND used_at IS NULL;
 
 -- name: CreateMfaChallenge :exec
 -- $6 is the service clock, stored as both created_at and last_sent_at so the
 -- issuance window and the resend window use the same time source as the code.
-INSERT INTO mfa_challenges (user_id, token_hash, code_hash, expires_at, attempts_left, created_at, last_sent_at)
-VALUES ($1, $2, $3, $4, $5, $6, $6);
+INSERT INTO mfa_challenges (id, user_id, token_hash, code_hash, expires_at, attempts_left, created_at, last_sent_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $7);
+
+-- name: DeleteMfaChallenge :exec
+-- An initial MFA code that could not be published must not consume the
+-- issuance window. The audit preserves the delivery attempt for operators.
+DELETE FROM mfa_challenges WHERE id = $1;
 
 -- name: GetMfaChallengeForUpdate :one
 SELECT c.id, c.user_id, c.code_hash, c.expires_at, c.attempts_left, c.last_sent_at, c.used_at,
@@ -169,6 +174,14 @@ RETURNING attempts_left;
 UPDATE mfa_challenges
 SET code_hash = $2, last_sent_at = $3
 WHERE id = $1 AND used_at IS NULL;
+
+-- name: RestoreMfaChallengeAfterFailedResend :execrows
+-- Publish happens after commit (D16). If it fails, restore this exact change
+-- so last_sent_at does not impose a retry delay. The expected new values avoid
+-- overwriting a later successful resend.
+UPDATE mfa_challenges
+SET code_hash = $3, last_sent_at = $5
+WHERE id = $1 AND code_hash = $2 AND last_sent_at = $4 AND used_at IS NULL;
 
 -- name: CreateRefreshToken :exec
 INSERT INTO refresh_tokens (user_id, token_hash, family_id, ip, user_agent, expires_at)
@@ -199,6 +212,36 @@ WITH candidate AS (
 SELECT candidate.user_id, candidate.family_id, candidate.id AS parent_id,
        candidate.status, EXISTS (SELECT 1 FROM created) AS rotated
 FROM candidate;
+
+
+-- name: ListActiveRefreshSessions :many
+-- A session is a refresh-token family. The single active token supplies the
+-- latest device metadata; the family history supplies its first creation and
+-- last use timestamps.
+SELECT active.family_id, active.ip, active.user_agent,
+       min(history.created_at)::timestamptz AS created_at,
+       max(COALESCE(history.last_used_at, history.created_at))::timestamptz AS last_used_at
+FROM refresh_tokens AS active
+JOIN refresh_tokens AS history ON history.family_id = active.family_id
+WHERE active.user_id = $1
+  AND active.status = 'active'
+  AND active.expires_at > now()
+GROUP BY active.family_id, active.ip, active.user_agent
+ORDER BY max(COALESCE(history.last_used_at, history.created_at)) DESC;
+
+-- name: RevokeActiveRefreshSession :one
+-- Ownership and activeness are both predicates: foreign, expired and already
+-- revoked families all return false to the HTTP layer as the same 404.
+WITH revoked AS (
+    UPDATE refresh_tokens
+    SET status = 'revoked'
+    WHERE user_id = $1
+      AND family_id = $2
+      AND status = 'active'
+      AND expires_at > now()
+    RETURNING 1
+)
+SELECT EXISTS (SELECT 1 FROM revoked) AS revoked;
 
 -- name: RevokeRefreshFamily :one
 WITH revoked AS (

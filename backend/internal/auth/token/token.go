@@ -21,7 +21,8 @@ const AccessTokenExpiresIn = int(accessTokenTTL / time.Second)
 type Clock func() time.Time
 
 type Claims struct {
-	Roles []string `json:"roles"`
+	Roles     []string `json:"roles"`
+	SessionID string   `json:"sid,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -65,6 +66,19 @@ func New(seed []byte, issuer, audience string, clock Clock) (*Service, error) {
 }
 
 func (s *Service) Issue(subject string, roles []string) (string, error) {
+	return s.issue(subject, roles, "")
+}
+
+// IssueForSession binds a console access token to its refresh-token family so
+// the session-management endpoint can identify the current session.
+func (s *Service) IssueForSession(subject string, roles []string, sessionID string) (string, error) {
+	if sessionID == "" {
+		return "", fmt.Errorf("session ID is required")
+	}
+	return s.issue(subject, roles, sessionID)
+}
+
+func (s *Service) issue(subject string, roles []string, sessionID string) (string, error) {
 	if subject == "" {
 		return "", fmt.Errorf("jwt subject is required")
 	}
@@ -74,7 +88,8 @@ func (s *Service) Issue(subject string, roles []string) (string, error) {
 	}
 	now := s.clock()
 	claims := Claims{
-		Roles: append([]string(nil), roles...),
+		Roles:     append([]string(nil), roles...),
+		SessionID: sessionID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    s.issuer,
 			Subject:   subject,

@@ -308,8 +308,10 @@ type memoryRepository struct {
 	inTransaction    bool
 	recentChallenges int
 	supersededUsers  []uuid.UUID
+	supersededAt     time.Time
 	createdCalls     int
 	resentAt         time.Time
+	deletedChallenge uuid.UUID
 }
 
 func (r *memoryRepository) WithinMFATransaction(_ context.Context, fn func(Writer) error) error {
@@ -321,8 +323,9 @@ func (r *memoryRepository) LockChallengeIssuance(context.Context, uuid.UUID) err
 func (r *memoryRepository) CountChallengesSince(context.Context, uuid.UUID, time.Time) (int, error) {
 	return r.recentChallenges, nil
 }
-func (r *memoryRepository) SupersedeOpenChallenges(_ context.Context, userID uuid.UUID) error {
+func (r *memoryRepository) SupersedeOpenChallenges(_ context.Context, userID uuid.UUID, usedAt time.Time) error {
 	r.supersededUsers = append(r.supersededUsers, userID)
+	r.supersededAt = usedAt
 	return nil
 }
 func (r *memoryRepository) CreateChallenge(_ context.Context, p CreateParams) error {
@@ -353,6 +356,14 @@ func (r *memoryRepository) RejectChallenge(context.Context, uuid.UUID) (int, err
 }
 func (r *memoryRepository) ResendChallenge(_ context.Context, _ uuid.UUID, codeHash []byte, sentAt time.Time) error {
 	r.resentHash, r.resentAt = codeHash, sentAt
+	return nil
+}
+func (r *memoryRepository) DeleteChallenge(_ context.Context, id uuid.UUID) error {
+	r.deletedChallenge = id
+	return nil
+}
+func (r *memoryRepository) RestoreResend(_ context.Context, _ uuid.UUID, _, previousHash []byte, _, previousSentAt time.Time) error {
+	r.resentHash, r.resentAt = previousHash, previousSentAt
 	return nil
 }
 func (r *memoryRepository) ListRolesForUser(context.Context, uuid.UUID) ([]string, error) {
@@ -538,6 +549,9 @@ func TestRF009_ElAccessTokenDeMFASoloLlevaRolesDeDirectorio(t *testing.T) {
 	if !reflect.DeepEqual(claims.Roles, []string{roles.User}) {
 		t.Fatalf("roles claim=%v, want only directory roles (D8): %v", claims.Roles, []string{roles.User})
 	}
+	if claims.SessionID != repo.refresh.FamilyID.String() {
+		t.Fatalf("session claim=%q, want refresh family %s", claims.SessionID, repo.refresh.FamilyID)
+	}
 }
 
 func TestRF014_VerificarRechazaUnDesafioVencido(t *testing.T) {
@@ -576,5 +590,43 @@ func TestRF014_ElReenvioRespetaLaVentanaDe60SegundosConElRelojDelServicio(t *tes
 	// last_sent_at must come from the same clock the window is measured with.
 	if !repo.resentAt.Equal(now) {
 		t.Fatalf("resent at %v, want the service clock %v", repo.resentAt, now)
+	}
+}
+
+func TestRF014_FalloDeEntregaInicialAnulaElDesafioParaNoContarEnElLimite(t *testing.T) {
+	repo := &memoryRepository{}
+	_, err := newVerifier(t, repo, &fakePublisher{err: errors.New("broker unavailable")}).Issue(context.Background(), User{ID: uuid.New(), Email: "ada@example.test"})
+	if !errors.Is(err, ErrDeliveryUnavailable) {
+		t.Fatalf("err=%v, want ErrDeliveryUnavailable", err)
+	}
+	if repo.deletedChallenge == uuid.Nil {
+		t.Fatal("an undelivered initial challenge must be canceled so it does not consume the issuance limit")
+	}
+}
+
+func TestRF014_FalloDeEntregaEnReenvioNoAdelantaLaVentana(t *testing.T) {
+	now := time.Date(2026, 9, 28, 14, 0, 0, 0, time.UTC)
+	challenge := activeChallenge("123456", MaxAttempts)
+	challenge.LastSentAt = now.Add(-ResendInterval)
+	repo := &memoryRepository{challenge: challenge}
+	service := newVerifierAt(t, repo, &fakePublisher{err: errors.New("broker unavailable")}, now)
+
+	err := service.Resend(context.Background(), encodedToken())
+	if !errors.Is(err, ErrDeliveryUnavailable) {
+		t.Fatalf("err=%v, want ErrDeliveryUnavailable", err)
+	}
+	if !repo.resentAt.Equal(challenge.LastSentAt) {
+		t.Fatalf("last sent at=%s, want restoration to %s after failed delivery", repo.resentAt, challenge.LastSentAt)
+	}
+}
+
+func TestRF014_SuperacionUsaElRelojDelServicio(t *testing.T) {
+	now := time.Date(2026, 9, 28, 14, 0, 0, 0, time.UTC)
+	repo := &memoryRepository{}
+	if _, err := newVerifierAt(t, repo, &fakePublisher{}, now).Issue(context.Background(), User{ID: uuid.New(), Email: "ada@example.test"}); err != nil {
+		t.Fatal(err)
+	}
+	if !repo.supersededAt.Equal(now) {
+		t.Fatalf("superseded at=%s, want service clock %s", repo.supersededAt, now)
 	}
 }

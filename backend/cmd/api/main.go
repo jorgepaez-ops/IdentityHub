@@ -29,6 +29,7 @@ import (
 	"github.com/jorgepaez/identity-hub/internal/auth/password"
 	"github.com/jorgepaez/identity-hub/internal/auth/passwordreset"
 	"github.com/jorgepaez/identity-hub/internal/auth/refresh"
+	"github.com/jorgepaez/identity-hub/internal/auth/session"
 	"github.com/jorgepaez/identity-hub/internal/auth/token"
 	"github.com/jorgepaez/identity-hub/internal/config"
 	"github.com/jorgepaez/identity-hub/internal/events"
@@ -142,6 +143,7 @@ func run() error {
 	server.SetLoginService(loginService)
 	server.SetMFAService(mfaService, cfg.RefreshTTL)
 	server.SetRefreshService(refreshService)
+	server.SetSessionService(session.New(db))
 	server.SetLogoutService(logout.New(db))
 	server.SetAdminUserService(admin.New(db))
 	server.SetAuditLogService(auditlog.New(db))

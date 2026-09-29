@@ -131,7 +131,7 @@ paths:
         envía por correo un código de 6 dígitos. No crea sesión hasta completar MFA.
         Cada desafío nuevo anula los abiertos de la cuenta; se emiten como máximo 5 por cuenta
         cada 15 minutos (`429` al superarlo). El código se publica tras confirmar la transacción:
-        si el broker falla, responde `503` y el desafío no usado vence solo (ADR 0006, D16).
+        si el broker falla, responde `503` y anula ese desafío para que no consuma el límite de emisión (ADR 0006, D16).
       x-requirement: RF-003
       security: []
       requestBody:
@@ -158,7 +158,7 @@ paths:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }
         '503':
-          description: No se pudo enviar el código MFA; el desafío no usado vence solo
+          description: No se pudo enviar el código MFA; el desafío se anula y no consume el límite de emisión
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }
@@ -198,7 +198,7 @@ paths:
       operationId: resendMfaCode
       tags: [auth]
       summary: Reenviar el código del desafío MFA
-      description: Anula el código anterior, conserva el desafío y permite un envío cada 60 segundos.
+      description: Anula el código anterior, conserva el desafío y permite un envío cada 60 segundos. Si el broker falla después del commit, restaura el código y `lastSentAt` previos para permitir reintentar sin esperar.
       x-requirement: RF-014
       security: []
       requestBody:
@@ -212,7 +212,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
         '503':
-          description: No se pudo enviar el código MFA; el desafío no usado vence solo
+          description: No se pudo enviar el código MFA; se restaura el código anterior y el reintento no espera 60 segundos
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }

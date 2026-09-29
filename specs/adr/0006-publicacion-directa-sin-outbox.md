@@ -38,9 +38,14 @@ revierten nada si el broker falla:
   (contraseña cambiada, sesiones revocadas, desbloqueo de D13 si aplica). Si falla la publicación
   del aviso, `POST /auth/password-reset/confirm` sigue respondiendo `204` y el fallo queda en el log
   estructurado con el id del usuario (sin secretos). Se acepta que un aviso pueda perderse.
-- **Código MFA (RF-014), al emitir el desafío y al reenviarlo.** Si falla la publicación tras el
-  `COMMIT`, `POST /auth/login` (o el reenvío) responde `503` con `application/problem+json`; el
-  desafío no usado vence solo a los 5 minutos y el cliente puede reintentar.
+- **Código MFA (RF-014), al emitir el desafío.** Si falla la publicación tras el `COMMIT`,
+  `POST /auth/login` responde `503` con `application/problem+json` y anula el desafío recién
+  creado. Así no queda un desafío imposible de recibir ni consume uno de los cinco cupos de
+  emisión de la ventana de 15 minutos; el audit conserva el intento para operación.
+- **Código MFA (RF-014), al reenviarlo.** Si falla la publicación tras el `COMMIT`, el endpoint
+  responde `503`, restaura el hash del código y `last_sent_at` anteriores, y permite reintentar
+  de inmediato en vez de imponer los 60 segundos. La restauración es condicional para no pisar
+  un reenvío posterior que sí haya tenido éxito.
 
 Motivo: publicar dentro de la transacción acopla la recuperación de cuentas (incluido el
 desbloqueo) a la disponibilidad del broker, retiene una conexión de la base mientras el broker es

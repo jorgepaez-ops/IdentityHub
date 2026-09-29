@@ -152,7 +152,7 @@ func (s *Service) Refresh(ctx context.Context, input Input) (Result, error) {
 			}
 			// The refresh cookie renews the Hub console's own directory-scoped
 			// token (D8, RF-009): an application role must not reappear here.
-			accessToken, err := s.tokens.Issue(rotation.UserID.String(), roles.Directory(userRoles))
+			accessToken, err := s.tokens.IssueForSession(rotation.UserID.String(), roles.Directory(userRoles), rotation.FamilyID.String())
 			if err != nil {
 				return fmt.Errorf("issue access token: %w", err)
 			}

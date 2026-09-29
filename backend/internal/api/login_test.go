@@ -333,3 +333,35 @@ func TestRF014_FalloDeEntregaDelCodigoDevuelve503ProblemJSON(t *testing.T) {
 		}
 	}
 }
+
+type mfaIssuerFailureStub struct{ err error }
+
+func (s mfaIssuerFailureStub) Issue(context.Context, mfa.User) (mfa.Challenge, error) {
+	return mfa.Challenge{}, s.err
+}
+
+func TestRF013_LoginRealMapeaLimiteYFalloDeEntregaMFA(t *testing.T) {
+	hash, err := password.Hash("correct horse battery")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, testCase := range []struct {
+		name   string
+		issue  error
+		status int
+	}{
+		{name: "issuance limited", issue: mfa.ErrIssuanceLimited, status: http.StatusTooManyRequests},
+		{name: "delivery unavailable", issue: mfa.ErrDeliveryUnavailable, status: http.StatusServiceUnavailable},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			repository := &realLoginRepositoryStub{user: login.User{ID: uuid.New(), Email: "ada@example.com", PasswordHash: hash, Status: login.StatusActive}}
+			server := NewServer(nil, "test", nil)
+			server.SetLoginService(login.New(repository).WithMFA(mfaIssuerFailureStub{err: testCase.issue}))
+			response := httptest.NewRecorder()
+			server.Login(response, httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", strings.NewReader(`{"email":"ada@example.com","password":"correct horse battery"}`)))
+			if response.Code != testCase.status {
+				t.Fatalf("status=%d body=%s, want %d", response.Code, response.Body.String(), testCase.status)
+			}
+		})
+	}
+}

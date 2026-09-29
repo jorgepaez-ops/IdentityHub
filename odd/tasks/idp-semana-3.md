@@ -488,7 +488,7 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 - Commit: `4b63728`
 
 ### T8 — RF-016 Sesiones activas
-- [ ] Estado · Ejecutor: `Codex` · Depende de: T3
+- [x] Estado · Ejecutor: `Codex` · Depende de: T3
 - Listar sesiones (IP, user-agent, creación, último uso) y revocar una concreta.
 - Con T8 (decisión del usuario, 2026-09-28), observaciones de la revisión nativa de T7-fix: un
   desafío cuyo código no se pudo publicar no cuenta para el tope de emisión (anularlo o
@@ -496,6 +496,12 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
   ADR 0006 y OpenAPI); prueba con el `login.Service` real y un emisor que devuelva
   `ErrIssuanceLimited`/`ErrDeliveryUnavailable` hasta el 429/503; `SupersedeOpenMfaChallenges` con el
   reloj del servicio; comentario de la prueba de desafío anulado ajustado a lo que prueba.
+- Verificación de Claude (2026-09-28): revisión del diff (listado y revocación filtran por
+  `user_id`; ajena, vencida o revocada dan el mismo 404; revocación y auditoría en una transacción;
+  sesión actual por claim firmado `sid`), unitarias, lint 0, trazabilidad al día e integración
+  completa con PostgreSQL real en verde (74,3%). Queda anotado: el access token de una sesión
+  revocada sigue valiendo hasta su vencimiento (15 min, JWT sin estado); `make gen` usa
+  openapi-typescript 7.13.0 frente al 6.7.6 que documenta `AGENTS.md`.
 - Commit: —
 
 ### T9 — Autorización para aplicaciones cliente (authorization code + PKCE)
@@ -579,14 +585,14 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 | Fase | Tareas | Hechas |
 |---|---|---|
 | 0 — Enmiendas de spec y decisiones | T1 a T3 (3) | 3 (T1 a T3) |
-| 1 — Backend | T4 a T10 (7) | 4 (T4 a T7) |
+| 1 — Backend | T4 a T10 (7) | 5 (T4 a T8) |
 | 2 — Dominios locales y frontend | T11 a T13 (3) | 0 |
 | 3 — Verificación, DAST y cierre | T14 a T17 (4) | 0 |
-| **Total** | **17** | **7** |
+| **Total** | **17** | **8** |
 
 ## Siguiente paso
 
-T8 (sesiones activas, Codex), con las observaciones de la revisión de T7-fix.
+Revisión nativa de T8; luego T9 (authorization code + PKCE, Codex con revisión reforzada).
 
 ## Cambios de spec propuestos
 
@@ -594,4 +600,7 @@ Todos en T3, tras T2.
 
 ## Notas de handoff Codex
 
-(vacío)
+- T8: se implementaron `GET/DELETE /api/v1/me/sessions` sobre familias de refresh, con propiedad del titular, `404` indistinguible para familia ajena/desconocida, auditoría `session_revoked` y marca `current` mediante el `sid` firmado del access token; se añadieron servicio, adaptador SQLc y composición.
+- T7-fix: un fallo al publicar el desafío inicial lo anula para no agotar el cupo; un fallo al publicar un reenvío restaura código y `last_sent_at`; la superación usa el reloj del servicio. ADR 0006 y OpenAPI documentan ambos casos; la prueba real de `login.Service` confirma 429/503.
+- RED observado: `cd backend && GOCACHE=/tmp/identity-hub-go-build go test ./internal/auth/session ./internal/auth/mfa ./internal/api -run 'TestRF016_|TestRF014_FalloDeEntrega' -count=1` falló por el paquete de sesiones inexistente, desafío no anulado y `last_sent_at` adelantado. GREEN: la misma selección y `go test -race ./internal/auth/session ./internal/auth/mfa ./internal/auth/refresh ./internal/api -count=1` pasaron.
+- Verificación: `make gen`, `make test-go`, `make lint`, `go vet -tags=integration ./...`, validación OpenAPI y trazabilidad en verde; T8 corrige además el generador para que RF-016 ya no figure diferido. Claude debe ejecutar `make test-integration` con PostgreSQL real; el sandbox no tiene `TEST_DATABASE_URL`.

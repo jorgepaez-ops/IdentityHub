@@ -57,6 +57,7 @@ type Challenge struct {
 }
 
 type CreateParams struct {
+	ID           uuid.UUID
 	UserID       uuid.UUID
 	TokenHash    []byte
 	CodeHash     []byte
@@ -115,9 +116,9 @@ var (
 	// ErrIssuanceLimited means the account already received
 	// MaxIssuancesPerWindow challenges within IssuanceWindow.
 	ErrIssuanceLimited = fmt.Errorf("mfa challenge issuance is rate limited")
-	// ErrDeliveryUnavailable means the challenge or resend was stored but its
-	// code could not be published after the commit (D16). The unused challenge
-	// simply expires.
+	// ErrDeliveryUnavailable means a committed challenge or resend could not be
+	// delivered after the commit (D16). Undelivered initial challenges are
+	// canceled, while a failed resend restores its previous send time.
 	ErrDeliveryUnavailable = fmt.Errorf("mfa code delivery is unavailable")
 )
 
@@ -127,8 +128,10 @@ type Writer interface {
 	LockChallengeIssuance(context.Context, uuid.UUID) error
 	CountChallengesSince(context.Context, uuid.UUID, time.Time) (int, error)
 	// SupersedeOpenChallenges marks the account's open challenges as used.
-	SupersedeOpenChallenges(context.Context, uuid.UUID) error
+	SupersedeOpenChallenges(context.Context, uuid.UUID, time.Time) error
 	CreateChallenge(context.Context, CreateParams) error
+	DeleteChallenge(context.Context, uuid.UUID) error
+	RestoreResend(context.Context, uuid.UUID, []byte, []byte, time.Time, time.Time) error
 	GetChallengeForUpdate(context.Context, []byte) (StoredChallenge, error)
 	ConsumeChallenge(context.Context, uuid.UUID) error
 	RejectChallenge(context.Context, uuid.UUID) (int, error)
@@ -250,7 +253,8 @@ func (s *Service) Verify(ctx context.Context, input VerifyInput) (Result, error)
 		if err != nil {
 			return fmt.Errorf("list mfa user roles: %w", err)
 		}
-		access, err := s.tokens.Issue(challenge.User.ID.String(), roles.Directory(userRoles))
+		familyID := uuid.New()
+		access, err := s.tokens.IssueForSession(challenge.User.ID.String(), roles.Directory(userRoles), familyID.String())
 		if err != nil {
 			return fmt.Errorf("issue mfa access token: %w", err)
 		}
@@ -259,7 +263,7 @@ func (s *Service) Verify(ctx context.Context, input VerifyInput) (Result, error)
 			return fmt.Errorf("generate mfa refresh token: %w", err)
 		}
 		refreshHash := sha256.Sum256(refreshRaw)
-		if err := w.CreateRefreshToken(ctx, RefreshToken{UserID: challenge.User.ID, TokenHash: refreshHash[:], FamilyID: uuid.New(), IP: input.IP, UserAgent: input.UserAgent, ExpiresAt: now.Add(s.refreshTTL)}); err != nil {
+		if err := w.CreateRefreshToken(ctx, RefreshToken{UserID: challenge.User.ID, TokenHash: refreshHash[:], FamilyID: familyID, IP: input.IP, UserAgent: input.UserAgent, ExpiresAt: now.Add(s.refreshTTL)}); err != nil {
 			return fmt.Errorf("create mfa refresh token: %w", err)
 		}
 		// The login only succeeds here, once the second factor is proven (D11).
@@ -336,6 +340,9 @@ func (s *Service) Resend(ctx context.Context, encodedToken string) error {
 	}
 	tokenHash := sha256.Sum256(raw)
 	var event events.MfaChallengeIssued
+	var challengeID uuid.UUID
+	var newHash, previousHash []byte
+	var sentAt, previousSentAt time.Time
 	if err := s.repository.WithinMFATransaction(ctx, func(w Writer) error {
 		challenge, err := w.GetChallengeForUpdate(ctx, tokenHash[:])
 		if err != nil {
@@ -354,7 +361,10 @@ func (s *Service) Resend(ctx context.Context, encodedToken string) error {
 		if err != nil {
 			return fmt.Errorf("generate mfa resend code: %w", err)
 		}
-		if err := w.ResendChallenge(ctx, challenge.ID, hashCode(raw, code), now); err != nil {
+		challengeID, sentAt = challenge.ID, now
+		newHash, previousHash = hashCode(raw, code), append([]byte(nil), challenge.CodeHash...)
+		previousSentAt = challenge.LastSentAt
+		if err := w.ResendChallenge(ctx, challengeID, newHash, sentAt); err != nil {
 			return fmt.Errorf("resend mfa challenge: %w", err)
 		}
 		if err := w.InsertAuditEvent(ctx, AuditEvent{ActorUserID: challenge.User.ID, Action: "mfa_code_resent"}); err != nil {
@@ -365,13 +375,27 @@ func (s *Service) Resend(ctx context.Context, encodedToken string) error {
 	}); err != nil {
 		return err
 	}
-	return s.publishCode(ctx, event)
+	if err := s.publishCode(ctx, event); err != nil {
+		if restoreErr := s.repository.WithinMFATransaction(ctx, func(w Writer) error {
+			if err := w.RestoreResend(ctx, challengeID, newHash, previousHash, sentAt, previousSentAt); err != nil {
+				return fmt.Errorf("restore failed mfa resend: %w", err)
+			}
+			return nil
+		}); restoreErr != nil {
+			// Do not keep ErrDeliveryUnavailable in this path: the compensating
+			// database failure must surface as infrastructure failure (5xx).
+			return fmt.Errorf("restore undelivered mfa resend: %w", restoreErr)
+		}
+		return err
+	}
+	return nil
 }
 
 // publishCode sends the code once the transaction that stored it has
 // committed (D16): a broker outage or a rolled-back commit can then neither
 // hold a database connection nor mail a code for a challenge that does not
-// exist. A failure leaves the stored challenge to expire on its own.
+// exist. On failure Issue cancels its challenge and Resend restores its prior
+// code timestamp, allowing an immediate retry.
 func (s *Service) publishCode(ctx context.Context, event events.MfaChallengeIssued) error {
 	if err := s.publisher.Publish(ctx, events.TypeMfaChallengeIssued, event); err != nil {
 		return fmt.Errorf("%w: publish mfa code: %w", ErrDeliveryUnavailable, err)
@@ -404,6 +428,7 @@ func (s *Service) Issue(ctx context.Context, user User) (Challenge, error) {
 		return Challenge{}, fmt.Errorf("generate mfa code: %w", err)
 	}
 	tokenHash, codeHash := sha256.Sum256(rawToken), hashCode(rawToken, code)
+	challengeID := uuid.New()
 	now := s.now().UTC()
 	expiresAt := now.Add(ChallengeTTL)
 	if err := s.repository.WithinMFATransaction(ctx, func(w Writer) error {
@@ -417,10 +442,10 @@ func (s *Service) Issue(ctx context.Context, user User) (Challenge, error) {
 		if issued >= MaxIssuancesPerWindow {
 			return ErrIssuanceLimited
 		}
-		if err := w.SupersedeOpenChallenges(ctx, user.ID); err != nil {
+		if err := w.SupersedeOpenChallenges(ctx, user.ID, now); err != nil {
 			return fmt.Errorf("supersede mfa challenges: %w", err)
 		}
-		if err := w.CreateChallenge(ctx, CreateParams{UserID: user.ID, TokenHash: tokenHash[:], CodeHash: codeHash, ExpiresAt: expiresAt, AttemptsLeft: MaxAttempts, SentAt: now}); err != nil {
+		if err := w.CreateChallenge(ctx, CreateParams{ID: challengeID, UserID: user.ID, TokenHash: tokenHash[:], CodeHash: codeHash, ExpiresAt: expiresAt, AttemptsLeft: MaxAttempts, SentAt: now}); err != nil {
 			return fmt.Errorf("create mfa challenge: %w", err)
 		}
 		if err := w.InsertAuditEvent(ctx, AuditEvent{ActorUserID: user.ID, Action: "mfa_challenge_issued"}); err != nil {
@@ -431,6 +456,16 @@ func (s *Service) Issue(ctx context.Context, user User) (Challenge, error) {
 		return Challenge{}, err
 	}
 	if err := s.publishCode(ctx, challengeEvent(user, code, expiresAt)); err != nil {
+		if cancelErr := s.repository.WithinMFATransaction(ctx, func(w Writer) error {
+			if err := w.DeleteChallenge(ctx, challengeID); err != nil {
+				return fmt.Errorf("cancel undelivered mfa challenge: %w", err)
+			}
+			return nil
+		}); cancelErr != nil {
+			// A failed compensation is an infrastructure fault, not a delivery
+			// outcome; avoid mapping it to the retryable MFA domain error.
+			return Challenge{}, fmt.Errorf("cancel undelivered mfa challenge: %w", cancelErr)
+		}
 		return Challenge{}, err
 	}
 	return Challenge{Token: base64.RawURLEncoding.EncodeToString(rawToken), ExpiresIn: challengeExpiresIn}, nil

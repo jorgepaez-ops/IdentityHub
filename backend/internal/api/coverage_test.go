@@ -5,23 +5,18 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-
-	"github.com/google/uuid"
 )
 
 // The deferred endpoints must stay explicitly visible to clients as RFC 7807
 // 501 responses. Exercising the generated routes keeps that contract from
 // silently becoming a 404 while their domain implementation is pending.
 func TestRNF005_DeferredContractOperationsReturnProblemNotImplemented(t *testing.T) {
-	sessionID := uuid.New()
 	for _, tt := range []struct {
 		name   string
 		method string
 		path   string
 	}{
 		{name: "exchange authorization code", method: http.MethodPost, path: "/oauth/token"},
-		{name: "list sessions", method: http.MethodGet, path: "/api/v1/me/sessions"},
-		{name: "revoke session", method: http.MethodDelete, path: "/api/v1/me/sessions/" + sessionID.String()},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			response := httptest.NewRecorder()

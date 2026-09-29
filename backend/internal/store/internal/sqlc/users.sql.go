@@ -209,11 +209,12 @@ func (q *Queries) CreateInvitationToken(ctx context.Context, arg CreateInvitatio
 }
 
 const createMfaChallenge = `-- name: CreateMfaChallenge :exec
-INSERT INTO mfa_challenges (user_id, token_hash, code_hash, expires_at, attempts_left, created_at, last_sent_at)
-VALUES ($1, $2, $3, $4, $5, $6, $6)
+INSERT INTO mfa_challenges (id, user_id, token_hash, code_hash, expires_at, attempts_left, created_at, last_sent_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
 `
 
 type CreateMfaChallengeParams struct {
+	ID           uuid.UUID
 	UserID       uuid.UUID
 	TokenHash    []byte
 	CodeHash     []byte
@@ -226,6 +227,7 @@ type CreateMfaChallengeParams struct {
 // issuance window and the resend window use the same time source as the code.
 func (q *Queries) CreateMfaChallenge(ctx context.Context, arg CreateMfaChallengeParams) error {
 	_, err := q.db.Exec(ctx, createMfaChallenge,
+		arg.ID,
 		arg.UserID,
 		arg.TokenHash,
 		arg.CodeHash,
@@ -319,6 +321,17 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const deleteMfaChallenge = `-- name: DeleteMfaChallenge :exec
+DELETE FROM mfa_challenges WHERE id = $1
+`
+
+// An initial MFA code that could not be published must not consume the
+// issuance window. The audit preserves the delivery attempt for operators.
+func (q *Queries) DeleteMfaChallenge(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteMfaChallenge, id)
+	return err
 }
 
 const deleteUserRoles = `-- name: DeleteUserRoles :exec
@@ -515,6 +528,56 @@ func (q *Queries) InvitationTokenIsUsable(ctx context.Context, tokenHash []byte)
 	return token_is_usable, err
 }
 
+const listActiveRefreshSessions = `-- name: ListActiveRefreshSessions :many
+SELECT active.family_id, active.ip, active.user_agent,
+       min(history.created_at)::timestamptz AS created_at,
+       max(COALESCE(history.last_used_at, history.created_at))::timestamptz AS last_used_at
+FROM refresh_tokens AS active
+JOIN refresh_tokens AS history ON history.family_id = active.family_id
+WHERE active.user_id = $1
+  AND active.status = 'active'
+  AND active.expires_at > now()
+GROUP BY active.family_id, active.ip, active.user_agent
+ORDER BY max(COALESCE(history.last_used_at, history.created_at)) DESC
+`
+
+type ListActiveRefreshSessionsRow struct {
+	FamilyID   uuid.UUID
+	Ip         *netip.Addr
+	UserAgent  pgtype.Text
+	CreatedAt  pgtype.Timestamptz
+	LastUsedAt pgtype.Timestamptz
+}
+
+// A session is a refresh-token family. The single active token supplies the
+// latest device metadata; the family history supplies its first creation and
+// last use timestamps.
+func (q *Queries) ListActiveRefreshSessions(ctx context.Context, userID uuid.UUID) ([]ListActiveRefreshSessionsRow, error) {
+	rows, err := q.db.Query(ctx, listActiveRefreshSessions, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListActiveRefreshSessionsRow
+	for rows.Next() {
+		var i ListActiveRefreshSessionsRow
+		if err := rows.Scan(
+			&i.FamilyID,
+			&i.Ip,
+			&i.UserAgent,
+			&i.CreatedAt,
+			&i.LastUsedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listAdminUsers = `-- name: ListAdminUsers :many
 SELECT id, email, password_hash, display_name, status, mfa_enabled, mfa_secret_enc, failed_login_count, locked_until, last_login_at, created_at, updated_at
 FROM users
@@ -708,6 +771,64 @@ func (q *Queries) ResendMfaChallenge(ctx context.Context, arg ResendMfaChallenge
 	return err
 }
 
+const restoreMfaChallengeAfterFailedResend = `-- name: RestoreMfaChallengeAfterFailedResend :execrows
+UPDATE mfa_challenges
+SET code_hash = $3, last_sent_at = $5
+WHERE id = $1 AND code_hash = $2 AND last_sent_at = $4 AND used_at IS NULL
+`
+
+type RestoreMfaChallengeAfterFailedResendParams struct {
+	ID           uuid.UUID
+	CodeHash     []byte
+	CodeHash_2   []byte
+	LastSentAt   pgtype.Timestamptz
+	LastSentAt_2 pgtype.Timestamptz
+}
+
+// Publish happens after commit (D16). If it fails, restore this exact change
+// so last_sent_at does not impose a retry delay. The expected new values avoid
+// overwriting a later successful resend.
+func (q *Queries) RestoreMfaChallengeAfterFailedResend(ctx context.Context, arg RestoreMfaChallengeAfterFailedResendParams) (int64, error) {
+	result, err := q.db.Exec(ctx, restoreMfaChallengeAfterFailedResend,
+		arg.ID,
+		arg.CodeHash,
+		arg.CodeHash_2,
+		arg.LastSentAt,
+		arg.LastSentAt_2,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const revokeActiveRefreshSession = `-- name: RevokeActiveRefreshSession :one
+WITH revoked AS (
+    UPDATE refresh_tokens
+    SET status = 'revoked'
+    WHERE user_id = $1
+      AND family_id = $2
+      AND status = 'active'
+      AND expires_at > now()
+    RETURNING 1
+)
+SELECT EXISTS (SELECT 1 FROM revoked) AS revoked
+`
+
+type RevokeActiveRefreshSessionParams struct {
+	UserID   uuid.UUID
+	FamilyID uuid.UUID
+}
+
+// Ownership and activeness are both predicates: foreign, expired and already
+// revoked families all return false to the HTTP layer as the same 404.
+func (q *Queries) RevokeActiveRefreshSession(ctx context.Context, arg RevokeActiveRefreshSessionParams) (bool, error) {
+	row := q.db.QueryRow(ctx, revokeActiveRefreshSession, arg.UserID, arg.FamilyID)
+	var revoked bool
+	err := row.Scan(&revoked)
+	return revoked, err
+}
+
 const revokeRefreshFamily = `-- name: RevokeRefreshFamily :one
 WITH revoked AS (
     UPDATE refresh_tokens
@@ -805,14 +926,19 @@ func (q *Queries) RotateRefreshToken(ctx context.Context, arg RotateRefreshToken
 }
 
 const supersedeOpenMfaChallenges = `-- name: SupersedeOpenMfaChallenges :exec
-UPDATE mfa_challenges SET used_at = now()
+UPDATE mfa_challenges SET used_at = $2
 WHERE user_id = $1 AND used_at IS NULL
 `
 
-// A new challenge replaces the account's open ones; marking them used makes
-// them fail verification exactly like a consumed challenge.
-func (q *Queries) SupersedeOpenMfaChallenges(ctx context.Context, userID uuid.UUID) error {
-	_, err := q.db.Exec(ctx, supersedeOpenMfaChallenges, userID)
+type SupersedeOpenMfaChallengesParams struct {
+	UserID uuid.UUID
+	UsedAt pgtype.Timestamptz
+}
+
+// A new challenge replaces the account's open ones with the service clock,
+// keeping deterministic tests and all MFA timestamps on one source of time.
+func (q *Queries) SupersedeOpenMfaChallenges(ctx context.Context, arg SupersedeOpenMfaChallengesParams) error {
+	_, err := q.db.Exec(ctx, supersedeOpenMfaChallenges, arg.UserID, arg.UsedAt)
 	return err
 }
 

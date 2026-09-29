@@ -43,6 +43,7 @@ type Server struct {
 	mfaRefreshTTL    time.Duration
 	currentUsers     currentUserRepository
 	refresh          refresh.Refresher
+	sessions         sessionManager
 	logout           logout.Revoker
 	adminUsers       admin.Manager
 	auditLog         auditlog.Reader
@@ -92,6 +93,9 @@ func (s *Server) SetCurrentUserRepository(repository currentUserRepository) {
 
 // SetRefreshService is used by composition and focused handler tests.
 func (s *Server) SetRefreshService(service refresh.Refresher) { s.refresh = service }
+
+// SetSessionService wires the RF-016 refresh-family manager.
+func (s *Server) SetSessionService(service sessionManager) { s.sessions = service }
 
 // SetLogoutService is used by composition and focused handler tests.
 func (s *Server) SetLogoutService(service logout.Revoker) { s.logout = service }
@@ -206,10 +210,6 @@ func (s *Server) RequestPasswordReset(w http.ResponseWriter, r *http.Request) {
 	s.requestPasswordReset(w, r)
 }
 
-func (s *Server) ListSessions(w http.ResponseWriter, r *http.Request) { s.notImplemented(w) }
-func (s *Server) RevokeSession(w http.ResponseWriter, r *http.Request, sessionID SessionId) {
-	s.notImplemented(w)
-}
 func (s *Server) GetHealth(w http.ResponseWriter, r *http.Request)    { s.Health(w, r) }
 func (s *Server) GetReadiness(w http.ResponseWriter, r *http.Request) { s.Readiness(w, r) }
 

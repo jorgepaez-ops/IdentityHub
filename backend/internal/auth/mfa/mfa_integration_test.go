@@ -216,7 +216,7 @@ func TestRF014_CreateChallengeGuardaLosIntentosRecibidosEnPostgres(t *testing.T)
 	userID := newActiveUser(t, pool, repository, "mfa-attempts@example.test")
 	hash := bytes.Repeat([]byte{3}, sha256.Size)
 	if err := repository.WithinMFATransaction(ctx, func(w mfa.Writer) error {
-		return w.CreateChallenge(ctx, mfa.CreateParams{UserID: userID, TokenHash: hash, CodeHash: hash, ExpiresAt: time.Now().Add(time.Minute), AttemptsLeft: 3, SentAt: time.Now()})
+		return w.CreateChallenge(ctx, mfa.CreateParams{ID: uuid.New(), UserID: userID, TokenHash: hash, CodeHash: hash, ExpiresAt: time.Now().Add(time.Minute), AttemptsLeft: 3, SentAt: time.Now()})
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -262,7 +262,7 @@ func TestRF014_UnDesafioNuevoAnulaLosAbiertosYLaEmisionTieneTope(t *testing.T) {
 	if total != mfa.MaxIssuancesPerWindow || open != 1 {
 		t.Fatalf("challenges total=%d open=%d, want %d total and only the latest open", total, open, mfa.MaxIssuancesPerWindow)
 	}
-	// The superseded first challenge no longer verifies, even with its own code.
+	// The superseded first challenge is rejected by Verify; this test proves rejection, not the original raw code.
 	if _, err := service.Verify(ctx, mfa.VerifyInput{Token: first.Token, Code: "000000"}); !errors.Is(err, mfa.ErrChallengeInvalid) {
 		t.Fatalf("verify on a superseded challenge = %v, want ErrChallengeInvalid", err)
 	}

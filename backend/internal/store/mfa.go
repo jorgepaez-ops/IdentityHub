@@ -50,8 +50,8 @@ func (w *mfaWriter) CountChallengesSince(ctx context.Context, userID uuid.UUID, 
 	return int(count), nil
 }
 
-func (w *mfaWriter) SupersedeOpenChallenges(ctx context.Context, userID uuid.UUID) error {
-	if err := w.queries.SupersedeOpenMfaChallenges(ctx, userID); err != nil {
+func (w *mfaWriter) SupersedeOpenChallenges(ctx context.Context, userID uuid.UUID, usedAt time.Time) error {
+	if err := w.queries.SupersedeOpenMfaChallenges(ctx, generated.SupersedeOpenMfaChallengesParams{UserID: userID, UsedAt: pgtype.Timestamptz{Time: usedAt, Valid: true}}); err != nil {
 		return fmt.Errorf("supersede mfa challenges: %w", err)
 	}
 	return nil
@@ -59,11 +59,29 @@ func (w *mfaWriter) SupersedeOpenChallenges(ctx context.Context, userID uuid.UUI
 
 func (w *mfaWriter) CreateChallenge(ctx context.Context, p mfa.CreateParams) error {
 	if err := w.queries.CreateMfaChallenge(ctx, generated.CreateMfaChallengeParams{
-		UserID: p.UserID, TokenHash: p.TokenHash, CodeHash: p.CodeHash,
+		ID: p.ID, UserID: p.UserID, TokenHash: p.TokenHash, CodeHash: p.CodeHash,
 		ExpiresAt: pgtype.Timestamptz{Time: p.ExpiresAt, Valid: true}, AttemptsLeft: p.AttemptsLeft,
 		CreatedAt: pgtype.Timestamptz{Time: p.SentAt, Valid: true},
 	}); err != nil {
 		return fmt.Errorf("create mfa challenge: %w", err)
+	}
+	return nil
+}
+
+func (w *mfaWriter) DeleteChallenge(ctx context.Context, id uuid.UUID) error {
+	if err := w.queries.DeleteMfaChallenge(ctx, id); err != nil {
+		return fmt.Errorf("delete undelivered mfa challenge: %w", err)
+	}
+	return nil
+}
+
+func (w *mfaWriter) RestoreResend(ctx context.Context, id uuid.UUID, expectedHash, previousHash []byte, sentAt, previousSentAt time.Time) error {
+	if _, err := w.queries.RestoreMfaChallengeAfterFailedResend(ctx, generated.RestoreMfaChallengeAfterFailedResendParams{
+		ID: id, CodeHash: expectedHash, CodeHash_2: previousHash,
+		LastSentAt:   pgtype.Timestamptz{Time: sentAt, Valid: true},
+		LastSentAt_2: pgtype.Timestamptz{Time: previousSentAt, Valid: true},
+	}); err != nil {
+		return fmt.Errorf("restore failed mfa resend: %w", err)
 	}
 	return nil
 }

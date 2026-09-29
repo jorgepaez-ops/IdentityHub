@@ -93,7 +93,7 @@ export interface paths {
          *     envía por correo un código de 6 dígitos. No crea sesión hasta completar MFA.
          *     Cada desafío nuevo anula los abiertos de la cuenta; se emiten como máximo 5 por cuenta
          *     cada 15 minutos (`429` al superarlo). El código se publica tras confirmar la transacción:
-         *     si el broker falla, responde `503` y el desafío no usado vence solo (ADR 0006, D16).
+         *     si el broker falla, responde `503` y anula ese desafío para que no consuma el límite de emisión (ADR 0006, D16).
          */
         post: operations["login"];
         delete?: never;
@@ -130,7 +130,7 @@ export interface paths {
         put?: never;
         /**
          * Reenviar el código del desafío MFA
-         * @description Anula el código anterior, conserva el desafío y permite un envío cada 60 segundos.
+         * @description Anula el código anterior, conserva el desafío y permite un envío cada 60 segundos. Si el broker falla después del commit, restaura el código y `lastSentAt` previos para permitir reintentar sin esperar.
          */
         post: operations["resendMfaCode"];
         delete?: never;
@@ -789,7 +789,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description No se pudo enviar el código MFA; el desafío no usado vence solo */
+            /** @description No se pudo enviar el código MFA; el desafío se anula y no consume el límite de emisión */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -851,7 +851,7 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             429: components["responses"]["TooManyRequests"];
-            /** @description No se pudo enviar el código MFA; el desafío no usado vence solo */
+            /** @description No se pudo enviar el código MFA; se restaura el código anterior y el reintento no espera 60 segundos */
             503: {
                 headers: {
                     [name: string]: unknown;

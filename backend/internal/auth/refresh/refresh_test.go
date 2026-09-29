@@ -96,6 +96,9 @@ func TestRF009_TokenRenovadoSoloContieneRolesDeDirectorio(t *testing.T) {
 	if len(claims.Roles) != 1 || claims.Roles[0] != "user" {
 		t.Fatalf("roles claim = %v, want only [user] (D8, RF-009): the Hub refresh cookie renews a directory-scoped token", claims.Roles)
 	}
+	if claims.SessionID != familyID.String() {
+		t.Fatalf("session claim=%q, want refresh family %s", claims.SessionID, familyID)
+	}
 }
 
 func TestRF006_ReusoDeTokenRotadoRevocaLaFamilia(t *testing.T) {

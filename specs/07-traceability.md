@@ -22,10 +22,10 @@ declaración de buenas intenciones.
 | **RF-010** | Administración de usuarios | P0 | `listUsers`, `getUser`, `updateUser` | 3 | 12 | — | ✅ completo |
 | **RF-011** | Registro de auditoría | P0 | `listAuditLog` | 1 | 9 | — | ✅ completo |
 | **RF-012** | Notificaciones asíncronas | P0 | — | 1 | 9 | — | ✅ completo |
-| **RF-013** | Segundo factor obligatorio por correo | P1 | — | 1 | 4 | — | ✅ completo |
-| **RF-014** | Inicio de sesión con segundo factor | P1 | `verifyMfa`, `resendMfaCode` | 5 | 28 | — | ✅ completo |
+| **RF-013** | Segundo factor obligatorio por correo | P1 | — | 1 | 5 | — | ✅ completo |
+| **RF-014** | Inicio de sesión con segundo factor | P1 | `verifyMfa`, `resendMfaCode` | 5 | 31 | — | ✅ completo |
 | **RF-015** | Restablecimiento de contraseña | P1 | `requestPasswordReset`, `confirmPasswordReset` | 3 | 32 | — | ✅ completo |
-| **RF-016** | Sesiones activas | P1 | `listSessions`, `revokeSession` | 1 | — | — | ⏳ diferido (semana 3) |
+| **RF-016** | Sesiones activas | P1 | `listSessions`, `revokeSession` | 1 | 6 | — | ✅ completo |
 | **RF-017** | Bloqueo por fuerza bruta | P1 | — | 4 | 21 | — | ✅ completo |
 | **RF-018** | Claves de servicio | P2 | — | — | — | — | ⏳ diferido (semana 3) |
 | **RF-019** | Exportación del audit log | P2 | — | — | — | — | ⏳ diferido (semana 3) |
@@ -43,7 +43,7 @@ declaración de buenas intenciones.
 | **RNF-011** | Los specs son la fuente de verdad | P0 | — | — | 4 | — | 🟡 parcial |
 | **RNF-012** | Logs sin datos sensibles | P0 | — | — | 3 | — | 🟡 parcial |
 
-**Resumen:** 32 requisitos · 15 completos · 6 parciales · 7 sin cubrir · 4 diferidos (semana 3).
+**Resumen:** 32 requisitos · 16 completos · 6 parciales · 7 sin cubrir · 3 diferidos (semana 3).
 
 Leyenda de estado: *completo* = verificado por al menos dos de las tres
 columnas de prueba · *parcial* = una sola · *sin cubrir* = ninguna · *diferido (semana 3)* = backlog de semana 3 por decisión Q14.
