@@ -514,6 +514,32 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
   responde error, el correo sale sin cobrar el tope.
 - Commit: `f537243`
 
+### T8-fix — Observaciones de la revisión nativa de T8
+- [ ] Estado · Ejecutor: `Codex` (GPT-5.6-Sol, esfuerzo medium; GPT-6.1-Sol no está disponible con la cuenta de ChatGPT) · Depende de: T8
+- Compensación tras fallo de publicación del código MFA (borrar el desafío o restaurar el reenvío)
+  con un contexto desacoplado de la petición (`context.WithoutCancel` + plazo propio), para que
+  una cancelación o timeout de la petición no deje el desafío contando para el tope de 5.
+- `RestoreResend` revisa `RowsAffected` y deja rastro (log) si no restauró nada; parámetros con nombre.
+- Pruebas: HTTP de 404/500/503 en listado y revocación de sesiones; unitaria de compensación con
+  contexto cancelado; integración en PostgreSQL de la compensación (borrado y restauración).
+- Menores: comentario de `CreateMfaChallenge` con los `$n` correctos, guardas duplicadas en los
+  handlers de sesiones, parámetros sin uso en `testSessionToken`. Si el broker acepta pero
+  responde error: documentar el comportamiento (no se cobra el tope) o decidirlo, sin cambiarlo en silencio.
+- Ruta: delegado a Codex (2+ archivos no triviales). Codex no tiene Docker: la integración con
+  PostgreSQL real la corre Claude al revisar.
+- Hecho por Codex (GPT-5.6-Sol medium; GPT-6.1-Sol falló al arrancar: la cuenta de ChatGPT no
+  lo admite). La compensación de `Issue` y `Resend` corre con `context.WithoutCancel` y un plazo
+  propio de 5 s, y registra el fallo si la compensación falla. RED observado:
+  `TestRF014_CompensacionDeEmisionSobreviveContextoCancelado` falló con `context canceled` antes
+  del cambio. Caso del broker que acepta pero responde error: sin cambios (el correo puede salir y
+  la compensación no cobra el tope); queda como riesgo aceptado, a decidir por el usuario.
+- Verificación de Claude (2026-09-29): revisión del diff; `sqlc generate` (v1.31.1) para llevar
+  el comentario `$7` al código generado; corregida una falta de ortografía que marcó el linter;
+  `golangci-lint` 0; unitarias en verde; integración con PostgreSQL real 75,9%, con las pruebas
+  nuevas de compensación (eliminación y restauración) en verde. Fallaron 3 pruebas de otros
+  paquetes (`audit`, `employee`, `invitation`) por la carrera ya anotada en T10; pasan en serie (`-p 1`).
+- Commit: —
+
 ### T9 — Autorización para aplicaciones cliente (authorization code + PKCE)
 - [ ] Estado · Ejecutor: `Codex` (con revisión reforzada de Claude) · Depende de: T3, T7
 - Sesión del Hub en su dominio; `GET /oauth/authorize` (valida cliente, `redirect_uri` exacto,
@@ -527,6 +553,11 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 - Integración intermitente: `TestRF002_AceptarPersisteHashArgon2idYActivaLaCuenta` y
   `TestRF006_DosRenovacionesConcurrentesUnaGana` fallaron una vez en T5 (pasaron en tres corridas
   más); investigar junto con la de `TestRF001_UsersAceptaArgon2idYRechazaMD5`.
+  Causa hallada en T8-fix (2026-09-29): la migración `000002` crea el rol `identity_app` con
+  "comprobar y después crear" (`IF NOT EXISTS ... CREATE ROLE`). Los roles son globales del
+  clúster y los paquetes de integración corren en paralelo sobre el mismo servidor, así que dos
+  paquetes crean el rol a la vez y uno falla con `23505 pg_authid_rolname_index`. Se reprodujo en
+  `audit`, `employee` e `invitation`; en serie (`-p 1`) pasan.
 - `handleBindingError` responde en texto plano y no en RFC 7807 (hallado por GGA en T3);
   `POST /api/v1/auth/login` con `{}` responde 500 en vez de 400; `/readyz` devuelve
   `err.Error()` por dependencia (puede filtrar host/usuario/base); investigar la intermitencia de
@@ -602,7 +633,7 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 
 ## Siguiente paso
 
-T8-fix (observaciones de la revisión nativa de T8, ver T8; ejecutor por decidir); luego T9 (authorization code + PKCE, Codex con revisión reforzada).
+T8-fix (en curso, Codex GPT-5.6-Sol medium); luego T9 (authorization code + PKCE, Codex con revisión reforzada).
 
 ## Cambios de spec propuestos
 

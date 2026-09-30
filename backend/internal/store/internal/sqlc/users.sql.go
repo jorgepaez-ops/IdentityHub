@@ -223,7 +223,7 @@ type CreateMfaChallengeParams struct {
 	CreatedAt    pgtype.Timestamptz
 }
 
-// $6 is the service clock, stored as both created_at and last_sent_at so the
+// $7 is the service clock, stored as both created_at and last_sent_at so the
 // issuance window and the resend window use the same time source as the code.
 func (q *Queries) CreateMfaChallenge(ctx context.Context, arg CreateMfaChallengeParams) error {
 	_, err := q.db.Exec(ctx, createMfaChallenge,

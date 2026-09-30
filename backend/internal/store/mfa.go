@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
@@ -76,12 +77,16 @@ func (w *mfaWriter) DeleteChallenge(ctx context.Context, id uuid.UUID) error {
 }
 
 func (w *mfaWriter) RestoreResend(ctx context.Context, id uuid.UUID, expectedHash, previousHash []byte, sentAt, previousSentAt time.Time) error {
-	if _, err := w.queries.RestoreMfaChallengeAfterFailedResend(ctx, generated.RestoreMfaChallengeAfterFailedResendParams{
+	restored, err := w.queries.RestoreMfaChallengeAfterFailedResend(ctx, generated.RestoreMfaChallengeAfterFailedResendParams{
 		ID: id, CodeHash: expectedHash, CodeHash_2: previousHash,
 		LastSentAt:   pgtype.Timestamptz{Time: sentAt, Valid: true},
 		LastSentAt_2: pgtype.Timestamptz{Time: previousSentAt, Valid: true},
-	}); err != nil {
+	})
+	if err != nil {
 		return fmt.Errorf("restore failed mfa resend: %w", err)
+	}
+	if restored == 0 {
+		slog.Warn("mfa resend compensation restored no challenge", "challenge_id", id)
 	}
 	return nil
 }

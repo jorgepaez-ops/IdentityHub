@@ -18,15 +18,10 @@ type sessionManager interface {
 // ListSessions returns the authenticated subject's active refresh-token
 // families. The current marker comes from the signed session-family claim.
 func (s *Server) ListSessions(w http.ResponseWriter, r *http.Request) {
-	RequireAuth(s.tokens)(http.HandlerFunc(s.listSessions)).ServeHTTP(w, r)
+	s.withSessionSubject(s.listSessions).ServeHTTP(w, r)
 }
 
-func (s *Server) listSessions(w http.ResponseWriter, r *http.Request) {
-	userID, ok := currentUserID(r)
-	if !ok {
-		writeUnauthorized(w)
-		return
-	}
+func (s *Server) listSessions(w http.ResponseWriter, r *http.Request, userID uuid.UUID) {
 	if s.sessions == nil {
 		writeProblem(w, http.StatusServiceUnavailable, "sessions-unavailable", "Service Unavailable", "Sessions are temporarily unavailable.")
 		return
@@ -52,12 +47,7 @@ func (s *Server) listSessions(w http.ResponseWriter, r *http.Request) {
 // RevokeSession revokes one active family only when it belongs to the signed-in
 // subject. Missing and foreign families deliberately share the same 404.
 func (s *Server) RevokeSession(w http.ResponseWriter, r *http.Request, sessionID SessionId) {
-	RequireAuth(s.tokens)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		userID, ok := currentUserID(r)
-		if !ok {
-			writeUnauthorized(w)
-			return
-		}
+	s.withSessionSubject(func(w http.ResponseWriter, r *http.Request, userID uuid.UUID) {
 		if s.sessions == nil {
 			writeProblem(w, http.StatusServiceUnavailable, "sessions-unavailable", "Service Unavailable", "Sessions are temporarily unavailable.")
 			return
@@ -71,5 +61,16 @@ func (s *Server) RevokeSession(w http.ResponseWriter, r *http.Request, sessionID
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
-	})).ServeHTTP(w, r)
+	}).ServeHTTP(w, r)
+}
+
+func (s *Server) withSessionSubject(next func(http.ResponseWriter, *http.Request, uuid.UUID)) http.Handler {
+	return RequireAuth(s.tokens)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := currentUserID(r)
+		if !ok {
+			writeUnauthorized(w)
+			return
+		}
+		next(w, r, userID)
+	}))
 }

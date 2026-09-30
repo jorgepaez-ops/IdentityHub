@@ -293,25 +293,27 @@ func TestRF014_FalloDeAlmacenamientoNoSeConfundeConDesafioInvalido(t *testing.T)
 }
 
 type memoryRepository struct {
-	challenge        StoredChallenge
-	created          CreateParams
-	resentHash       []byte
-	consumed         bool
-	refresh          RefreshToken
-	audits           []AuditEvent
-	priorFailures    int64
-	locked           bool
-	lockedUntil      time.Time
-	lastLoginUpdated bool
-	getErr           error
-	roles            []string
-	inTransaction    bool
-	recentChallenges int
-	supersededUsers  []uuid.UUID
-	supersededAt     time.Time
-	createdCalls     int
-	resentAt         time.Time
-	deletedChallenge uuid.UUID
+	challenge                StoredChallenge
+	created                  CreateParams
+	resentHash               []byte
+	consumed                 bool
+	refresh                  RefreshToken
+	audits                   []AuditEvent
+	priorFailures            int64
+	locked                   bool
+	lockedUntil              time.Time
+	lastLoginUpdated         bool
+	getErr                   error
+	roles                    []string
+	inTransaction            bool
+	recentChallenges         int
+	supersededUsers          []uuid.UUID
+	supersededAt             time.Time
+	createdCalls             int
+	resentAt                 time.Time
+	deletedChallenge         uuid.UUID
+	requireLiveDeleteContext bool
+	deleteContextErr         error
 }
 
 func (r *memoryRepository) WithinMFATransaction(_ context.Context, fn func(Writer) error) error {
@@ -358,11 +360,15 @@ func (r *memoryRepository) ResendChallenge(_ context.Context, _ uuid.UUID, codeH
 	r.resentHash, r.resentAt = codeHash, sentAt
 	return nil
 }
-func (r *memoryRepository) DeleteChallenge(_ context.Context, id uuid.UUID) error {
+func (r *memoryRepository) DeleteChallenge(ctx context.Context, id uuid.UUID) error {
+	r.deleteContextErr = ctx.Err()
+	if r.requireLiveDeleteContext && r.deleteContextErr != nil {
+		return r.deleteContextErr
+	}
 	r.deletedChallenge = id
 	return nil
 }
-func (r *memoryRepository) RestoreResend(_ context.Context, _ uuid.UUID, _, previousHash []byte, _, previousSentAt time.Time) error {
+func (r *memoryRepository) RestoreResend(_ context.Context, _ uuid.UUID, _ []byte, previousHash []byte, _ time.Time, previousSentAt time.Time) error {
 	r.resentHash, r.resentAt = previousHash, previousSentAt
 	return nil
 }
@@ -601,6 +607,23 @@ func TestRF014_FalloDeEntregaInicialAnulaElDesafioParaNoContarEnElLimite(t *test
 	}
 	if repo.deletedChallenge == uuid.Nil {
 		t.Fatal("an undelivered initial challenge must be canceled so it does not consume the issuance limit")
+	}
+}
+
+func TestRF014_CompensacionDeEmisionSobreviveContextoCancelado(t *testing.T) {
+	requestCtx, cancel := context.WithCancel(context.Background())
+	repo := &memoryRepository{requireLiveDeleteContext: true}
+	publisher := &fakePublisher{err: errors.New("broker unavailable"), onPublish: cancel}
+
+	_, err := New(repo, publisher, bytes.NewReader(bytes.Repeat([]byte{7}, 64)), time.Now).Issue(requestCtx, User{ID: uuid.New(), Email: "ada@example.test"})
+	if !errors.Is(err, ErrDeliveryUnavailable) {
+		t.Fatalf("err=%v, want ErrDeliveryUnavailable after compensation", err)
+	}
+	if repo.deletedChallenge == uuid.Nil {
+		t.Fatal("challenge was not deleted after the publish failure")
+	}
+	if repo.deleteContextErr != nil {
+		t.Fatalf("compensation used a canceled context: %v", repo.deleteContextErr)
 	}
 }
 

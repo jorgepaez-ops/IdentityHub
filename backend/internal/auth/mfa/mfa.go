@@ -33,6 +33,7 @@ const (
 	// one is tuned for wrong credentials, this one bounds successful ones.
 	IssuanceWindow        = 15 * time.Minute
 	MaxIssuancesPerWindow = 5
+	compensationTimeout   = 5 * time.Second
 	// StatusActive is the only account status that may verify or resend a code.
 	StatusActive       = "active"
 	challengeExpiresIn = int(ChallengeTTL / time.Second)
@@ -131,7 +132,7 @@ type Writer interface {
 	SupersedeOpenChallenges(context.Context, uuid.UUID, time.Time) error
 	CreateChallenge(context.Context, CreateParams) error
 	DeleteChallenge(context.Context, uuid.UUID) error
-	RestoreResend(context.Context, uuid.UUID, []byte, []byte, time.Time, time.Time) error
+	RestoreResend(ctx context.Context, challengeID uuid.UUID, expectedHash []byte, previousHash []byte, sentAt time.Time, previousSentAt time.Time) error
 	GetChallengeForUpdate(context.Context, []byte) (StoredChallenge, error)
 	ConsumeChallenge(context.Context, uuid.UUID) error
 	RejectChallenge(context.Context, uuid.UUID) (int, error)
@@ -376,12 +377,15 @@ func (s *Service) Resend(ctx context.Context, encodedToken string) error {
 		return err
 	}
 	if err := s.publishCode(ctx, event); err != nil {
-		if restoreErr := s.repository.WithinMFATransaction(ctx, func(w Writer) error {
-			if err := w.RestoreResend(ctx, challengeID, newHash, previousHash, sentAt, previousSentAt); err != nil {
+		compensationCtx, cancel := compensationContext(ctx)
+		defer cancel()
+		if restoreErr := s.repository.WithinMFATransaction(compensationCtx, func(w Writer) error {
+			if err := w.RestoreResend(compensationCtx, challengeID, newHash, previousHash, sentAt, previousSentAt); err != nil {
 				return fmt.Errorf("restore failed mfa resend: %w", err)
 			}
 			return nil
 		}); restoreErr != nil {
+			s.logCompensationFailure("restore_mfa_resend", restoreErr)
 			// Do not keep ErrDeliveryUnavailable in this path: the compensating
 			// database failure must surface as infrastructure failure (5xx).
 			return fmt.Errorf("restore undelivered mfa resend: %w", restoreErr)
@@ -389,6 +393,16 @@ func (s *Service) Resend(ctx context.Context, encodedToken string) error {
 		return err
 	}
 	return nil
+}
+
+func compensationContext(parent context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.WithoutCancel(parent), compensationTimeout)
+}
+
+func (s *Service) logCompensationFailure(operation string, err error) {
+	if s.logger != nil {
+		s.logger.Error("mfa delivery compensation failed", "operation", operation, "error", err)
+	}
 }
 
 // publishCode sends the code once the transaction that stored it has
@@ -456,12 +470,15 @@ func (s *Service) Issue(ctx context.Context, user User) (Challenge, error) {
 		return Challenge{}, err
 	}
 	if err := s.publishCode(ctx, challengeEvent(user, code, expiresAt)); err != nil {
-		if cancelErr := s.repository.WithinMFATransaction(ctx, func(w Writer) error {
-			if err := w.DeleteChallenge(ctx, challengeID); err != nil {
+		compensationCtx, cancel := compensationContext(ctx)
+		defer cancel()
+		if cancelErr := s.repository.WithinMFATransaction(compensationCtx, func(w Writer) error {
+			if err := w.DeleteChallenge(compensationCtx, challengeID); err != nil {
 				return fmt.Errorf("cancel undelivered mfa challenge: %w", err)
 			}
 			return nil
 		}); cancelErr != nil {
+			s.logCompensationFailure("delete_mfa_challenge", cancelErr)
 			// A failed compensation is an infrastructure fault, not a delivery
 			// outcome; avoid mapping it to the retryable MFA domain error.
 			return Challenge{}, fmt.Errorf("cancel undelivered mfa challenge: %w", cancelErr)

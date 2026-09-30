@@ -29,6 +29,13 @@ type publisher struct{}
 
 func (publisher) Publish(context.Context, string, any) error { return nil }
 
+type cancelledRequestPublisher struct{ cancel context.CancelFunc }
+
+func (p cancelledRequestPublisher) Publish(context.Context, string, any) error {
+	p.cancel()
+	return errors.New("broker unavailable")
+}
+
 func newActiveUser(t *testing.T, pool *pgxpool.Pool, repository *store.Store, email string) uuid.UUID {
 	t.Helper()
 	ctx := context.Background()
@@ -322,5 +329,57 @@ func TestRF014_ElReenvioGuardaLastSentAtConElRelojDelServicio(t *testing.T) {
 	}
 	if !sentAt.Equal(later) {
 		t.Fatalf("last_sent_at after resend = %v, want the service clock %v", sentAt, later)
+	}
+}
+
+func TestRF014_CompensacionDeEntregaCanceladaEliminaYRestauraEnPostgres(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test requires a PostgreSQL server")
+	}
+	pool := testdb.New(t)
+	repository, err := store.NewWithPool(pool)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	start := time.Now().UTC().Truncate(time.Microsecond)
+
+	issueUser := mfa.User{ID: newActiveUser(t, pool, repository, "mfa-compensation-issue@example.test"), Email: "mfa-compensation-issue@example.test"}
+	issueCtx, cancelIssue := context.WithCancel(ctx)
+	_, err = mfa.New(repository, cancelledRequestPublisher{cancel: cancelIssue}, bytes.NewReader(bytes.Repeat([]byte{1}, 64)), func() time.Time { return start }).Issue(issueCtx, issueUser)
+	if !errors.Is(err, mfa.ErrDeliveryUnavailable) {
+		t.Fatalf("issue error=%v, want ErrDeliveryUnavailable", err)
+	}
+	var issued int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM mfa_challenges WHERE user_id = $1`, issueUser.ID).Scan(&issued); err != nil {
+		t.Fatal(err)
+	}
+	if issued != 0 {
+		t.Fatalf("undelivered challenges=%d, want 0 after compensation", issued)
+	}
+
+	resendUser := mfa.User{ID: newActiveUser(t, pool, repository, "mfa-compensation-resend@example.test"), Email: "mfa-compensation-resend@example.test"}
+	challenge, err := newIntegrationService(t, repository, func() time.Time { return start }).Issue(ctx, resendUser)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var previousHash []byte
+	var previousSentAt time.Time
+	if err := pool.QueryRow(ctx, `SELECT code_hash, last_sent_at FROM mfa_challenges WHERE user_id = $1`, resendUser.ID).Scan(&previousHash, &previousSentAt); err != nil {
+		t.Fatal(err)
+	}
+	resendCtx, cancelResend := context.WithCancel(ctx)
+	later := start.Add(mfa.ResendInterval + time.Second)
+	err = mfa.New(repository, cancelledRequestPublisher{cancel: cancelResend}, bytes.NewReader(bytes.Repeat([]byte{2}, 64)), func() time.Time { return later }).Resend(resendCtx, challenge.Token)
+	if !errors.Is(err, mfa.ErrDeliveryUnavailable) {
+		t.Fatalf("resend error=%v, want ErrDeliveryUnavailable", err)
+	}
+	var restoredHash []byte
+	var restoredSentAt time.Time
+	if err := pool.QueryRow(ctx, `SELECT code_hash, last_sent_at FROM mfa_challenges WHERE user_id = $1`, resendUser.ID).Scan(&restoredHash, &restoredSentAt); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(restoredHash, previousHash) || !restoredSentAt.Equal(previousSentAt) {
+		t.Fatalf("restored code_hash=%x last_sent_at=%v, want original code_hash=%x last_sent_at=%v", restoredHash, restoredSentAt, previousHash, previousSentAt)
 	}
 }

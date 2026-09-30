@@ -141,7 +141,7 @@ UPDATE mfa_challenges SET used_at = $2
 WHERE user_id = $1 AND used_at IS NULL;
 
 -- name: CreateMfaChallenge :exec
--- $6 is the service clock, stored as both created_at and last_sent_at so the
+-- $7 is the service clock, stored as both created_at and last_sent_at so the
 -- issuance window and the resend window use the same time source as the code.
 INSERT INTO mfa_challenges (id, user_id, token_hash, code_hash, expires_at, attempts_left, created_at, last_sent_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $7);
