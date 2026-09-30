@@ -543,7 +543,7 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 - Commit: `06e5f7d`
 
 ### T9 — Autorización para aplicaciones cliente (authorization code + PKCE)
-- [ ] Estado · Ejecutor: `Codex` (GPT-5.6-Sol medium, con revisión reforzada de Claude) · Depende de: T3, T7
+- [x] Estado · Ejecutor: `Codex` (GPT-5.6-Sol medium, con revisión reforzada de Claude) · Depende de: T3, T7
 - Sesión del Hub en su dominio; `GET /oauth/authorize` (valida cliente, `redirect_uri` exacto,
   `state`, `code_challenge` S256; si no hay sesión, lleva al login del Hub con MFA) y
   `POST /oauth/token` (canjea código + `code_verifier` por access token; código de un solo uso).
@@ -575,6 +575,23 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 - Para T11: `hub_session` es `Secure` y el Hub va por HTTP en `*.localhost` (D10); comprobar en
   Chromium y Firefox que el navegador la guarda. El cliente queda fijado dos veces (constantes de
   configuración y fila sembrada en la migración) y deben coincidir.
+- Revisión nativa (alto, 30 archivos, 1.721 líneas, 4 lentes): **aprobada** y acusada
+  (`review-c3eb980b2c81235c`) con 15 observaciones informativas, pasadas a T9-fix.
+- Commit: `9c3b070`
+
+### T9-fix — Observaciones de la revisión nativa de T9
+- [ ] Estado · Ejecutor: por decidir · Depende de: T9
+- Riesgo: revisar qué otros caminos que cortan sesiones (revocación de RF-016, reuso de refresh,
+  bloqueo de cuenta) deben revocar también `hub_sessions` (hallazgo R1 en `mfa.go`, creación de la
+  sesión del Hub).
+- Fiabilidad y resiliencia: un error de base de datos al leer la sesión del Hub se trata como "sin
+  sesión" y redirige al login en vez de dar 5xx; el canje consume el código antes de leer roles y
+  auditar, así que un fallo posterior deja el código gastado sin token; los 500 de OAuth no se
+  registran en el log; las tablas `authorization_codes` y `hub_sessions` crecen sin purga.
+- Legibilidad: cliente duplicado en constantes y en la fila sembrada (un desfase da 500), validación
+  de autorización duplicada entre handler y servicio, rama muerta al armar `continue`, centinela
+  engañoso en `GetHubSessionUser` (usa `ErrAuthorizationCodeInvalid`), cotas de PKCE sin nombre,
+  estado de RF-020 en la matriz de trazabilidad por revisar; prueba unitaria de MFA de la sesión Hub.
 - Commit: —
 
 ### T10 — Pendientes chicos de la semana 2
@@ -659,14 +676,14 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 | Fase | Tareas | Hechas |
 |---|---|---|
 | 0 — Enmiendas de spec y decisiones | T1 a T3 (3) | 3 (T1 a T3) |
-| 1 — Backend | T4 a T10 (7) | 5 (T4 a T8) |
+| 1 — Backend | T4 a T10 (7) | 6 (T4 a T9) |
 | 2 — Dominios locales y frontend | T11 a T13 (3) | 0 |
 | 3 — Verificación, DAST y cierre | T14 a T17 (4) | 0 |
-| **Total** | **17** | **8** |
+| **Total** | **17** | **9** |
 
 ## Siguiente paso
 
-T9 en curso (authorization code + PKCE, Codex GPT-5.6-Sol medium, revisión reforzada de Claude).
+T9-fix (observaciones de la revisión nativa de T9) y T10 (pendientes chicos); con eso cierra la fase 1 y toca el PR de corte.
 
 ## Cambios de spec propuestos
 
