@@ -515,7 +515,7 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 - Commit: `f537243`
 
 ### T8-fix — Observaciones de la revisión nativa de T8
-- [ ] Estado · Ejecutor: `Codex` (GPT-5.6-Sol, esfuerzo medium; GPT-6.1-Sol no está disponible con la cuenta de ChatGPT) · Depende de: T8
+- [x] Estado · Ejecutor: `Codex` (GPT-5.6-Sol, esfuerzo medium; GPT-6.1-Sol no está disponible con la cuenta de ChatGPT) · Depende de: T8
 - Compensación tras fallo de publicación del código MFA (borrar el desafío o restaurar el reenvío)
   con un contexto desacoplado de la petición (`context.WithoutCancel` + plazo propio), para que
   una cancelación o timeout de la petición no deje el desafío contando para el tope de 5.
@@ -538,7 +538,9 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
   `golangci-lint` 0; unitarias en verde; integración con PostgreSQL real 75,9%, con las pruebas
   nuevas de compensación (eliminación y restauración) en verde. Fallaron 3 pruebas de otros
   paquetes (`audit`, `employee`, `invitation`) por la carrera ya anotada en T10; pasan en serie (`-p 1`).
-- Commit: —
+- Revisión nativa (alto, 10 archivos, 297 líneas, 4 lentes): **aprobada** y acusada
+  (`review-311ed4df12551d88`) con 6 observaciones informativas, pasadas a T10.
+- Commit: `06e5f7d`
 
 ### T9 — Autorización para aplicaciones cliente (authorization code + PKCE)
 - [ ] Estado · Ejecutor: `Codex` (con revisión reforzada de Claude) · Depende de: T3, T7
@@ -563,6 +565,10 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
   `err.Error()` por dependencia (puede filtrar host/usuario/base); investigar la intermitencia de
   `TestRF001_UsersAceptaArgon2idYRechazaMD5`.
 - Commit: —
+- Observaciones de la revisión nativa de T8-fix: `RestoreResend` del store registra con el
+  `slog` global y no con un logger inyectado, y el caso en que no restaura nada no tiene prueba;
+  falta prueba del camino en que la compensación misma falla (`logCompensationFailure`); documentar
+  por qué el plazo de compensación es de 5 s; nombres de parámetros de `RestoreResend` en la interfaz.
 
 ## Fase 2 — Dominios locales y frontend
 
@@ -633,7 +639,7 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 
 ## Siguiente paso
 
-T8-fix (en curso, Codex GPT-5.6-Sol medium); luego T9 (authorization code + PKCE, Codex con revisión reforzada).
+T9 (authorization code + PKCE, Codex con revisión reforzada).
 
 ## Cambios de spec propuestos
 
