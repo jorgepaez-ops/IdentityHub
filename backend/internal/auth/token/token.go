@@ -78,7 +78,20 @@ func (s *Service) IssueForSession(subject string, roles []string, sessionID stri
 	return s.issue(subject, roles, sessionID)
 }
 
+// IssueForAudience emits an application access token. It deliberately has no
+// session claim because browser applications never receive Hub refresh state.
+func (s *Service) IssueForAudience(subject string, roles []string, audience string) (string, error) {
+	if audience == "" {
+		return "", fmt.Errorf("jwt audience is required")
+	}
+	return s.issueForAudience(subject, roles, "", audience)
+}
+
 func (s *Service) issue(subject string, roles []string, sessionID string) (string, error) {
+	return s.issueForAudience(subject, roles, sessionID, s.audience)
+}
+
+func (s *Service) issueForAudience(subject string, roles []string, sessionID, audience string) (string, error) {
 	if subject == "" {
 		return "", fmt.Errorf("jwt subject is required")
 	}
@@ -93,7 +106,7 @@ func (s *Service) issue(subject string, roles []string, sessionID string) (strin
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    s.issuer,
 			Subject:   subject,
-			Audience:  jwt.ClaimStrings{s.audience},
+			Audience:  jwt.ClaimStrings{audience},
 			ExpiresAt: jwt.NewNumericDate(now.Add(accessTokenTTL)),
 			IssuedAt:  jwt.NewNumericDate(now),
 			ID:        hex.EncodeToString(jti),

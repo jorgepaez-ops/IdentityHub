@@ -143,6 +143,14 @@ func (ns NullUserStatus) Value() (driver.Value, error) {
 	return string(ns.UserStatus), nil
 }
 
+type Application struct {
+	ID            uuid.UUID
+	ClientID      string
+	RedirectUri   string
+	AllowedOrigin string
+	Name          string
+}
+
 type AuditLog struct {
 	ID           int64
 	ActorUserID  pgtype.UUID
@@ -153,6 +161,26 @@ type AuditLog struct {
 	UserAgent    pgtype.Text
 	Metadata     []byte
 	CreatedAt    pgtype.Timestamptz
+}
+
+type AuthorizationCode struct {
+	ID            uuid.UUID
+	UserID        uuid.UUID
+	ApplicationID uuid.UUID
+	CodeHash      []byte
+	RedirectUri   string
+	CodeChallenge string
+	ExpiresAt     pgtype.Timestamptz
+	UsedAt        pgtype.Timestamptz
+}
+
+type HubSession struct {
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	TokenHash []byte
+	ExpiresAt pgtype.Timestamptz
+	RevokedAt pgtype.Timestamptz
+	CreatedAt pgtype.Timestamptz
 }
 
 type MfaChallenge struct {

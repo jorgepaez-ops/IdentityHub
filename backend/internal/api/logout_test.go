@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
 
 	"github.com/jorgepaez/identity-hub/internal/auth/logout"
@@ -41,6 +42,16 @@ func TestRF007_LogoutRevocaElRefreshToken(t *testing.T) {
 		t.Fatalf("body=%q, want empty", recorder.Body.String())
 	}
 	cookies := recorder.Result().Cookies()
+	var hub *http.Cookie
+	for _, cookie := range cookies {
+		if cookie.Name == hubSessionCookieName {
+			hub = cookie
+		}
+	}
+	if hub == nil || hub.Value != "" || hub.MaxAge >= 0 || !hub.HttpOnly || !hub.Secure || hub.SameSite != http.SameSiteLaxMode || hub.Path != "/oauth" {
+		t.Fatalf("hub_session cookie not cleared: %+v", hub)
+	}
+	cookies = slices.DeleteFunc(slices.Clone(cookies), func(cookie *http.Cookie) bool { return cookie.Name == hubSessionCookieName })
 	if len(cookies) != 1 || cookies[0].Name != refreshCookieName || cookies[0].Value != "" || cookies[0].MaxAge >= 0 || !cookies[0].HttpOnly || !cookies[0].Secure || cookies[0].SameSite != http.SameSiteStrictMode || cookies[0].Path != "/api/v1/auth" {
 		t.Fatalf("cookies=%+v", cookies)
 	}

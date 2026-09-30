@@ -27,5 +27,6 @@ func (s *Server) Logout(w http.ResponseWriter, r *http.Request, params LogoutPar
 		return
 	}
 	clearRefreshCookie(w)
+	http.SetCookie(w, hubSessionCookie("", -1))
 	w.WriteHeader(http.StatusNoContent)
 }

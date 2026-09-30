@@ -94,6 +94,11 @@ type RefreshToken struct {
 	UserAgent *string
 	ExpiresAt time.Time
 }
+type HubSession struct {
+	UserID    uuid.UUID
+	TokenHash []byte
+	ExpiresAt time.Time
+}
 
 // VerifyInput carries the request metadata recorded with the resulting
 // refresh session. Its IP must come from the trusted API middleware, never
@@ -106,8 +111,8 @@ type VerifyInput struct {
 }
 
 type Result struct {
-	AccessToken, RefreshToken, TokenType string
-	ExpiresIn                            int
+	AccessToken, RefreshToken, HubSessionToken, TokenType string
+	ExpiresIn                                             int
 }
 
 var (
@@ -141,6 +146,7 @@ type Writer interface {
 	ResendChallenge(context.Context, uuid.UUID, []byte, time.Time) error
 	ListRolesForUser(context.Context, uuid.UUID) ([]string, error)
 	CreateRefreshToken(context.Context, RefreshToken) error
+	CreateHubSession(context.Context, HubSession) error
 	InsertAuditEvent(context.Context, AuditEvent) error
 	CountLoginFailuresByAccount(context.Context, uuid.UUID, time.Time) (int64, error)
 	LockLoginUser(context.Context, uuid.UUID, time.Time) error
@@ -164,14 +170,15 @@ type Authenticator interface {
 }
 
 type Service struct {
-	repository Repository
-	publisher  Publisher
-	random     io.Reader
-	now        func() time.Time
-	tokens     *token.Service
-	refreshTTL time.Duration
-	lockout    lockout.Config
-	logger     *slog.Logger
+	repository    Repository
+	publisher     Publisher
+	random        io.Reader
+	now           func() time.Time
+	tokens        *token.Service
+	refreshTTL    time.Duration
+	hubSessionTTL time.Duration
+	lockout       lockout.Config
+	logger        *slog.Logger
 }
 
 // WithLogger sets where publication failures that must not change the client
@@ -180,6 +187,9 @@ func (s *Service) WithLogger(logger *slog.Logger) *Service {
 	s.logger = logger
 	return s
 }
+
+// WithHubSessionTTL enables the independent SameSite=Lax Hub SSO session.
+func (s *Service) WithHubSessionTTL(ttl time.Duration) *Service { s.hubSessionTTL = ttl; return s }
 
 func (s *Service) WithTokenService(tokens *token.Service, refreshTTL time.Duration) *Service {
 	s.tokens, s.refreshTTL = tokens, refreshTTL
@@ -267,6 +277,18 @@ func (s *Service) Verify(ctx context.Context, input VerifyInput) (Result, error)
 		if err := w.CreateRefreshToken(ctx, RefreshToken{UserID: challenge.User.ID, TokenHash: refreshHash[:], FamilyID: familyID, IP: input.IP, UserAgent: input.UserAgent, ExpiresAt: now.Add(s.refreshTTL)}); err != nil {
 			return fmt.Errorf("create mfa refresh token: %w", err)
 		}
+		var hubSessionToken string
+		if s.hubSessionTTL > 0 {
+			hubRaw := make([]byte, 32)
+			if _, err := io.ReadFull(s.random, hubRaw); err != nil {
+				return fmt.Errorf("generate hub session token: %w", err)
+			}
+			hubHash := sha256.Sum256(hubRaw)
+			if err := w.CreateHubSession(ctx, HubSession{UserID: challenge.User.ID, TokenHash: hubHash[:], ExpiresAt: now.Add(s.hubSessionTTL)}); err != nil {
+				return fmt.Errorf("create hub session: %w", err)
+			}
+			hubSessionToken = base64.RawURLEncoding.EncodeToString(hubRaw)
+		}
 		// The login only succeeds here, once the second factor is proven (D11).
 		if err := w.UpdateLastLogin(ctx, challenge.User.ID); err != nil {
 			return fmt.Errorf("update last login: %w", err)
@@ -276,7 +298,7 @@ func (s *Service) Verify(ctx context.Context, input VerifyInput) (Result, error)
 				return fmt.Errorf("audit %s: %w", action, err)
 			}
 		}
-		result = Result{AccessToken: access, RefreshToken: base64.RawURLEncoding.EncodeToString(refreshRaw), TokenType: "Bearer", ExpiresIn: token.AccessTokenExpiresIn}
+		result = Result{AccessToken: access, RefreshToken: base64.RawURLEncoding.EncodeToString(refreshRaw), HubSessionToken: hubSessionToken, TokenType: "Bearer", ExpiresIn: token.AccessTokenExpiresIn}
 		return nil
 	})
 	if err != nil {

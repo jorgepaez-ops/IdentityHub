@@ -543,11 +543,38 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 - Commit: `06e5f7d`
 
 ### T9 — Autorización para aplicaciones cliente (authorization code + PKCE)
-- [ ] Estado · Ejecutor: `Codex` (con revisión reforzada de Claude) · Depende de: T3, T7
+- [ ] Estado · Ejecutor: `Codex` (GPT-5.6-Sol medium, con revisión reforzada de Claude) · Depende de: T3, T7
 - Sesión del Hub en su dominio; `GET /oauth/authorize` (valida cliente, `redirect_uri` exacto,
   `state`, `code_challenge` S256; si no hay sesión, lleva al login del Hub con MFA) y
   `POST /oauth/token` (canjea código + `code_verifier` por access token; código de un solo uso).
   Cliente Contabilidad fijado en configuración. Una prueba por cada control de "Restricciones".
+- Hecho por Codex (GPT-5.6-Sol medium): migración `000007` (`applications`, `hub_sessions`,
+  `authorization_codes`, solo hashes), paquete `internal/auth/oauth`, handlers en `api/oauth.go`
+  compuestos en `Server.Routes()` (sin los stubs `501`), cookie `hub_session` desde `verifyMfa`,
+  `IssueForAudience` (`aud` = cliente, solo roles de la aplicación, sin `sid`) y CORS limitado a
+  `/oauth/token` y el JWKS. Canje en una transacción: bloquear, validar cliente, `redirect_uri` y
+  PKCE, consumir, confirmar (un verificador incorrecto no consume el código). TDD parcial según el
+  propio Codex: algunas correcciones de su verificador interno se hicieron antes que sus pruebas.
+- Revisión reforzada de Claude, cuatro hallazgos corregidos por Sonnet (Codex sin cuota hasta las
+  23:53) con TDD y RED observado: (1) el logout y la confirmación del restablecimiento no revocaban
+  `hub_sessions`, así que el SSO seguía emitiendo códigos 30 días tras cerrar sesión, contra la
+  ADR 0009; ahora se revocan en la misma transacción y el logout borra la cookie; (2) un error de
+  base de datos en el canje daba 400 y cualquier código inválido dejaba una auditoría
+  `authorization_code_reused` sin actor (inundable sin autenticarse); ahora solo el reuso real se
+  audita, con el dueño como actor, y los fallos de infraestructura dan 500; (3) `Cache-Control:
+  no-store` en `/oauth/token` (RFC 6749 §5.1); (4) `Vary: Origin` siempre en las rutas con CORS.
+- Verificación de Claude (2026-09-29): `golangci-lint` 0, unitarias en verde, `sqlc generate` sin
+  deriva, trazabilidad al día, integración completa con PostgreSQL real 78,5% sin pruebas omitidas
+  (`-p 1` por la carrera de roles anotada en T10).
+- Tras la nota de GGA en el pre-commit: el `redirect_uri` del cliente se valida una vez en
+  `SetOAuthService` (si no es absoluto, OAuth queda en 503) en vez de ignorar el error de
+  `url.Parse` en cada petición, y `main.go` arma el cliente una sola vez.
+  GGA detectó que ese cambio abría un `nil` en el camino de error de enlace de `/oauth/authorize`
+  cuando OAuth no está configurado (500 por pánico recuperado); corregido con prueba primero
+  (`TestRF020_AutorizacionSinOAuthConfiguradoNoRedirigeNiFalla`, RED 500, GREEN).
+- Para T11: `hub_session` es `Secure` y el Hub va por HTTP en `*.localhost` (D10); comprobar en
+  Chromium y Firefox que el navegador la guarda. El cliente queda fijado dos veces (constantes de
+  configuración y fila sembrada en la migración) y deben coincidir.
 - Commit: —
 
 ### T10 — Pendientes chicos de la semana 2
@@ -639,7 +666,7 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 
 ## Siguiente paso
 
-T9 (authorization code + PKCE, Codex con revisión reforzada).
+T9 en curso (authorization code + PKCE, Codex GPT-5.6-Sol medium, revisión reforzada de Claude).
 
 ## Cambios de spec propuestos
 

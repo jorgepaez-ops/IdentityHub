@@ -349,6 +349,7 @@ func (r *memoryRepository) ConsumeChallenge(context.Context, uuid.UUID) error {
 	r.challenge.Used = true
 	return nil
 }
+func (r *memoryRepository) CreateHubSession(context.Context, HubSession) error { return nil }
 func (r *memoryRepository) RejectChallenge(context.Context, uuid.UUID) (int, error) {
 	r.challenge.AttemptsLeft--
 	if r.challenge.AttemptsLeft == 0 {

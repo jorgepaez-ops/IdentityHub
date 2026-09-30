@@ -135,6 +135,13 @@ func (w *mfaWriter) CreateRefreshToken(ctx context.Context, token mfa.RefreshTok
 	return nil
 }
 
+func (w *mfaWriter) CreateHubSession(ctx context.Context, session mfa.HubSession) error {
+	if err := w.queries.CreateHubSession(ctx, generated.CreateHubSessionParams{UserID: session.UserID, TokenHash: session.TokenHash, ExpiresAt: pgtype.Timestamptz{Time: session.ExpiresAt, Valid: true}}); err != nil {
+		return fmt.Errorf("create hub session: %w", err)
+	}
+	return nil
+}
+
 func (w *mfaWriter) InsertAuditEvent(ctx context.Context, event mfa.AuditEvent) error {
 	metadata := map[string]string{}
 	if event.Reason != "" {

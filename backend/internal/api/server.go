@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/netip"
+	"net/url"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -24,6 +25,7 @@ import (
 	"github.com/jorgepaez/identity-hub/internal/auth/login"
 	"github.com/jorgepaez/identity-hub/internal/auth/logout"
 	"github.com/jorgepaez/identity-hub/internal/auth/mfa"
+	"github.com/jorgepaez/identity-hub/internal/auth/oauth"
 	"github.com/jorgepaez/identity-hub/internal/auth/passwordreset"
 	"github.com/jorgepaez/identity-hub/internal/auth/refresh"
 	"github.com/jorgepaez/identity-hub/internal/auth/token"
@@ -41,6 +43,12 @@ type Server struct {
 	login            login.Authenticator
 	mfa              mfa.Authenticator
 	mfaRefreshTTL    time.Duration
+	hubSessionTTL    time.Duration
+	oauth            *oauth.Service
+	hubSessions      oauth.HubSessionReader
+	oauthClient      oauth.Client
+	oauthRedirect    *url.URL
+	oauthLoginURL    string
 	currentUsers     currentUserRepository
 	refresh          refresh.Refresher
 	sessions         sessionManager
@@ -84,6 +92,17 @@ func (s *Server) SetLoginService(service login.Authenticator) { s.login = servic
 // the lifetime of the refresh cookie it sets.
 func (s *Server) SetMFAService(service mfa.Authenticator, refreshTTL time.Duration) {
 	s.mfa, s.mfaRefreshTTL = service, refreshTTL
+}
+
+// SetOAuthService wires the OAuth endpoints. An unparsable or relative
+// redirect URI leaves OAuth unavailable (503) instead of failing per request.
+func (s *Server) SetOAuthService(service *oauth.Service, sessions oauth.HubSessionReader, client oauth.Client, loginURL string, hubSessionTTL time.Duration) {
+	s.hubSessionTTL = hubSessionTTL
+	redirect, err := url.Parse(client.RedirectURI)
+	if err != nil || !redirect.IsAbs() {
+		return
+	}
+	s.oauth, s.hubSessions, s.oauthClient, s.oauthRedirect, s.oauthLoginURL = service, sessions, client, redirect, loginURL
 }
 
 // SetCurrentUserRepository is used by composition and focused profile tests.
@@ -132,7 +151,7 @@ func (s *Server) Routes() http.Handler {
 	// de Docker, puede alcanzarlo.
 	r.Handle("/metrics", promhttp.Handler())
 
-	return HandlerWithOptions(s, ChiServerOptions{BaseRouter: r, ErrorHandlerFunc: s.handleBindingError})
+	return s.oauthCORS(HandlerWithOptions(s, ChiServerOptions{BaseRouter: r, ErrorHandlerFunc: s.handleBindingError}))
 }
 
 // handleBindingError overrides oapi-codegen's default binding error response
@@ -141,6 +160,9 @@ func (s *Server) Routes() http.Handler {
 // like an invalid token (401, with the compromised cookie cleared), per
 // RF-005/RF-007, not surface as a generic bad request.
 func (s *Server) handleBindingError(w http.ResponseWriter, r *http.Request, err error) {
+	if r.URL.Path == "/oauth/authorize" && s.redirectOAuthError(w, r) {
+		return
+	}
 	var paramName string
 	var required *RequiredParamError
 	var invalidFormat *InvalidParamFormatError
@@ -197,10 +219,10 @@ func (s *Server) AcceptInvitation(w http.ResponseWriter, r *http.Request) {
 }
 func (s *Server) ResendMfaCode(w http.ResponseWriter, r *http.Request) { s.resendMfaCode(w, r) }
 func (s *Server) AuthorizeClient(w http.ResponseWriter, r *http.Request, params AuthorizeClientParams) {
-	s.notImplemented(w)
+	s.authorizeClient(w, r, params)
 }
 func (s *Server) ExchangeAuthorizationCode(w http.ResponseWriter, r *http.Request) {
-	s.notImplemented(w)
+	s.exchangeAuthorizationCode(w, r)
 }
 func (s *Server) VerifyMfa(w http.ResponseWriter, r *http.Request) { s.verifyMfa(w, r) }
 func (s *Server) ConfirmPasswordReset(w http.ResponseWriter, r *http.Request) {
@@ -212,7 +234,3 @@ func (s *Server) RequestPasswordReset(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) GetHealth(w http.ResponseWriter, r *http.Request)    { s.Health(w, r) }
 func (s *Server) GetReadiness(w http.ResponseWriter, r *http.Request) { s.Readiness(w, r) }
-
-func (s *Server) notImplemented(w http.ResponseWriter) {
-	writeProblem(w, http.StatusNotImplemented, "not-implemented", "Not Implemented", "This operation is not implemented yet.")
-}

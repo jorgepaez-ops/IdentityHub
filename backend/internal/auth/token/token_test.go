@@ -39,6 +39,24 @@ func TestRF004_VigenciaDe15Minutos(t *testing.T) {
 	}
 }
 
+func TestRF020_TokenParaAplicacionTieneAudienciaYRolesAcotados(t *testing.T) {
+	service, err := New(testSeed(), "issuer", "identity-hub", time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := service.IssueForAudience("user-1", []string{"contabilidad.senior"}, "contabilidad")
+	if err != nil {
+		t.Fatal(err)
+	}
+	claims := Claims{}
+	if _, err := jwt.ParseWithClaims(raw, &claims, func(*jwt.Token) (any, error) { return service.PublicKey(), nil }, jwt.WithValidMethods([]string{"EdDSA"})); err != nil {
+		t.Fatal(err)
+	}
+	if len(claims.Audience) != 1 || claims.Audience[0] != "contabilidad" || len(claims.Roles) != 1 || claims.Roles[0] != "contabilidad.senior" {
+		t.Fatalf("claims=%+v", claims)
+	}
+}
+
 func TestRF004_TokenSeVerificaConLaClavePublica(t *testing.T) {
 	now := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 	service, err := New(testSeed(), "issuer", "audience", func() time.Time { return now })

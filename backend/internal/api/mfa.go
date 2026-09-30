@@ -37,6 +37,9 @@ func (s *Server) verifyMfa(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		// Persist the session across browser restarts, as the pre-MFA login did.
 		http.SetCookie(w, refreshCookie(result.RefreshToken, int(s.mfaRefreshTTL.Seconds())))
+		if result.HubSessionToken != "" && s.hubSessionTTL > 0 {
+			http.SetCookie(w, hubSessionCookie(result.HubSessionToken, int(s.hubSessionTTL.Seconds())))
+		}
 		writeJSON(w, http.StatusOK, TokenPair{AccessToken: result.AccessToken, TokenType: TokenPairTokenType(result.TokenType), ExpiresIn: result.ExpiresIn})
 		return
 	}

@@ -1,4 +1,4 @@
-// Package logout revokes the presented refresh token.
+// Package logout revokes the presented refresh token and the user's Hub sessions.
 package logout
 
 import (
@@ -31,6 +31,9 @@ type AuditEvent struct {
 
 type Writer interface {
 	RevokeRefreshToken(context.Context, []byte) (uuid.UUID, error)
+	// RevokeHubSessions ends every active Hub SSO session of the user so the
+	// hub_session cookie stops issuing authorization codes (ADR 0009).
+	RevokeHubSessions(context.Context, uuid.UUID) error
 	InsertAuditEvent(context.Context, AuditEvent) error
 }
 
@@ -67,6 +70,9 @@ func (s *Service) Logout(ctx context.Context, input Input) error {
 				return ErrInvalidRefreshToken
 			}
 			return fmt.Errorf("revoke refresh token: %w", err)
+		}
+		if err := writer.RevokeHubSessions(ctx, userID); err != nil {
+			return fmt.Errorf("revoke hub sessions: %w", err)
 		}
 		if err := writer.InsertAuditEvent(ctx, AuditEvent{ActorUserID: &userID, Action: "logout", Reason: "refresh_token_revoked", IP: input.IP, UserAgent: input.UserAgent}); err != nil {
 			return fmt.Errorf("record logout audit: %w", err)

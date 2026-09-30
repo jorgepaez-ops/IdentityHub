@@ -26,6 +26,7 @@ import (
 	"github.com/jorgepaez/identity-hub/internal/auth/login"
 	"github.com/jorgepaez/identity-hub/internal/auth/logout"
 	"github.com/jorgepaez/identity-hub/internal/auth/mfa"
+	"github.com/jorgepaez/identity-hub/internal/auth/oauth"
 	"github.com/jorgepaez/identity-hub/internal/auth/password"
 	"github.com/jorgepaez/identity-hub/internal/auth/passwordreset"
 	"github.com/jorgepaez/identity-hub/internal/auth/refresh"
@@ -127,7 +128,7 @@ func run() error {
 		FailureWindow:      cfg.LoginFailureWindow,
 		LockoutDuration:    cfg.LoginLockoutDuration,
 	}
-	mfaService := mfa.New(db, broker, rand.Reader, time.Now).WithTokenService(tokens, cfg.RefreshTTL).WithLockout(lockoutPolicy).WithLogger(logger)
+	mfaService := mfa.New(db, broker, rand.Reader, time.Now).WithTokenService(tokens, cfg.RefreshTTL).WithHubSessionTTL(cfg.HubSessionTTL).WithLockout(lockoutPolicy).WithLogger(logger)
 	loginService := login.New(db, lockoutPolicy).WithEventPublisher(loginSecurityEventPublisher{users: db, publisher: broker, logger: logger}).WithMFA(mfaService)
 	refreshService := refresh.New(db, tokens, cfg.RefreshTTL).WithEventPublisher(refreshSecurityEventPublisher{users: db, publisher: broker, logger: logger})
 
@@ -142,6 +143,8 @@ func run() error {
 	server.SetPasswordResetService(passwordreset.New(db, broker, passwordHasher{}, rand.Reader, time.Now).WithLogger(logger))
 	server.SetLoginService(loginService)
 	server.SetMFAService(mfaService, cfg.RefreshTTL)
+	oauthClient := oauth.Client{ID: cfg.OAuthClientID, RedirectURI: cfg.OAuthRedirectURI, Origin: cfg.OAuthClientOrigin}
+	server.SetOAuthService(oauth.New(db.OAuthRepository(), oauthClient, rand.Reader, time.Now), db.OAuthRepository(), oauthClient, cfg.PublicBaseURL+"/login", cfg.HubSessionTTL)
 	server.SetRefreshService(refreshService)
 	server.SetSessionService(session.New(db))
 	server.SetLogoutService(logout.New(db))

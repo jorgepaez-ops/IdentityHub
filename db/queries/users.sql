@@ -187,6 +187,41 @@ WHERE id = $1 AND code_hash = $2 AND last_sent_at = $4 AND used_at IS NULL;
 INSERT INTO refresh_tokens (user_id, token_hash, family_id, ip, user_agent, expires_at)
 VALUES ($1, $2, $3, $4, $5, $6);
 
+-- name: CreateHubSession :exec
+INSERT INTO hub_sessions (user_id, token_hash, expires_at)
+VALUES ($1, $2, $3);
+
+-- name: GetHubSessionUser :one
+SELECT s.user_id
+FROM hub_sessions s
+JOIN users u ON u.id = s.user_id
+WHERE s.token_hash = $1 AND s.revoked_at IS NULL AND s.expires_at > now() AND u.status = 'active';
+
+-- name: RevokeHubSessionsForUser :exec
+UPDATE hub_sessions SET revoked_at = now()
+WHERE user_id = $1 AND revoked_at IS NULL;
+
+-- name: GetUsedAuthorizationCodeOwner :one
+SELECT user_id FROM authorization_codes
+WHERE code_hash = $1 AND used_at IS NOT NULL;
+
+-- name: CreateAuthorizationCode :execrows
+INSERT INTO authorization_codes (id, user_id, application_id, code_hash, redirect_uri, code_challenge, expires_at)
+SELECT $1, $2, id, $3, $4, $5, $6
+FROM applications
+WHERE client_id = $7 AND redirect_uri = $4;
+
+-- name: GetAuthorizationCodeForUpdate :one
+SELECT c.id, c.user_id, a.client_id, c.redirect_uri, c.code_challenge, c.expires_at
+FROM authorization_codes c
+JOIN applications a ON a.id = c.application_id
+WHERE c.code_hash = $1 AND c.used_at IS NULL AND c.expires_at > $2
+FOR UPDATE OF c;
+
+-- name: MarkAuthorizationCodeUsed :execrows
+UPDATE authorization_codes SET used_at = $2
+WHERE id = $1 AND used_at IS NULL;
+
 -- name: RotateRefreshToken :one
 WITH candidate AS (
     SELECT refresh_tokens.id, refresh_tokens.user_id, refresh_tokens.family_id, refresh_tokens.status, refresh_tokens.expires_at
@@ -331,6 +366,12 @@ WITH consumed AS (
     SET status = 'revoked'
     WHERE user_id = (SELECT id FROM updated_user)
       AND status <> 'revoked'
+    RETURNING id
+), revoked_hub_sessions AS (
+    UPDATE hub_sessions
+    SET revoked_at = now()
+    WHERE user_id = (SELECT id FROM updated_user)
+      AND revoked_at IS NULL
     RETURNING id
 )
 SELECT updated_user.*, (previous_user.status = 'locked') AS unlocked
