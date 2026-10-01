@@ -669,7 +669,7 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 ## Fase 2 — Dominios locales y frontend
 
 ### T11 — Dos dominios locales y portabilidad
-- [ ] Estado · Ejecutor: `Claude` (Docker y navegadores; Codex no puede) · Depende de: D10
+- [x] Estado · Ejecutor: `Claude` (Docker y navegadores; Codex no puede) · Depende de: D10
 - Primero, la comprobación de D10 con Playwright en Chromium y Firefox: `*.localhost` resuelve sin
   `/etc/hosts` y una cookie `Secure` por HTTP se guarda y se envía.
 - Dos `server` en Nginx (`identityhub.localhost` y `contabilidad.localhost`), cabeceras RNF-009 en
@@ -678,7 +678,36 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
   `docker compose up -d` porque el compose vive en `deploy/` (no en la raíz) y exige un `.env` que no
   se versiona (secretos, VULN-001/003). La solución (compose en la raíz y generación de `.env` o de
   secretos de desarrollo sin reabrir esos VULN) se decide en la semana 4.
-- Commit: —
+- Ruta: delegada (Sonnet; Docker, navegadores y red). Revisó y commiteó Claude.
+- D10 comprobado (2026-10-01) con un script de Playwright desechable fuera del repo. Chromium
+  (host): `identityhub.localhost` resuelve sin `/etc/hosts`, la cookie `Secure` por HTTP se guarda y
+  se envía, y no llega a `contabilidad.localhost` (sitios distintos). Firefox: los builds de
+  Playwright no arrancan en macOS 27 (perfil/sandbox), así que se probó en
+  `mcr.microsoft.com/playwright:v1.63.0-noble` (Firefox 155.0, servidor y navegador en el mismo
+  contenedor, decisión del usuario): las mismas cuatro comprobaciones pasan.
+- Nginx: el Hub (`identityhub.localhost`) es `default_server`, así que `localhost:8080` lo sigue
+  sirviendo (CI, ZAP); nuevo proxy `/oauth/` hacia la API (antes `/oauth/authorize` caía en la SPA).
+  `contabilidad.localhost` sirve un marcador estático hasta T13. Las cinco cabeceras de RNF-009
+  viven en `security-headers.conf` con la CSP por `server` en `$csp` (Contabilidad agrega el Hub en
+  `connect-src`); el include en `/assets/` corrige además que esa `location` perdía las cabeceras.
+- `PUBLIC_BASE_URL` y `JWT_ISSUER` pasan a `http://identityhub.localhost:8080` (config, compose,
+  OpenAPI, README, guía y Makefile). TDD: RED `go test -race ./internal/config/` con los dos valores
+  por defecto viejos; GREEN `ok`.
+- Verificación (stack real con `make up`): Hub, Contabilidad y `localhost:8080` responden 200 con
+  las cinco cabeceras y su CSP; ruta profunda 200; `/healthz`, `/readyz` y JWKS 200 por el Hub;
+  login con credenciales inventadas 401 problem+json; `/oauth/token` 400 y `/oauth/authorize` sin
+  parámetros 400. Chromium carga el Hub y el marcador. `make test-go` ok, `make test-integration`
+  ok, `npm run test` ok, `golangci-lint` 0 issues, trazabilidad al día, Trivy de `web` 0
+  HIGH/CRITICAL corregibles. Nada quedó corriendo.
+- Pendiente: `.env.example` (líneas de `API_BASE_URL` y `JWT_ISSUER`) sigue con
+  `http://localhost:8080`; los permisos del entorno bloquean editarlo. Sin efecto funcional (nadie
+  lee `API_BASE_URL` y el compose fija `JWT_ISSUER`), pero el ejemplo queda desactualizado: lo
+  cambia el usuario.
+- Revisión nativa: evaluación **alta** (12 rutas, 114 líneas; `security-headers.conf` y
+  `Makefile`). **No disponible** por el mismo defecto #4890 (la selección de archivos sin
+  seguimiento pierde `--base-ref`/`--committed-only`). El usuario eligió continuar sin reportar; no
+  se ejecutó START.
+- Commit: `3cb30fc`
 
 ### T12 — Consola de Identity Hub (React)
 - [ ] Estado · Ejecutor: `Codex` · Depende de: T5, T7, T8, T11
@@ -729,15 +758,16 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 |---|---|---|
 | 0 — Enmiendas de spec y decisiones | T1 a T3 (3) | 3 (T1 a T3) |
 | 1 — Backend | T4 a T10 (7) | 7 (T4 a T10) |
-| 2 — Dominios locales y frontend | T11 a T13 (3) | 0 |
+| 2 — Dominios locales y frontend | T11 a T13 (3) | 1 (T11) |
 | 3 — Verificación, DAST y cierre | T14 a T17 (4) | 0 |
-| **Total** | **17** | **10** |
+| **Total** | **17** | **11** |
 
 ## Siguiente paso
 
 Fase 1 cerrada el 2026-09-30 (T9-fix y T10). PR de corte de las fases 0 y 1: #6, mergeado el
 2026-10-01 en `ece7e7f` (merge commit; CI de `main` en verde). Incluye `7bfc125`, falso positivo de
-gitleaks en `accept_invitation.go` agregado a `.gitleaksignore`. Sigue T11.
+gitleaks en `accept_invitation.go` agregado a `.gitleaksignore`. T11 cerrada el 2026-10-01
+(`3cb30fc`); sigue T12.
 
 - `main` protegida desde el 2026-10-01 (ruleset "Protect main", decisión del usuario): PR
   obligatorio sin aprobaciones requeridas, los 17 checks del PR #6 obligatorios, sin force push ni
