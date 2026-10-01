@@ -106,8 +106,12 @@ func ensureBootstrapAdmin(ctx context.Context, logger *slog.Logger, service boot
 		logger.Info("bootstrap administrator invitation reissued")
 	case bootstrap.OutcomeInvitationPending:
 		logger.Info("bootstrap administrator skipped because its invitation is still valid")
+	case bootstrap.OutcomeInvitationUndelivered:
+		logger.Warn("bootstrap administrator invitation could not be delivered; the next startup will reissue it")
+	case bootstrap.OutcomeInvitationUndeliveredLive:
+		logger.Warn("bootstrap administrator invitation could not be delivered and could not be withdrawn; it will be reissued after it expires")
 	case bootstrap.OutcomeAdminExists:
-		logger.Info("bootstrap administrator skipped because an active administrator already exists")
+		logger.Info("bootstrap administrator skipped because an administrator already exists")
 	case bootstrap.OutcomeEmailConflict:
 		logger.Warn("bootstrap administrator skipped because configured email is already in use")
 	}

@@ -13,7 +13,7 @@ import (
 // decide and, only when needed, create the installation's first administrator.
 type BootstrapAdminWriter interface {
 	LockBootstrapAdmin(context.Context) error
-	ActiveAdminExists(context.Context) (bool, error)
+	NonPendingAdminExists(context.Context) (bool, error)
 	GetUserByEmail(context.Context, string) (User, error)
 	CreateUser(context.Context, CreateUserParams) (User, error)
 	AddBootstrapUserRole(context.Context, uuid.UUID, string) error
@@ -51,10 +51,10 @@ func (w *bootstrapAdminWriter) LockBootstrapAdmin(ctx context.Context) error {
 	return nil
 }
 
-func (w *bootstrapAdminWriter) ActiveAdminExists(ctx context.Context) (bool, error) {
-	exists, err := w.queries.ActiveAdminExists(ctx)
+func (w *bootstrapAdminWriter) NonPendingAdminExists(ctx context.Context) (bool, error) {
+	exists, err := w.queries.NonPendingAdminExists(ctx)
 	if err != nil {
-		return false, fmt.Errorf("check active administrator: %w", err)
+		return false, fmt.Errorf("check existing administrator: %w", err)
 	}
 	return exists, nil
 }

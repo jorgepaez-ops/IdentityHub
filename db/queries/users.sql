@@ -415,17 +415,18 @@ WHERE user_id = $1
 -- transaction-scoped, so no connection can retain it after a failed startup.
 SELECT pg_advisory_xact_lock(hashtextextended('identity-hub/bootstrap-admin', 0));
 
--- name: ActiveAdminExists :one
--- Only an active administrator can resend invitations, so only it makes the
--- bootstrap a no-op. A pending one (invitation never accepted) must not.
+-- name: NonPendingAdminExists :one
+-- Any account holding the admin role makes the bootstrap a no-op, whatever its
+-- state (active, locked, disabled): only a pending one (invitation never
+-- accepted) does not, so the installation cannot be left without a way in.
 SELECT EXISTS (
     SELECT 1
     FROM user_roles
     JOIN roles ON roles.id = user_roles.role_id
     JOIN users ON users.id = user_roles.user_id
     WHERE roles.name = 'admin'
-      AND users.status = 'active'
-) AS active_admin_exists;
+      AND users.status <> 'pending_verification'
+) AS non_pending_admin_exists;
 
 -- name: AddBootstrapUserRole :execrows
 -- The first administrator has no human grantor. The audit event records the

@@ -21,9 +21,11 @@ import (
 const (
 	invitationTTL           = 24 * time.Hour
 	placeholderPasswordSize = 32
+	invitationTokenSize     = 32
+	// withdrawTimeout bounds the compensating transaction that runs after a
+	// failed publish; it must not depend on the (possibly canceled) startup ctx.
+	withdrawTimeout = 5 * time.Second
 )
-
-var ErrPublish = errors.New("publish bootstrap invitation event")
 
 type safeOperationError struct {
 	message string
@@ -36,12 +38,14 @@ func (e safeOperationError) Unwrap() error { return e.cause }
 type Outcome string
 
 const (
-	OutcomeDisabled           Outcome = "disabled"
-	OutcomeCreated            Outcome = "created"
-	OutcomeAdminExists        Outcome = "admin_exists"
-	OutcomeEmailConflict      Outcome = "email_conflict"
-	OutcomeInvitationReissued Outcome = "invitation_reissued"
-	OutcomeInvitationPending  Outcome = "invitation_pending"
+	OutcomeDisabled                  Outcome = "disabled"
+	OutcomeCreated                   Outcome = "created"
+	OutcomeAdminExists               Outcome = "admin_exists"
+	OutcomeEmailConflict             Outcome = "email_conflict"
+	OutcomeInvitationReissued        Outcome = "invitation_reissued"
+	OutcomeInvitationPending         Outcome = "invitation_pending"
+	OutcomeInvitationUndelivered     Outcome = "invitation_undelivered"
+	OutcomeInvitationUndeliveredLive Outcome = "invitation_undelivered_live"
 )
 
 type Hasher interface{ Hash(string) (string, error) }
@@ -64,9 +68,15 @@ func New(repository Repository, publisher Publisher, hasher Hasher, random io.Re
 	return &Service{repository: repository, publisher: publisher, hasher: hasher, random: random, now: now}
 }
 
-// Ensure creates an invitation-only administrator only when no active
-// administrator exists, or replaces the invitation of a pending one. Database uncertainty fails startup: granting a privileged bootstrap
-// account when that predicate cannot be decided is unsafe.
+// Ensure creates an invitation-only administrator only when no administrator
+// beyond a pending one exists (locked and disabled admins count), or replaces
+// the invitation of a pending one. Database uncertainty fails startup:
+// granting a privileged bootstrap account when that predicate cannot be
+// decided is unsafe.
+//
+// user.invited carries the raw token, so it is published only after the
+// transaction commits (like D16): never while holding the advisory lock, and
+// never for a transaction that rolls back.
 func (s *Service) Ensure(ctx context.Context, email string) (Outcome, error) {
 	if strings.TrimSpace(email) == "" {
 		return OutcomeDisabled, nil
@@ -76,11 +86,12 @@ func (s *Service) Ensure(ctx context.Context, email string) (Outcome, error) {
 	}
 
 	outcome := OutcomeDisabled
+	var invitation *events.UserInvited
 	err := s.repository.WithinBootstrapAdminTransaction(ctx, func(writer store.BootstrapAdminWriter) error {
 		if err := writer.LockBootstrapAdmin(ctx); err != nil {
 			return err
 		}
-		adminExists, err := writer.ActiveAdminExists(ctx)
+		adminExists, err := writer.NonPendingAdminExists(ctx)
 		if err != nil {
 			return err
 		}
@@ -112,7 +123,8 @@ func (s *Service) Ensure(ctx context.Context, email string) (Outcome, error) {
 			if err := writer.InvalidateInvitationTokens(ctx, existing.ID); err != nil {
 				return fmt.Errorf("invalidate old bootstrap invitation tokens: %w", err)
 			}
-			if err := s.invite(ctx, writer, existing, "bootstrap_admin_invitation_reissued"); err != nil {
+			invitation, err = s.invite(ctx, writer, existing, "bootstrap_admin_invitation_reissued")
+			if err != nil {
 				return err
 			}
 			outcome = OutcomeInvitationReissued
@@ -139,7 +151,8 @@ func (s *Service) Ensure(ctx context.Context, email string) (Outcome, error) {
 				return fmt.Errorf("assign bootstrap role: %w", err)
 			}
 		}
-		if err := s.invite(ctx, writer, user, "bootstrap_admin_created"); err != nil {
+		invitation, err = s.invite(ctx, writer, user, "bootstrap_admin_created")
+		if err != nil {
 			return err
 		}
 		outcome = OutcomeCreated
@@ -148,7 +161,35 @@ func (s *Service) Ensure(ctx context.Context, email string) (Outcome, error) {
 	if err != nil {
 		return "", err
 	}
+	if invitation != nil {
+		return s.publishAfterCommit(ctx, outcome, invitation), nil
+	}
 	return outcome, nil
+}
+
+// publishAfterCommit sends the committed invitation. When publishing fails it
+// withdraws that token in a fresh short transaction so the next startup
+// reissues at once instead of waiting for the 24 h expiry. Startup continues
+// either way: the account is pending, has no password and cannot be used, so
+// a broker outage is not a reason to keep the API down, and the failed
+// publish is reported through the outcome, which main logs without the email
+// or the token.
+func (s *Service) publishAfterCommit(ctx context.Context, outcome Outcome, invitation *events.UserInvited) Outcome {
+	if err := s.publisher.Publish(ctx, events.TypeUserInvited, *invitation); err == nil {
+		return outcome
+	}
+	withdrawCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), withdrawTimeout)
+	defer cancel()
+	withdraw := s.repository.WithinBootstrapAdminTransaction(withdrawCtx, func(writer store.BootstrapAdminWriter) error {
+		if err := writer.LockBootstrapAdmin(withdrawCtx); err != nil {
+			return err
+		}
+		return writer.InvalidateInvitationTokens(withdrawCtx, invitation.Data.UserID)
+	})
+	if withdraw != nil {
+		return OutcomeInvitationUndeliveredLive
+	}
+	return OutcomeInvitationUndelivered
 }
 
 func (s *Service) isPendingAdmin(ctx context.Context, writer store.BootstrapAdminWriter, user store.User) (bool, error) {
@@ -162,27 +203,25 @@ func (s *Service) isPendingAdmin(ctx context.Context, writer store.BootstrapAdmi
 	return slices.Contains(names, roles.Admin), nil
 }
 
-// invite persists a fresh invitation token, records the system/bootstrap audit
-// entry and publishes user.invited, exactly like the invitation resend flow.
-func (s *Service) invite(ctx context.Context, writer store.BootstrapAdminWriter, user store.User, action string) error {
-	rawToken := make([]byte, 32)
+// invite persists a fresh invitation token and records the system/bootstrap
+// audit entry inside the transaction. It returns the user.invited event for
+// the caller to publish once the transaction has committed.
+func (s *Service) invite(ctx context.Context, writer store.BootstrapAdminWriter, user store.User, action string) (*events.UserInvited, error) {
+	rawToken := make([]byte, invitationTokenSize)
 	if _, err := io.ReadFull(s.random, rawToken); err != nil {
-		return fmt.Errorf("generate bootstrap invitation token: %w", err)
+		return nil, fmt.Errorf("generate bootstrap invitation token: %w", err)
 	}
 	tokenHash := sha256.Sum256(rawToken)
 	expiresAt := s.now().UTC().Add(invitationTTL)
 	if err := writer.CreateInvitationToken(ctx, store.CreateInvitationTokenParams{UserID: user.ID, TokenHash: tokenHash[:], ExpiresAt: expiresAt}); err != nil {
-		return fmt.Errorf("persist bootstrap invitation token: %w", err)
+		return nil, fmt.Errorf("persist bootstrap invitation token: %w", err)
 	}
 	resourceType, resourceID := "user", user.ID.String()
 	if _, err := writer.InsertAuditEvent(ctx, store.InsertAuditEventParams{Action: action, ResourceType: &resourceType, ResourceID: &resourceID, Metadata: []byte(`{"actor":"system/bootstrap"}`)}); err != nil {
-		return fmt.Errorf("record bootstrap audit event: %w", err)
+		return nil, fmt.Errorf("record bootstrap audit event: %w", err)
 	}
 	event := events.UserInvited{Envelope: events.NewEnvelope(events.TypeUserInvited, "")}
 	event.Data.UserID, event.Data.Email, event.Data.DisplayName = user.ID, user.Email, user.DisplayName
 	event.Data.InvitationToken, event.Data.ExpiresAt = base64.RawURLEncoding.EncodeToString(rawToken), expiresAt
-	if err := s.publisher.Publish(ctx, events.TypeUserInvited, event); err != nil {
-		return fmt.Errorf("%w: %w", ErrPublish, safeOperationError{message: "bootstrap invitation publish failed", cause: err})
-	}
-	return nil
+	return &event, nil
 }

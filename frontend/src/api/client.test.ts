@@ -4,6 +4,24 @@ import { authenticatedRequest, refreshSession, resendMfaCode, resetSessionForTes
 const json = (status: number, body: unknown, contentType = 'application/json') =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': contentType } })
 
+// Installs one fake BroadcastChannel and exposes the instances it created.
+function stubBroadcastChannel() {
+  class TestBroadcastChannel {
+    static instances: TestBroadcastChannel[] = []
+    readonly name: string
+    onmessage: ((event: MessageEvent<{ token?: unknown }>) => void) | null = null
+    close = vi.fn()
+    postMessage = vi.fn()
+
+    constructor(name: string) {
+      this.name = name
+      TestBroadcastChannel.instances.push(this)
+    }
+  }
+  vi.stubGlobal('BroadcastChannel', TestBroadcastChannel)
+  return TestBroadcastChannel
+}
+
 describe('API client', () => {
   afterEach(() => {
     resetSessionForTests()
@@ -45,16 +63,29 @@ describe('API client', () => {
     await expect(resendMfaCode({ mfaToken: 'challenge' })).resolves.toBeUndefined()
   })
 
-  it('TestRF014_AcceptsSuccessfulResponsesWithoutConsumableJSON', async () => {
+  it('TestRF014_AcceptsSuccessfulResponsesWithoutBody', async () => {
     const fetch = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(new Response(null, { status: 205 }))
       .mockResolvedValueOnce(new Response(null, { status: 202, headers: { 'Content-Type': 'application/json' } }))
-      .mockResolvedValueOnce(new Response('queued', { status: 202, headers: { 'Content-Type': 'text/plain' } }))
+      .mockResolvedValueOnce(new Response('  ', { status: 202, headers: { 'Content-Type': 'text/plain' } }))
     vi.stubGlobal('fetch', fetch)
 
-    await expect(resendMfaCode({ mfaToken: 'challenge' })).resolves.toBeUndefined()
-    await expect(resendMfaCode({ mfaToken: 'challenge' })).resolves.toBeUndefined()
-    await expect(resendMfaCode({ mfaToken: 'challenge' })).resolves.toBeUndefined()
+    for (let call = 0; call < 4; call += 1) {
+      await expect(resendMfaCode({ mfaToken: 'challenge' })).resolves.toBeUndefined()
+    }
+  })
+
+  it('TestRF005_RejectsNonEmptySuccessBodyThatIsNotJSON', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('<html>proxy</html>', { status: 200, headers: { 'Content-Type': 'text/html' } })))
+
+    await expect(authenticatedRequest('/api/v1/me')).rejects.toThrow(/respuesta inesperada/i)
+  })
+
+  it('TestRF005_RejectsNonEmptySuccessBodyWithoutContentType', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(new Blob(['queued']), { status: 202 })))
+
+    await expect(resendMfaCode({ mfaToken: 'challenge' })).rejects.toThrow(/respuesta inesperada/i)
   })
 
   it('TestRF005_ParsesSuccessfulJSONResponse', async () => {
@@ -90,19 +121,7 @@ describe('API client', () => {
   })
 
   it('TestRF005_ReusesAndClosesTheSessionBroadcastChannel', async () => {
-    class TestBroadcastChannel {
-      static instances: TestBroadcastChannel[] = []
-      readonly name: string
-      onmessage: ((event: MessageEvent<{ token?: unknown }>) => void) | null = null
-      close = vi.fn()
-      postMessage = vi.fn()
-
-      constructor(name: string) {
-        this.name = name
-        TestBroadcastChannel.instances.push(this)
-      }
-    }
-    vi.stubGlobal('BroadcastChannel', TestBroadcastChannel)
+    const TestBroadcastChannel = stubBroadcastChannel()
     vi.resetModules()
     const session = await import('./client')
     vi.stubGlobal('fetch', vi.fn(async () => json(200, { accessToken: 'access', tokenType: 'Bearer', expiresIn: 900 })))
@@ -115,19 +134,7 @@ describe('API client', () => {
   })
 
   it('TestRF005_ReceivesTokenBroadcastBeforeLocalPublication', async () => {
-    class TestBroadcastChannel {
-      static instances: TestBroadcastChannel[] = []
-      readonly name: string
-      onmessage: ((event: MessageEvent<{ token?: unknown }>) => void) | null = null
-      close = vi.fn()
-      postMessage = vi.fn()
-
-      constructor(name: string) {
-        this.name = name
-        TestBroadcastChannel.instances.push(this)
-      }
-    }
-    vi.stubGlobal('BroadcastChannel', TestBroadcastChannel)
+    const TestBroadcastChannel = stubBroadcastChannel()
     vi.resetModules()
     const session = await import('./client')
     const fetch = vi.fn()
@@ -140,6 +147,26 @@ describe('API client', () => {
     await expect(session.authenticatedRequest('/api/v1/me')).resolves.toEqual({ id: 'user' })
     const finalRequest = fetch.mock.calls.at(-1)?.[1] as RequestInit | undefined
     expect(new Headers(finalRequest?.headers).get('Authorization')).toBe('Bearer remote-access')
+    session.resetSessionForTests()
+  })
+
+  it('TestRF005_ClearSessionOnlyClearsThisTabWithoutBroadcasting', async () => {
+    const TestBroadcastChannel = stubBroadcastChannel()
+    vi.resetModules()
+    const session = await import('./client')
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(json(200, { accessToken: 'access', tokenType: 'Bearer', expiresIn: 900 }))
+      .mockResolvedValueOnce(json(200, { id: 'user' }))
+    vi.stubGlobal('fetch', fetch)
+
+    await session.refreshSession()
+    const channel = TestBroadcastChannel.instances[0]
+    expect(channel?.postMessage).toHaveBeenCalledTimes(1)
+    session.clearSession()
+    expect(channel?.postMessage).toHaveBeenCalledTimes(1)
+    await session.authenticatedRequest('/api/v1/me')
+    const finalRequest = fetch.mock.calls.at(-1)?.[1] as RequestInit | undefined
+    expect(new Headers(finalRequest?.headers).get('Authorization')).toBeNull()
     session.resetSessionForTests()
   })
 })

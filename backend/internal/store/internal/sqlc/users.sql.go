@@ -13,26 +13,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const activeAdminExists = `-- name: ActiveAdminExists :one
-SELECT EXISTS (
-    SELECT 1
-    FROM user_roles
-    JOIN roles ON roles.id = user_roles.role_id
-    JOIN users ON users.id = user_roles.user_id
-    WHERE roles.name = 'admin'
-      AND users.status = 'active'
-) AS active_admin_exists
-`
-
-// Only an active administrator can resend invitations, so only it makes the
-// bootstrap a no-op. A pending one (invitation never accepted) must not.
-func (q *Queries) ActiveAdminExists(ctx context.Context) (bool, error) {
-	row := q.db.QueryRow(ctx, activeAdminExists)
-	var active_admin_exists bool
-	err := row.Scan(&active_admin_exists)
-	return active_admin_exists, err
-}
-
 const addBootstrapUserRole = `-- name: AddBootstrapUserRole :execrows
 INSERT INTO user_roles (user_id, role_id, granted_by)
 SELECT $1, id, NULL
@@ -951,6 +931,27 @@ func (q *Queries) MarkAuthorizationCodeUsed(ctx context.Context, arg MarkAuthori
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const nonPendingAdminExists = `-- name: NonPendingAdminExists :one
+SELECT EXISTS (
+    SELECT 1
+    FROM user_roles
+    JOIN roles ON roles.id = user_roles.role_id
+    JOIN users ON users.id = user_roles.user_id
+    WHERE roles.name = 'admin'
+      AND users.status <> 'pending_verification'
+) AS non_pending_admin_exists
+`
+
+// Any account holding the admin role makes the bootstrap a no-op, whatever its
+// state (active, locked, disabled): only a pending one (invitation never
+// accepted) does not, so the installation cannot be left without a way in.
+func (q *Queries) NonPendingAdminExists(ctx context.Context) (bool, error) {
+	row := q.db.QueryRow(ctx, nonPendingAdminExists)
+	var non_pending_admin_exists bool
+	err := row.Scan(&non_pending_admin_exists)
+	return non_pending_admin_exists, err
 }
 
 const passwordResetTokenIsUsable = `-- name: PasswordResetTokenIsUsable :one

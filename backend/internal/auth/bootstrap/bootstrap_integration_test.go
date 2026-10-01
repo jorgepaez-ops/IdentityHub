@@ -5,6 +5,7 @@ package bootstrap
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -21,13 +22,20 @@ func (integrationHasher) Hash(value string) (string, error) { return password.Ha
 type integrationPublisher struct {
 	mu     sync.Mutex
 	events int
+	err    error
 }
 
 func (p *integrationPublisher) Publish(context.Context, string, any) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.events++
-	return nil
+	return p.err
+}
+
+func (p *integrationPublisher) setErr(err error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.err = err
 }
 
 func TestBootstrap_IniciosConcurrentesCreanUnaCuentaYUnaInvitacion(t *testing.T) {
@@ -155,5 +163,82 @@ func TestBootstrap_AdminActivoHaceNoOp(t *testing.T) {
 	defer publisher.mu.Unlock()
 	if publisher.events != 1 {
 		t.Fatalf("published invitations = %d, want 1", publisher.events)
+	}
+}
+
+func TestBootstrap_AdminBloqueadoODeshabilitadoHaceNoOp(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test requires a PostgreSQL server")
+	}
+	for _, status := range []string{"locked", "disabled"} {
+		t.Run(status, func(t *testing.T) {
+			pool := testdb.New(t)
+			repository, err := store.NewWithPool(pool)
+			if err != nil {
+				t.Fatalf("NewWithPool: %v", err)
+			}
+			publisher := &integrationPublisher{}
+			service := New(repository, publisher, integrationHasher{}, rand.Reader, time.Now)
+			ctx := context.Background()
+			const email = "first-admin@example.test"
+			if _, err := service.Ensure(ctx, email); err != nil {
+				t.Fatalf("Ensure: %v", err)
+			}
+			if _, err := pool.Exec(ctx, `UPDATE users SET status = $2 WHERE email = $1`, email, status); err != nil {
+				t.Fatalf("set status: %v", err)
+			}
+			// A different configured email must not create a second admin.
+			outcome, err := service.Ensure(ctx, "another-admin@example.test")
+			if err != nil || outcome != OutcomeAdminExists {
+				t.Fatalf("Ensure = %q, %v; want admin_exists", outcome, err)
+			}
+			var users int
+			if err := pool.QueryRow(ctx, `SELECT count(*) FROM users`).Scan(&users); err != nil || users != 1 {
+				t.Fatalf("users = %d, err %v; want 1", users, err)
+			}
+			publisher.mu.Lock()
+			defer publisher.mu.Unlock()
+			if publisher.events != 1 {
+				t.Fatalf("published invitations = %d, want 1", publisher.events)
+			}
+		})
+	}
+}
+
+func TestBootstrap_FalloDePublicacionTrasCommitDejaCuentaPendienteSinInvitacionVigenteYElSiguienteArranqueReemite(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test requires a PostgreSQL server")
+	}
+	pool := testdb.New(t)
+	repository, err := store.NewWithPool(pool)
+	if err != nil {
+		t.Fatalf("NewWithPool: %v", err)
+	}
+	publisher := &integrationPublisher{}
+	publisher.setErr(errors.New("broker unavailable"))
+	service := New(repository, publisher, integrationHasher{}, rand.Reader, time.Now)
+	ctx := context.Background()
+	const email = "first-admin@example.test"
+
+	outcome, err := service.Ensure(ctx, email)
+	if err != nil || outcome != OutcomeInvitationUndelivered {
+		t.Fatalf("first Ensure = %q, %v; want invitation_undelivered", outcome, err)
+	}
+	var status string
+	var live int
+	if err := pool.QueryRow(ctx, `SELECT status FROM users WHERE email = $1`, email).Scan(&status); err != nil || status != "pending_verification" {
+		t.Fatalf("status = %q, err %v; want pending_verification", status, err)
+	}
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM verification_tokens WHERE purpose = 'invitation' AND used_at IS NULL AND expires_at > now()`).Scan(&live); err != nil || live != 0 {
+		t.Fatalf("live invitations = %d, err %v; want 0", live, err)
+	}
+
+	publisher.setErr(nil)
+	outcome, err = service.Ensure(ctx, email)
+	if err != nil || outcome != OutcomeInvitationReissued {
+		t.Fatalf("second Ensure = %q, %v; want invitation_reissued", outcome, err)
+	}
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM verification_tokens WHERE purpose = 'invitation' AND used_at IS NULL AND expires_at > now()`).Scan(&live); err != nil || live != 1 {
+		t.Fatalf("live invitations after reissue = %d, err %v; want 1", live, err)
 	}
 }

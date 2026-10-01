@@ -67,9 +67,14 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (init.body) headers.set('Content-Type', 'application/json')
   const response = await fetch(path, { ...init, headers, credentials: 'same-origin' })
   if (!response.ok) throw await parseError(response)
-  if (response.status === 204 || !response.headers.get('content-type')?.includes('application/json')) return undefined as T
+  // No-content responses (204/205 or an empty body) carry nothing to parse.
+  if (response.status === 204 || response.status === 205) return undefined as T
   const body = await response.text()
   if (!body.trim()) return undefined as T
+  // A body that is not JSON (e.g. a proxy error page) must not look like success.
+  if (!response.headers.get('content-type')?.includes('application/json')) {
+    throw new Error('Respuesta inesperada del servidor: el cuerpo no es JSON.')
+  }
   return JSON.parse(body) as T
 }
 
@@ -137,8 +142,10 @@ export async function logout(): Promise<void> {
   }
 }
 
+// Clears only this tab's token. It does not announce null: the failure that led
+// here (e.g. a profile fetch) is local and must not sign the other tabs out.
 export function clearSession() {
-  setAccessToken(null)
+  setAccessToken(null, false)
 }
 
 // Test-only reset; session state is module memory and never uses Web Storage.

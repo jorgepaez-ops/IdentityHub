@@ -136,7 +136,7 @@ func Load() (*Config, error) {
 	bootstrapAdminEmail := strings.TrimSpace(os.Getenv("BOOTSTRAP_ADMIN_EMAIL"))
 	if bootstrapAdminEmail != "" {
 		parsed, err := mail.ParseAddress(bootstrapAdminEmail)
-		if err != nil || parsed.Address != bootstrapAdminEmail || !strings.Contains(bootstrapAdminEmail, "@") {
+		if err != nil || parsed.Address != bootstrapAdminEmail {
 			problems = append(problems, "BOOTSTRAP_ADMIN_EMAIL debe ser un correo válido cuando está definido")
 		}
 	}

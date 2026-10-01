@@ -13,9 +13,23 @@ import (
 	"github.com/jorgepaez/identity-hub/internal/store"
 )
 
+// callLog records the order of transaction and publish steps across fakes.
+type callLog struct{ steps []string }
+
+func (l *callLog) add(step string) {
+	if l != nil {
+		l.steps = append(l.steps, step)
+	}
+}
+
 type fakeRepository struct {
 	writer    *fakeWriter
 	committed bool
+	commitErr error
+	// commitErrOn limits commitErr to the Nth transaction (0 means every one).
+	commitErrOn int
+	begins      int
+	log         *callLog
 }
 
 type fakeWriter struct {
@@ -30,18 +44,29 @@ type fakeWriter struct {
 	liveInvite  bool
 	invalidated []uuid.UUID
 	audits      []store.InsertAuditEventParams
+	auditErr    error
 }
 
 func (r *fakeRepository) WithinBootstrapAdminTransaction(_ context.Context, fn func(store.BootstrapAdminWriter) error) error {
+	r.begins++
+	r.log.add("begin")
 	if err := fn(r.writer); err != nil {
+		r.log.add("rollback")
 		return err
 	}
+	if r.commitErr != nil && (r.commitErrOn == 0 || r.commitErrOn == r.begins) {
+		r.log.add("rollback")
+		return r.commitErr
+	}
 	r.committed = true
+	r.log.add("commit")
 	return nil
 }
 
-func (w *fakeWriter) LockBootstrapAdmin(context.Context) error        { w.locked++; return nil }
-func (w *fakeWriter) ActiveAdminExists(context.Context) (bool, error) { return w.adminExists, nil }
+func (w *fakeWriter) LockBootstrapAdmin(context.Context) error { w.locked++; return nil }
+func (w *fakeWriter) NonPendingAdminExists(context.Context) (bool, error) {
+	return w.adminExists, nil
+}
 func (w *fakeWriter) GetUserByEmail(context.Context, string) (store.User, error) {
 	return w.user, w.userErr
 }
@@ -72,7 +97,7 @@ func (w *fakeWriter) CreateInvitationToken(context.Context, store.CreateInvitati
 }
 func (w *fakeWriter) InsertAuditEvent(_ context.Context, params store.InsertAuditEventParams) (store.AuditEvent, error) {
 	w.audits = append(w.audits, params)
-	return store.AuditEvent{}, nil
+	return store.AuditEvent{}, w.auditErr
 }
 
 type fakeHasher struct{ calls int }
@@ -82,9 +107,11 @@ func (h *fakeHasher) Hash(string) (string, error) { h.calls++; return "$argon2id
 type fakePublisher struct {
 	err    error
 	events []any
+	log    *callLog
 }
 
 func (p *fakePublisher) Publish(_ context.Context, _ string, event any) error {
+	p.log.add("publish")
 	p.events = append(p.events, event)
 	return p.err
 }
@@ -148,14 +175,73 @@ func TestBootstrap_NoOpParaAdminExistenteOCorreoYaOcupado(t *testing.T) {
 	}
 }
 
-func TestBootstrap_ElErrorDelBrokerRevierteLaCreacion(t *testing.T) {
-	repo := &fakeRepository{writer: &fakeWriter{userErr: pgx.ErrNoRows}}
-	_, err := newTestService(repo, &fakePublisher{err: errors.New("broker unavailable")}).Ensure(context.Background(), "first-admin@example.test")
-	if !errors.Is(err, ErrPublish) {
-		t.Fatalf("Ensure() error = %v, want ErrPublish", err)
+func TestBootstrap_PublicaDespuesDelCommitYNuncaDentroDeLaTransaccion(t *testing.T) {
+	log := &callLog{}
+	repo := &fakeRepository{writer: &fakeWriter{userErr: pgx.ErrNoRows}, log: log}
+	publisher := &fakePublisher{log: log}
+	if _, err := newTestService(repo, publisher).Ensure(context.Background(), "first-admin@example.test"); err != nil {
+		t.Fatalf("Ensure() error = %v", err)
 	}
-	if repo.committed {
-		t.Fatal("transaction committed after publish failure")
+	if got, want := strings.Join(log.steps, ","), "begin,commit,publish"; got != want {
+		t.Fatalf("call order = %s, want %s", got, want)
+	}
+}
+
+func TestBootstrap_SiLaTransaccionFallaNoSePublicaNada(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		repo *fakeRepository
+	}{
+		{name: "write fails", repo: &fakeRepository{writer: &fakeWriter{userErr: pgx.ErrNoRows, auditErr: errors.New("audit write failed")}}},
+		{name: "commit fails", repo: &fakeRepository{writer: &fakeWriter{userErr: pgx.ErrNoRows}, commitErr: errors.New("commit failed")}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			log := &callLog{}
+			tt.repo.log = log
+			publisher := &fakePublisher{log: log}
+			outcome, err := newTestService(tt.repo, publisher).Ensure(context.Background(), "first-admin@example.test")
+			if err == nil || outcome != "" {
+				t.Fatalf("Ensure() = %q, %v; want empty outcome and an error", outcome, err)
+			}
+			if len(publisher.events) != 0 {
+				t.Fatalf("published %d events although the transaction failed (%v)", len(publisher.events), log.steps)
+			}
+		})
+	}
+}
+
+func TestBootstrap_FalloDePublicacionTrasCommitAnulaLaInvitacionYElArranqueContinua(t *testing.T) {
+	log := &callLog{}
+	repo := &fakeRepository{writer: &fakeWriter{userErr: pgx.ErrNoRows}, log: log}
+	publisher := &fakePublisher{err: errors.New("broker unavailable"), log: log}
+	outcome, err := newTestService(repo, publisher).Ensure(context.Background(), "first-admin@example.test")
+	if err != nil {
+		t.Fatalf("Ensure() error = %v, want nil (the pending account is harmless)", err)
+	}
+	if outcome != OutcomeInvitationUndelivered {
+		t.Fatalf("outcome = %q, want %q", outcome, OutcomeInvitationUndelivered)
+	}
+	if got, want := strings.Join(log.steps, ","), "begin,commit,publish,begin,commit"; got != want {
+		t.Fatalf("call order = %s, want %s", got, want)
+	}
+	if got := repo.writer.invalidated; len(got) != 1 || got[0] != repo.writer.user.ID {
+		t.Fatalf("invalidated = %v, want the just-created account only", got)
+	}
+}
+
+func TestBootstrap_SiNoSePuedeAnularLaInvitacionTrasFalloDePublicacionSeAvisaSinFallar(t *testing.T) {
+	log := &callLog{}
+	repo := &fakeRepository{writer: &fakeWriter{userErr: pgx.ErrNoRows}, log: log}
+	// The compensating transaction is the second one; make its commit fail.
+	repo.commitErrOn = 2
+	repo.commitErr = errors.New("commit failed")
+	publisher := &fakePublisher{err: errors.New("broker unavailable"), log: log}
+	outcome, err := newTestService(repo, publisher).Ensure(context.Background(), "first-admin@example.test")
+	if err != nil {
+		t.Fatalf("Ensure() error = %v, want nil", err)
+	}
+	if outcome != OutcomeInvitationUndeliveredLive {
+		t.Fatalf("outcome = %q, want %q", outcome, OutcomeInvitationUndeliveredLive)
 	}
 }
 
@@ -205,14 +291,16 @@ func TestBootstrap_AdminPendienteRecibeInvitacionDeReemplazoSinDuplicarCuenta(t 
 	}
 }
 
-func TestBootstrap_ElErrorDelBrokerRevierteLaInvitacionDeReemplazo(t *testing.T) {
-	repo := &fakeRepository{writer: &fakeWriter{user: store.User{ID: uuid.New(), Status: "pending_verification"}, userRoles: []string{"admin"}}}
-	_, err := newTestService(repo, &fakePublisher{err: errors.New("broker unavailable")}).Ensure(context.Background(), "first-admin@example.test")
-	if !errors.Is(err, ErrPublish) {
-		t.Fatalf("Ensure() error = %v, want ErrPublish", err)
+func TestBootstrap_FalloDePublicacionEnReemisionDejaLaCuentaSinInvitacionVigente(t *testing.T) {
+	pending := store.User{ID: uuid.New(), Status: "pending_verification"}
+	repo := &fakeRepository{writer: &fakeWriter{user: pending, userRoles: []string{"admin"}}}
+	outcome, err := newTestService(repo, &fakePublisher{err: errors.New("broker unavailable")}).Ensure(context.Background(), "first-admin@example.test")
+	if err != nil || outcome != OutcomeInvitationUndelivered {
+		t.Fatalf("Ensure() = %q, %v; want undelivered and no error", outcome, err)
 	}
-	if repo.committed {
-		t.Fatal("transaction committed after publish failure")
+	// Once before issuing the replacement and once to withdraw it.
+	if got := repo.writer.invalidated; len(got) != 2 || got[0] != pending.ID || got[1] != pending.ID {
+		t.Fatalf("invalidated = %v, want two invalidations of %s", got, pending.ID)
 	}
 }
 
