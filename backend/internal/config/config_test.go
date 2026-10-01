@@ -162,8 +162,12 @@ func TestRF012_PublicBaseURLTieneValorPorDefectoYAdmiteOverride(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load default: %v", err)
 	}
-	if cfg.PublicBaseURL != "http://localhost:8080" {
+	// D10: el Hub vive en su propio dominio local, no en localhost a secas.
+	if cfg.PublicBaseURL != "http://identityhub.localhost:8080" {
 		t.Errorf("default PublicBaseURL = %q", cfg.PublicBaseURL)
+	}
+	if cfg.JWTIssuer != "http://identityhub.localhost:8080" {
+		t.Errorf("default JWTIssuer = %q", cfg.JWTIssuer)
 	}
 
 	t.Setenv("PUBLIC_BASE_URL", "https://identity.example")

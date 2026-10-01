@@ -48,7 +48,8 @@ El objetivo usa `docker compose --env-file .env -f deploy/docker-compose.yml` y 
 
 | Servicio | Dirección |
 |---|---|
-| Aplicación web | <http://localhost:8080> |
+| Aplicación web (Hub) | <http://identityhub.localhost:8080> (<http://localhost:8080> también sirve el Hub) |
+| Contabilidad (marcador, T13) | <http://contabilidad.localhost:8080> |
 | API | <http://localhost:8081/healthz> |
 | RabbitMQ | <http://localhost:15672> |
 | Mailpit | <http://localhost:8025> |

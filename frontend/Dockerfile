@@ -24,6 +24,8 @@ RUN npm run build
 FROM nginxinc/nginx-unprivileged@sha256:ed04ec1ff34502c339ee5c3ae3f855442398edc1d05591e2b98981dcbbd20b1e AS web
 
 COPY nginx/default.conf /etc/nginx/conf.d/default.conf
+COPY nginx/security-headers.conf /etc/nginx/security-headers.conf
+COPY nginx/contabilidad /usr/share/nginx/contabilidad
 COPY --from=builder /app/dist /usr/share/nginx/html
 
 EXPOSE 8080

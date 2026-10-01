@@ -180,7 +180,7 @@ día cuando cablee `main.go`). Obligatorias = el proceso no arranca sin ellas.
 | `JWT_SIGNING_KEY` | sí | — | semilla Ed25519 de 32 bytes, en base64 (`openssl rand -base64 32`) |
 | `API_PORT` | no | `8081` | puerto HTTP de la API |
 | `LOG_LEVEL` | no | `info` | |
-| `JWT_ISSUER` | no | `http://localhost:8080` | claim `iss` del token |
+| `JWT_ISSUER` | no | `http://identityhub.localhost:8080` | claim `iss` del token |
 | `JWT_AUDIENCE` | no | `identity-hub` | claim `aud` |
 | `JWT_ACCESS_TTL` | no | `15m` | vigencia del access token |
 | `JWT_REFRESH_TTL` | no | `720h` | vigencia del refresh token (cookie) |
@@ -191,7 +191,7 @@ día cuando cablee `main.go`). Obligatorias = el proceso no arranca sin ellas.
 | `TRUSTED_PROXIES` | no | vacío | CIDR separados por coma; sin esto, `X-Forwarded-For` se ignora siempre (T6) |
 | `ARGON2_MEMORY_KIB` / `_ITERATIONS` / `_PARALLELISM` / `_CONCURRENCY` | no | `65536` / `3` / `2` / `4` | parámetros de Argon2id |
 | `SMTP_HOST` / `_PORT` / `_FROM` | no | `mailpit` / `1025` / `no-reply@identity.local` | |
-| `PUBLIC_BASE_URL` | no | `http://localhost:8080` | usado para armar enlaces en los correos |
+| `PUBLIC_BASE_URL` | no | `http://identityhub.localhost:8080` | usado para armar enlaces en los correos |
 
 `Load()` acumula **todos** los errores de configuración antes de fallar
 (ver el comentario en `config.go`): un solo arranque fallido lista todo lo

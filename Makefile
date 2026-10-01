@@ -20,7 +20,8 @@ help: ## Muestra esta ayuda
 up: ## Levanta el stack de desarrollo
 	$(COMPOSE) up -d --build
 	@echo ""
-	@echo "  Aplicación      http://localhost:8080"
+	@echo "  Hub             http://identityhub.localhost:8080  (localhost:8080 también sirve el Hub)"
+	@echo "  Contabilidad    http://contabilidad.localhost:8080"
 	@echo "  API             http://localhost:8081/healthz"
 	@echo "  RabbitMQ        http://localhost:15672   (credentials from .env)"
 	@echo "  Mailpit         http://localhost:8025"
