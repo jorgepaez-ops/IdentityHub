@@ -1,7 +1,8 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { encodeBase64Url } from './base64url'
 import { verifyAccessToken } from './jwt'
-import { AUDIENCE, ISSUER, NOW, makeKey, signToken, validClaims, type TestKey } from '../testing'
+import { AUDIENCE, ISSUER } from '../config'
+import { NOW, makeKey, signToken, validClaims, type TestKey } from '../testing'
 
 let key: TestKey
 let other: TestKey
@@ -57,8 +58,17 @@ describe('access token verification against the Hub JWKS', () => {
   })
 
   it('TestRF020_RejectsExpiredToken', async () => {
-    const token = await signToken(key, validClaims({ exp: NOW - 1 }))
+    const token = await signToken(key, validClaims({ exp: NOW - 61 }))
     await expect(verifyAccessToken(token, { keys: [key.jwk] }, expected)).rejects.toThrow(/expired/)
+  })
+
+  it('TestRF020_AcceptsClockSkewAtExpiryAndNotBeforeBoundaries', async () => {
+    const expAtLeeway = await signToken(key, validClaims({ exp: NOW - 60, nbf: NOW + 60 }))
+    await expect(verifyAccessToken(expAtLeeway, { keys: [key.jwk] }, expected)).resolves.toBeTruthy()
+    const expPastLeeway = await signToken(key, validClaims({ exp: NOW - 61 }))
+    await expect(verifyAccessToken(expPastLeeway, { keys: [key.jwk] }, expected)).rejects.toThrow(/expired/)
+    const nbfPastLeeway = await signToken(key, validClaims({ nbf: NOW + 61 }))
+    await expect(verifyAccessToken(nbfPastLeeway, { keys: [key.jwk] }, expected)).rejects.toThrow(/not yet valid/)
   })
 
   it('TestRF020_RejectsMissingExpiry', async () => {

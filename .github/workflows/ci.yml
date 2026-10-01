@@ -115,7 +115,7 @@ jobs:
 
       - name: Instalar dependencias del frontend
         working-directory: frontend
-        run: npm ci || npm install
+        run: npm ci
 
       - name: ESLint
         working-directory: frontend
@@ -128,7 +128,7 @@ jobs:
       # T13 — la SPA de Contabilidad pasa por los mismos gates que la consola.
       - name: Instalar dependencias de Contabilidad
         working-directory: contabilidad
-        run: npm ci || npm install
+        run: npm ci
 
       - name: ESLint (Contabilidad)
         working-directory: contabilidad

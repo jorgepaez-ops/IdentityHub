@@ -33,6 +33,10 @@ export function AuditLogPage({ onSessionEnded }: { onSessionEnded: () => void })
   const [loadingMore, setLoadingMore] = useState(false)
   const generation = useRef(0)
 
+  useEffect(() => () => {
+    generation.current += 1
+  }, [])
+
   useEffect(() => {
     const mine = ++generation.current
     setError(null)

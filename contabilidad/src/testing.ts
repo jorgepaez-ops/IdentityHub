@@ -1,7 +1,6 @@
 import { encodeBase64Url } from './auth/base64url'
+import { AUDIENCE, ISSUER } from './config'
 
-export const ISSUER = 'http://identityhub.localhost:8080'
-export const AUDIENCE = 'contabilidad'
 export const NOW = 1_800_000_000
 
 export interface TestKey {

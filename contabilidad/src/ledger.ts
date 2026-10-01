@@ -35,7 +35,14 @@ export const visibleMovements = (movements: Movement[], level: 'full' | 'own') =
 export const totalOf = (movements: Movement[], status: Status) => movements.filter((movement) => movement.status === status).reduce((sum, movement) => sum + movement.amount, 0)
 export const countOf = (movements: Movement[], status: Status) => movements.filter((movement) => movement.status === status).length
 
+const FOLIO_PREFIX = 'M-'
+const INITIAL_FOLIO_NUMBER = 2040
+
 export function nextId(movements: Movement[]): string {
-  const highest = movements.reduce((max, movement) => Math.max(max, Number(movement.id.slice(2))), 2040)
-  return `M-${highest + 1}`
+  const highest = movements.reduce((max, movement) => {
+    if (!movement.id.startsWith(FOLIO_PREFIX)) return max
+    const number = Number(movement.id.slice(FOLIO_PREFIX.length))
+    return Number.isInteger(number) ? Math.max(max, number) : max
+  }, INITIAL_FOLIO_NUMBER)
+  return `${FOLIO_PREFIX}${highest + 1}`
 }

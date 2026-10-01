@@ -1,5 +1,7 @@
 import { decodeBase64Url } from './base64url'
 
+export const CLOCK_LEEWAY_SECONDS = 60
+
 export interface Jwk {
   kty?: string
   crv?: string
@@ -72,8 +74,8 @@ export async function verifyAccessToken(token: string, jwks: Jwks, expected: Exp
   const audience = Array.isArray(claims.aud) ? claims.aud : [claims.aud]
   if (!audience.includes(expected.audience)) throw new TokenVerificationError('unexpected audience')
   const now = (expected.now ?? (() => Math.floor(Date.now() / 1000)))()
-  if (typeof claims.exp !== 'number' || claims.exp <= now) throw new TokenVerificationError('token expired')
-  if (typeof claims.nbf === 'number' && claims.nbf > now) throw new TokenVerificationError('token not yet valid')
+  if (typeof claims.exp !== 'number' || claims.exp < now - CLOCK_LEEWAY_SECONDS) throw new TokenVerificationError('token expired')
+  if (typeof claims.nbf === 'number' && claims.nbf > now + CLOCK_LEEWAY_SECONDS) throw new TokenVerificationError('token not yet valid')
   if (typeof claims.sub !== 'string' || claims.sub === '') throw new TokenVerificationError('missing subject')
 
   // The Hub serializes an empty role set as null.

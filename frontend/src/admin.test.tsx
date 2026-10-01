@@ -1,6 +1,8 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from './App'
+import { UsersPage } from './features/admin/UsersPage'
+import { AuditLogPage } from './features/admin/AuditLogPage'
 import { resetSessionForTests } from './api/client'
 import { type Handler, goTo, json, problem, profile, signedIn, stubApi, type } from './test-utils'
 
@@ -50,6 +52,53 @@ afterEach(() => {
   resetSessionForTests()
   vi.unstubAllGlobals()
   goTo('/')
+})
+
+describe('admin page unmount safety', () => {
+  it('TestRNF012_UsersPageIgnoresLateUnauthorizedResponseAfterUnmount', async () => {
+    const late = deferred<Response>()
+    const onSessionEnded = vi.fn()
+    const api = stubApi({
+      'GET /api/v1/admin/users': () => late.promise,
+      'POST /api/v1/auth/refresh': () => problem(401),
+    })
+    const view = render(<UsersPage currentUserId="admin-id" onSessionEnded={onSessionEnded} />)
+    await waitFor(() => expect(api.calls).toHaveLength(1))
+    view.unmount()
+    await act(async () => { late.resolve(problem(401)) })
+    expect(onSessionEnded).not.toHaveBeenCalled()
+  })
+
+  it('TestRNF012_AuditLogPageIgnoresLateUnauthorizedResponseAfterUnmount', async () => {
+    const late = deferred<Response>()
+    const onSessionEnded = vi.fn()
+    const api = stubApi({
+      'GET /api/v1/admin/audit-log': () => late.promise,
+      'POST /api/v1/auth/refresh': () => problem(401),
+    })
+    const view = render(<AuditLogPage onSessionEnded={onSessionEnded} />)
+    await waitFor(() => expect(api.calls).toHaveLength(1))
+    view.unmount()
+    await act(async () => { late.resolve(problem(401)) })
+    expect(onSessionEnded).not.toHaveBeenCalled()
+  })
+
+  it('TestRNF012_UsersPageIgnoresLateResendFailureAfterUnmount', async () => {
+    const late = deferred<Response>()
+    const onSessionEnded = vi.fn()
+    const api = stubApi({
+      'GET /api/v1/admin/users': () => json(200, { items: directory, nextCursor: null }),
+      'POST /api/v1/admin/users/beto-id/invitation': () => late.promise,
+      'POST /api/v1/auth/refresh': () => problem(401),
+    })
+    const view = render(<UsersPage currentUserId="admin-id" onSessionEnded={onSessionEnded} />)
+    const resend = await screen.findByRole('button', { name: 'Reenviar invitación a Beto Ruiz' })
+    fireEvent.click(resend)
+    await waitFor(() => expect(api.calls.some((call) => call.key === 'POST /api/v1/admin/users/beto-id/invitation')).toBe(true))
+    view.unmount()
+    await act(async () => { late.resolve(problem(401)) })
+    expect(onSessionEnded).not.toHaveBeenCalled()
+  })
 })
 
 describe('user directory', () => {

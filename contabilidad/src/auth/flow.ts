@@ -8,7 +8,7 @@ import { challengeFor, generateState, generateVerifier } from './pkce'
 const VERIFIER_KEY = 'contabilidad.pkce_verifier'
 const STATE_KEY = 'contabilidad.oauth_state'
 
-export type CallbackErrorKind = 'state' | 'denied' | 'exchange' | 'token'
+export type CallbackErrorKind = 'state' | 'denied' | 'exchange' | 'token' | 'hub_unavailable'
 
 export class CallbackError extends Error {
   constructor(readonly kind: CallbackErrorKind, message: string) {
@@ -87,10 +87,17 @@ export async function completeCallback(search: string): Promise<Session> {
     throw new CallbackError('exchange', reason instanceof Error ? reason.message : 'token exchange failed')
   }
 
+  let jwksResponse: Response
   try {
-    const response = await fetch(`${HUB_ORIGIN}/.well-known/jwks.json`, { credentials: 'omit' })
-    if (!response.ok) throw new Error(`jwks answered ${response.status}`)
-    const jwks = (await response.json()) as Jwks
+    jwksResponse = await fetch(`${HUB_ORIGIN}/.well-known/jwks.json`, { credentials: 'omit' })
+  } catch (reason) {
+    throw new CallbackError('hub_unavailable', reason instanceof Error ? reason.message : 'JWKS fetch failed')
+  }
+  if (jwksResponse.status >= 500) throw new CallbackError('hub_unavailable', `jwks answered ${jwksResponse.status}`)
+
+  try {
+    if (!jwksResponse.ok) throw new Error(`jwks answered ${jwksResponse.status}`)
+    const jwks = (await jwksResponse.json()) as Jwks
     const verified = await verifyAccessToken(accessToken, jwks, { issuer: ISSUER, audience: AUDIENCE })
     return { accessToken, verified }
   } catch (reason) {

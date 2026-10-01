@@ -1,12 +1,11 @@
 import { useState } from 'react'
 import type { Access } from './access'
 import { INITIAL_MOVEMENTS, PERIOD, nextId, type Movement } from './ledger'
-import { AdministrationView } from './views/Administration'
 import { ClosingView } from './views/Closing'
 import { SummaryView } from './views/Summary'
 import { TransactionsView } from './views/Transactions'
 
-type View = 'summary' | 'transactions' | 'closing' | 'administration'
+type View = 'summary' | 'transactions' | 'closing'
 
 interface Props {
   access: Access
@@ -33,11 +32,10 @@ export function Shell({ access, subject, onLogout }: Props) {
     setToast(`Cierre de ${PERIOD} registrado (datos de ejemplo).`)
   }
 
-  const items: { id: View; label: string; locked?: boolean; hidden?: boolean }[] = [
+  const items: { id: View; label: string; locked?: boolean }[] = [
     { id: 'summary', label: 'Resumen' },
     { id: 'transactions', label: 'Transacciones' },
     { id: 'closing', label: 'Cierre contable', locked: !access.canClose },
-    { id: 'administration', label: 'Administración', hidden: !access.showAdministration },
   ]
   const initials = access.label.split(' ').map((word) => word[0]).join('').slice(0, 2).toUpperCase()
 
@@ -57,7 +55,7 @@ export function Shell({ access, subject, onLogout }: Props) {
       <div className="layout">
         <aside className="rail">
           <nav aria-label="Secciones">
-            {items.filter((item) => !item.hidden).map((item) => (
+            {items.map((item) => (
               <button
                 key={item.id}
                 type="button"
@@ -77,7 +75,6 @@ export function Shell({ access, subject, onLogout }: Props) {
           {view === 'summary' && <SummaryView access={access} movements={movements} />}
           {view === 'transactions' && <TransactionsView access={access} movements={movements} onDecide={decide} onRegister={register} />}
           {view === 'closing' && <ClosingView access={access} movements={movements} closed={closed} onClose={close} />}
-          {view === 'administration' && access.showAdministration && <AdministrationView />}
         </main>
       </div>
       {toast && <div className="toast" role="status">{toast}</div>}

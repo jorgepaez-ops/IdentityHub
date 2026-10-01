@@ -3,9 +3,10 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { App } from './App'
 import { beginLogin } from './auth/flow'
 import * as navigation from './navigation'
+import { AUDIENCE, HUB_ORIGIN, ISSUER } from './config'
 import { makeKey, signToken, validClaims, type TestKey } from './testing'
 
-const HUB = 'http://identityhub.localhost:8080'
+const HUB = HUB_ORIGIN
 let key: TestKey
 let redirect: ReturnType<typeof vi.spyOn>
 
@@ -18,6 +19,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.useRealTimers()
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
   window.history.replaceState({}, '', '/')
@@ -102,20 +104,55 @@ describe('callback screen', () => {
   })
 
   it('TestRF020_ExpiredTokenGoesBackToAuthorizeWithoutRefreshToken', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-01T12:00:00Z'))
     await beginLogin()
     const nowSeconds = Math.floor(Date.now() / 1000)
-    stubHub({ roles: ['contabilidad.senior'], exp: nowSeconds + 1 })
+    stubHub({ roles: ['contabilidad.senior'], exp: nowSeconds + 61 })
     window.history.replaceState({}, '', `/oauth/callback?code=c&state=${sessionStorage.getItem('contabilidad.oauth_state')}`)
     redirect.mockClear()
     render(<App />)
-    await screen.findByRole('navigation', { name: 'Secciones' })
-    await waitFor(() => expect(redirect).toHaveBeenCalledTimes(1), { timeout: 3500 })
+    await act(async () => { await vi.advanceTimersByTimeAsync(0) })
+    expect(screen.getByRole('navigation', { name: 'Secciones' })).toBeInTheDocument()
+    await act(async () => { await vi.advanceTimersByTimeAsync(61_000) })
+    expect(redirect).toHaveBeenCalledTimes(1)
     expect(String(redirect.mock.calls[0]?.[0])).toContain(`${HUB}/oauth/authorize?`)
   })
+  it('TestRF020_ShowsHubUnavailableMessageAndRetryWhenJwksFails', async () => {
+    await beginLogin()
+    const state = sessionStorage.getItem('contabilidad.oauth_state')
+    const nowSeconds = Math.floor(Date.now() / 1000)
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === `${HUB}/oauth/token`) {
+        const access = await signToken(key, validClaims({ iss: ISSUER, aud: [AUDIENCE], iat: nowSeconds, exp: nowSeconds + 900 }))
+        return new Response(JSON.stringify({ access_token: access }), { status: 200 })
+      }
+      throw new TypeError('Failed to fetch')
+    }))
+    window.history.replaceState({}, '', `/oauth/callback?code=c&state=${state}`)
+    render(<App />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Identity Hub no está disponible')
+    expect(screen.getByRole('button', { name: 'Reintentar' })).toBeInTheDocument()
+  })
+
+  it('TestRF020_ShowsClockProblemInsteadOfRedirectingAgainForNearExpiryToken', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-01T12:00:00Z'))
+    await beginLogin()
+    const nowSeconds = Math.floor(Date.now() / 1000)
+    stubHub({ roles: ['contabilidad.senior'], exp: nowSeconds + 60 })
+    window.history.replaceState({}, '', `/oauth/callback?code=c&state=${sessionStorage.getItem('contabilidad.oauth_state')}`)
+    redirect.mockClear()
+    render(<App />)
+    await act(async () => { await vi.advanceTimersByTimeAsync(0) })
+    expect(screen.getByRole('alert')).toHaveTextContent('reloj')
+    expect(redirect).not.toHaveBeenCalled()
+  })
+
 })
 
 describe('access denied', () => {
-  it.each([[['user']], [[]], [null]])('TestRF009_TokenWithoutContabilidadRoleIsDenied %j', async (roles) => {
+  it.each([[['admin']], [['user']], [[]], [null]])('TestRF009_TokenWithoutContabilidadRoleIsDenied %j', async (roles) => {
     await signInAs(roles, 'denied')
     // The access-denied screen replaces the whole shell: no rail, no ledger.
     expect(screen.queryByRole('navigation', { name: 'Secciones' })).not.toBeInTheDocument()
@@ -197,16 +234,6 @@ describe('senior role', () => {
   })
 })
 
-describe('admin role', () => {
-  it('TestRF009_AdminSeesAdministrationPointingToTheHub', async () => {
-    await signInAs(['admin'])
-    goTo(/Administración/)
-    expect(screen.getByText(/La gestión de usuarios y roles vive en Identity Hub/)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Identity Hub/ })).toHaveAttribute('href', HUB)
-    expect(screen.getByText('Acceso total, igual que en Identity Hub.')).toBeInTheDocument()
-    expect(within(rail()).getByRole('button', { name: /Cierre contable/ })).toBeEnabled()
-  })
-})
 
 describe('logout', () => {
   it('TestRF020_LogoutClearsMemoryAndReturnsToLogin', async () => {

@@ -13,9 +13,6 @@ module.exports = {
     'react-hooks/rules-of-hooks': 'error',
     'react-hooks/exhaustive-deps': 'warn',
 
-    // RNF-009 / AM-015: la vía más corta a un XSS en React es inyectar HTML
-    // sin sanear. Se prohíbe de raíz en vez de confiar en la revisión.
-    'react/no-danger': 'off',
     'no-restricted-properties': [
       'error',
       {
@@ -24,6 +21,7 @@ module.exports = {
         message: 'eval() está prohibido: ver RNF-009.',
       },
     ],
+    // RNF-009 / AM-015: este selector JSX prohíbe la prop que inyecta HTML.
     'no-restricted-syntax': [
       'error',
       {

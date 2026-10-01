@@ -2,9 +2,10 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { challengeFor } from './pkce'
 import { beginLogin, completeCallback } from './flow'
 import * as navigation from '../navigation'
-import { AUDIENCE, ISSUER, makeKey, signToken, validClaims, type TestKey } from '../testing'
+import { AUDIENCE, HUB_ORIGIN, ISSUER } from '../config'
+import { makeKey, signToken, validClaims, type TestKey } from '../testing'
 
-const HUB = 'http://identityhub.localhost:8080'
+const HUB = HUB_ORIGIN
 let key: TestKey
 
 beforeAll(async () => { key = await makeKey('hub-key') })
@@ -134,6 +135,26 @@ describe('completeCallback: code exchange and token handling', () => {
     stubHub({ token: () => jsonResponse(200, { access_token: forged, token_type: 'Bearer', expires_in: 900 }) })
     await expect(completeCallback(`?code=c&state=${state}`)).rejects.toMatchObject({ kind: 'token' })
     expect(ISSUER).toBe(HUB)
+  })
+
+  it('TestRF020_CallbackReportsJwksNetworkFailureAsHubUnavailable', async () => {
+    const { state } = await startedFlow()
+    const access = await signToken(key, validClaims({ exp: Math.floor(Date.now() / 1000) + 900 }))
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === `${HUB}/oauth/token`) return jsonResponse(200, { access_token: access })
+      throw new TypeError('Failed to fetch')
+    }))
+    await expect(completeCallback(`?code=c&state=${state}`)).rejects.toMatchObject({ kind: 'hub_unavailable' })
+  })
+
+  it('TestRF020_CallbackReportsJwksServerFailureAsHubUnavailable', async () => {
+    const { state } = await startedFlow()
+    const access = await signToken(key, validClaims({ exp: Math.floor(Date.now() / 1000) + 900 }))
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === `${HUB}/oauth/token`) return jsonResponse(200, { access_token: access })
+      return jsonResponse(503, { title: 'Unavailable' })
+    }))
+    await expect(completeCallback(`?code=c&state=${state}`)).rejects.toMatchObject({ kind: 'hub_unavailable' })
   })
 
   it('TestRF020_CallbackReportsNetworkFailureAsExchangeError', async () => {

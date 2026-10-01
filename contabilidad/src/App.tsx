@@ -5,11 +5,14 @@ import { CALLBACK_PATH } from './config'
 import { AccessDenied, LoginScreen, type LoginState } from './Login'
 import { Shell } from './Shell'
 
+const MINIMUM_SESSION_LIFETIME_MS = 60_000
+
 const CALLBACK_MESSAGES: Record<CallbackError['kind'], string> = {
   state: 'No se pudo validar el inicio de sesión (la respuesta no corresponde a esta solicitud). Inténtalo de nuevo.',
   denied: 'Identity Hub no autorizó el acceso. Inténtalo de nuevo.',
   exchange: 'No se pudo completar el inicio de sesión con Identity Hub. Inténtalo de nuevo.',
   token: 'La credencial recibida de Identity Hub no es válida. Inténtalo de nuevo.',
+  hub_unavailable: 'Identity Hub no está disponible en este momento. Inténtalo de nuevo.',
 }
 
 export function App() {
@@ -24,7 +27,13 @@ export function App() {
     if (!returning || callbackHandled.current) return
     callbackHandled.current = true
     completeCallback(window.location.search).then(
-      (result) => setSession(result),
+      (result) => {
+        if (result.verified.expiresAt * 1000 - Date.now() <= MINIMUM_SESSION_LIFETIME_MS) {
+          setLogin({ kind: 'error', message: 'No se pudo iniciar sesión por un problema de reloj. Verifica la hora de tu dispositivo e inténtalo de nuevo.' })
+          return
+        }
+        setSession(result)
+      },
       (reason: unknown) => setLogin({ kind: 'error', message: CALLBACK_MESSAGES[(reason as CallbackError)?.kind] ?? CALLBACK_MESSAGES.exchange }),
     )
   }, [returning])
