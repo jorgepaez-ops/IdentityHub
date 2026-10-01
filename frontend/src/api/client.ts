@@ -5,6 +5,11 @@ export type MfaChallenge = components['schemas']['MfaChallenge']
 type MfaVerifyRequest = operations['verifyMfa']['requestBody']['content']['application/json']
 type MfaResendRequest = operations['resendMfaCode']['requestBody']['content']['application/json']
 type TokenPair = components['schemas']['TokenPair']
+type InvitationAcceptRequest = operations['acceptInvitation']['requestBody']['content']['application/json']
+type EmailRequest = operations['requestPasswordReset']['requestBody']['content']['application/json']
+type PasswordResetConfirmRequest = operations['confirmPasswordReset']['requestBody']['content']['application/json']
+type UpdateProfileRequest = operations['updateCurrentUser']['requestBody']['content']['application/json']
+export type Session = components['schemas']['Session']
 export type CurrentUser = components['schemas']['User']
 export type Problem = components['schemas']['Problem']
 
@@ -17,6 +22,7 @@ export class ApiProblemError extends Error {
   readonly status: number
   readonly title: string
   readonly detail?: string
+  readonly errors: NonNullable<Problem['errors']>
 
   constructor(problem: Problem, fallbackStatus: number) {
     super(problem.detail ?? problem.title)
@@ -24,6 +30,7 @@ export class ApiProblemError extends Error {
     this.status = problem.status ?? fallbackStatus
     this.title = problem.title
     this.detail = problem.detail
+    this.errors = problem.errors ?? []
   }
 }
 
@@ -56,6 +63,7 @@ async function parseError(response: Response): Promise<ApiProblemError> {
       title: problem.title ?? (response.statusText || 'Error de la API'),
       status: problem.status ?? response.status,
       ...(problem.detail ? { detail: problem.detail } : {}),
+      ...(Array.isArray(problem.errors) ? { errors: problem.errors } : {}),
     },
     response.status,
   )
@@ -133,6 +141,15 @@ export async function verifyMfa(input: MfaVerifyRequest): Promise<void> {
 
 export const resendMfaCode = (input: MfaResendRequest) => post<void>('/api/v1/auth/mfa/resend', input)
 export const getCurrentUser = () => authenticatedRequest<CurrentUser>('/api/v1/me')
+
+export const acceptInvitation = (input: InvitationAcceptRequest) => post<void>('/api/v1/auth/invitations/accept', input)
+export const requestPasswordReset = (input: EmailRequest) => post<void>('/api/v1/auth/password-reset/request', input)
+export const confirmPasswordReset = (input: PasswordResetConfirmRequest) => post<void>('/api/v1/auth/password-reset/confirm', input)
+export const updateCurrentUser = (input: UpdateProfileRequest) =>
+  authenticatedRequest<CurrentUser>('/api/v1/me', { method: 'PATCH', body: JSON.stringify(input) })
+export const listSessions = () => authenticatedRequest<Session[]>('/api/v1/me/sessions')
+export const revokeSession = (sessionId: string) =>
+  authenticatedRequest<void>(`/api/v1/me/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE' })
 
 export async function logout(): Promise<void> {
   try {

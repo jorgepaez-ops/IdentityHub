@@ -71,3 +71,25 @@ nav a.active { background: var(--accent-soft); color: var(--accent); font-weight
   .logout-button { width: auto; margin-top: 0; margin-left: auto; }
   .app-content { padding: 1.5rem; }
 }
+.text-link { display: block; margin-top: 1rem; text-align: center; font-size: .85rem; }
+.button-link { display: block; text-align: center; text-decoration: none; }
+.hint { margin: .35rem 0 0; color: var(--muted); font-size: .78rem; }
+.error-box p, .success-box p { margin: 0; }
+.error-box p + p { margin-top: .35rem; }
+.error-box + form, .success-box + form, .success-box + .button-link, .error-box + .button-link { margin-top: 1rem; }
+.error-box, .success-box { margin-bottom: 1rem; }
+.account-grid { display: grid; gap: 1.25rem; margin-top: 1.5rem; max-width: 46rem; }
+.panel { padding: 1.5rem; background: var(--panel); border: 1px solid var(--line); border-radius: 1rem; }
+.panel h2 { margin: 0 0 .5rem; font-family: var(--display); font-size: 1.1rem; }
+.field-label { margin: 1rem 0 .35rem; color: var(--muted); font-size: .78rem; font-weight: 600; }
+.fit { width: auto; }
+.chips { display: flex; flex-wrap: wrap; gap: .4rem; margin: 0; padding: 0; list-style: none; }
+.chip { display: inline-block; padding: .15rem .6rem; font-size: .75rem; font-weight: 600; border-radius: 999px; background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
+.chip-accent { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+.chip-warn { background: var(--warn-soft); color: var(--warn); border-color: transparent; }
+.chip-ok { margin-left: .5rem; background: var(--ok-soft); color: var(--ok); border-color: transparent; }
+.session-list { display: grid; gap: .75rem; margin: 1rem 0 0; padding: 0; list-style: none; }
+.session-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .85rem 1rem; background: var(--bg); border: 1px solid var(--line); border-radius: .75rem; }
+.session-row p { margin: 0; }
+.session-row .session-agent { font-weight: 600; }
+.session-row .secondary-button { margin-top: 0; }

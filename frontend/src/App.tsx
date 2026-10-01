@@ -1,5 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react'
-import { BrowserRouter, NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
+import { BrowserRouter, Link, NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
+import { MyAccountPage } from './features/account/MyAccountPage'
+import { AcceptInvitationPage, ForgotPasswordPage, ResetPasswordPage } from './features/account/PublicPages'
 import { ApiProblemError, clearSession, type CurrentUser, type MfaChallenge, getCurrentUser, login, logout, refreshSession, resendMfaCode, verifyMfa } from './api/client'
 
 type ErrorStep = 'credentials' | 'verify' | 'resend'
@@ -126,6 +128,7 @@ function LoginPage({ onAuthenticated }: { onAuthenticated: (user: CurrentUser) =
             <label htmlFor="password">Contraseña</label>
             <input id="password" name="password" type="password" required />
             <button className="primary-button" disabled={pending} type="submit">{pending ? 'Validando…' : 'Iniciar sesión'}</button>
+            <Link className="text-link" to="/forgot-password">¿Olvidaste tu contraseña?</Link>
           </form>
         )}
       </section>
@@ -133,7 +136,7 @@ function LoginPage({ onAuthenticated }: { onAuthenticated: (user: CurrentUser) =
   )
 }
 
-function AppShell({ user, onLogout }: { user: CurrentUser; onLogout: () => Promise<void> }) {
+function AppShell({ user, onLogout, onUserChange, onSessionEnded }: { user: CurrentUser; onLogout: () => Promise<void>; onUserChange: (user: CurrentUser) => void; onSessionEnded: () => void }) {
   const navigate = useNavigate()
   const closeSession = async () => {
     try {
@@ -158,7 +161,7 @@ function AppShell({ user, onLogout }: { user: CurrentUser; onLogout: () => Promi
       <main className="app-content">
         <Routes>
           <Route path="/usuarios" element={user.roles.includes('admin') ? <Placeholder title="Usuarios" text="El directorio de usuarios estará disponible próximamente." /> : <Navigate to="/me" replace />} />
-          <Route path="/me" element={<Placeholder title="Mi cuenta" text="Tu perfil y sesiones estarán disponibles próximamente." />} />
+          <Route path="/me" element={<MyAccountPage user={user} onUserChange={onUserChange} onSessionEnded={onSessionEnded} />} />
           <Route path="*" element={<Navigate to={user.roles.includes('admin') ? '/usuarios' : '/me'} replace />} />
         </Routes>
       </main>
@@ -194,8 +197,11 @@ function AppRoutes() {
 
   return (
     <Routes>
+      <Route path="/invitations/accept" element={<AcceptInvitationPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/password-reset" element={<ResetPasswordPage />} />
       <Route path="/login" element={user ? <Navigate to={user.roles.includes('admin') ? '/usuarios' : '/me'} replace /> : <LoginPage onAuthenticated={setUser} />} />
-      <Route path="/*" element={user ? <AppShell user={user} onLogout={async () => { try { await logout() } finally { setUser(null) } }} /> : <Navigate to="/login" replace />} />
+      <Route path="/*" element={user ? <AppShell user={user} onLogout={async () => { try { await logout() } finally { setUser(null) } }} onUserChange={setUser} onSessionEnded={() => { clearSession(); setUser(null) }} /> : <Navigate to="/login" replace />} />
     </Routes>
   )
 }
