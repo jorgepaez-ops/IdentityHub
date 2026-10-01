@@ -28,3 +28,10 @@ Una etiqueta mutable hace que la misma construcción pueda incorporar una imagen
 Imagen final cambiada a `nginxinc/nginx-unprivileged:stable`, fijada por digest real
 (`sha256:0918d093...`) en vez de una etiqueta móvil. Hadolint sobre `frontend/Dockerfile`: sin
 DL3007.
+
+Actualización (2026-10-01, PR #6): la imagen Debian fijada acumuló 13 CVE HIGH corregibles
+publicados después de fijarla (`openssl`, `libpcre2`, `libheif`; CI run 36863251783) y el digest
+más reciente de `stable` (2026-09-28) todavía no los incluía. La base pasó a
+`nginxinc/nginx-unprivileged:stable-alpine` (Alpine 3.24.2), fijada por digest
+(`sha256:ed04ec1f...`), con 0 HIGH/CRITICAL corregibles. La remediación de esta ficha no cambia:
+sigue siendo una base fijada por digest, no una etiqueta móvil.
