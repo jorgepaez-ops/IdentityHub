@@ -40,11 +40,9 @@ de la decisión.
 T34b subió `golang.org/x/crypto` de 0.55.0 a 0.56.0 (`go get` + `go mod tidy`), lo que corrige
 GO-2026-6354 y GO-2026-6355. `golang.org/x/crypto` >= 0.56.0 declara `go 1.26.0` en su propio
 `go.mod`, así que la directiva `go` del módulo subió de 1.25.0 a 1.26.0 (MVS obliga a igualar o
-superar el mínimo de cada dependencia); no fue una elección independiente de T34b. Pendiente para
-una tarea futura: `backend/Dockerfile` sigue en `golang:1.25-bookworm` y `GO_VERSION` en `ci.yml`
-sigue en `"1.25"` — ambos dependen de `GOTOOLCHAIN=auto` (valor por defecto) para descargar el
-toolchain 1.26.0 al vuelo; T34b no lo verificó de punta a punta porque no puede tocar Dockerfiles
-ni `ci.yml`.
+superar el mínimo de cada dependencia); no fue una elección independiente de T34b. `backend/Dockerfile`
+usa `golang:1.26-bookworm` y `GO_VERSION` en `ci.yml` usa `"1.26"`; ambos satisfacen la
+directiva `go 1.26.0` del módulo tras T34b.
 
 ## Riesgo aceptado (GO-2026-5932)
 

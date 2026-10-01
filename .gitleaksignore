@@ -81,3 +81,8 @@ ac159e86dc206f84a8f2163ace4f13682f3e2e22:docs/guia-desarrollo.md:url-de-conexion
 # Falso positivo: clave JWT de prueba en un test de configuración. Es el base64 de
 # "0123456789abcdef0123456789abcdef", un valor de relleno sin uso fuera del test.
 902a047e16bce1ff4edc90e11ad93f5d7d532e62:backend/internal/config/trusted_proxies_test.go:generic-api-key:41
+
+# Falso positivo: asignación de campo de struct (Password: request.Password) en el
+# handler de aceptación de invitaciones. Es el valor que llega en el request, no un
+# secreto en el código; la regla genérica toma cualquier "password: <valor>".
+28293ddebaeaa94a978556c9ee52eb20c3f8254e:backend/internal/api/accept_invitation.go:contrasena-en-variable-de-entorno:29

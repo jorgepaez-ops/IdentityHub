@@ -168,6 +168,22 @@ func (w *worker) handle(ctx context.Context, d amqp.Delivery) {
 // deliver arma el correo específico del tipo de evento y lo envía por SMTP.
 // Nunca registra el cuerpo bruto porque algunos eventos llevan tokens en claro.
 func (w *worker) deliver(ctx context.Context, env events.Envelope, body []byte) error {
+	if env.EventType == events.TypePasswordResetRequested {
+		var event events.PasswordResetRequested
+		if err := json.Unmarshal(body, &event); err != nil {
+			return fmt.Errorf("decode password reset notification: %w", err)
+		}
+		if !event.Data.AccountExists {
+			// Anti-enumeration rule (AM-004): silently drop the email for a
+			// reset request on an account that does not exist, but still
+			// leave an operational trace without the email or token
+			// (RNF-012 forbids logging either).
+			if w.logger != nil {
+				w.logger.Info("password reset event skipped: account does not exist", "event_type", env.EventType, "event_id", env.EventID.String())
+			}
+			return nil
+		}
+	}
 	message, err := notify.Render(env.EventType, w.cfg.PublicBaseURL, body)
 	if err != nil {
 		return fmt.Errorf("renderizando la notificación: %w", err)

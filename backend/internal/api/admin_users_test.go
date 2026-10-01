@@ -87,3 +87,52 @@ func TestRF010_AdminNoPuedeDeshabilitarseASiMismo(t *testing.T) {
 		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
 	}
 }
+
+func TestRF010_AdminNoPuedeAsignarseRolesASiMismo(t *testing.T) {
+	actor := uuid.New()
+	service := &adminServiceStub{err: admin.ErrSelfRoleAssignment}
+	response := adminRequest(t, adminServer(t, actor, service), http.MethodPatch, "/api/v1/admin/users/"+actor.String(), `{"roles":["contabilidad.senior"]}`, actor)
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestRF009_UpdateUserRechazaRolDesconocido(t *testing.T) {
+	actor, target := uuid.New(), uuid.New()
+	service := &adminServiceStub{err: admin.ErrInvalidRole}
+	response := adminRequest(t, adminServer(t, actor, service), http.MethodPatch, "/api/v1/admin/users/"+target.String(), `{"roles":["operator"]}`, actor)
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestRF009_UpdateUserRechazaQuitarElRolBaseUser(t *testing.T) {
+	actor, target := uuid.New(), uuid.New()
+	service := &adminServiceStub{err: admin.ErrBaseRoleRequired}
+	response := adminRequest(t, adminServer(t, actor, service), http.MethodPatch, "/api/v1/admin/users/"+target.String(), `{"roles":["contabilidad.senior"]}`, actor)
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestRF009_UpdateUserAceptaRolesDeNegocioDeContabilidad(t *testing.T) {
+	actor, target := uuid.New(), uuid.New()
+	service := &adminServiceStub{updateUser: admin.User{ID: target, Email: "target@example.test", Status: admin.StatusActive, Roles: []string{"user", "contabilidad.senior"}}}
+	response := adminRequest(t, adminServer(t, actor, service), http.MethodPatch, "/api/v1/admin/users/"+target.String(), `{"roles":["user","contabilidad.senior"]}`, actor)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	var body User
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, role := range body.Roles {
+		if string(role) == "contabilidad.senior" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("roles=%v, want contabilidad.senior included", body.Roles)
+	}
+}

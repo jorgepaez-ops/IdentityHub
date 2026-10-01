@@ -11,30 +11,44 @@ Prioridad: **P0** núcleo no negociable · **P1** segundo anillo · **P2** si so
 
 ## Requisitos funcionales
 
-### RF-001 — Registro de cuenta · P0
-Una persona puede crear una cuenta con correo y contraseña.
-- La contraseña se almacena con Argon2id; jamás en claro ni con hash rápido.
-- Se rechaza una contraseña de menos de 12 caracteres.
-- Un correo ya registrado devuelve `409`, **con el mismo tiempo de respuesta** que uno nuevo
-  (mitiga enumeración de usuarios).
-- La cuenta nace en estado `pending_verification` y no puede iniciar sesión.
-- **Aceptación:** registrarse devuelve `201`; un segundo intento con el mismo correo devuelve
-  `409`; la fila en `users` tiene un hash con prefijo `$argon2id$`.
+### RF-001 — Alta de empleados por administración · P0
+Un administrador crea la cuenta de un empleado con correo, nombre y roles, sin conocer ni fijar
+su contraseña.
+- El alta pública está cerrada; solo un `admin` autenticado puede crear cuentas.
+- Toda cuenta recibe el rol base `user` y puede recibir roles de aplicación autorizados.
+- La cuenta nace en estado `pending_verification` y se envía una invitación asíncrona al correo.
+- Un `admin` puede reenviar la invitación solo mientras la cuenta siga en `pending_verification`:
+  anula los enlaces anteriores, emite uno nuevo de 24 h y registra la acción en auditoría.
+- Un correo ya registrado devuelve `409` sin exponer más información de la cuenta existente.
+- **Aceptación:** el alta devuelve `201`, registra al administrador como actor y encola la
+  invitación; la cuenta no puede iniciar sesión antes de aceptarla.
 
-### RF-002 — Verificación de correo · P0
-La cuenta se activa mediante un enlace enviado por correo.
-- El token es de 32 bytes de `crypto/rand`, se guarda hasheado y expira en 24 h.
-- Es de un solo uso; un segundo intento devuelve `410`.
-- **Aceptación:** tras registrarse, el correo llega a Mailpit; abrir el enlace pasa la cuenta a
-  `active`; reutilizar el enlace falla.
+> **Enmienda T3 · 2026-09-27 · D6/D9:** se retira el autorregistro y se sustituye por alta
+> administrativa con invitación.
+
+> **Enmienda T6 · 2026-09-28 · D12:** el reenvío evita que una invitación perdida o vencida
+> deje una cuenta pendiente sin una vía de activación.
+
+### RF-002 — Aceptación de invitación y verificación de correo · P0
+El empleado demuestra que controla el correo al aceptar la invitación y definir su contraseña.
+- El token tiene 32 bytes de `crypto/rand`, se guarda hasheado, expira en 24 h y es de un solo uso.
+- La contraseña se almacena con Argon2id y debe tener entre 12 y 128 caracteres.
+- Consumir el token activa la cuenta; un token expirado o reutilizado devuelve `410`.
+- **Aceptación:** el correo llega a Mailpit; aceptar el enlace fija la contraseña y pasa la cuenta
+  a `active`; reutilizar el enlace falla.
+
+> **Enmienda T3 · 2026-09-27 · D6/D9:** aceptar la invitación sustituye la verificación separada
+> y prueba la posesión del correo.
 
 ### RF-003 — Inicio de sesión · P0
-Una cuenta activa obtiene un par de tokens presentando correo y contraseña.
+Una cuenta activa inicia un desafío MFA presentando correo y contraseña.
 - Credenciales inválidas devuelven `401` con un mensaje genérico, sin revelar si el correo
   existe.
 - Una cuenta en `pending_verification`, `locked` o `disabled` no puede iniciar sesión.
-- **Aceptación:** credenciales correctas devuelven `200` con `access_token` y `refresh_token`;
-  contraseña incorrecta devuelve `401`; el intento queda en el audit log.
+- **Aceptación:** credenciales correctas devuelven `202` con `mfaToken`; contraseña incorrecta
+  devuelve `401`; el intento queda en el audit log.
+
+> **Enmienda T3 · 2026-09-27 · D11/ADR 0010:** todo login continúa obligatoriamente con MFA.
 
 ### RF-004 — Emisión y validación de JWT · P0
 La API emite JWT firmados con Ed25519 y publica su clave pública.
@@ -68,44 +82,78 @@ El titular consulta y actualiza su nombre para mostrar.
 - **Aceptación:** `GET /me` con token válido devuelve el usuario autenticado; sin token, `401`.
 
 ### RF-009 — Control de acceso por roles · P0
-Los roles `admin` y `user` gobiernan el acceso a los recursos.
-- El rol viaja en el claim `roles` y se verifica **en el servidor**, nunca confiando en el cliente.
+Los roles de directorio y de aplicación gobiernan ámbitos distintos.
+- `admin` y `user` son roles de directorio; `user` es el rol base de toda cuenta.
+- `contabilidad.senior` y `contabilidad.analista` son roles exclusivos de Contabilidad.
+- Un token dirigido a una aplicación incluye únicamente los roles de esa aplicación en `roles`;
+  los privilegios se verifican **en el servidor**, nunca confiando en el cliente.
 - Un `user` que llama a un endpoint de administración recibe `403`.
 - **Aceptación:** las rutas `/admin/*` responden `200` a un admin y `403` a un user.
 
+> **Enmienda T3 · 2026-09-27 · D8:** se separan roles de directorio y roles de aplicación.
+
 ### RF-010 — Administración de usuarios · P0
-Un admin lista, busca, y habilita o deshabilita cuentas.
+Un admin lista, busca, habilita, deshabilita y asigna roles a cuentas.
 - No puede deshabilitarse a sí mismo (evita dejar el sistema sin administrador).
+- No puede asignarse roles a sí mismo; otro administrador debe hacerlo y la acción se audita.
 - **Aceptación:** un admin deshabilita a un usuario y ese usuario ya no puede iniciar sesión.
+
+> **Enmienda T3 · 2026-09-27 · D8:** se añade separación de funciones para la autoasignación.
 
 ### RF-011 — Registro de auditoría · P0
 Todo evento de seguridad queda registrado de forma inmutable.
-- Eventos: registro, verificación, login exitoso/fallido, logout, rotación y reuso de refresh,
-  cambio de contraseña, alta y baja de MFA, cambio de rol, bloqueo de cuenta.
+- Eventos: alta, invitación aceptada, login y MFA exitosos/fallidos, reenvío o agotamiento del
+  desafío, logout, rotación y reuso de refresh, cambio de contraseña, cambio de rol, autorización,
+  canje y reuso de código OAuth y bloqueo de cuenta.
 - Cada entrada guarda actor, acción, recurso, IP, user-agent y marca temporal.
 - La tabla es *append-only*: sin `UPDATE` ni `DELETE` concedidos al rol de la aplicación.
 - **Aceptación:** un login fallido crea una fila; intentar modificarla con el usuario de la
   aplicación falla por permisos.
 
+> **Enmienda T3 · 2026-09-27 · D8/D9/ADR 0009/ADR 0010:** se actualiza el catálogo mínimo de
+> eventos de seguridad de los nuevos flujos.
+
 ### RF-012 — Notificaciones asíncronas · P0
 Los correos se envían fuera del ciclo de la petición HTTP.
 - La API publica un mensaje en RabbitMQ; el worker lo consume y entrega por SMTP.
 - Reintentos con retroceso exponencial; tras 3 fallos, el mensaje va a la *dead-letter queue*.
-- **Aceptación:** registrarse encola un mensaje visible en RabbitMQ y el correo aparece en
-  Mailpit; con el worker detenido, la petición HTTP sigue respondiendo en menos de 500 ms.
+- **Aceptación:** el alta o un desafío MFA encolan mensajes visibles en RabbitMQ y el correo
+  aparece en Mailpit; con el worker detenido, la petición HTTP sigue respondiendo en menos de 500 ms.
 
-### RF-013 — Alta de segundo factor (TOTP) · P1
-El titular activa TOTP y recibe códigos de recuperación.
-- El secreto se entrega una sola vez como URI `otpauth://` y código QR.
-- La activación exige confirmar un código válido.
-- Se generan 10 códigos de recuperación de un solo uso, guardados hasheados.
-- **Aceptación:** activar MFA y confirmar con un código correcto marca `mfa_enabled = true`.
+> **Enmienda T3 · 2026-09-27 · D5/D6/D9:** las notificaciones pasan a ser invitaciones y códigos MFA.
+
+### RF-013 — Segundo factor obligatorio por correo · P1
+Toda cuenta usa como segundo factor un código de un solo uso enviado al correo verificado.
+- No existe enrolamiento: aceptar la invitación establece el canal verificado.
+- No se admiten TOTP, códigos QR ni códigos de recuperación.
+- **Aceptación:** ningún login emite una sesión sin completar el desafío por correo.
+
+> **Enmienda T3 · 2026-09-27 · D5/D11/ADR 0010:** el MFA por correo obligatorio sustituye TOTP.
 
 ### RF-014 — Inicio de sesión con segundo factor · P1
-Con MFA activo, la contraseña no basta.
-- El login devuelve `202` y un `mfa_token` de corta vida en lugar de los tokens de sesión.
-- Se acepta un código TOTP o uno de recuperación (que se consume).
-- **Aceptación:** login sin código devuelve `202`; con código válido devuelve `200` y los tokens.
+La contraseña correcta inicia un desafío, pero no crea una sesión.
+- El login devuelve `202` con un `mfaToken` temporal y envía un código de 6 dígitos generado con
+  `crypto/rand`, guardado solo como hash, de vida de **5 minutos** y de un solo uso.
+- Cada desafío admite como máximo **5 intentos** y el reenvío se permite una vez cada **60 segundos**.
+- Cada desafío limita intentos; agotarlos lo anula. **Cada código rechazado** (también el que agota
+  el desafío) cuenta como un intento fallido para RF-017, de modo que adivinar códigos a través de
+  desafíos sucesivos bloquea la cuenta igual que adivinar la contraseña.
+- El reenvío está limitado por frecuencia, anula el código anterior y queda auditado.
+- Desafío, fallos, reenvío, agotamiento y acierto quedan auditados.
+- **Aceptación:** un código válido devuelve `200`, el access token y la cookie refresh; reutilizarlo
+  falla, y el código anterior falla después de un reenvío.
+
+> **Enmienda T3 · 2026-09-27 · ADR 0010:** se concreta el desafío MFA por correo.
+
+> **Enmienda T7-fix · 2026-09-28 · D16:** el código se publica después de confirmar la transacción
+> (ADR 0006, Enmienda D16), al emitir y al reenviar. Si el broker falla en ese punto, el login (o
+> el reenvío) responde `503` y el desafío no usado vence solo. Cada desafío nuevo anula los
+> desafíos abiertos de la cuenta y se emiten como máximo **5 desafíos por cuenta cada 15 minutos**;
+> el sexto responde `429` (`application/problem+json`) sin crear desafío ni enviar correo.
+
+> **Enmienda T7 · 2026-09-28 · D15:** se fijan los límites de 5 minutos, 5 intentos y 60 segundos.
+> El código se guarda como HMAC-SHA256 con clave en el token del desafío, y el éxito del inicio de
+> sesión (`login_succeeded`, `last_login_at`) se registra al aceptar el código, no al verificar la contraseña.
 
 ### RF-015 — Restablecimiento de contraseña · P1
 Quien olvida su contraseña la restablece por correo.
@@ -113,6 +161,23 @@ Quien olvida su contraseña la restablece por correo.
 - Token de un solo uso con 1 h de vigencia; al usarlo se revocan todas las sesiones activas.
 - **Aceptación:** completar el flujo permite entrar con la nueva contraseña y las sesiones
   anteriores dejan de funcionar.
+
+> **Enmienda T3 · 2026-09-27 · D6:** comparte con la invitación el mecanismo de token de cuenta
+> hasheado, expirable y de un solo uso, manteniendo propósitos y vigencias independientes.
+
+> **Enmienda T6-fix · 2026-09-28 · D13:** un restablecimiento completado sobre una cuenta
+> `locked` (RF-017) la pasa a `active` y limpia su bloqueo en la misma sentencia; no reactiva
+> cuentas `disabled` ni `pending_verification`. Los intentos fallidos anteriores al
+> restablecimiento dejan de contar para el conteo de bloqueo de RF-017, así que un solo fallo justo
+> después no vuelve a bloquear la cuenta. Queda auditado como `password_reset_completed`, con
+> metadatos que indican si desbloqueó la cuenta.
+
+> **Enmienda T7 · 2026-09-28 · D14:** todo restablecimiento completado envía un aviso de contraseña
+> cambiada y sesiones cerradas; indica el desbloqueo solo cuando aplica.
+
+> **Enmienda T7-fix · 2026-09-28 · D16:** el aviso se publica después de confirmar el
+> restablecimiento. Si el broker falla, el restablecimiento se mantiene, `confirm` responde `204` y
+> el fallo queda en el log (ADR 0006, Enmienda D16).
 
 ### RF-016 — Sesiones activas · P1
 El titular ve sus sesiones y puede revocarlas individualmente.
@@ -122,6 +187,8 @@ El titular ve sus sesiones y puede revocarlas individualmente.
 ### RF-017 — Bloqueo por fuerza bruta · P1
 Tras 5 intentos fallidos en 15 minutos, la cuenta se bloquea 15 minutos.
 - El bloqueo se registra en auditoría y se notifica al titular.
+- Cuentan como fallo tanto la contraseña incorrecta (`login_failed`) como el código MFA rechazado
+  (`mfa_code_rejected`), con el mismo umbral y ventana; el límite por IP cuenta ambos.
 - **Aceptación:** seis intentos fallidos devuelven `423 Locked`; la contraseña correcta también
   falla mientras dure el bloqueo.
 
@@ -130,6 +197,28 @@ Un admin emite claves de API para integraciones máquina a máquina.
 
 ### RF-019 — Exportación del audit log · P2
 Un admin exporta el registro de auditoría filtrado en CSV o JSON.
+
+### RF-020 — Autorización de aplicaciones cliente · P1
+Una aplicación cliente obtiene un access token mediante authorization code con PKCE S256.
+- Existe un único cliente público, Contabilidad, con `client_id` y `redirect_uri` fijos en
+  configuración; la URI de retorno exige coincidencia exacta y `state` es obligatorio.
+- El código de autorización es aleatorio, se guarda solo como hash, vence en aproximadamente un
+  minuto, es de un solo uso y queda ligado al cliente, la URI y el `code_challenge` S256.
+- El Hub mantiene una sesión propia en cookie `HttpOnly`, `Secure`, `SameSite=Lax`, separada de la
+  cookie refresh de la consola, que conserva `SameSite=Strict`; la crea el canje exitoso del desafío
+  MFA (RF-014).
+- Sin sesión SSO, `/oauth/authorize` redirige al login del Hub con un parámetro `continue` que solo
+  admite rutas relativas que empiecen por `/oauth/authorize`; cualquier otro valor se ignora (sin
+  redirección abierta).
+- El access token tiene `aud` igual al cliente y solo sus roles de aplicación; no se entrega
+  refresh token a la aplicación.
+- CORS se permite únicamente en `/oauth/token` y `/.well-known/jwks.json`, sin credenciales y solo
+  para el origen configurado del cliente.
+- **Aceptación:** el flujo correcto redirige con `code` y el mismo `state`; una segunda entrada usa
+  la sesión SSO sin contraseña; URI incorrecta, `state` ausente, PKCE `plain`, reuso del código
+  o un `continue` absoluto o externo se rechazan; el JWT contiene solo los roles de Contabilidad.
+
+> **Enmienda T3 · 2026-09-27 · ADR 0009:** se añade el contrato mínimo de SSO entre dominios.
 
 ---
 

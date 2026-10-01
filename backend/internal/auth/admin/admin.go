@@ -8,14 +8,17 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jorgepaez/identity-hub/internal/auth/roles"
 )
 
 var (
-	ErrUserNotFound    = errors.New("user not found")
-	ErrSelfDisable     = errors.New("an administrator cannot disable their own account")
-	ErrLastActiveAdmin = errors.New("the system must retain an active administrator")
-	ErrInvalidStatus   = errors.New("invalid user status")
-	ErrInvalidRole     = errors.New("invalid user role")
+	ErrUserNotFound       = errors.New("user not found")
+	ErrSelfDisable        = errors.New("an administrator cannot disable their own account")
+	ErrSelfRoleAssignment = errors.New("an administrator cannot assign roles to their own account")
+	ErrLastActiveAdmin    = errors.New("the system must retain an active administrator")
+	ErrInvalidStatus      = errors.New("invalid user status")
+	ErrInvalidRole        = errors.New("invalid user role")
+	ErrBaseRoleRequired   = errors.New("every account must keep the base user role")
 )
 
 type Status string
@@ -124,11 +127,31 @@ func (s *Service) UpdateUser(ctx context.Context, input UpdateInput) (User, erro
 	if s.repository == nil {
 		return User{}, errors.New("admin user service is unavailable")
 	}
+	// Invariant 11 (D8): an administrator never grants itself roles, even when
+	// the requested set matches what it already has or is otherwise invalid.
+	// It runs before request validation so that every self-assignment attempt
+	// is audited; the audit needs its own committed transaction.
+	if input.Roles != nil && input.ActorUserID == input.UserID {
+		auditErr := s.repository.WithinUserManagementTransaction(ctx, func(writer Writer) error {
+			return writer.InsertAuditEvent(ctx, AuditEvent{ActorUserID: &input.ActorUserID, Action: "role_assignment_rejected", ResourceType: "user", ResourceID: input.UserID.String()})
+		})
+		if auditErr != nil {
+			return User{}, fmt.Errorf("audit rejected self role assignment: %w", auditErr)
+		}
+		return User{}, ErrSelfRoleAssignment
+	}
 	if input.Status != nil && !validStatus(*input.Status) {
 		return User{}, ErrInvalidStatus
 	}
 	if input.Roles != nil && !validRoles(*input.Roles) {
 		return User{}, ErrInvalidRole
+	}
+	// D8 / RF-009: user is the base role of every account. Roles is a full
+	// replacement of the target's role set (not an additive patch), so a
+	// request that omits it would silently strip it; reject that statically,
+	// like ErrInvalidRole, before touching the repository.
+	if input.Roles != nil && !hasRole(*input.Roles, "user") {
+		return User{}, ErrBaseRoleRequired
 	}
 	if input.Status != nil && *input.Status == StatusDisabled && input.ActorUserID == input.UserID {
 		return User{}, ErrSelfDisable
@@ -192,9 +215,9 @@ func (s *Service) UpdateUser(ctx context.Context, input UpdateInput) (User, erro
 func validStatus(status Status) bool {
 	return status == StatusPendingVerification || status == StatusActive || status == StatusLocked || status == StatusDisabled
 }
-func validRoles(roles []string) bool {
-	for _, role := range roles {
-		if role != "admin" && role != "user" {
+func validRoles(candidates []string) bool {
+	for _, role := range candidates {
+		if !roles.Valid(role) {
 			return false
 		}
 	}

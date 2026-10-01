@@ -17,8 +17,11 @@ import (
 // AsyncAPI y se usan como routing key en el exchange topic.
 const (
 	TypeUserRegistered         = "user.registered"
+	TypeUserInvited            = "user.invited"
 	TypeEmailVerified          = "user.email_verified"
 	TypePasswordResetRequested = "user.password_reset_requested"
+	TypePasswordResetCompleted = "user.password_reset_completed"
+	TypeMfaChallengeIssued     = "security.mfa_challenge_issued"
 	TypeRefreshReuseDetected   = "security.refresh_reuse_detected"
 	TypeAccountLocked          = "security.account_locked"
 )
@@ -63,6 +66,20 @@ type UserRegistered struct {
 	} `json:"data"`
 }
 
+// UserInvited is published when an administrator creates an employee account
+// (T5, RF-001/RF-012, D6/D9). The worker renders InvitationToken into the
+// account's set-password link; it never reaches logs (RNF-012).
+type UserInvited struct {
+	Envelope
+	Data struct {
+		UserID          uuid.UUID `json:"userId"`
+		Email           string    `json:"email"`
+		DisplayName     string    `json:"displayName"`
+		InvitationToken string    `json:"invitationToken"`
+		ExpiresAt       time.Time `json:"expiresAt"`
+	} `json:"data"`
+}
+
 type EmailVerified struct {
 	Envelope
 	Data struct {
@@ -75,10 +92,33 @@ type EmailVerified struct {
 type PasswordResetRequested struct {
 	Envelope
 	Data struct {
-		UserID     uuid.UUID `json:"userId"`
-		Email      string    `json:"email"`
-		ResetToken string    `json:"resetToken"`
-		ExpiresAt  time.Time `json:"expiresAt"`
+		Email         string    `json:"email"`
+		ResetToken    string    `json:"resetToken"`
+		ExpiresAt     time.Time `json:"expiresAt"`
+		AccountExists bool      `json:"accountExists"`
+	} `json:"data"`
+}
+
+// PasswordResetCompleted is always sent after a reset commits so the account
+// holder learns that their password changed and sessions were closed (D14).
+type PasswordResetCompleted struct {
+	Envelope
+	Data struct {
+		UserID      uuid.UUID `json:"userId"`
+		Email       string    `json:"email"`
+		DisplayName string    `json:"displayName"`
+		Unlocked    bool      `json:"unlocked"`
+	} `json:"data"`
+}
+
+type MfaChallengeIssued struct {
+	Envelope
+	Data struct {
+		UserID      uuid.UUID `json:"userId"`
+		Email       string    `json:"email"`
+		DisplayName string    `json:"displayName"`
+		Code        string    `json:"code"`
+		ExpiresAt   time.Time `json:"expiresAt"`
 	} `json:"data"`
 }
 
@@ -99,6 +139,7 @@ type AccountLocked struct {
 	Data struct {
 		UserID         uuid.UUID `json:"userId"`
 		Email          string    `json:"email"`
+		DisplayName    string    `json:"displayName"`
 		LockedUntil    time.Time `json:"lockedUntil"`
 		FailedAttempts int       `json:"failedAttempts"`
 		IP             string    `json:"ip"`

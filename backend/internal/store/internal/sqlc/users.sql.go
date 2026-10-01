@@ -31,25 +31,34 @@ func (q *Queries) AddUserRole(ctx context.Context, arg AddUserRoleParams) error 
 	return err
 }
 
-const consumeEmailVerificationToken = `-- name: ConsumeEmailVerificationToken :one
+const consumeInvitationToken = `-- name: ConsumeInvitationToken :one
 WITH consumed AS (
     UPDATE verification_tokens
     SET used_at = now()
     WHERE token_hash = $1
-      AND purpose = 'email_verification'
+      AND purpose = 'invitation'
       AND used_at IS NULL
       AND expires_at > now()
     RETURNING user_id
 )
 UPDATE users
-SET status = 'active', updated_at = now()
+SET password_hash = $2, status = 'active', updated_at = now()
 WHERE id = (SELECT user_id FROM consumed)
   AND status = 'pending_verification'
 RETURNING id, email, password_hash, display_name, status, mfa_enabled, mfa_secret_enc, failed_login_count, locked_until, last_login_at, created_at, updated_at
 `
 
-func (q *Queries) ConsumeEmailVerificationToken(ctx context.Context, tokenHash []byte) (User, error) {
-	row := q.db.QueryRow(ctx, consumeEmailVerificationToken, tokenHash)
+type ConsumeInvitationTokenParams struct {
+	TokenHash    []byte
+	PasswordHash string
+}
+
+// Consumes a one-time invitation token and, in the same statement, sets the
+// password the invitee just chose and activates the account (T5, RF-002).
+// Shares the verification_tokens table with other token purposes but never
+// accepts a token whose purpose is not invitation (invariant 7).
+func (q *Queries) ConsumeInvitationToken(ctx context.Context, arg ConsumeInvitationTokenParams) (User, error) {
+	row := q.db.QueryRow(ctx, consumeInvitationToken, arg.TokenHash, arg.PasswordHash)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -66,6 +75,255 @@ func (q *Queries) ConsumeEmailVerificationToken(ctx context.Context, tokenHash [
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const consumeMfaChallenge = `-- name: ConsumeMfaChallenge :exec
+UPDATE mfa_challenges SET used_at = now()
+WHERE id = $1 AND used_at IS NULL
+`
+
+func (q *Queries) ConsumeMfaChallenge(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, consumeMfaChallenge, id)
+	return err
+}
+
+const consumePasswordResetTokenAndRevokeSessions = `-- name: ConsumePasswordResetTokenAndRevokeSessions :one
+WITH consumed AS (
+    UPDATE verification_tokens
+    SET used_at = now()
+    WHERE verification_tokens.token_hash = $1
+      AND verification_tokens.purpose = 'password_reset'
+      AND verification_tokens.used_at IS NULL
+      AND verification_tokens.expires_at > now()
+    RETURNING verification_tokens.id, verification_tokens.user_id
+), invalidated_reset_tokens AS (
+    UPDATE verification_tokens
+    SET used_at = now()
+    WHERE user_id = (SELECT user_id FROM consumed)
+      AND purpose = 'password_reset'
+      AND used_at IS NULL
+      AND id <> (SELECT id FROM consumed)
+    RETURNING id
+), previous_user AS (
+    SELECT id, status FROM users WHERE id = (SELECT user_id FROM consumed) FOR UPDATE
+), updated_user AS (
+    UPDATE users
+    SET password_hash = $2,
+        updated_at = now(),
+        status = CASE WHEN status = 'locked' THEN 'active' ELSE status END,
+        locked_until = CASE WHEN status = 'locked' THEN NULL ELSE locked_until END
+    WHERE id = (SELECT id FROM previous_user)
+    RETURNING id, email, password_hash, display_name, status, mfa_enabled, mfa_secret_enc, failed_login_count, locked_until, last_login_at, created_at, updated_at
+), revoked AS (
+    UPDATE refresh_tokens
+    SET status = 'revoked'
+    WHERE user_id = (SELECT id FROM updated_user)
+      AND status <> 'revoked'
+    RETURNING id
+), revoked_hub_sessions AS (
+    UPDATE hub_sessions
+    SET revoked_at = now()
+    WHERE user_id = (SELECT id FROM updated_user)
+      AND revoked_at IS NULL
+    RETURNING id
+)
+SELECT updated_user.id, updated_user.email, updated_user.password_hash, updated_user.display_name, updated_user.status, updated_user.mfa_enabled, updated_user.mfa_secret_enc, updated_user.failed_login_count, updated_user.locked_until, updated_user.last_login_at, updated_user.created_at, updated_user.updated_at, (previous_user.status = 'locked') AS unlocked
+FROM updated_user
+JOIN previous_user ON previous_user.id = updated_user.id
+`
+
+type ConsumePasswordResetTokenAndRevokeSessionsParams struct {
+	TokenHash    []byte
+	PasswordHash string
+}
+
+type ConsumePasswordResetTokenAndRevokeSessionsRow struct {
+	ID               uuid.UUID
+	Email            string
+	PasswordHash     string
+	DisplayName      string
+	Status           UserStatus
+	MfaEnabled       bool
+	MfaSecretEnc     []byte
+	FailedLoginCount int32
+	LockedUntil      pgtype.Timestamptz
+	LastLoginAt      pgtype.Timestamptz
+	CreatedAt        pgtype.Timestamptz
+	UpdatedAt        pgtype.Timestamptz
+	Unlocked         bool
+}
+
+// The password update, one-time token consumption, and all-session revocation
+// share one statement so no transaction can expose the new password with an
+// old active refresh token (RF-015 / AM-005). D13: a locked account (RF-017)
+// is reactivated in the same statement, because controlling the mailbox is a
+// different factor than the password being guessed, so unlocking here adds
+// no exposure; disabled and pending_verification accounts are left as-is.
+// `unlocked` reports whether this reset just cleared a lockout, for the
+// caller's audit metadata.
+func (q *Queries) ConsumePasswordResetTokenAndRevokeSessions(ctx context.Context, arg ConsumePasswordResetTokenAndRevokeSessionsParams) (ConsumePasswordResetTokenAndRevokeSessionsRow, error) {
+	row := q.db.QueryRow(ctx, consumePasswordResetTokenAndRevokeSessions, arg.TokenHash, arg.PasswordHash)
+	var i ConsumePasswordResetTokenAndRevokeSessionsRow
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.PasswordHash,
+		&i.DisplayName,
+		&i.Status,
+		&i.MfaEnabled,
+		&i.MfaSecretEnc,
+		&i.FailedLoginCount,
+		&i.LockedUntil,
+		&i.LastLoginAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Unlocked,
+	)
+	return i, err
+}
+
+const countMfaChallengesSince = `-- name: CountMfaChallengesSince :one
+SELECT count(*) FROM mfa_challenges WHERE user_id = $1 AND created_at >= $2
+`
+
+type CountMfaChallengesSinceParams struct {
+	UserID    uuid.UUID
+	CreatedAt pgtype.Timestamptz
+}
+
+func (q *Queries) CountMfaChallengesSince(ctx context.Context, arg CountMfaChallengesSinceParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countMfaChallengesSince, arg.UserID, arg.CreatedAt)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const createAuthorizationCode = `-- name: CreateAuthorizationCode :execrows
+INSERT INTO authorization_codes (id, user_id, application_id, code_hash, redirect_uri, code_challenge, expires_at)
+SELECT $1, $2, id, $3, $4, $5, $6
+FROM applications
+WHERE client_id = $7 AND redirect_uri = $4
+`
+
+type CreateAuthorizationCodeParams struct {
+	ID            uuid.UUID
+	UserID        uuid.UUID
+	CodeHash      []byte
+	RedirectUri   string
+	CodeChallenge string
+	ExpiresAt     pgtype.Timestamptz
+	ClientID      string
+}
+
+func (q *Queries) CreateAuthorizationCode(ctx context.Context, arg CreateAuthorizationCodeParams) (int64, error) {
+	result, err := q.db.Exec(ctx, createAuthorizationCode,
+		arg.ID,
+		arg.UserID,
+		arg.CodeHash,
+		arg.RedirectUri,
+		arg.CodeChallenge,
+		arg.ExpiresAt,
+		arg.ClientID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const createHubSession = `-- name: CreateHubSession :exec
+INSERT INTO hub_sessions (user_id, token_hash, family_id, expires_at)
+VALUES ($1, $2, $3, $4)
+`
+
+type CreateHubSessionParams struct {
+	UserID    uuid.UUID
+	TokenHash []byte
+	FamilyID  pgtype.UUID
+	ExpiresAt pgtype.Timestamptz
+}
+
+func (q *Queries) CreateHubSession(ctx context.Context, arg CreateHubSessionParams) error {
+	_, err := q.db.Exec(ctx, createHubSession,
+		arg.UserID,
+		arg.TokenHash,
+		arg.FamilyID,
+		arg.ExpiresAt,
+	)
+	return err
+}
+
+const createInvitationToken = `-- name: CreateInvitationToken :exec
+INSERT INTO verification_tokens (user_id, token_hash, purpose, expires_at)
+VALUES ($1, $2, 'invitation', $3)
+`
+
+type CreateInvitationTokenParams struct {
+	UserID    uuid.UUID
+	TokenHash []byte
+	ExpiresAt pgtype.Timestamptz
+}
+
+func (q *Queries) CreateInvitationToken(ctx context.Context, arg CreateInvitationTokenParams) error {
+	_, err := q.db.Exec(ctx, createInvitationToken, arg.UserID, arg.TokenHash, arg.ExpiresAt)
+	return err
+}
+
+const createMfaChallenge = `-- name: CreateMfaChallenge :exec
+INSERT INTO mfa_challenges (id, user_id, token_hash, code_hash, expires_at, attempts_left, created_at, last_sent_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
+`
+
+type CreateMfaChallengeParams struct {
+	ID           uuid.UUID
+	UserID       uuid.UUID
+	TokenHash    []byte
+	CodeHash     []byte
+	ExpiresAt    pgtype.Timestamptz
+	AttemptsLeft int32
+	CreatedAt    pgtype.Timestamptz
+}
+
+// $7 is the service clock, stored as both created_at and last_sent_at so the
+// issuance window and the resend window use the same time source as the code.
+func (q *Queries) CreateMfaChallenge(ctx context.Context, arg CreateMfaChallengeParams) error {
+	_, err := q.db.Exec(ctx, createMfaChallenge,
+		arg.ID,
+		arg.UserID,
+		arg.TokenHash,
+		arg.CodeHash,
+		arg.ExpiresAt,
+		arg.AttemptsLeft,
+		arg.CreatedAt,
+	)
+	return err
+}
+
+const createPasswordResetTokenForEmail = `-- name: CreatePasswordResetTokenForEmail :one
+WITH inserted AS (
+    INSERT INTO verification_tokens (user_id, token_hash, purpose, expires_at)
+    SELECT id, $2, 'password_reset', $3
+    FROM users
+    WHERE email = $1
+    RETURNING user_id
+)
+SELECT EXISTS (SELECT 1 FROM inserted) AS token_created
+`
+
+type CreatePasswordResetTokenForEmailParams struct {
+	Email     string
+	TokenHash []byte
+	ExpiresAt pgtype.Timestamptz
+}
+
+// The same INSERT ... SELECT statement runs for every request. It stores a
+// hash-only one-hour token only when the normalized email has a user row;
+// callers pass the boolean only to the broker event, never to HTTP responses.
+func (q *Queries) CreatePasswordResetTokenForEmail(ctx context.Context, arg CreatePasswordResetTokenForEmailParams) (bool, error) {
+	row := q.db.QueryRow(ctx, createPasswordResetTokenForEmail, arg.Email, arg.TokenHash, arg.ExpiresAt)
+	var token_created bool
+	err := row.Scan(&token_created)
+	return token_created, err
 }
 
 const createRefreshToken = `-- name: CreateRefreshToken :exec
@@ -126,19 +384,14 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 	return i, err
 }
 
-const createVerificationToken = `-- name: CreateVerificationToken :exec
-INSERT INTO verification_tokens (user_id, token_hash, purpose, expires_at)
-VALUES ($1, $2, 'email_verification', $3)
+const deleteMfaChallenge = `-- name: DeleteMfaChallenge :exec
+DELETE FROM mfa_challenges WHERE id = $1
 `
 
-type CreateVerificationTokenParams struct {
-	UserID    uuid.UUID
-	TokenHash []byte
-	ExpiresAt pgtype.Timestamptz
-}
-
-func (q *Queries) CreateVerificationToken(ctx context.Context, arg CreateVerificationTokenParams) error {
-	_, err := q.db.Exec(ctx, createVerificationToken, arg.UserID, arg.TokenHash, arg.ExpiresAt)
+// An initial MFA code that could not be published must not consume the
+// issuance window. The audit preserves the delivery attempt for operators.
+func (q *Queries) DeleteMfaChallenge(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteMfaChallenge, id)
 	return err
 }
 
@@ -152,8 +405,58 @@ func (q *Queries) DeleteUserRoles(ctx context.Context, userID uuid.UUID) error {
 	return err
 }
 
+const getAuthorizationCodeForUpdate = `-- name: GetAuthorizationCodeForUpdate :one
+SELECT c.id, c.user_id, a.client_id, c.redirect_uri, c.code_challenge, c.expires_at
+FROM authorization_codes c
+JOIN applications a ON a.id = c.application_id
+WHERE c.code_hash = $1 AND c.used_at IS NULL AND c.expires_at > $2
+FOR UPDATE OF c
+`
+
+type GetAuthorizationCodeForUpdateParams struct {
+	CodeHash  []byte
+	ExpiresAt pgtype.Timestamptz
+}
+
+type GetAuthorizationCodeForUpdateRow struct {
+	ID            uuid.UUID
+	UserID        uuid.UUID
+	ClientID      string
+	RedirectUri   string
+	CodeChallenge string
+	ExpiresAt     pgtype.Timestamptz
+}
+
+func (q *Queries) GetAuthorizationCodeForUpdate(ctx context.Context, arg GetAuthorizationCodeForUpdateParams) (GetAuthorizationCodeForUpdateRow, error) {
+	row := q.db.QueryRow(ctx, getAuthorizationCodeForUpdate, arg.CodeHash, arg.ExpiresAt)
+	var i GetAuthorizationCodeForUpdateRow
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.ClientID,
+		&i.RedirectUri,
+		&i.CodeChallenge,
+		&i.ExpiresAt,
+	)
+	return i, err
+}
+
+const getHubSessionUser = `-- name: GetHubSessionUser :one
+SELECT s.user_id
+FROM hub_sessions s
+JOIN users u ON u.id = s.user_id
+WHERE s.token_hash = $1 AND s.revoked_at IS NULL AND s.expires_at > now() AND u.status = 'active'
+`
+
+func (q *Queries) GetHubSessionUser(ctx context.Context, tokenHash []byte) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, getHubSessionUser, tokenHash)
+	var user_id uuid.UUID
+	err := row.Scan(&user_id)
+	return user_id, err
+}
+
 const getLoginUserByEmail = `-- name: GetLoginUserByEmail :one
-SELECT id, email, password_hash, status, locked_until, mfa_enabled
+SELECT id, email, display_name, password_hash, status, locked_until, mfa_enabled
 FROM users
 WHERE email = $1
 FOR UPDATE
@@ -162,6 +465,7 @@ FOR UPDATE
 type GetLoginUserByEmailRow struct {
 	ID           uuid.UUID
 	Email        string
+	DisplayName  string
 	PasswordHash string
 	Status       UserStatus
 	LockedUntil  pgtype.Timestamptz
@@ -174,12 +478,84 @@ func (q *Queries) GetLoginUserByEmail(ctx context.Context, email string) (GetLog
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
+		&i.DisplayName,
 		&i.PasswordHash,
 		&i.Status,
 		&i.LockedUntil,
 		&i.MfaEnabled,
 	)
 	return i, err
+}
+
+const getMfaChallengeForUpdate = `-- name: GetMfaChallengeForUpdate :one
+SELECT c.id, c.user_id, c.code_hash, c.expires_at, c.attempts_left, c.last_sent_at, c.used_at,
+       u.email, u.display_name, u.status
+FROM mfa_challenges c
+JOIN users u ON u.id = c.user_id
+WHERE c.token_hash = $1
+FOR UPDATE OF c, u
+`
+
+type GetMfaChallengeForUpdateRow struct {
+	ID           uuid.UUID
+	UserID       uuid.UUID
+	CodeHash     []byte
+	ExpiresAt    pgtype.Timestamptz
+	AttemptsLeft int32
+	LastSentAt   pgtype.Timestamptz
+	UsedAt       pgtype.Timestamptz
+	Email        string
+	DisplayName  string
+	Status       UserStatus
+}
+
+func (q *Queries) GetMfaChallengeForUpdate(ctx context.Context, tokenHash []byte) (GetMfaChallengeForUpdateRow, error) {
+	row := q.db.QueryRow(ctx, getMfaChallengeForUpdate, tokenHash)
+	var i GetMfaChallengeForUpdateRow
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.CodeHash,
+		&i.ExpiresAt,
+		&i.AttemptsLeft,
+		&i.LastSentAt,
+		&i.UsedAt,
+		&i.Email,
+		&i.DisplayName,
+		&i.Status,
+	)
+	return i, err
+}
+
+const getOAuthApplication = `-- name: GetOAuthApplication :one
+SELECT client_id, redirect_uri, allowed_origin
+FROM applications
+WHERE client_id = $1
+`
+
+type GetOAuthApplicationRow struct {
+	ClientID      string
+	RedirectUri   string
+	AllowedOrigin string
+}
+
+func (q *Queries) GetOAuthApplication(ctx context.Context, clientID string) (GetOAuthApplicationRow, error) {
+	row := q.db.QueryRow(ctx, getOAuthApplication, clientID)
+	var i GetOAuthApplicationRow
+	err := row.Scan(&i.ClientID, &i.RedirectUri, &i.AllowedOrigin)
+	return i, err
+}
+
+const getUsedAuthorizationCodeOwner = `-- name: GetUsedAuthorizationCodeOwner :one
+SELECT user_id FROM authorization_codes
+WHERE code_hash = $1 AND used_at IS NOT NULL
+`
+
+func (q *Queries) GetUsedAuthorizationCodeOwner(ctx context.Context, codeHash []byte) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, getUsedAuthorizationCodeOwner, codeHash)
+	var user_id uuid.UUID
+	err := row.Scan(&user_id)
+	return user_id, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
@@ -259,6 +635,89 @@ func (q *Queries) GetUserByIDForUpdate(ctx context.Context, id uuid.UUID) (User,
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const invalidateInvitationTokens = `-- name: InvalidateInvitationTokens :exec
+UPDATE verification_tokens
+SET used_at = now()
+WHERE user_id = $1
+  AND purpose = 'invitation'
+  AND used_at IS NULL
+`
+
+func (q *Queries) InvalidateInvitationTokens(ctx context.Context, userID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, invalidateInvitationTokens, userID)
+	return err
+}
+
+const invitationTokenIsUsable = `-- name: InvitationTokenIsUsable :one
+SELECT EXISTS (
+    SELECT 1
+    FROM verification_tokens
+    WHERE token_hash = $1
+      AND purpose = 'invitation'
+      AND used_at IS NULL
+      AND expires_at > now()
+) AS token_is_usable
+`
+
+// This cheap read prevents password hashing for invalid public invitation
+// tokens. ConsumeInvitationToken remains the atomic source of truth.
+func (q *Queries) InvitationTokenIsUsable(ctx context.Context, tokenHash []byte) (bool, error) {
+	row := q.db.QueryRow(ctx, invitationTokenIsUsable, tokenHash)
+	var token_is_usable bool
+	err := row.Scan(&token_is_usable)
+	return token_is_usable, err
+}
+
+const listActiveRefreshSessions = `-- name: ListActiveRefreshSessions :many
+SELECT active.family_id, active.ip, active.user_agent,
+       min(history.created_at)::timestamptz AS created_at,
+       max(COALESCE(history.last_used_at, history.created_at))::timestamptz AS last_used_at
+FROM refresh_tokens AS active
+JOIN refresh_tokens AS history ON history.family_id = active.family_id
+WHERE active.user_id = $1
+  AND active.status = 'active'
+  AND active.expires_at > now()
+GROUP BY active.family_id, active.ip, active.user_agent
+ORDER BY max(COALESCE(history.last_used_at, history.created_at)) DESC
+`
+
+type ListActiveRefreshSessionsRow struct {
+	FamilyID   uuid.UUID
+	Ip         *netip.Addr
+	UserAgent  pgtype.Text
+	CreatedAt  pgtype.Timestamptz
+	LastUsedAt pgtype.Timestamptz
+}
+
+// A session is a refresh-token family. The single active token supplies the
+// latest device metadata; the family history supplies its first creation and
+// last use timestamps.
+func (q *Queries) ListActiveRefreshSessions(ctx context.Context, userID uuid.UUID) ([]ListActiveRefreshSessionsRow, error) {
+	rows, err := q.db.Query(ctx, listActiveRefreshSessions, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListActiveRefreshSessionsRow
+	for rows.Next() {
+		var i ListActiveRefreshSessionsRow
+		if err := rows.Scan(
+			&i.FamilyID,
+			&i.Ip,
+			&i.UserAgent,
+			&i.CreatedAt,
+			&i.LastUsedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listAdminUsers = `-- name: ListAdminUsers :many
@@ -392,13 +851,199 @@ func (q *Queries) LockLoginUser(ctx context.Context, arg LockLoginUserParams) er
 	return err
 }
 
+const lockMfaChallengeIssuance = `-- name: LockMfaChallengeIssuance :exec
+SELECT pg_advisory_xact_lock(hashtextextended($1::uuid::text, 0))
+`
+
+// Serializes concurrent issuance for one account (transaction-scoped advisory
+// lock, so it never contends with the row locks Verify takes).
+func (q *Queries) LockMfaChallengeIssuance(ctx context.Context, dollar_1 uuid.UUID) error {
+	_, err := q.db.Exec(ctx, lockMfaChallengeIssuance, dollar_1)
+	return err
+}
+
+const markAuthorizationCodeUsed = `-- name: MarkAuthorizationCodeUsed :execrows
+UPDATE authorization_codes SET used_at = $2
+WHERE id = $1 AND used_at IS NULL
+`
+
+type MarkAuthorizationCodeUsedParams struct {
+	ID     uuid.UUID
+	UsedAt pgtype.Timestamptz
+}
+
+func (q *Queries) MarkAuthorizationCodeUsed(ctx context.Context, arg MarkAuthorizationCodeUsedParams) (int64, error) {
+	result, err := q.db.Exec(ctx, markAuthorizationCodeUsed, arg.ID, arg.UsedAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const passwordResetTokenIsUsable = `-- name: PasswordResetTokenIsUsable :one
+SELECT EXISTS (
+    SELECT 1
+    FROM verification_tokens
+    WHERE token_hash = $1
+      AND purpose = 'password_reset'
+      AND used_at IS NULL
+      AND expires_at > now()
+) AS token_is_usable
+`
+
+// Cheap precheck before Argon2id. The consuming statement below is authoritative.
+func (q *Queries) PasswordResetTokenIsUsable(ctx context.Context, tokenHash []byte) (bool, error) {
+	row := q.db.QueryRow(ctx, passwordResetTokenIsUsable, tokenHash)
+	var token_is_usable bool
+	err := row.Scan(&token_is_usable)
+	return token_is_usable, err
+}
+
+const purgeAuthorizationCodes = `-- name: PurgeAuthorizationCodes :execrows
+DELETE FROM authorization_codes
+WHERE expires_at <= now() OR used_at IS NOT NULL
+`
+
+func (q *Queries) PurgeAuthorizationCodes(ctx context.Context) (int64, error) {
+	result, err := q.db.Exec(ctx, purgeAuthorizationCodes)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const purgeHubSessions = `-- name: PurgeHubSessions :execrows
+DELETE FROM hub_sessions
+WHERE expires_at <= now() OR revoked_at IS NOT NULL
+`
+
+func (q *Queries) PurgeHubSessions(ctx context.Context) (int64, error) {
+	result, err := q.db.Exec(ctx, purgeHubSessions)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const rejectMfaChallenge = `-- name: RejectMfaChallenge :one
+UPDATE mfa_challenges
+SET attempts_left = attempts_left - 1,
+    used_at = CASE WHEN attempts_left = 1 THEN now() ELSE used_at END
+WHERE id = $1 AND used_at IS NULL AND attempts_left > 0
+RETURNING attempts_left
+`
+
+func (q *Queries) RejectMfaChallenge(ctx context.Context, id uuid.UUID) (int32, error) {
+	row := q.db.QueryRow(ctx, rejectMfaChallenge, id)
+	var attempts_left int32
+	err := row.Scan(&attempts_left)
+	return attempts_left, err
+}
+
+const resendMfaChallenge = `-- name: ResendMfaChallenge :exec
+UPDATE mfa_challenges
+SET code_hash = $2, last_sent_at = $3
+WHERE id = $1 AND used_at IS NULL
+`
+
+type ResendMfaChallengeParams struct {
+	ID         uuid.UUID
+	CodeHash   []byte
+	LastSentAt pgtype.Timestamptz
+}
+
+func (q *Queries) ResendMfaChallenge(ctx context.Context, arg ResendMfaChallengeParams) error {
+	_, err := q.db.Exec(ctx, resendMfaChallenge, arg.ID, arg.CodeHash, arg.LastSentAt)
+	return err
+}
+
+const restoreMfaChallengeAfterFailedResend = `-- name: RestoreMfaChallengeAfterFailedResend :execrows
+UPDATE mfa_challenges
+SET code_hash = $3, last_sent_at = $5
+WHERE id = $1 AND code_hash = $2 AND last_sent_at = $4 AND used_at IS NULL
+`
+
+type RestoreMfaChallengeAfterFailedResendParams struct {
+	ID           uuid.UUID
+	CodeHash     []byte
+	CodeHash_2   []byte
+	LastSentAt   pgtype.Timestamptz
+	LastSentAt_2 pgtype.Timestamptz
+}
+
+// Publish happens after commit (D16). If it fails, restore this exact change
+// so last_sent_at does not impose a retry delay. The expected new values avoid
+// overwriting a later successful resend.
+func (q *Queries) RestoreMfaChallengeAfterFailedResend(ctx context.Context, arg RestoreMfaChallengeAfterFailedResendParams) (int64, error) {
+	result, err := q.db.Exec(ctx, restoreMfaChallengeAfterFailedResend,
+		arg.ID,
+		arg.CodeHash,
+		arg.CodeHash_2,
+		arg.LastSentAt,
+		arg.LastSentAt_2,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const revokeActiveRefreshSession = `-- name: RevokeActiveRefreshSession :one
+WITH revoked AS (
+    UPDATE refresh_tokens
+    SET status = 'revoked'
+    WHERE refresh_tokens.user_id = $1
+      AND refresh_tokens.family_id = $2
+      AND refresh_tokens.status = 'active'
+      AND refresh_tokens.expires_at > now()
+    RETURNING 1
+), revoked_hub_session AS (
+    UPDATE hub_sessions
+    SET revoked_at = now()
+    WHERE family_id = $2
+      AND revoked_at IS NULL
+      AND EXISTS (SELECT 1 FROM revoked)
+)
+SELECT EXISTS (SELECT 1 FROM revoked) AS revoked
+`
+
+type RevokeActiveRefreshSessionParams struct {
+	UserID   uuid.UUID
+	FamilyID uuid.UUID
+}
+
+// Ownership and activeness are both predicates: foreign, expired and already
+// revoked families all return false to the HTTP layer as the same 404.
+func (q *Queries) RevokeActiveRefreshSession(ctx context.Context, arg RevokeActiveRefreshSessionParams) (bool, error) {
+	row := q.db.QueryRow(ctx, revokeActiveRefreshSession, arg.UserID, arg.FamilyID)
+	var revoked bool
+	err := row.Scan(&revoked)
+	return revoked, err
+}
+
+const revokeHubSessionsForUser = `-- name: RevokeHubSessionsForUser :exec
+UPDATE hub_sessions SET revoked_at = now()
+WHERE user_id = $1 AND revoked_at IS NULL
+`
+
+func (q *Queries) RevokeHubSessionsForUser(ctx context.Context, userID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, revokeHubSessionsForUser, userID)
+	return err
+}
+
 const revokeRefreshFamily = `-- name: RevokeRefreshFamily :one
 WITH revoked AS (
     UPDATE refresh_tokens
     SET status = 'revoked'
-    WHERE family_id = $1
-      AND status <> 'revoked'
+    WHERE refresh_tokens.family_id = $1
+      AND refresh_tokens.status <> 'revoked'
     RETURNING 1
+), revoked_hub_session AS (
+    UPDATE hub_sessions
+    SET revoked_at = now()
+    WHERE family_id = $1
+      AND revoked_at IS NULL
+      AND EXISTS (SELECT 1 FROM revoked)
 )
 SELECT count(*)::bigint FROM revoked
 `
@@ -488,6 +1133,23 @@ func (q *Queries) RotateRefreshToken(ctx context.Context, arg RotateRefreshToken
 	return i, err
 }
 
+const supersedeOpenMfaChallenges = `-- name: SupersedeOpenMfaChallenges :exec
+UPDATE mfa_challenges SET used_at = $2
+WHERE user_id = $1 AND used_at IS NULL
+`
+
+type SupersedeOpenMfaChallengesParams struct {
+	UserID uuid.UUID
+	UsedAt pgtype.Timestamptz
+}
+
+// A new challenge replaces the account's open ones with the service clock,
+// keeping deterministic tests and all MFA timestamps on one source of time.
+func (q *Queries) SupersedeOpenMfaChallenges(ctx context.Context, arg SupersedeOpenMfaChallengesParams) error {
+	_, err := q.db.Exec(ctx, supersedeOpenMfaChallenges, arg.UserID, arg.UsedAt)
+	return err
+}
+
 const unlockLoginUser = `-- name: UnlockLoginUser :exec
 UPDATE users
 SET status = 'active', locked_until = NULL
@@ -563,19 +1225,31 @@ func (q *Queries) UpdateDisplayName(ctx context.Context, arg UpdateDisplayNamePa
 	return i, err
 }
 
-const updateLoginSuccess = `-- name: UpdateLoginSuccess :exec
+const updateLastLogin = `-- name: UpdateLastLogin :exec
 UPDATE users
-SET password_hash = $2,
-    last_login_at = now()
+SET last_login_at = now()
 WHERE id = $1
 `
 
-type UpdateLoginSuccessParams struct {
+// Recorded only when the MFA code is accepted (D11), not at password check.
+func (q *Queries) UpdateLastLogin(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, updateLastLogin, id)
+	return err
+}
+
+const updatePasswordHash = `-- name: UpdatePasswordHash :exec
+UPDATE users
+SET password_hash = $2
+WHERE id = $1
+`
+
+type UpdatePasswordHashParams struct {
 	ID           uuid.UUID
 	PasswordHash string
 }
 
-func (q *Queries) UpdateLoginSuccess(ctx context.Context, arg UpdateLoginSuccessParams) error {
-	_, err := q.db.Exec(ctx, updateLoginSuccess, arg.ID, arg.PasswordHash)
+// Transparent Argon2id rehash after a verified password (RF-003).
+func (q *Queries) UpdatePasswordHash(ctx context.Context, arg UpdatePasswordHashParams) error {
+	_, err := q.db.Exec(ctx, updatePasswordHash, arg.ID, arg.PasswordHash)
 	return err
 }

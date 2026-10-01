@@ -36,6 +36,14 @@ channels:
       operationId: publishUserRegistered
       message: { $ref: '#/components/messages/UserRegistered' }
 
+  user.invited:
+    description: |
+      Un admin dio de alta a un empleado (T5, RF-001/D6/D9); hay que enviar la
+      invitación con el enlace para definir la contraseña.
+    publish:
+      operationId: publishUserInvited
+      message: { $ref: '#/components/messages/UserInvited' }
+
   user.email_verified:
     description: La cuenta quedó activa; correo de bienvenida.
     publish:
@@ -47,6 +55,18 @@ channels:
     publish:
       operationId: publishPasswordResetRequested
       message: { $ref: '#/components/messages/PasswordResetRequested' }
+
+  user.password_reset_completed:
+    description: Restablecimiento completado; avisa del cambio y cierre de sesiones (D14).
+    publish:
+      operationId: publishPasswordResetCompleted
+      message: { $ref: '#/components/messages/PasswordResetCompleted' }
+
+  security.mfa_challenge_issued:
+    description: Código MFA de un solo uso para entrega por correo (RF-014).
+    publish:
+      operationId: publishMfaChallengeIssued
+      message: { $ref: '#/components/messages/MfaChallengeIssued' }
 
   security.refresh_reuse_detected:
     description: |
@@ -84,6 +104,26 @@ components:
                   verificationToken: { type: string, description: 'Token en claro: solo viaja por el broker, nunca se registra en logs' }
                   expiresAt:         { type: string, format: date-time }
 
+    UserInvited:
+      name: UserInvited
+      title: Empleado invitado
+      contentType: application/json
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/Envelope'
+          - type: object
+            required: [data]
+            properties:
+              data:
+                type: object
+                required: [userId, email, displayName, invitationToken, expiresAt]
+                properties:
+                  userId:          { type: string, format: uuid }
+                  email:           { type: string, format: email }
+                  displayName:     { type: string }
+                  invitationToken: { type: string, description: 'Token en claro: solo viaja por el broker, nunca se registra en logs' }
+                  expiresAt:       { type: string, format: date-time }
+
     EmailVerified:
       name: EmailVerified
       contentType: application/json
@@ -112,12 +152,49 @@ components:
             properties:
               data:
                 type: object
-                required: [userId, email, resetToken, expiresAt]
+                required: [email, resetToken, expiresAt, accountExists]
                 properties:
-                  userId:     { type: string, format: uuid }
-                  email:      { type: string, format: email }
-                  resetToken: { type: string }
-                  expiresAt:  { type: string, format: date-time }
+                  email:         { type: string, format: email }
+                  resetToken:    { type: string }
+                  expiresAt:     { type: string, format: date-time }
+                  accountExists: { type: boolean, description: Solo para el worker de notificaciones; nunca se expone por HTTP. }
+
+    PasswordResetCompleted:
+      name: PasswordResetCompleted
+      contentType: application/json
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/Envelope'
+          - type: object
+            required: [data]
+            properties:
+              data:
+                type: object
+                required: [userId, email, displayName, unlocked]
+                properties:
+                  userId: { type: string, format: uuid }
+                  email: { type: string, format: email }
+                  displayName: { type: string }
+                  unlocked: { type: boolean }
+
+    MfaChallengeIssued:
+      name: MfaChallengeIssued
+      contentType: application/json
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/Envelope'
+          - type: object
+            required: [data]
+            properties:
+              data:
+                type: object
+                required: [userId, email, displayName, code, expiresAt]
+                properties:
+                  userId: { type: string, format: uuid }
+                  email: { type: string, format: email }
+                  displayName: { type: string }
+                  code: { type: string, pattern: '^[0-9]{6}$' }
+                  expiresAt: { type: string, format: date-time }
 
     RefreshReuseDetected:
       name: RefreshReuseDetected
@@ -154,6 +231,7 @@ components:
                 properties:
                   userId:         { type: string, format: uuid }
                   email:          { type: string, format: email }
+                  displayName:    { type: string }
                   lockedUntil:    { type: string, format: date-time }
                   failedAttempts: { type: integer }
                   ip:             { type: string }

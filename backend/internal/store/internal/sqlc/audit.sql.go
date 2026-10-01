@@ -14,10 +14,21 @@ import (
 
 const countLoginFailuresByAccount = `-- name: CountLoginFailuresByAccount :one
 SELECT count(*)::bigint
-FROM audit_log
-WHERE actor_user_id = $1
-  AND action = 'login_failed'
-  AND created_at >= $2
+FROM audit_log AS failures
+WHERE failures.actor_user_id = $1
+  -- RF-017 also counts rejected MFA codes. D13's reset boundary remains
+  -- intentionally shared because both are authentication failures for the user.
+  AND failures.action IN ('login_failed', 'mfa_code_rejected')
+  AND failures.created_at >= $2
+  AND failures.created_at > COALESCE(
+        (SELECT resets.created_at
+         FROM audit_log AS resets
+         WHERE resets.actor_user_id = $1
+           AND resets.action = 'password_reset_completed'
+         ORDER BY resets.created_at DESC
+         LIMIT 1),
+        '-infinity'::timestamptz
+      )
 `
 
 type CountLoginFailuresByAccountParams struct {
@@ -25,6 +36,13 @@ type CountLoginFailuresByAccountParams struct {
 	CreatedAt   pgtype.Timestamptz
 }
 
+// D13: failures recorded before the account's latest completed password
+// reset no longer count, so a single wrong attempt right after a reset does
+// not immediately re-lock the account. The IP-based sibling query below is
+// unaffected on purpose: RF-017 keeps limiting guessing from one IP
+// regardless of which account last reset its password.
+// The 'password_reset_completed' literal below must stay identical to the
+// Action written by internal/auth/passwordreset (password_reset.go).
 func (q *Queries) CountLoginFailuresByAccount(ctx context.Context, arg CountLoginFailuresByAccountParams) (int64, error) {
 	row := q.db.QueryRow(ctx, countLoginFailuresByAccount, arg.ActorUserID, arg.CreatedAt)
 	var column_1 int64
@@ -36,7 +54,7 @@ const countLoginFailuresByIP = `-- name: CountLoginFailuresByIP :one
 SELECT count(*)::bigint
 FROM audit_log
 WHERE ip = $1
-  AND action = 'login_failed'
+  AND action IN ('login_failed', 'mfa_code_rejected')
   AND created_at >= $2
 `
 
@@ -45,6 +63,8 @@ type CountLoginFailuresByIPParams struct {
 	CreatedAt pgtype.Timestamptz
 }
 
+// RF-017 / RF-014: rejected MFA codes count toward the per-IP limit too, so
+// guessing codes across successive challenges cannot dodge it.
 func (q *Queries) CountLoginFailuresByIP(ctx context.Context, arg CountLoginFailuresByIPParams) (int64, error) {
 	row := q.db.QueryRow(ctx, countLoginFailuresByIP, arg.Ip, arg.CreatedAt)
 	var column_1 int64

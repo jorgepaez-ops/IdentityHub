@@ -1,6 +1,6 @@
 # 0008 — GitHub Actions como orquestador y GHCR como registry
 
-Estado: aceptada · 2026-09-05
+Estado: aceptada · 2026-09-05 · Sustituida parcialmente por 0011 (registry: Docker Hub) · 2026-09-27
 
 ## Contexto
 

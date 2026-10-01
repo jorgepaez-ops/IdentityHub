@@ -23,6 +23,16 @@ const (
 	Ok HealthStatusStatus = "ok"
 )
 
+// Defines values for OAuthTokenRequestGrantType.
+const (
+	AuthorizationCode OAuthTokenRequestGrantType = "authorization_code"
+)
+
+// Defines values for OAuthTokenResponseTokenType.
+const (
+	OAuthTokenResponseTokenTypeBearer OAuthTokenResponseTokenType = "Bearer"
+)
+
 // Defines values for ReadinessStatusChecksStatus.
 const (
 	Down ReadinessStatusChecksStatus = "down"
@@ -37,13 +47,15 @@ const (
 
 // Defines values for Role.
 const (
-	RoleAdmin Role = "admin"
-	RoleUser  Role = "user"
+	RoleAdmin                Role = "admin"
+	RoleContabilidadAnalista Role = "contabilidad.analista"
+	RoleContabilidadSenior   Role = "contabilidad.senior"
+	RoleUser                 Role = "user"
 )
 
 // Defines values for TokenPairTokenType.
 const (
-	Bearer TokenPairTokenType = "Bearer"
+	TokenPairTokenTypeBearer TokenPairTokenType = "Bearer"
 )
 
 // Defines values for UserStatus.
@@ -53,6 +65,23 @@ const (
 	Locked              UserStatus = "locked"
 	PendingVerification UserStatus = "pending_verification"
 )
+
+// Defines values for AuthorizeClientParamsResponseType.
+const (
+	Code AuthorizeClientParamsResponseType = "code"
+)
+
+// Defines values for AuthorizeClientParamsCodeChallengeMethod.
+const (
+	S256 AuthorizeClientParamsCodeChallengeMethod = "S256"
+)
+
+// AdminCreateUserRequest defines model for AdminCreateUserRequest.
+type AdminCreateUserRequest struct {
+	DisplayName string              `json:"displayName"`
+	Email       openapi_types.Email `json:"email"`
+	Roles       []Role              `json:"roles"`
+}
 
 // AdminUpdateUserRequest defines model for AdminUpdateUserRequest.
 type AdminUpdateUserRequest struct {
@@ -93,6 +122,12 @@ type HealthStatus struct {
 // HealthStatusStatus defines model for HealthStatus.Status.
 type HealthStatusStatus string
 
+// InvitationAcceptRequest defines model for InvitationAcceptRequest.
+type InvitationAcceptRequest struct {
+	Password string `json:"password"`
+	Token    string `json:"token"`
+}
+
 // Jwks defines model for Jwks.
 type Jwks struct {
 	Keys []struct {
@@ -121,34 +156,40 @@ type MfaChallenge struct {
 	MfaToken string `json:"mfaToken"`
 }
 
-// MfaCodeRequest defines model for MfaCodeRequest.
-type MfaCodeRequest struct {
-	Code string `json:"code"`
-}
-
-// MfaEnrollment defines model for MfaEnrollment.
-type MfaEnrollment struct {
-	// OtpauthUri URI otpauth:// para el código QR
-	OtpauthUri string `json:"otpauthUri"`
-
-	// RecoveryCodes Diez códigos de un solo uso. Se muestran una sola vez.
-	RecoveryCodes []string `json:"recoveryCodes"`
-
-	// Secret Secreto TOTP en base32. Se muestra una sola vez.
-	Secret string `json:"secret"`
+// MfaResendRequest defines model for MfaResendRequest.
+type MfaResendRequest struct {
+	MfaToken string `json:"mfaToken"`
 }
 
 // MfaVerifyRequest defines model for MfaVerifyRequest.
 type MfaVerifyRequest struct {
-	// Code Código TOTP de 6 dígitos o código de recuperación
+	// Code Código de un solo uso enviado por correo
 	Code     string `json:"code"`
 	MfaToken string `json:"mfaToken"`
 }
 
-// PasswordConfirmRequest defines model for PasswordConfirmRequest.
-type PasswordConfirmRequest struct {
-	Password string `json:"password"`
+// OAuthTokenRequest defines model for OAuthTokenRequest.
+type OAuthTokenRequest struct {
+	ClientId     string                     `json:"client_id"`
+	Code         string                     `json:"code"`
+	CodeVerifier string                     `json:"code_verifier"`
+	GrantType    OAuthTokenRequestGrantType `json:"grant_type"`
+	RedirectUri  string                     `json:"redirect_uri"`
 }
+
+// OAuthTokenRequestGrantType defines model for OAuthTokenRequest.GrantType.
+type OAuthTokenRequestGrantType string
+
+// OAuthTokenResponse defines model for OAuthTokenResponse.
+type OAuthTokenResponse struct {
+	// AccessToken JWT Ed25519 con `aud` del cliente y solo sus roles
+	AccessToken string                      `json:"access_token"`
+	ExpiresIn   int                         `json:"expires_in"`
+	TokenType   OAuthTokenResponseTokenType `json:"token_type"`
+}
+
+// OAuthTokenResponseTokenType defines model for OAuthTokenResponse.TokenType.
+type OAuthTokenResponseTokenType string
 
 // PasswordResetConfirmRequest defines model for PasswordResetConfirmRequest.
 type PasswordResetConfirmRequest struct {
@@ -185,20 +226,6 @@ type ReadinessStatusChecksStatus string
 
 // ReadinessStatusStatus defines model for ReadinessStatus.Status.
 type ReadinessStatusStatus string
-
-// RegisterRequest defines model for RegisterRequest.
-type RegisterRequest struct {
-	DisplayName string              `json:"displayName"`
-	Email       openapi_types.Email `json:"email"`
-	Password    string              `json:"password"`
-}
-
-// RegisterResponse defines model for RegisterResponse.
-type RegisterResponse struct {
-	Email  openapi_types.Email `json:"email"`
-	Id     openapi_types.UUID  `json:"id"`
-	Status UserStatus          `json:"status"`
-}
 
 // Role defines model for Role.
 type Role string
@@ -245,9 +272,11 @@ type User struct {
 	Email       openapi_types.Email `json:"email"`
 	Id          openapi_types.UUID  `json:"id"`
 	LastLoginAt *time.Time          `json:"lastLoginAt"`
-	MfaEnabled  bool                `json:"mfaEnabled"`
-	Roles       []Role              `json:"roles"`
-	Status      UserStatus          `json:"status"`
+
+	// MfaEnabled Siempre verdadero para cuentas activas; no requiere enrolamiento
+	MfaEnabled bool       `json:"mfaEnabled"`
+	Roles      []Role     `json:"roles"`
+	Status     UserStatus `json:"status"`
 }
 
 // UserPage defines model for UserPage.
@@ -331,11 +360,36 @@ type RefreshSessionParams struct {
 	RefreshToken string `form:"refresh_token" json:"refresh_token"`
 }
 
+// AuthorizeClientParams defines parameters for AuthorizeClient.
+type AuthorizeClientParams struct {
+	ClientId            string                                   `form:"client_id" json:"client_id"`
+	RedirectUri         string                                   `form:"redirect_uri" json:"redirect_uri"`
+	ResponseType        AuthorizeClientParamsResponseType        `form:"response_type" json:"response_type"`
+	State               string                                   `form:"state" json:"state"`
+	CodeChallenge       string                                   `form:"code_challenge" json:"code_challenge"`
+	CodeChallengeMethod AuthorizeClientParamsCodeChallengeMethod `form:"code_challenge_method" json:"code_challenge_method"`
+}
+
+// AuthorizeClientParamsResponseType defines parameters for AuthorizeClient.
+type AuthorizeClientParamsResponseType string
+
+// AuthorizeClientParamsCodeChallengeMethod defines parameters for AuthorizeClient.
+type AuthorizeClientParamsCodeChallengeMethod string
+
+// CreateEmployeeJSONRequestBody defines body for CreateEmployee for application/json ContentType.
+type CreateEmployeeJSONRequestBody = AdminCreateUserRequest
+
 // UpdateUserJSONRequestBody defines body for UpdateUser for application/json ContentType.
 type UpdateUserJSONRequestBody = AdminUpdateUserRequest
 
+// AcceptInvitationJSONRequestBody defines body for AcceptInvitation for application/json ContentType.
+type AcceptInvitationJSONRequestBody = InvitationAcceptRequest
+
 // LoginJSONRequestBody defines body for Login for application/json ContentType.
 type LoginJSONRequestBody = LoginRequest
+
+// ResendMfaCodeJSONRequestBody defines body for ResendMfaCode for application/json ContentType.
+type ResendMfaCodeJSONRequestBody = MfaResendRequest
 
 // VerifyMfaJSONRequestBody defines body for VerifyMfa for application/json ContentType.
 type VerifyMfaJSONRequestBody = MfaVerifyRequest
@@ -346,20 +400,11 @@ type ConfirmPasswordResetJSONRequestBody = PasswordResetConfirmRequest
 // RequestPasswordResetJSONRequestBody defines body for RequestPasswordReset for application/json ContentType.
 type RequestPasswordResetJSONRequestBody = EmailRequest
 
-// RegisterJSONRequestBody defines body for Register for application/json ContentType.
-type RegisterJSONRequestBody = RegisterRequest
-
-// VerifyEmailJSONRequestBody defines body for VerifyEmail for application/json ContentType.
-type VerifyEmailJSONRequestBody = TokenRequest
-
 // UpdateCurrentUserJSONRequestBody defines body for UpdateCurrentUser for application/json ContentType.
 type UpdateCurrentUserJSONRequestBody = UpdateProfileRequest
 
-// DisableMfaJSONRequestBody defines body for DisableMfa for application/json ContentType.
-type DisableMfaJSONRequestBody = PasswordConfirmRequest
-
-// ActivateMfaJSONRequestBody defines body for ActivateMfa for application/json ContentType.
-type ActivateMfaJSONRequestBody = MfaCodeRequest
+// ExchangeAuthorizationCodeFormdataRequestBody defines body for ExchangeAuthorizationCode for application/x-www-form-urlencoded ContentType.
+type ExchangeAuthorizationCodeFormdataRequestBody = OAuthTokenRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -372,18 +417,30 @@ type ServerInterface interface {
 	// Listar y buscar cuentas
 	// (GET /api/v1/admin/users)
 	ListUsers(w http.ResponseWriter, r *http.Request, params ListUsersParams)
+	// Dar de alta a un empleado y enviar su invitación
+	// (POST /api/v1/admin/users)
+	CreateEmployee(w http.ResponseWriter, r *http.Request)
 	// Consultar una cuenta
 	// (GET /api/v1/admin/users/{userId})
 	GetUser(w http.ResponseWriter, r *http.Request, userId UserId)
 	// Cambiar el estado o los roles de una cuenta
 	// (PATCH /api/v1/admin/users/{userId})
 	UpdateUser(w http.ResponseWriter, r *http.Request, userId UserId)
+	// Reenviar la invitación de una cuenta pendiente
+	// (POST /api/v1/admin/users/{userId}/invitation)
+	ResendInvitation(w http.ResponseWriter, r *http.Request, userId UserId)
+	// Aceptar una invitación y definir la contraseña
+	// (POST /api/v1/auth/invitations/accept)
+	AcceptInvitation(w http.ResponseWriter, r *http.Request)
 	// Iniciar sesión con correo y contraseña
 	// (POST /api/v1/auth/login)
 	Login(w http.ResponseWriter, r *http.Request)
 	// Revocar el refresh token de la sesión actual
 	// (POST /api/v1/auth/logout)
 	Logout(w http.ResponseWriter, r *http.Request, params LogoutParams)
+	// Reenviar el código del desafío MFA
+	// (POST /api/v1/auth/mfa/resend)
+	ResendMfaCode(w http.ResponseWriter, r *http.Request)
 	// Canjear el desafío de segundo factor por una sesión
 	// (POST /api/v1/auth/mfa/verify)
 	VerifyMfa(w http.ResponseWriter, r *http.Request)
@@ -396,27 +453,12 @@ type ServerInterface interface {
 	// Rotar el refresh token y obtener un par nuevo
 	// (POST /api/v1/auth/refresh)
 	RefreshSession(w http.ResponseWriter, r *http.Request, params RefreshSessionParams)
-	// Crear una cuenta
-	// (POST /api/v1/auth/register)
-	Register(w http.ResponseWriter, r *http.Request)
-	// Activar la cuenta con el token recibido por correo
-	// (POST /api/v1/auth/verify-email)
-	VerifyEmail(w http.ResponseWriter, r *http.Request)
 	// Perfil del usuario autenticado
 	// (GET /api/v1/me)
 	GetCurrentUser(w http.ResponseWriter, r *http.Request)
 	// Actualizar el perfil propio
 	// (PATCH /api/v1/me)
 	UpdateCurrentUser(w http.ResponseWriter, r *http.Request)
-	// Desactivar el segundo factor
-	// (DELETE /api/v1/me/mfa)
-	DisableMfa(w http.ResponseWriter, r *http.Request)
-	// Confirmar el alta con un código TOTP válido
-	// (POST /api/v1/me/mfa/activate)
-	ActivateMfa(w http.ResponseWriter, r *http.Request)
-	// Iniciar el alta de TOTP
-	// (POST /api/v1/me/mfa/enroll)
-	EnrollMfa(w http.ResponseWriter, r *http.Request)
 	// Sesiones activas del titular
 	// (GET /api/v1/me/sessions)
 	ListSessions(w http.ResponseWriter, r *http.Request)
@@ -426,6 +468,12 @@ type ServerInterface interface {
 	// Sonda de vitalidad
 	// (GET /healthz)
 	GetHealth(w http.ResponseWriter, r *http.Request)
+	// Autorizar al cliente mediante Authorization Code con PKCE
+	// (GET /oauth/authorize)
+	AuthorizeClient(w http.ResponseWriter, r *http.Request, params AuthorizeClientParams)
+	// Canjear un código de autorización por un access token
+	// (POST /oauth/token)
+	ExchangeAuthorizationCode(w http.ResponseWriter, r *http.Request)
 	// Sonda de disponibilidad (comprueba base de datos y broker)
 	// (GET /readyz)
 	GetReadiness(w http.ResponseWriter, r *http.Request)
@@ -453,6 +501,12 @@ func (_ Unimplemented) ListUsers(w http.ResponseWriter, r *http.Request, params 
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// Dar de alta a un empleado y enviar su invitación
+// (POST /api/v1/admin/users)
+func (_ Unimplemented) CreateEmployee(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // Consultar una cuenta
 // (GET /api/v1/admin/users/{userId})
 func (_ Unimplemented) GetUser(w http.ResponseWriter, r *http.Request, userId UserId) {
@@ -465,6 +519,18 @@ func (_ Unimplemented) UpdateUser(w http.ResponseWriter, r *http.Request, userId
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// Reenviar la invitación de una cuenta pendiente
+// (POST /api/v1/admin/users/{userId}/invitation)
+func (_ Unimplemented) ResendInvitation(w http.ResponseWriter, r *http.Request, userId UserId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Aceptar una invitación y definir la contraseña
+// (POST /api/v1/auth/invitations/accept)
+func (_ Unimplemented) AcceptInvitation(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // Iniciar sesión con correo y contraseña
 // (POST /api/v1/auth/login)
 func (_ Unimplemented) Login(w http.ResponseWriter, r *http.Request) {
@@ -474,6 +540,12 @@ func (_ Unimplemented) Login(w http.ResponseWriter, r *http.Request) {
 // Revocar el refresh token de la sesión actual
 // (POST /api/v1/auth/logout)
 func (_ Unimplemented) Logout(w http.ResponseWriter, r *http.Request, params LogoutParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Reenviar el código del desafío MFA
+// (POST /api/v1/auth/mfa/resend)
+func (_ Unimplemented) ResendMfaCode(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -501,18 +573,6 @@ func (_ Unimplemented) RefreshSession(w http.ResponseWriter, r *http.Request, pa
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Crear una cuenta
-// (POST /api/v1/auth/register)
-func (_ Unimplemented) Register(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// Activar la cuenta con el token recibido por correo
-// (POST /api/v1/auth/verify-email)
-func (_ Unimplemented) VerifyEmail(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
 // Perfil del usuario autenticado
 // (GET /api/v1/me)
 func (_ Unimplemented) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
@@ -522,24 +582,6 @@ func (_ Unimplemented) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 // Actualizar el perfil propio
 // (PATCH /api/v1/me)
 func (_ Unimplemented) UpdateCurrentUser(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// Desactivar el segundo factor
-// (DELETE /api/v1/me/mfa)
-func (_ Unimplemented) DisableMfa(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// Confirmar el alta con un código TOTP válido
-// (POST /api/v1/me/mfa/activate)
-func (_ Unimplemented) ActivateMfa(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// Iniciar el alta de TOTP
-// (POST /api/v1/me/mfa/enroll)
-func (_ Unimplemented) EnrollMfa(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -558,6 +600,18 @@ func (_ Unimplemented) RevokeSession(w http.ResponseWriter, r *http.Request, ses
 // Sonda de vitalidad
 // (GET /healthz)
 func (_ Unimplemented) GetHealth(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Autorizar al cliente mediante Authorization Code con PKCE
+// (GET /oauth/authorize)
+func (_ Unimplemented) AuthorizeClient(w http.ResponseWriter, r *http.Request, params AuthorizeClientParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Canjear un código de autorización por un access token
+// (POST /oauth/token)
+func (_ Unimplemented) ExchangeAuthorizationCode(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -712,6 +766,26 @@ func (siw *ServerInterfaceWrapper) ListUsers(w http.ResponseWriter, r *http.Requ
 	handler.ServeHTTP(w, r)
 }
 
+// CreateEmployee operation middleware
+func (siw *ServerInterfaceWrapper) CreateEmployee(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateEmployee(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetUser operation middleware
 func (siw *ServerInterfaceWrapper) GetUser(w http.ResponseWriter, r *http.Request) {
 
@@ -774,6 +848,51 @@ func (siw *ServerInterfaceWrapper) UpdateUser(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// ResendInvitation operation middleware
+func (siw *ServerInterfaceWrapper) ResendInvitation(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "userId" -------------
+	var userId UserId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", chi.URLParam(r, "userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ResendInvitation(w, r, userId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AcceptInvitation operation middleware
+func (siw *ServerInterfaceWrapper) AcceptInvitation(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AcceptInvitation(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // Login operation middleware
 func (siw *ServerInterfaceWrapper) Login(w http.ResponseWriter, r *http.Request) {
 
@@ -816,6 +935,20 @@ func (siw *ServerInterfaceWrapper) Logout(w http.ResponseWriter, r *http.Request
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.Logout(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ResendMfaCode operation middleware
+func (siw *ServerInterfaceWrapper) ResendMfaCode(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ResendMfaCode(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -904,34 +1037,6 @@ func (siw *ServerInterfaceWrapper) RefreshSession(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
-// Register operation middleware
-func (siw *ServerInterfaceWrapper) Register(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.Register(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// VerifyEmail operation middleware
-func (siw *ServerInterfaceWrapper) VerifyEmail(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.VerifyEmail(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
 // GetCurrentUser operation middleware
 func (siw *ServerInterfaceWrapper) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 
@@ -963,66 +1068,6 @@ func (siw *ServerInterfaceWrapper) UpdateCurrentUser(w http.ResponseWriter, r *h
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateCurrentUser(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// DisableMfa operation middleware
-func (siw *ServerInterfaceWrapper) DisableMfa(w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DisableMfa(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// ActivateMfa operation middleware
-func (siw *ServerInterfaceWrapper) ActivateMfa(w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ActivateMfa(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// EnrollMfa operation middleware
-func (siw *ServerInterfaceWrapper) EnrollMfa(w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.EnrollMfa(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1088,6 +1133,129 @@ func (siw *ServerInterfaceWrapper) GetHealth(w http.ResponseWriter, r *http.Requ
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetHealth(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AuthorizeClient operation middleware
+func (siw *ServerInterfaceWrapper) AuthorizeClient(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AuthorizeClientParams
+
+	// ------------- Required query parameter "client_id" -------------
+
+	if paramValue := r.URL.Query().Get("client_id"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "client_id"})
+		return
+	}
+
+	err = runtime.BindQueryParameter("form", true, true, "client_id", r.URL.Query(), &params.ClientId)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "client_id", Err: err})
+		return
+	}
+
+	// ------------- Required query parameter "redirect_uri" -------------
+
+	if paramValue := r.URL.Query().Get("redirect_uri"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "redirect_uri"})
+		return
+	}
+
+	err = runtime.BindQueryParameter("form", true, true, "redirect_uri", r.URL.Query(), &params.RedirectUri)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "redirect_uri", Err: err})
+		return
+	}
+
+	// ------------- Required query parameter "response_type" -------------
+
+	if paramValue := r.URL.Query().Get("response_type"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "response_type"})
+		return
+	}
+
+	err = runtime.BindQueryParameter("form", true, true, "response_type", r.URL.Query(), &params.ResponseType)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "response_type", Err: err})
+		return
+	}
+
+	// ------------- Required query parameter "state" -------------
+
+	if paramValue := r.URL.Query().Get("state"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "state"})
+		return
+	}
+
+	err = runtime.BindQueryParameter("form", true, true, "state", r.URL.Query(), &params.State)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "state", Err: err})
+		return
+	}
+
+	// ------------- Required query parameter "code_challenge" -------------
+
+	if paramValue := r.URL.Query().Get("code_challenge"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "code_challenge"})
+		return
+	}
+
+	err = runtime.BindQueryParameter("form", true, true, "code_challenge", r.URL.Query(), &params.CodeChallenge)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "code_challenge", Err: err})
+		return
+	}
+
+	// ------------- Required query parameter "code_challenge_method" -------------
+
+	if paramValue := r.URL.Query().Get("code_challenge_method"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "code_challenge_method"})
+		return
+	}
+
+	err = runtime.BindQueryParameter("form", true, true, "code_challenge_method", r.URL.Query(), &params.CodeChallengeMethod)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "code_challenge_method", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AuthorizeClient(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ExchangeAuthorizationCode operation middleware
+func (siw *ServerInterfaceWrapper) ExchangeAuthorizationCode(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ExchangeAuthorizationCode(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1234,16 +1402,28 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/api/v1/admin/users", wrapper.ListUsers)
 	})
 	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/admin/users", wrapper.CreateEmployee)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/admin/users/{userId}", wrapper.GetUser)
 	})
 	r.Group(func(r chi.Router) {
 		r.Patch(options.BaseURL+"/api/v1/admin/users/{userId}", wrapper.UpdateUser)
 	})
 	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/admin/users/{userId}/invitation", wrapper.ResendInvitation)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/auth/invitations/accept", wrapper.AcceptInvitation)
+	})
+	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/v1/auth/login", wrapper.Login)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/v1/auth/logout", wrapper.Logout)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/auth/mfa/resend", wrapper.ResendMfaCode)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/v1/auth/mfa/verify", wrapper.VerifyMfa)
@@ -1258,25 +1438,10 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/api/v1/auth/refresh", wrapper.RefreshSession)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/api/v1/auth/register", wrapper.Register)
-	})
-	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/api/v1/auth/verify-email", wrapper.VerifyEmail)
-	})
-	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/me", wrapper.GetCurrentUser)
 	})
 	r.Group(func(r chi.Router) {
 		r.Patch(options.BaseURL+"/api/v1/me", wrapper.UpdateCurrentUser)
-	})
-	r.Group(func(r chi.Router) {
-		r.Delete(options.BaseURL+"/api/v1/me/mfa", wrapper.DisableMfa)
-	})
-	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/api/v1/me/mfa/activate", wrapper.ActivateMfa)
-	})
-	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/api/v1/me/mfa/enroll", wrapper.EnrollMfa)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/me/sessions", wrapper.ListSessions)
@@ -1286,6 +1451,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/healthz", wrapper.GetHealth)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/oauth/authorize", wrapper.AuthorizeClient)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/oauth/token", wrapper.ExchangeAuthorizationCode)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/readyz", wrapper.GetReadiness)

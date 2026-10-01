@@ -37,6 +37,13 @@ func (w *logoutWriter) RevokeRefreshToken(ctx context.Context, tokenHash []byte)
 	return userID, nil
 }
 
+func (w *logoutWriter) RevokeHubSessions(ctx context.Context, userID uuid.UUID) error {
+	if err := w.queries.RevokeHubSessionsForUser(ctx, userID); err != nil {
+		return fmt.Errorf("revoke hub sessions: %w", err)
+	}
+	return nil
+}
+
 func (w *logoutWriter) InsertAuditEvent(ctx context.Context, event logout.AuditEvent) error {
 	metadata, err := json.Marshal(map[string]string{"reason": event.Reason})
 	if err != nil {

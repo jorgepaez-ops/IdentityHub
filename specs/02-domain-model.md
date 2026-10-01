@@ -7,8 +7,12 @@ erDiagram
     users ||--o{ user_roles         : tiene
     roles ||--o{ user_roles         : concede
     users ||--o{ refresh_tokens     : abre
-    users ||--o{ verification_tokens: solicita
-    users ||--o{ recovery_codes     : posee
+    users ||--o{ account_tokens     : solicita
+    users ||--o{ mfa_challenges     : afronta
+    users ||--o{ hub_sessions       : mantiene
+    users ||--o{ authorization_codes: autoriza
+    applications ||--o{ roles       : define
+    applications ||--o{ authorization_codes: recibe
     users ||--o{ audit_log          : origina
     refresh_tokens ||--o{ refresh_tokens : rota_a
 
@@ -18,8 +22,6 @@ erDiagram
         text   password_hash
         text   display_name
         text   status        "pending_verification|active|locked|disabled"
-        bool   mfa_enabled
-        bytea  mfa_secret_enc "nullable, cifrado en reposo"
         int    failed_login_count
         timestamptz locked_until "nullable"
         timestamptz created_at
@@ -27,7 +29,8 @@ erDiagram
     }
     roles {
         uuid id PK
-        text name UK "admin|user"
+        text name UK "admin|user|contabilidad.senior|contabilidad.analista"
+        uuid application_id FK "nullable para roles de directorio"
         text description
     }
     user_roles {
@@ -49,18 +52,47 @@ erDiagram
         timestamptz created_at
         timestamptz last_used_at
     }
-    verification_tokens {
+    account_tokens {
         uuid   id PK
         uuid   user_id FK
         bytea  token_hash UK
-        text   purpose "email_verification|password_reset"
+        text   purpose "invitation|password_reset"
         timestamptz expires_at
         timestamptz used_at "nullable"
     }
-    recovery_codes {
+    mfa_challenges {
         uuid   id PK
         uuid   user_id FK
-        text   code_hash
+        bytea  token_hash UK "SHA-256 del mfaToken"
+        bytea  code_hash "código de 6 dígitos"
+        int    attempts_remaining
+        timestamptz expires_at
+        timestamptz used_at "nullable"
+        timestamptz sent_at
+    }
+    applications {
+        uuid   id PK
+        text   client_id UK
+        text   redirect_uri
+        text   allowed_origin
+        text   name
+    }
+    hub_sessions {
+        uuid   id PK
+        uuid   user_id FK
+        bytea  token_hash UK
+        timestamptz expires_at
+        timestamptz revoked_at "nullable"
+        timestamptz created_at
+    }
+    authorization_codes {
+        uuid   id PK
+        uuid   user_id FK
+        uuid   application_id FK
+        bytea  code_hash UK
+        text   redirect_uri
+        text   code_challenge
+        timestamptz expires_at
         timestamptz used_at "nullable"
     }
     audit_log {
@@ -93,17 +125,24 @@ Reglas que el sistema garantiza siempre. Cada una tiene una prueba con su nombre
    por convención.
 6. **Siempre existe al menos un administrador habilitado.** Un `UPDATE` que dejaría el sistema
    sin ningún admin activo se rechaza.
-7. **Los códigos de recuperación son de un solo uso.** Consumir uno fija `used_at` en la misma
-   transacción que emite los tokens de sesión.
+7. **Los tokens de cuenta son de un solo uso y propósito único.** Invitación y restablecimiento
+   comparten almacenamiento, pero una operación nunca acepta el propósito de la otra.
+8. **Un desafío MFA solo se consume una vez.** El acierto, el vencimiento, el agotamiento de
+   intentos o el reenvío invalidan el código anterior de forma atómica.
+9. **Los ámbitos de roles no se mezclan.** Toda cuenta tiene `user`; los JWT de Contabilidad
+   contienen solo `contabilidad.senior` y/o `contabilidad.analista`.
+10. **Un código de autorización solo se canjea una vez.** Está ligado a cliente, URI de retorno y
+    desafío PKCE; el canje fija `used_at` en la misma transacción que emite el access token.
+11. **Un administrador no se autoasigna roles.** El actor y el destinatario deben ser distintos.
 
 ## Máquina de estados de la cuenta
 
 ```
-                registro
+             alta administrativa
                    │
                    ▼
         ┌──────────────────────┐
-        │ pending_verification │──── token de verificación ────┐
+        │ pending_verification │──── acepta invitación ────────┐
         └──────────┬───────────┘                              │
                    │ 24 h sin verificar                        ▼
                    ▼                                    ┌──────────┐
@@ -125,8 +164,13 @@ Reglas que el sistema garantiza siempre. Cada una tiene una prueba con su nombre
   datos y no en código de aplicación, donde es fácil olvidarla y abrir un registro duplicado.
 - **`family_id` en los refresh tokens** es lo que hace posible RF-006: la detección de reuso
   necesita alcanzar a todos los descendientes de una sesión comprometida con un solo `UPDATE`.
-- **`mfa_secret_enc` cifrado en reposo**, no solo hasheado: el servidor necesita el secreto en
-  claro para verificar cada código TOTP, así que se cifra con una clave del entorno (AES-GCM).
-  Esto lo distingue de las contraseñas, que sí son irreversibles.
+- **`account_tokens` unifica invitaciones y restablecimientos** sin hacerlos intercambiables: el
+  campo `purpose` forma parte de la validación y cada flujo conserva su propia vigencia.
+- **MFA por correo no guarda secretos recuperables.** Tanto el `mfaToken` como el código se
+  almacenan como hash; no hay TOTP, enrolamiento ni códigos de recuperación (ADR 0010).
+- **`hub_sessions` es independiente del refresh de consola.** La cookie SSO usa `SameSite=Lax` y
+  el refresh conserva `SameSite=Strict`; ambos valores opacos se guardan solo como hash.
+- **`applications` representa el único cliente configurado.** En esta fase solo existe
+  Contabilidad; `authorization_codes` liga cada código al cliente, URI y PKCE S256 (ADR 0009).
 - **UUID v7 como claves primarias** salvo en `audit_log`, donde un `bigint` secuencial deja
   explícito el orden de inserción y hace más barata la consulta por rango temporal.

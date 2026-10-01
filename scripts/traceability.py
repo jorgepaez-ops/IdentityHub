@@ -27,13 +27,9 @@ OUT = ROOT / "specs" / "07-traceability.md"
 RF_HEADING = re.compile(r"^### (R[FN]-\d{3}) — (.+?) · (P\d)$", re.M)
 RF_TAG = re.compile(r"\b((?:RNF|RF)-\d{3})\b")
 
-# Decisión Q14: estos requisitos pertenecen al backlog de semana 3. Se muestran
-# para mantenerlos visibles, pero no se evalúan como parte de esta feature.
+# Requisitos pendientes de implementación. T3 define sus contratos, pero la matriz los
+# mantiene diferidos hasta que sus tareas de backend/frontend queden cerradas.
 DEFERRED = {
-    "RF-013": "Backlog de semana 3 por decisión Q14.",
-    "RF-014": "Backlog de semana 3 por decisión Q14.",
-    "RF-015": "Backlog de semana 3 por decisión Q14.",
-    "RF-016": "Backlog de semana 3 por decisión Q14.",
     "RF-018": "Backlog de semana 3 por decisión Q14.",
     "RF-019": "Backlog de semana 3 por decisión Q14.",
 }

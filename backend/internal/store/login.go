@@ -13,8 +13,8 @@ import (
 	generated "github.com/jorgepaez/identity-hub/internal/store/internal/sqlc"
 )
 
-// WithinLoginTransaction groups password rehashing, session issuance, and its
-// audit event. A failed login audit is also committed as the callback returns
+// WithinLoginTransaction groups the password check, its transparent rehash and
+// the failure audit/lockout bookkeeping. A failed login audit is also committed as the callback returns
 // the domain authentication error only after the audit insert succeeds.
 func (s *Store) WithinLoginTransaction(ctx context.Context, fn func(login.Writer) error) error {
 	tx, err := s.pool.Begin(ctx)
@@ -38,7 +38,7 @@ func (w *loginWriter) GetLoginUserByEmail(ctx context.Context, email string) (lo
 	if err != nil {
 		return login.User{}, fmt.Errorf("get login user by email: %w", err)
 	}
-	return login.User{ID: row.ID, Email: row.Email, PasswordHash: row.PasswordHash, Status: login.Status(row.Status), LockedUntil: optionalTime(row.LockedUntil), MFAEnabled: row.MfaEnabled}, nil
+	return login.User{ID: row.ID, Email: row.Email, DisplayName: row.DisplayName, PasswordHash: row.PasswordHash, Status: login.Status(row.Status), LockedUntil: optionalTime(row.LockedUntil)}, nil
 }
 
 func (w *loginWriter) CountLoginFailuresByAccount(ctx context.Context, userID uuid.UUID, since time.Time) (int64, error) {
@@ -71,24 +71,9 @@ func (w *loginWriter) UnlockLoginUser(ctx context.Context, userID uuid.UUID) err
 	return nil
 }
 
-func (w *loginWriter) ListRolesForUser(ctx context.Context, userID uuid.UUID) ([]string, error) {
-	roles, err := w.queries.ListRolesForUser(ctx, userID)
-	if err != nil {
-		return nil, fmt.Errorf("list roles for user: %w", err)
-	}
-	return roles, nil
-}
-
-func (w *loginWriter) UpdateLoginSuccess(ctx context.Context, userID uuid.UUID, passwordHash string) error {
-	if err := w.queries.UpdateLoginSuccess(ctx, generated.UpdateLoginSuccessParams{ID: userID, PasswordHash: passwordHash}); err != nil {
-		return fmt.Errorf("update login success: %w", err)
-	}
-	return nil
-}
-
-func (w *loginWriter) CreateRefreshToken(ctx context.Context, refresh login.RefreshToken) error {
-	if err := w.queries.CreateRefreshToken(ctx, generated.CreateRefreshTokenParams{UserID: refresh.UserID, TokenHash: refresh.TokenHash, FamilyID: refresh.FamilyID, Ip: copyAddr(refresh.IP), UserAgent: nullableText(refresh.UserAgent), ExpiresAt: pgtype.Timestamptz{Time: refresh.ExpiresAt, Valid: true}}); err != nil {
-		return fmt.Errorf("create refresh token: %w", err)
+func (w *loginWriter) UpdatePasswordHash(ctx context.Context, userID uuid.UUID, passwordHash string) error {
+	if err := w.queries.UpdatePasswordHash(ctx, generated.UpdatePasswordHashParams{ID: userID, PasswordHash: passwordHash}); err != nil {
+		return fmt.Errorf("update password hash: %w", err)
 	}
 	return nil
 }

@@ -24,6 +24,16 @@ const (
 	maxPasswordRunes = 128
 )
 
+// Account-chosen password length policy shared by every flow that lets a
+// user pick their own password (invitation acceptance, password reset).
+// It is stricter than Hash's own floor (any non-empty secret up to
+// maxPasswordRunes), so it lives here once instead of being duplicated as
+// magic numbers in each caller.
+const (
+	AccountPasswordMinRunes = 12
+	AccountPasswordMaxRunes = maxPasswordRunes
+)
+
 var ErrMalformedHash = errors.New("malformed Argon2id hash")
 
 // InvalidPasswordError reports a password that cannot be hashed or verified.

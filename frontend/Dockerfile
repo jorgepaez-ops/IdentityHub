@@ -19,9 +19,9 @@ COPY . .
 RUN npm run build
 
 # ── Imagen final ──────────────────────────────────────────────────────────
-# nginxinc/nginx-unprivileged:stable — corre como uid 101 por defecto y ya
+# nginxinc/nginx-unprivileged:stable-alpine — corre como uid 101 por defecto y ya
 # escucha en el puerto 8080 que usa este proyecto, sin cambiar nada más.
-FROM nginxinc/nginx-unprivileged@sha256:0918d093d6088225655ddf602fdf00679c1c0c9a89c01c6dcdce5ee5e6c2f3f3 AS web
+FROM nginxinc/nginx-unprivileged@sha256:ed04ec1ff34502c339ee5c3ae3f855442398edc1d05591e2b98981dcbbd20b1e AS web
 
 COPY nginx/default.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/dist /usr/share/nginx/html

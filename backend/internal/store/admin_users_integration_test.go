@@ -224,6 +224,88 @@ func TestRF010_ActualizaEstadoYRolesPersisteEnUnaTransaccion(t *testing.T) {
 	}
 }
 
+func TestRF009_Migracion000004AgregaCatalogoDeRolesDeNegocio(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test requires a PostgreSQL server")
+	}
+	ctx := context.Background()
+	pool := testdb.New(t)
+
+	var names []string
+	rows, err := pool.Query(ctx, `SELECT name FROM roles ORDER BY name`)
+	if err != nil {
+		t.Fatalf("query roles: %v", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			t.Fatalf("scan role name: %v", err)
+		}
+		names = append(names, name)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("iterate roles: %v", err)
+	}
+	want := []string{"admin", "contabilidad.analista", "contabilidad.senior", "user"}
+	if !equalStrings(names, want) {
+		t.Fatalf("roles catalog = %v, want %v", names, want)
+	}
+}
+
+// equalStrings avoids importing reflect for a small, order-sensitive
+// comparison already guaranteed by the ORDER BY above.
+func equalStrings(got, want []string) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for i := range got {
+		if got[i] != want[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func TestRF010_AsignaRolesDeNegocioDeContabilidadEnUnaTransaccion(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test requires a PostgreSQL server")
+	}
+	ctx := context.Background()
+	pool := testdb.New(t)
+	repository, err := store.NewWithPool(pool)
+	if err != nil {
+		t.Fatalf("NewWithPool: %v", err)
+	}
+
+	actor := createAdminTestUser(t, ctx, repository, "roles-admin@example.test", "Roles Admin", "active")
+	target := createAdminTestUser(t, ctx, repository, "roles-target@example.test", "Roles Target", "active")
+
+	err = repository.WithinUserManagementTransaction(ctx, func(writer admin.Writer) error {
+		if err := writer.ReplaceRoles(ctx, target.ID, []string{"user", "contabilidad.senior"}, actor.ID); err != nil {
+			return err
+		}
+		return writer.InsertAuditEvent(ctx, admin.AuditEvent{ActorUserID: &actor.ID, Action: "role_changed", ResourceType: "user", ResourceID: target.ID.String()})
+	})
+	if err != nil {
+		t.Fatalf("WithinUserManagementTransaction: %v", err)
+	}
+
+	persisted, err := repository.GetUser(ctx, target.ID)
+	if err != nil {
+		t.Fatalf("GetUser: %v", err)
+	}
+	if !equalStrings(sortedCopy(persisted.Roles), []string{"contabilidad.senior", "user"}) {
+		t.Fatalf("persisted roles = %v, want [contabilidad.senior user]", persisted.Roles)
+	}
+}
+
+func sortedCopy(values []string) []string {
+	out := append([]string(nil), values...)
+	sort.Strings(out)
+	return out
+}
+
 func TestRF010_TransaccionDeAdministracionSeRevierteSiElEscritorFalla(t *testing.T) {
 	if testing.Short() {
 		t.Skip("integration test requires a PostgreSQL server")

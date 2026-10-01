@@ -13,8 +13,8 @@ info:
   title: Identity Hub API
   version: 0.1.0
   description: |
-    Proveedor de identidad: registro, autenticación, emisión y rotación de tokens,
-    segundo factor, control de acceso por roles y auditoría.
+    Proveedor de identidad: alta administrativa, autenticación, emisión y rotación de
+    tokens, segundo factor, autorización de aplicaciones, control por roles y auditoría.
 
     Cada operación declara `x-requirement` con el identificador del requisito que
     implementa (ver specs/01-requirements.md).
@@ -25,9 +25,10 @@ info:
     y logout confirma con `204`. El resto de la API usa exclusivamente
     `Authorization: Bearer`, nunca cookies, por lo que no queda expuesta a CSRF.
 
-    La API se entrega al frontend a través de Nginx y comparte origen, por lo que no
-    habilita CORS. Si fuera necesario en el futuro, `Access-Control-Allow-Credentials`
-    solo podrá usarse con un origen explícito, nunca con `*`.
+    La API de la consola se entrega a través de Nginx y comparte origen. CORS solo se
+    habilita para el origen configurado de Contabilidad en `POST /oauth/token` y en el
+    JWKS, siempre sin credenciales. Los nombres OAuth en `snake_case` son la única
+    excepción intencional a la convención `camelCase`: los define RFC 6749.
   license:
     name: Apache-2.0
     url: https://www.apache.org/licenses/LICENSE-2.0
@@ -87,6 +88,7 @@ paths:
       operationId: getJwks
       tags: [system]
       summary: Clave pública para validar los tokens emitidos
+      description: CORS sin credenciales, permitido solo al origen configurado del cliente.
       x-requirement: RF-004
       security: []
       responses:
@@ -97,46 +99,21 @@ paths:
               schema: { $ref: '#/components/schemas/Jwks' }
 
   # ── Autenticación ─────────────────────────────────────────────────────────
-  /api/v1/auth/register:
+  /api/v1/auth/invitations/accept:
     post:
-      operationId: register
+      operationId: acceptInvitation
       tags: [auth]
-      summary: Crear una cuenta
-      x-requirement: RF-001
-      security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/RegisterRequest' }
-      responses:
-        '201':
-          description: Cuenta creada en estado pending_verification
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/RegisterResponse' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '409':
-          description: El correo ya está registrado
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
-        '429': { $ref: '#/components/responses/TooManyRequests' }
-
-  /api/v1/auth/verify-email:
-    post:
-      operationId: verifyEmail
-      tags: [auth]
-      summary: Activar la cuenta con el token recibido por correo
+      summary: Aceptar una invitación y definir la contraseña
+      description: Consume un token de invitación de un solo uso y activa la cuenta.
       x-requirement: RF-002
       security: []
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/TokenRequest' }
+            schema: { $ref: '#/components/schemas/InvitationAcceptRequest' }
       responses:
-        '204': { description: Cuenta activada }
+        '204': { description: Invitación aceptada y cuenta activada }
         '400': { $ref: '#/components/responses/BadRequest' }
         '410':
           description: El token expiró o ya fue usado
@@ -150,9 +127,11 @@ paths:
       tags: [auth]
       summary: Iniciar sesión con correo y contraseña
       description: |
-        Devuelve `200` con el par de tokens si la cuenta no tiene segundo factor.
-        Si lo tiene, devuelve `202` con un `mfa_token` de corta vida que debe
-        canjearse en `/api/v1/auth/mfa/verify`.
+        Una contraseña correcta siempre devuelve `202` con un `mfaToken` temporal y
+        envía por correo un código de 6 dígitos. No crea sesión hasta completar MFA.
+        Cada desafío nuevo anula los abiertos de la cuenta; se emiten como máximo 5 por cuenta
+        cada 15 minutos (`429` al superarlo). El código se publica tras confirmar la transacción:
+        si el broker falla, responde `503` y anula ese desafío para que no consuma el límite de emisión (ADR 0006, D16).
       x-requirement: RF-003
       security: []
       requestBody:
@@ -161,15 +140,6 @@ paths:
           application/json:
             schema: { $ref: '#/components/schemas/LoginRequest' }
       responses:
-        '200':
-          description: Sesión iniciada
-          headers:
-            Set-Cookie:
-              description: 'refresh_token=<opaco>; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Max-Age=<vigencia del refresh>'
-              schema: { type: string }
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/TokenPair' }
         '202':
           description: Se requiere segundo factor
           content:
@@ -182,7 +152,16 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }
-        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '429':
+          description: Límite de peticiones excedido, o ya se emitieron 5 desafíos MFA para la cuenta en 15 minutos
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '503':
+          description: No se pudo enviar el código MFA; el desafío se anula y no consume el límite de emisión
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
 
   /api/v1/auth/mfa/verify:
     post:
@@ -198,16 +177,45 @@ paths:
             schema: { $ref: '#/components/schemas/MfaVerifyRequest' }
       responses:
         '200':
-          description: Sesión iniciada
+          description: >
+            Sesión iniciada. Emite dos cookies independientes: el refresh de la consola
+            (`SameSite=Strict`, ADR 0005) y la sesión SSO del Hub (`SameSite=Lax`, ADR 0009),
+            que usa `/oauth/authorize` para no volver a pedir credenciales.
           headers:
             Set-Cookie:
-              description: 'refresh_token=<opaco>; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Max-Age=<vigencia del refresh>'
+              description: >
+                'refresh_token=<opaco>; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Max-Age=<vigencia del refresh>'
+                y, en otra cabecera Set-Cookie, 'hub_session=<opaco>; HttpOnly; Secure; SameSite=Lax; Path=/oauth; Max-Age=<vigencia de la sesión SSO>'
               schema: { type: string }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/TokenPair' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/v1/auth/mfa/resend:
+    post:
+      operationId: resendMfaCode
+      tags: [auth]
+      summary: Reenviar el código del desafío MFA
+      description: Anula el código anterior, conserva el desafío y permite un envío cada 60 segundos. Si el broker falla después del commit, restaura el código y `lastSentAt` previos para permitir reintentar sin esperar.
+      x-requirement: RF-014
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MfaResendRequest' }
+      responses:
+        '202': { description: Código anterior anulado y nuevo envío encolado }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503':
+          description: No se pudo enviar el código MFA; se restaura el código anterior y el reintento no espera 60 segundos
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
 
   /api/v1/auth/refresh:
     post:
@@ -275,7 +283,13 @@ paths:
             schema: { $ref: '#/components/schemas/EmailRequest' }
       responses:
         '202': { description: 'Si la cuenta existe, se envió el correo' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503':
+          description: El servicio de restablecimiento no está disponible
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
 
   /api/v1/auth/password-reset/confirm:
     post:
@@ -290,13 +304,93 @@ paths:
           application/json:
             schema: { $ref: '#/components/schemas/PasswordResetConfirmRequest' }
       responses:
-        '204': { description: Contraseña actualizada y sesiones revocadas }
+        '204': { description: Contraseña actualizada y sesiones revocadas; el aviso por correo se publica tras confirmar y un fallo del broker no cambia el resultado (D16) }
         '400': { $ref: '#/components/responses/BadRequest' }
         '410':
           description: El token expiró o ya fue usado
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }
+
+  # ── OAuth 2.0 para aplicaciones cliente ──────────────────────────────────
+  /oauth/authorize:
+    get:
+      operationId: authorizeClient
+      tags: [auth]
+      summary: Autorizar al cliente mediante Authorization Code con PKCE
+      description: |
+        Valida el cliente configurado, la coincidencia exacta de `redirect_uri`, `state`
+        obligatorio y PKCE S256. Si existe la cookie SSO del Hub (`HttpOnly`, `Secure`,
+        `SameSite=Lax`) no vuelve a pedir contraseña. Sin sesión SSO
+        válida responde `302` al login del Hub con `continue` = la ruta relativa de esta misma
+        petición; el login solo acepta `continue` si es una ruta relativa que empieza por
+        `/oauth/authorize` (nunca una URL absoluta ni `//host`, para evitar redirección abierta)
+        y vuelve a ella tras completar el MFA. Los errores con una URI validada se
+        devuelven por redirección según RFC 6749 §4.1.2.1. No se habilita CORS aquí.
+        Los parámetros en `snake_case` son nombres de protocolo definidos por RFC 6749.
+      x-requirement: RF-020
+      security: []
+      parameters:
+        - name: client_id
+          in: query
+          required: true
+          schema: { type: string }
+        - name: redirect_uri
+          in: query
+          required: true
+          schema: { type: string, format: uri }
+        - name: response_type
+          in: query
+          required: true
+          schema: { type: string, enum: [code] }
+        - name: state
+          in: query
+          required: true
+          schema: { type: string, minLength: 1 }
+        - name: code_challenge
+          in: query
+          required: true
+          schema: { type: string, minLength: 43, maxLength: 128 }
+        - name: code_challenge_method
+          in: query
+          required: true
+          schema: { type: string, enum: [S256] }
+      responses:
+        '302':
+          description: Redirección al cliente con `code` y `state`, o con `error` y el mismo `state`.
+          headers:
+            Location:
+              required: true
+              schema: { type: string, format: uri }
+        '400':
+          description: Petición inválida que no puede redirigirse de forma segura.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /oauth/token:
+    post:
+      operationId: exchangeAuthorizationCode
+      tags: [auth]
+      summary: Canjear un código de autorización por un access token
+      description: |
+        Acepta exclusivamente `application/x-www-form-urlencoded`. CORS se permite sin
+        credenciales y solo para el origen configurado del cliente. No emite refresh token.
+        Los campos en `snake_case` son nombres de protocolo definidos por RFC 6749.
+      x-requirement: RF-020
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema: { $ref: '#/components/schemas/OAuthTokenRequest' }
+      responses:
+        '200':
+          description: Access token dirigido al cliente
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OAuthTokenResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
 
   # ── Titular ───────────────────────────────────────────────────────────────
   /api/v1/me:
@@ -360,59 +454,32 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
 
-  /api/v1/me/mfa/enroll:
+  # ── Administración ────────────────────────────────────────────────────────
+  /api/v1/admin/users:
     post:
-      operationId: enrollMfa
-      tags: [me]
-      summary: Iniciar el alta de TOTP
-      description: Devuelve el secreto una única vez. No se puede volver a consultar.
-      x-requirement: RF-013
+      operationId: createEmployee
+      tags: [admin]
+      summary: Dar de alta a un empleado y enviar su invitación
+      x-requirement: RF-001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminCreateUserRequest' }
       responses:
-        '200':
-          description: Secreto y códigos de recuperación
+        '201':
+          description: Cuenta creada en estado pending_verification
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/MfaEnrollment' }
+              schema: { $ref: '#/components/schemas/User' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '409':
-          description: El segundo factor ya está activo
+          description: El correo ya está registrado
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }
-
-  /api/v1/me/mfa/activate:
-    post:
-      operationId: activateMfa
-      tags: [me]
-      summary: Confirmar el alta con un código TOTP válido
-      x-requirement: RF-013
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/MfaCodeRequest' }
-      responses:
-        '204': { description: Segundo factor activado }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-
-  /api/v1/me/mfa:
-    delete:
-      operationId: disableMfa
-      tags: [me]
-      summary: Desactivar el segundo factor
-      x-requirement: RF-013
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/PasswordConfirmRequest' }
-      responses:
-        '204': { description: Segundo factor desactivado }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-
-  # ── Administración ────────────────────────────────────────────────────────
-  /api/v1/admin/users:
     get:
       operationId: listUsers
       tags: [admin]
@@ -453,7 +520,7 @@ paths:
       operationId: updateUser
       tags: [admin]
       summary: Cambiar el estado o los roles de una cuenta
-      description: Un administrador no puede deshabilitarse a sí mismo (invariante 6).
+      description: Un administrador no puede deshabilitarse ni asignarse roles a sí mismo (invariantes 6 y 11).
       x-requirement: RF-010
       parameters:
         - $ref: '#/components/parameters/UserId'
@@ -472,6 +539,26 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/admin/users/{userId}/invitation:
+    post:
+      operationId: resendInvitation
+      tags: [admin]
+      summary: Reenviar la invitación de una cuenta pendiente
+      description: Anula invitaciones anteriores y envía un enlace nuevo que vence en 24 horas.
+      x-requirement: RF-001
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '204': { description: Invitación reenviada }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: La cuenta no está pendiente de verificación
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
 
   /api/v1/admin/audit-log:
     get:
@@ -635,7 +722,7 @@ components:
 
     Role:
       type: string
-      enum: [admin, user]
+      enum: [admin, user, contabilidad.senior, contabilidad.analista]
 
     User:
       type: object
@@ -648,7 +735,7 @@ components:
         roles:
           type: array
           items: { $ref: '#/components/schemas/Role' }
-        mfaEnabled:  { type: boolean }
+        mfaEnabled:  { type: boolean, description: Siempre verdadero para cuentas activas; no requiere enrolamiento }
         createdAt:   { type: string, format: date-time }
         lastLoginAt: { type: string, format: date-time, nullable: true }
 
@@ -661,21 +748,25 @@ components:
           items: { $ref: '#/components/schemas/User' }
         nextCursor: { type: string, nullable: true }
 
-    RegisterRequest:
+    AdminCreateUserRequest:
       type: object
-      required: [email, password, displayName]
+      required: [email, displayName, roles]
       properties:
         email:       { type: string, format: email, maxLength: 254 }
-        password:    { type: string, minLength: 12, maxLength: 128, format: password }
         displayName: { type: string, minLength: 1, maxLength: 100 }
+        roles:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/Role' }
 
-    RegisterResponse:
-      type: object
-      required: [id, email, status]
-      properties:
-        id:     { type: string, format: uuid }
-        email:  { type: string, format: email }
-        status: { $ref: '#/components/schemas/UserStatus' }
+    InvitationAcceptRequest:
+      allOf:
+        - $ref: '#/components/schemas/TokenRequest'
+        - type: object
+          required: [password]
+          properties:
+            password: { type: string, minLength: 12, maxLength: 128, format: password }
 
     LoginRequest:
       type: object
@@ -704,30 +795,18 @@ components:
       required: [mfaToken, code]
       properties:
         mfaToken: { type: string }
-        code:     { type: string, description: Código TOTP de 6 dígitos o código de recuperación }
+        code:
+          type: string
+          description: Código de un solo uso enviado por correo
+          minLength: 6
+          maxLength: 6
+          pattern: '^[0-9]{6}$'
 
-    MfaEnrollment:
+    MfaResendRequest:
       type: object
-      required: [secret, otpauthUri, recoveryCodes]
+      required: [mfaToken]
       properties:
-        secret:     { type: string, description: Secreto TOTP en base32. Se muestra una sola vez. }
-        otpauthUri: { type: string, description: 'URI otpauth:// para el código QR' }
-        recoveryCodes:
-          type: array
-          description: Diez códigos de un solo uso. Se muestran una sola vez.
-          items: { type: string }
-
-    MfaCodeRequest:
-      type: object
-      required: [code]
-      properties:
-        code: { type: string, minLength: 6, maxLength: 6 }
-
-    PasswordConfirmRequest:
-      type: object
-      required: [password]
-      properties:
-        password: { type: string, format: password }
+        mfaToken: { type: string }
 
     TokenRequest:
       type: object
@@ -760,6 +839,24 @@ components:
         roles:
           type: array
           items: { $ref: '#/components/schemas/Role' }
+
+    OAuthTokenRequest:
+      type: object
+      required: [grant_type, code, redirect_uri, client_id, code_verifier]
+      properties:
+        grant_type:   { type: string, enum: [authorization_code] }
+        code:         { type: string }
+        redirect_uri: { type: string, format: uri }
+        client_id:    { type: string }
+        code_verifier: { type: string, minLength: 43, maxLength: 128 }
+
+    OAuthTokenResponse:
+      type: object
+      required: [access_token, token_type, expires_in]
+      properties:
+        access_token: { type: string, description: JWT Ed25519 con `aud` del cliente y solo sus roles }
+        token_type:   { type: string, enum: [Bearer] }
+        expires_in:   { type: integer, example: 900 }
 
     Session:
       type: object

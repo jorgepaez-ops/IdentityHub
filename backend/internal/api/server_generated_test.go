@@ -1,9 +1,12 @@
 package api
 
 import (
+	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -21,28 +24,14 @@ func TestRNF011_GeneratedServerContract(t *testing.T) {
 		}
 	})
 
-	t.Run("unwired registration returns RFC7807", func(t *testing.T) {
-		server := NewServer(nil, "test", nil)
-		response := httptest.NewRecorder()
-
-		server.Routes().ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/v1/auth/register", nil))
-
-		if response.Code != http.StatusServiceUnavailable {
-			t.Fatalf("POST /api/v1/auth/register status = %d, want %d", response.Code, http.StatusServiceUnavailable)
-		}
-		if got := response.Header().Get("Content-Type"); got != "application/problem+json; charset=utf-8" {
-			t.Fatalf("Content-Type = %q, want RFC 7807 content type", got)
-		}
-	})
-
 	t.Run("refresh token is only a cookie parameter", func(t *testing.T) {
 		if _, exists := reflect.TypeOf(TokenPair{}).FieldByName("RefreshToken"); exists {
 			t.Fatal("TokenPair must not expose RefreshToken")
 		}
 
 		contract := reflect.TypeOf((*ServerInterface)(nil)).Elem()
-		if contract.NumMethod() != 22 {
-			t.Fatalf("ServerInterface methods = %d, want 22", contract.NumMethod())
+		if contract.NumMethod() != 23 {
+			t.Fatalf("ServerInterface methods = %d, want 23", contract.NumMethod())
 		}
 		for _, operation := range []string{"RefreshSession", "Logout"} {
 			method, ok := contract.MethodByName(operation)
@@ -59,4 +48,30 @@ func TestRNF011_GeneratedServerContract(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestRNF012_ErrorDeBindingEsProblemJSONSinDetalleInterno(t *testing.T) {
+	server := NewServer(nil, "test", nil)
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", nil)
+	internalDetail := "dial tcp db.internal:5432: connection refused"
+
+	server.handleBindingError(response, request, errors.New(internalDetail))
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
+	}
+	if contentType := response.Header().Get("Content-Type"); !strings.HasPrefix(contentType, "application/problem+json") {
+		t.Fatalf("Content-Type = %q, want application/problem+json", contentType)
+	}
+	if strings.Contains(response.Body.String(), internalDetail) {
+		t.Fatalf("response leaked binding detail: %s", response.Body.String())
+	}
+	var problem map[string]any
+	if err := json.Unmarshal(response.Body.Bytes(), &problem); err != nil {
+		t.Fatalf("decode RFC 7807 response: %v", err)
+	}
+	if problem["status"] != float64(http.StatusBadRequest) || problem["title"] == "" || problem["detail"] == "" {
+		t.Fatalf("problem = %#v, want populated RFC 7807 fields", problem)
+	}
 }

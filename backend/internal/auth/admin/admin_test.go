@@ -9,8 +9,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jorgepaez/identity-hub/internal/auth/login"
+	"github.com/jorgepaez/identity-hub/internal/auth/mfa"
 	"github.com/jorgepaez/identity-hub/internal/auth/password"
-	"github.com/jorgepaez/identity-hub/internal/auth/token"
 )
 
 type repositoryStub struct {
@@ -99,14 +99,16 @@ func TestRF010_AdminDeshabilitaYElUsuarioNoEntra(t *testing.T) {
 	if len(repository.audits) != 1 || repository.audits[0].Action != "user_disabled" || repository.audits[0].ActorUserID == nil || *repository.audits[0].ActorUserID != actorID {
 		t.Fatalf("audits=%+v", repository.audits)
 	}
-	signer, err := token.New(make([]byte, 32), "https://issuer.test", "identity-hub", time.Now)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = login.New(loginRepository{repository}, signer, time.Hour).Login(context.Background(), login.Input{Email: "user@example.com", Password: "correct horse battery"})
+	_, err = login.New(loginRepository{repository}).WithMFA(adminMFAIssuer{}).Login(context.Background(), login.Input{Email: "user@example.com", Password: "correct horse battery"})
 	if !errors.Is(err, login.ErrInvalidCredentials) {
 		t.Fatalf("disabled user login error=%v", err)
 	}
+}
+
+type adminMFAIssuer struct{}
+
+func (adminMFAIssuer) Issue(context.Context, mfa.User) (mfa.Challenge, error) {
+	return mfa.Challenge{Token: "admin-test-challenge", ExpiresIn: 300}, nil
 }
 
 type loginRepository struct{ *repositoryStub }
@@ -125,8 +127,7 @@ func (w loginWriter) GetLoginUserByEmail(_ context.Context, email string) (login
 	}
 	return login.User{}, errors.New("not found")
 }
-func (w loginWriter) UpdateLoginSuccess(context.Context, uuid.UUID, string) error  { return nil }
-func (w loginWriter) CreateRefreshToken(context.Context, login.RefreshToken) error { return nil }
+func (w loginWriter) UpdatePasswordHash(context.Context, uuid.UUID, string) error { return nil }
 func (w loginWriter) CountLoginFailuresByAccount(context.Context, uuid.UUID, time.Time) (int64, error) {
 	return 0, nil
 }
@@ -135,11 +136,93 @@ func (w loginWriter) CountLoginFailuresByIP(context.Context, netip.Addr, time.Ti
 }
 func (w loginWriter) LockLoginUser(context.Context, uuid.UUID, time.Time) error { return nil }
 func (w loginWriter) UnlockLoginUser(context.Context, uuid.UUID) error          { return nil }
-func (w loginWriter) ListRolesForUser(ctx context.Context, id uuid.UUID) ([]string, error) {
-	return w.repositoryStub.ListRolesForUser(ctx, id)
-}
 func (w loginWriter) InsertAuditEvent(_ context.Context, event login.AuditEvent) error {
 	return w.repositoryStub.InsertAuditEvent(context.Background(), AuditEvent{ActorUserID: event.ActorUserID, Action: event.Action})
+}
+
+func TestRF009_UpdateUserAceptaRolesDeNegocioDeContabilidad(t *testing.T) {
+	actorID, targetID := uuid.New(), uuid.New()
+	repository := &repositoryStub{
+		users: map[uuid.UUID]User{
+			actorID:  {ID: actorID, Status: StatusActive},
+			targetID: {ID: targetID, Status: StatusActive},
+		},
+		roles: map[uuid.UUID][]string{actorID: {"admin"}, targetID: {"user"}},
+	}
+	newRoles := []string{"user", "contabilidad.senior"}
+	updated, err := New(repository).UpdateUser(context.Background(), UpdateInput{ActorUserID: actorID, UserID: targetID, Roles: &newRoles})
+	if err != nil {
+		t.Fatalf("UpdateUser() error=%v, want nil", err)
+	}
+	if !testHasRole(updated.Roles, "contabilidad.senior") {
+		t.Fatalf("updated.Roles=%v, want contabilidad.senior included", updated.Roles)
+	}
+	if !testHasRole(repository.roles[targetID], "contabilidad.senior") {
+		t.Fatalf("persisted roles=%v, want contabilidad.senior included", repository.roles[targetID])
+	}
+}
+
+func TestRF010_AdminNoPuedeAsignarseRolesASiMismo(t *testing.T) {
+	adminID := uuid.New()
+	repository := &repositoryStub{
+		users: map[uuid.UUID]User{adminID: {ID: adminID, Status: StatusActive}},
+		roles: map[uuid.UUID][]string{adminID: {"admin"}},
+	}
+	requested := []string{"user", "admin", "contabilidad.senior"}
+	_, err := New(repository).UpdateUser(context.Background(), UpdateInput{ActorUserID: adminID, UserID: adminID, Roles: &requested})
+	if !errors.Is(err, ErrSelfRoleAssignment) {
+		t.Fatalf("UpdateUser() error=%v, want ErrSelfRoleAssignment", err)
+	}
+	if testHasRole(repository.roles[adminID], "contabilidad.senior") {
+		t.Fatalf("roles=%v, self-assignment must not have been persisted", repository.roles[adminID])
+	}
+	if len(repository.audits) != 1 || repository.audits[0].Action != "role_assignment_rejected" || repository.audits[0].ActorUserID == nil || *repository.audits[0].ActorUserID != adminID {
+		t.Fatalf("audits=%+v, want one role_assignment_rejected event actored by %s", repository.audits, adminID)
+	}
+}
+
+func TestRF010_AutoasignacionSeAuditaAunqueLaSolicitudSeaInvalida(t *testing.T) {
+	for name, requested := range map[string][]string{
+		"sin rol base user": {"admin", "contabilidad.senior"},
+		"rol desconocido":   {"user", "operator"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			adminID := uuid.New()
+			repository := &repositoryStub{
+				users: map[uuid.UUID]User{adminID: {ID: adminID, Status: StatusActive}},
+				roles: map[uuid.UUID][]string{adminID: {"admin", "user"}},
+			}
+			_, err := New(repository).UpdateUser(context.Background(), UpdateInput{ActorUserID: adminID, UserID: adminID, Roles: &requested})
+			if !errors.Is(err, ErrSelfRoleAssignment) {
+				t.Fatalf("UpdateUser() error=%v, want ErrSelfRoleAssignment: the self-assignment rule must win over request validation", err)
+			}
+			if len(repository.audits) != 1 || repository.audits[0].Action != "role_assignment_rejected" {
+				t.Fatalf("audits=%+v, want one role_assignment_rejected event", repository.audits)
+			}
+		})
+	}
+}
+
+func TestRF009_UpdateUserRequiereMantenerElRolBaseUser(t *testing.T) {
+	actorID, targetID := uuid.New(), uuid.New()
+	repository := &repositoryStub{
+		users: map[uuid.UUID]User{
+			actorID:  {ID: actorID, Status: StatusActive},
+			targetID: {ID: targetID, Status: StatusActive},
+		},
+		roles: map[uuid.UUID][]string{actorID: {"admin"}, targetID: {"user"}},
+	}
+	requested := []string{"contabilidad.senior"}
+	_, err := New(repository).UpdateUser(context.Background(), UpdateInput{ActorUserID: actorID, UserID: targetID, Roles: &requested})
+	if !errors.Is(err, ErrBaseRoleRequired) {
+		t.Fatalf("UpdateUser() error=%v, want ErrBaseRoleRequired", err)
+	}
+	if !testHasRole(repository.roles[targetID], "user") || testHasRole(repository.roles[targetID], "contabilidad.senior") {
+		t.Fatalf("roles=%v, the base role removal must not have been persisted", repository.roles[targetID])
+	}
+	if len(repository.audits) != 0 {
+		t.Fatalf("audits=%+v, want none: this is a static request validation, like ErrInvalidRole", repository.audits)
+	}
 }
 
 func statusPtr(value Status) *Status { return &value }

@@ -71,7 +71,7 @@ func TestRNF005_AdminUpdateRejectsInvalidAndSelfTargetedChanges(t *testing.T) {
 		want  error
 	}{
 		{name: "unknown status", input: UpdateInput{Status: statusPointer("unknown")}, want: ErrInvalidStatus},
-		{name: "unknown role", input: UpdateInput{Roles: rolesPointer([]string{"operator"})}, want: ErrInvalidRole},
+		{name: "unknown role", input: UpdateInput{ActorUserID: actorID, UserID: uuid.New(), Roles: rolesPointer([]string{"operator"})}, want: ErrInvalidRole},
 		{name: "self disable", input: UpdateInput{ActorUserID: actorID, UserID: actorID, Status: statusPointer(StatusDisabled)}, want: ErrSelfDisable},
 	} {
 		t.Run(tt.name, func(t *testing.T) {

@@ -3,12 +3,18 @@
 package store_test
 
 import (
+	"bytes"
 	"context"
+	"log/slog"
 	"net"
 	"net/url"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/jorgepaez/identity-hub/internal/auth/mfa"
 
 	"github.com/jorgepaez/identity-hub/internal/store"
 	"github.com/jorgepaez/identity-hub/internal/testdb"
@@ -69,5 +75,28 @@ func TestRNF005_NewDevuelveErrorSiLaBaseNoResponde(t *testing.T) {
 	// immediately instead of hanging until New's internal 5s ping timeout.
 	if _, err := store.New(ctx, "postgres://127.0.0.1:1/identity?sslmode=disable"); err == nil {
 		t.Fatal("New(unreachable host) = nil error, want a connectivity error")
+	}
+}
+
+func TestRNF014_RestoreResendSinFilaDejaRastroEnLoggerInyectado(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test requires a PostgreSQL server")
+	}
+	pool := testdb.New(t)
+	var logs bytes.Buffer
+	repository, err := store.NewWithPool(pool)
+	if err != nil {
+		t.Fatalf("NewWithPool: %v", err)
+	}
+	repository.WithLogger(slog.New(slog.NewTextHandler(&logs, nil)))
+
+	err = repository.WithinMFATransaction(context.Background(), func(writer mfa.Writer) error {
+		return writer.RestoreResend(context.Background(), uuid.New(), []byte("expected"), []byte("previous"), time.Now(), time.Now().Add(-time.Minute))
+	})
+	if err != nil {
+		t.Fatalf("RestoreResend without matching challenge: %v", err)
+	}
+	if !strings.Contains(logs.String(), "mfa resend compensation restored no challenge") {
+		t.Fatalf("log=%q, want injected logger record", logs.String())
 	}
 }

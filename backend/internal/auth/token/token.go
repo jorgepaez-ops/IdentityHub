@@ -14,10 +14,15 @@ import (
 
 const accessTokenTTL = 15 * time.Minute
 
+// AccessTokenExpiresIn is the access token lifetime in seconds, as reported in
+// the `expiresIn` field of every token response.
+const AccessTokenExpiresIn = int(accessTokenTTL / time.Second)
+
 type Clock func() time.Time
 
 type Claims struct {
-	Roles []string `json:"roles"`
+	Roles     []string `json:"roles"`
+	SessionID string   `json:"sid,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -61,6 +66,32 @@ func New(seed []byte, issuer, audience string, clock Clock) (*Service, error) {
 }
 
 func (s *Service) Issue(subject string, roles []string) (string, error) {
+	return s.issue(subject, roles, "")
+}
+
+// IssueForSession binds a console access token to its refresh-token family so
+// the session-management endpoint can identify the current session.
+func (s *Service) IssueForSession(subject string, roles []string, sessionID string) (string, error) {
+	if sessionID == "" {
+		return "", fmt.Errorf("session ID is required")
+	}
+	return s.issue(subject, roles, sessionID)
+}
+
+// IssueForAudience emits an application access token. It deliberately has no
+// session claim because browser applications never receive Hub refresh state.
+func (s *Service) IssueForAudience(subject string, roles []string, audience string) (string, error) {
+	if audience == "" {
+		return "", fmt.Errorf("jwt audience is required")
+	}
+	return s.issueForAudience(subject, roles, "", audience)
+}
+
+func (s *Service) issue(subject string, roles []string, sessionID string) (string, error) {
+	return s.issueForAudience(subject, roles, sessionID, s.audience)
+}
+
+func (s *Service) issueForAudience(subject string, roles []string, sessionID, audience string) (string, error) {
 	if subject == "" {
 		return "", fmt.Errorf("jwt subject is required")
 	}
@@ -70,11 +101,12 @@ func (s *Service) Issue(subject string, roles []string) (string, error) {
 	}
 	now := s.clock()
 	claims := Claims{
-		Roles: append([]string(nil), roles...),
+		Roles:     append([]string(nil), roles...),
+		SessionID: sessionID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    s.issuer,
 			Subject:   subject,
-			Audience:  jwt.ClaimStrings{s.audience},
+			Audience:  jwt.ClaimStrings{audience},
 			ExpiresAt: jwt.NewNumericDate(now.Add(accessTokenTTL)),
 			IssuedAt:  jwt.NewNumericDate(now),
 			ID:        hex.EncodeToString(jti),

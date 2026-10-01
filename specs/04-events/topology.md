@@ -45,3 +45,5 @@ escrito. El patrón correcto es un *outbox transaccional* (escribir el evento en
 la misma transacción que el usuario y publicarlo con un relay aparte). Se
 documenta en `adr/0006` y queda como trabajo futuro: con un mes de presupuesto se
 prefiere una publicación directa bien instrumentada a un outbox a medio hacer.
+La Enmienda D16 de esa ADR exceptúa el aviso de restablecimiento completado y el código MFA: se
+publican después del commit y un fallo del broker no revierte la operación.

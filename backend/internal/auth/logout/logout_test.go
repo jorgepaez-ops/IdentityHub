@@ -13,10 +13,16 @@ import (
 )
 
 type repositoryStub struct {
-	userID  uuid.UUID
-	err     error
-	revoked [][]byte
-	audits  []AuditEvent
+	userID     uuid.UUID
+	err        error
+	revoked    [][]byte
+	audits     []AuditEvent
+	hubRevoked []uuid.UUID
+}
+
+func (r *repositoryStub) RevokeHubSessions(_ context.Context, userID uuid.UUID) error {
+	r.hubRevoked = append(r.hubRevoked, userID)
+	return nil
 }
 
 func (r *repositoryStub) WithinLogoutTransaction(_ context.Context, fn func(Writer) error) error {
@@ -47,6 +53,9 @@ func TestRF007_LogoutRevocaElTokenYRegistraAuditoria(t *testing.T) {
 	wantHash := sha256.Sum256([]byte("current-refresh-raw-bytes"))
 	if len(repo.revoked) != 1 || string(repo.revoked[0]) != string(wantHash[:]) {
 		t.Fatalf("revoked=%v", repo.revoked)
+	}
+	if len(repo.hubRevoked) != 1 || repo.hubRevoked[0] != userID {
+		t.Fatalf("hub sessions revoked for %v, want %s", repo.hubRevoked, userID)
 	}
 	if len(repo.audits) != 1 || repo.audits[0].Action != "logout" || repo.audits[0].ActorUserID == nil || *repo.audits[0].ActorUserID != userID || repo.audits[0].IP == nil || *repo.audits[0].IP != ip {
 		t.Fatalf("audits=%+v", repo.audits)

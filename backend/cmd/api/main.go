@@ -19,13 +19,19 @@ import (
 	"github.com/jorgepaez/identity-hub/internal/api"
 	"github.com/jorgepaez/identity-hub/internal/auth/admin"
 	"github.com/jorgepaez/identity-hub/internal/auth/auditlog"
+	"github.com/jorgepaez/identity-hub/internal/auth/employee"
+	"github.com/jorgepaez/identity-hub/internal/auth/invitation"
+	"github.com/jorgepaez/identity-hub/internal/auth/invitationresend"
+	"github.com/jorgepaez/identity-hub/internal/auth/lockout"
 	"github.com/jorgepaez/identity-hub/internal/auth/login"
 	"github.com/jorgepaez/identity-hub/internal/auth/logout"
+	"github.com/jorgepaez/identity-hub/internal/auth/mfa"
+	"github.com/jorgepaez/identity-hub/internal/auth/oauth"
 	"github.com/jorgepaez/identity-hub/internal/auth/password"
+	"github.com/jorgepaez/identity-hub/internal/auth/passwordreset"
 	"github.com/jorgepaez/identity-hub/internal/auth/refresh"
-	"github.com/jorgepaez/identity-hub/internal/auth/registration"
+	"github.com/jorgepaez/identity-hub/internal/auth/session"
 	"github.com/jorgepaez/identity-hub/internal/auth/token"
-	"github.com/jorgepaez/identity-hub/internal/auth/verification"
 	"github.com/jorgepaez/identity-hub/internal/config"
 	"github.com/jorgepaez/identity-hub/internal/events"
 	"github.com/jorgepaez/identity-hub/internal/observability"
@@ -94,6 +100,7 @@ func run() error {
 		return err
 	}
 	defer db.Close()
+	db.WithLogger(logger)
 	logger.Info("conectado a postgres")
 
 	broker, err := events.Connect(cfg.RabbitURL.Reveal())
@@ -112,15 +119,22 @@ func run() error {
 		return fmt.Errorf("create token service: %w", err)
 	}
 	password.Configure(cfg.Argon2)
+	oauthClient := oauth.Client{ID: cfg.OAuthClientID, RedirectURI: cfg.OAuthRedirectURI, Origin: cfg.OAuthClientOrigin}
+	if err := db.ValidateOAuthClient(ctx, oauthClient); err != nil {
+		return fmt.Errorf("validate OAuth client registration: %w", err)
+	}
 
-	registrationService := registration.New(db, broker, passwordHasher{}, rand.Reader, time.Now)
-	verificationService := verification.New(db, broker)
-	loginService := login.New(db, tokens, cfg.RefreshTTL, login.LockoutConfig{
+	employeeService := employee.New(db, broker, passwordHasher{}, rand.Reader, time.Now)
+	invitationService := invitation.New(db, broker, passwordHasher{})
+	// One RF-017 policy for both the password and the MFA-code steps.
+	lockoutPolicy := lockout.Config{
 		AccountMaxFailures: cfg.LoginAccountMaxFailures,
 		IPMaxFailures:      cfg.LoginIPMaxFailures,
 		FailureWindow:      cfg.LoginFailureWindow,
 		LockoutDuration:    cfg.LoginLockoutDuration,
-	}).WithEventPublisher(loginSecurityEventPublisher{users: db, publisher: broker, logger: logger})
+	}
+	mfaService := mfa.New(db, broker, rand.Reader, time.Now).WithTokenService(tokens, cfg.RefreshTTL).WithHubSessionTTL(cfg.HubSessionTTL).WithLockout(lockoutPolicy).WithLogger(logger)
+	loginService := login.New(db, lockoutPolicy).WithEventPublisher(loginSecurityEventPublisher{users: db, publisher: broker, logger: logger}).WithMFA(mfaService)
 	refreshService := refresh.New(db, tokens, cfg.RefreshTTL).WithEventPublisher(refreshSecurityEventPublisher{users: db, publisher: broker, logger: logger})
 
 	server := api.NewServer(logger, cfg.Version, map[string]api.Checker{
@@ -128,10 +142,15 @@ func run() error {
 		"broker":   brokerChecker{broker},
 	})
 	server.SetTokenService(tokens)
-	server.SetRegistrationService(registrationService)
-	server.SetLoginService(loginService, cfg.RefreshTTL)
-	server.SetEmailVerificationService(verificationService)
+	server.SetEmployeeCreationService(employeeService)
+	server.SetInvitationAcceptanceService(invitationService)
+	server.SetInvitationResendService(invitationresend.New(db, broker, rand.Reader, time.Now))
+	server.SetPasswordResetService(passwordreset.New(db, broker, passwordHasher{}, rand.Reader, time.Now).WithLogger(logger))
+	server.SetLoginService(loginService)
+	server.SetMFAService(mfaService, cfg.RefreshTTL)
+	server.SetOAuthService(oauth.New(db.OAuthRepository(), oauthClient, rand.Reader, time.Now), db.OAuthRepository(), oauthClient, cfg.PublicBaseURL+"/login", cfg.HubSessionTTL)
 	server.SetRefreshService(refreshService)
+	server.SetSessionService(session.New(db))
 	server.SetLogoutService(logout.New(db))
 	server.SetAdminUserService(admin.New(db))
 	server.SetAuditLogService(auditlog.New(db))

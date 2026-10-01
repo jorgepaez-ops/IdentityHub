@@ -48,6 +48,10 @@ type Config struct {
 	JWTAudience             string
 	AccessTTL               time.Duration
 	RefreshTTL              time.Duration
+	HubSessionTTL           time.Duration
+	OAuthClientID           string
+	OAuthRedirectURI        string
+	OAuthClientOrigin       string
 	LoginAccountMaxFailures int
 	LoginIPMaxFailures      int
 	LoginFailureWindow      time.Duration
@@ -55,6 +59,12 @@ type Config struct {
 	Argon2                  PasswordConfig
 	TrustedProxies          []netip.Prefix
 }
+
+const (
+	OAuthClientID     = "contabilidad"
+	OAuthRedirectURI  = "http://contabilidad.localhost:8080/oauth/callback"
+	OAuthClientOrigin = "http://contabilidad.localhost:8080"
+)
 
 // Load lee el entorno y acumula TODOS los errores antes de fallar, en vez de
 // abortar en el primero. Arrancar el contenedor cinco veces para descubrir cinco
@@ -137,6 +147,10 @@ func Load() (*Config, error) {
 		JWTAudience:             opt("JWT_AUDIENCE", "identity-hub"),
 		AccessTTL:               dur("JWT_ACCESS_TTL", "15m"),
 		RefreshTTL:              dur("JWT_REFRESH_TTL", "720h"),
+		HubSessionTTL:           positiveDuration("HUB_SESSION_TTL", "720h"),
+		OAuthClientID:           OAuthClientID,
+		OAuthRedirectURI:        OAuthRedirectURI,
+		OAuthClientOrigin:       OAuthClientOrigin,
 		LoginAccountMaxFailures: positiveNum("LOGIN_ACCOUNT_MAX_FAILURES", "5"),
 		LoginIPMaxFailures:      positiveNum("LOGIN_IP_MAX_FAILURES", "20"),
 		LoginFailureWindow:      positiveDuration("LOGIN_FAILURE_WINDOW", "15m"),

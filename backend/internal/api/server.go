@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/netip"
+	"net/url"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -18,29 +19,43 @@ import (
 
 	"github.com/jorgepaez/identity-hub/internal/auth/admin"
 	"github.com/jorgepaez/identity-hub/internal/auth/auditlog"
+	"github.com/jorgepaez/identity-hub/internal/auth/employee"
+	"github.com/jorgepaez/identity-hub/internal/auth/invitation"
+	"github.com/jorgepaez/identity-hub/internal/auth/invitationresend"
 	"github.com/jorgepaez/identity-hub/internal/auth/login"
 	"github.com/jorgepaez/identity-hub/internal/auth/logout"
+	"github.com/jorgepaez/identity-hub/internal/auth/mfa"
+	"github.com/jorgepaez/identity-hub/internal/auth/oauth"
+	"github.com/jorgepaez/identity-hub/internal/auth/passwordreset"
 	"github.com/jorgepaez/identity-hub/internal/auth/refresh"
-	"github.com/jorgepaez/identity-hub/internal/auth/registration"
 	"github.com/jorgepaez/identity-hub/internal/auth/token"
-	"github.com/jorgepaez/identity-hub/internal/auth/verification"
 )
 
 type Server struct {
-	logger         *slog.Logger
-	version        string
-	deps           map[string]Checker
-	tokens         *token.Service
-	registration   registration.Registrar
-	login          login.Authenticator
-	refreshTTL     time.Duration
-	verification   verification.Verifier
-	currentUsers   currentUserRepository
-	refresh        refresh.Refresher
-	logout         logout.Revoker
-	adminUsers     admin.Manager
-	auditLog       auditlog.Reader
-	trustedProxies []netip.Prefix
+	logger           *slog.Logger
+	version          string
+	deps             map[string]Checker
+	tokens           *token.Service
+	employeeCreation employee.Creator
+	invitationAccept invitation.Acceptor
+	invitationResend invitationresend.Resender
+	passwordReset    passwordreset.HandlerService
+	login            login.Authenticator
+	mfa              mfa.Authenticator
+	mfaRefreshTTL    time.Duration
+	hubSessionTTL    time.Duration
+	oauth            *oauth.Service
+	hubSessions      oauth.HubSessionReader
+	oauthClient      oauth.Client
+	oauthRedirect    *url.URL
+	oauthLoginURL    string
+	currentUsers     currentUserRepository
+	refresh          refresh.Refresher
+	sessions         sessionManager
+	logout           logout.Revoker
+	adminUsers       admin.Manager
+	auditLog         auditlog.Reader
+	trustedProxies   []netip.Prefix
 }
 
 func NewServer(logger *slog.Logger, version string, deps map[string]Checker) *Server {
@@ -49,17 +64,46 @@ func NewServer(logger *slog.Logger, version string, deps map[string]Checker) *Se
 
 func (s *Server) SetTokenService(tokens *token.Service) { s.tokens = tokens }
 
-// SetRegistrationService is used by composition and focused handler tests.
-func (s *Server) SetRegistrationService(service registration.Registrar) { s.registration = service }
+// SetEmployeeCreationService is used by composition and focused handler tests
+// (T5, RF-001). It replaces the week-2 SetRegistrationService: D9 retired
+// public self-registration, so only an admin-driven employee creation
+// service is wired into the Server now.
+func (s *Server) SetEmployeeCreationService(service employee.Creator) { s.employeeCreation = service }
 
-// SetLoginService is used by composition and focused handler tests.
-func (s *Server) SetLoginService(service login.Authenticator, refreshTTL time.Duration) {
-	s.login = service
-	s.refreshTTL = refreshTTL
+// SetInvitationAcceptanceService is used by composition and focused handler
+// tests (T5, RF-002). It replaces the week-2 SetEmailVerificationService:
+// accepting the invitation now does what email verification used to.
+func (s *Server) SetInvitationAcceptanceService(service invitation.Acceptor) {
+	s.invitationAccept = service
 }
 
-// SetEmailVerificationService is used by composition and focused handler tests.
-func (s *Server) SetEmailVerificationService(service verification.Verifier) { s.verification = service }
+func (s *Server) SetInvitationResendService(service invitationresend.Resender) {
+	s.invitationResend = service
+}
+func (s *Server) SetPasswordResetService(service passwordreset.HandlerService) {
+	s.passwordReset = service
+}
+
+// SetLoginService is used by composition and focused handler tests. The
+// password step issues no session, so it needs no refresh lifetime.
+func (s *Server) SetLoginService(service login.Authenticator) { s.login = service }
+
+// SetMFAService wires the second step, which issues the session; refreshTTL is
+// the lifetime of the refresh cookie it sets.
+func (s *Server) SetMFAService(service mfa.Authenticator, refreshTTL time.Duration) {
+	s.mfa, s.mfaRefreshTTL = service, refreshTTL
+}
+
+// SetOAuthService wires the OAuth endpoints. An unparsable or relative
+// redirect URI leaves OAuth unavailable (503) instead of failing per request.
+func (s *Server) SetOAuthService(service *oauth.Service, sessions oauth.HubSessionReader, client oauth.Client, loginURL string, hubSessionTTL time.Duration) {
+	s.hubSessionTTL = hubSessionTTL
+	redirect, err := url.Parse(client.RedirectURI)
+	if err != nil || !redirect.IsAbs() {
+		return
+	}
+	s.oauth, s.hubSessions, s.oauthClient, s.oauthRedirect, s.oauthLoginURL = service, sessions, client, redirect, loginURL
+}
 
 // SetCurrentUserRepository is used by composition and focused profile tests.
 func (s *Server) SetCurrentUserRepository(repository currentUserRepository) {
@@ -68,6 +112,9 @@ func (s *Server) SetCurrentUserRepository(repository currentUserRepository) {
 
 // SetRefreshService is used by composition and focused handler tests.
 func (s *Server) SetRefreshService(service refresh.Refresher) { s.refresh = service }
+
+// SetSessionService wires the RF-016 refresh-family manager.
+func (s *Server) SetSessionService(service sessionManager) { s.sessions = service }
 
 // SetLogoutService is used by composition and focused handler tests.
 func (s *Server) SetLogoutService(service logout.Revoker) { s.logout = service }
@@ -104,7 +151,7 @@ func (s *Server) Routes() http.Handler {
 	// de Docker, puede alcanzarlo.
 	r.Handle("/metrics", promhttp.Handler())
 
-	return HandlerWithOptions(s, ChiServerOptions{BaseRouter: r, ErrorHandlerFunc: s.handleBindingError})
+	return s.oauthCORS(HandlerWithOptions(s, ChiServerOptions{BaseRouter: r, ErrorHandlerFunc: s.handleBindingError}))
 }
 
 // handleBindingError overrides oapi-codegen's default binding error response
@@ -113,6 +160,9 @@ func (s *Server) Routes() http.Handler {
 // like an invalid token (401, with the compromised cookie cleared), per
 // RF-005/RF-007, not surface as a generic bad request.
 func (s *Server) handleBindingError(w http.ResponseWriter, r *http.Request, err error) {
+	if r.URL.Path == "/oauth/authorize" && s.redirectOAuthError(w, r) {
+		return
+	}
 	var paramName string
 	var required *RequiredParamError
 	var invalidFormat *InvalidParamFormatError
@@ -127,7 +177,7 @@ func (s *Server) handleBindingError(w http.ResponseWriter, r *http.Request, err 
 		writeUnauthorized(w)
 		return
 	}
-	http.Error(w, err.Error(), http.StatusBadRequest)
+	writeProblem(w, http.StatusBadRequest, "invalid-request", "Bad Request", "The request could not be processed.")
 }
 
 func (s *Server) ListAuditLog(w http.ResponseWriter, r *http.Request, params ListAuditLogParams) {
@@ -150,20 +200,37 @@ func (s *Server) UpdateUser(w http.ResponseWriter, r *http.Request, userID UserI
 		s.updateUser(w, request, userID)
 	}))).ServeHTTP(w, r)
 }
-func (s *Server) VerifyMfa(w http.ResponseWriter, r *http.Request)            { s.notImplemented(w) }
-func (s *Server) ConfirmPasswordReset(w http.ResponseWriter, r *http.Request) { s.notImplemented(w) }
-func (s *Server) RequestPasswordReset(w http.ResponseWriter, r *http.Request) { s.notImplemented(w) }
-
-func (s *Server) DisableMfa(w http.ResponseWriter, r *http.Request)   { s.notImplemented(w) }
-func (s *Server) ActivateMfa(w http.ResponseWriter, r *http.Request)  { s.notImplemented(w) }
-func (s *Server) EnrollMfa(w http.ResponseWriter, r *http.Request)    { s.notImplemented(w) }
-func (s *Server) ListSessions(w http.ResponseWriter, r *http.Request) { s.notImplemented(w) }
-func (s *Server) RevokeSession(w http.ResponseWriter, r *http.Request, sessionID SessionId) {
-	s.notImplemented(w)
+func (s *Server) CreateEmployee(w http.ResponseWriter, r *http.Request) {
+	RequireAuth(s.tokens)(RequireRole(s.currentUsers, "admin")(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		s.createEmployee(w, request)
+	}))).ServeHTTP(w, r)
 }
+func (s *Server) ResendInvitation(w http.ResponseWriter, r *http.Request, userID UserId) {
+	RequireAuth(s.tokens)(RequireRole(s.currentUsers, "admin")(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		s.resendInvitation(w, request, userID)
+	}))).ServeHTTP(w, r)
+}
+
+// AcceptInvitation is unauthenticated (security: [] in openapi.yaml): the
+// invitation token itself, not a bearer token, proves the caller may set
+// this account's password (RF-002).
+func (s *Server) AcceptInvitation(w http.ResponseWriter, r *http.Request) {
+	s.acceptInvitation(w, r)
+}
+func (s *Server) ResendMfaCode(w http.ResponseWriter, r *http.Request) { s.resendMfaCode(w, r) }
+func (s *Server) AuthorizeClient(w http.ResponseWriter, r *http.Request, params AuthorizeClientParams) {
+	s.authorizeClient(w, r, params)
+}
+func (s *Server) ExchangeAuthorizationCode(w http.ResponseWriter, r *http.Request) {
+	s.exchangeAuthorizationCode(w, r)
+}
+func (s *Server) VerifyMfa(w http.ResponseWriter, r *http.Request) { s.verifyMfa(w, r) }
+func (s *Server) ConfirmPasswordReset(w http.ResponseWriter, r *http.Request) {
+	s.confirmPasswordReset(w, r)
+}
+func (s *Server) RequestPasswordReset(w http.ResponseWriter, r *http.Request) {
+	s.requestPasswordReset(w, r)
+}
+
 func (s *Server) GetHealth(w http.ResponseWriter, r *http.Request)    { s.Health(w, r) }
 func (s *Server) GetReadiness(w http.ResponseWriter, r *http.Request) { s.Readiness(w, r) }
-
-func (s *Server) notImplemented(w http.ResponseWriter) {
-	writeProblem(w, http.StatusNotImplemented, "not-implemented", "Not Implemented", "This operation is not implemented yet.")
-}
