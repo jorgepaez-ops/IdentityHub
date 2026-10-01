@@ -735,9 +735,20 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 
 ## Siguiente paso
 
-Fase 1 cerrada el 2026-09-30 (T9-fix y T10). PR de corte de las fases 0 y 1 abierto el
-2026-10-01: #6 (incluye `7bfc125`, falso positivo de gitleaks en `accept_invitation.go` agregado a
-`.gitleaksignore`). Después del merge, T11.
+Fase 1 cerrada el 2026-09-30 (T9-fix y T10). PR de corte de las fases 0 y 1: #6, mergeado el
+2026-10-01 en `ece7e7f` (merge commit; CI de `main` en verde). Incluye `7bfc125`, falso positivo de
+gitleaks en `accept_invitation.go` agregado a `.gitleaksignore`. Sigue T11.
+
+- `main` protegida desde el 2026-10-01 (ruleset "Protect main", decisión del usuario): PR
+  obligatorio sin aprobaciones requeridas, los 17 checks del PR #6 obligatorios, sin force push ni
+  borrado, solo merge commit (squash y rebase deshabilitados en el repo) y sin bypass.
+- Evidencias (decisión del usuario, 2026-10-01): se toman al cambiar de semana, no por fase. El
+  cambio a Alpine no lleva captura por ahora.
+- Code scanning tras el merge: 85 alertas abiertas (antes 417; 332 eran de la imagen `web` Debian).
+- Hallazgo nuevo fuera de alcance: CodeQL reporta 33 `js/remote-property-injection` en los tres HTML
+  de `docs/diagramas/` (diagramas generados, no código de la app). El plan de la semana 2 decía no
+  commitear esa carpeta y está versionada. Pendiente decidir si se sacan del repo o se excluyen del
+  análisis.
 
 - Hallazgo nuevo fuera de alcance (CI del PR #6, run 36863251783, job "9-10 · Construir y escanear
   imágenes (web)"): Trivy encuentra 13 HIGH corregibles en la imagen base de `web`
