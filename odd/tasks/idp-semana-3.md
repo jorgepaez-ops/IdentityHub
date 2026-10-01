@@ -657,7 +657,10 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 - Verificación (Claude): suite de integración completa **en paralelo** (sin `-p 1`) con
   `-race` sobre un clúster nuevo, todo `ok`; `go test -race ./...` `ok`; `golangci-lint` 0 issues
   (con tag `integration` sigue solo el `errcheck` previo de `testdb.go`, ahora línea 76).
-- Commit: (este)
+- Revisión nativa: evaluación **alta** (16 rutas, 252 líneas). **No disponible** por el mismo
+  defecto de Gentle AI 3.7.0 (#4890: la selección de archivos sin seguimiento pierde
+  `--base-ref`). El usuario eligió continuar sin reportar otra vez; no se ejecutó START.
+- Commit: `20ad92b`
 - Observaciones de la revisión nativa de T8-fix: `RestoreResend` del store registra con el
   `slog` global y no con un logger inyectado, y el caso en que no restaura nada no tiene prueba;
   falta prueba del camino en que la compensación misma falla (`logCompensationFailure`); documentar
