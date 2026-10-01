@@ -19,6 +19,7 @@ import (
 	"github.com/jorgepaez/identity-hub/internal/api"
 	"github.com/jorgepaez/identity-hub/internal/auth/admin"
 	"github.com/jorgepaez/identity-hub/internal/auth/auditlog"
+	"github.com/jorgepaez/identity-hub/internal/auth/bootstrap"
 	"github.com/jorgepaez/identity-hub/internal/auth/employee"
 	"github.com/jorgepaez/identity-hub/internal/auth/invitation"
 	"github.com/jorgepaez/identity-hub/internal/auth/invitationresend"
@@ -83,6 +84,36 @@ func runHealthcheck(client healthcheckHTTPClient, url string) int {
 	return 0
 }
 
+type bootstrapEnsurer interface {
+	Ensure(context.Context, string) (bootstrap.Outcome, error)
+}
+
+// ensureBootstrapAdmin runs only after PostgreSQL and RabbitMQ are ready and
+// before HTTP serves requests. Its log messages deliberately omit the email
+// and invitation token, both of which are sensitive bootstrap material.
+func ensureBootstrapAdmin(ctx context.Context, logger *slog.Logger, service bootstrapEnsurer, email string) error {
+	if email == "" {
+		return nil
+	}
+	outcome, err := service.Ensure(ctx, email)
+	if err != nil {
+		return fmt.Errorf("bootstrap administrator: %w", err)
+	}
+	switch outcome {
+	case bootstrap.OutcomeCreated:
+		logger.Info("bootstrap administrator invitation created")
+	case bootstrap.OutcomeInvitationReissued:
+		logger.Info("bootstrap administrator invitation reissued")
+	case bootstrap.OutcomeInvitationPending:
+		logger.Info("bootstrap administrator skipped because its invitation is still valid")
+	case bootstrap.OutcomeAdminExists:
+		logger.Info("bootstrap administrator skipped because an active administrator already exists")
+	case bootstrap.OutcomeEmailConflict:
+		logger.Warn("bootstrap administrator skipped because configured email is already in use")
+	}
+	return nil
+}
+
 func run() error {
 	cfg, err := config.Load()
 	if err != nil {
@@ -123,8 +154,8 @@ func run() error {
 	if err := db.ValidateOAuthClient(ctx, oauthClient); err != nil {
 		return fmt.Errorf("validate OAuth client registration: %w", err)
 	}
-
 	employeeService := employee.New(db, broker, passwordHasher{}, rand.Reader, time.Now)
+	bootstrapService := bootstrap.New(db, broker, passwordHasher{}, rand.Reader, time.Now)
 	invitationService := invitation.New(db, broker, passwordHasher{})
 	// One RF-017 policy for both the password and the MFA-code steps.
 	lockoutPolicy := lockout.Config{
@@ -136,6 +167,9 @@ func run() error {
 	mfaService := mfa.New(db, broker, rand.Reader, time.Now).WithTokenService(tokens, cfg.RefreshTTL).WithHubSessionTTL(cfg.HubSessionTTL).WithLockout(lockoutPolicy).WithLogger(logger)
 	loginService := login.New(db, lockoutPolicy).WithEventPublisher(loginSecurityEventPublisher{users: db, publisher: broker, logger: logger}).WithMFA(mfaService)
 	refreshService := refresh.New(db, tokens, cfg.RefreshTTL).WithEventPublisher(refreshSecurityEventPublisher{users: db, publisher: broker, logger: logger})
+	if err := ensureBootstrapAdmin(ctx, logger, bootstrapService, cfg.BootstrapAdminEmail); err != nil {
+		return err
+	}
 
 	server := api.NewServer(logger, cfg.Version, map[string]api.Checker{
 		"database": db,

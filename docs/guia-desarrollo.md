@@ -192,6 +192,22 @@ día cuando cablee `main.go`). Obligatorias = el proceso no arranca sin ellas.
 | `ARGON2_MEMORY_KIB` / `_ITERATIONS` / `_PARALLELISM` / `_CONCURRENCY` | no | `65536` / `3` / `2` / `4` | parámetros de Argon2id |
 | `SMTP_HOST` / `_PORT` / `_FROM` | no | `mailpit` / `1025` / `no-reply@identity.local` | |
 | `PUBLIC_BASE_URL` | no | `http://identityhub.localhost:8080` | usado para armar enlaces en los correos |
+| `BOOTSTRAP_ADMIN_EMAIL` | no | vacío | crea una sola invitación para el primer administrador; debe ser un correo válido si se define |
+
+### Administrador inicial opcional
+
+En una instalación nueva, define `BOOTSTRAP_ADMIN_EMAIL` solo para crear la
+primera cuenta administradora pendiente. La API la crea con los roles `user` y
+`admin`, envía la invitación habitual y espera que la persona elija su propia
+contraseña al aceptarla. No existe una variable de contraseña para este flujo.
+
+El arranque no cambia nada si la variable está vacía, ya hay un administrador
+activo o el correo pertenece a otra cuenta. Si el administrador inicial sigue
+pendiente y su invitación (24 h) venció sin aceptarse, el arranque siguiente
+invalida el enlace anterior y envía uno nuevo (auditoría con actor
+`system/bootstrap`); mientras la invitación siga vigente no reenvía nada. Todos
+estos casos se registran sin mostrar el correo ni el token. Si no se puede comprobar o crear de forma segura,
+la API no arranca.
 
 `Load()` acumula **todos** los errores de configuración antes de fallar
 (ver el comentario en `config.go`): un solo arranque fallido lista todo lo

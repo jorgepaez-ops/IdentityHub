@@ -13,6 +13,48 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const activeAdminExists = `-- name: ActiveAdminExists :one
+SELECT EXISTS (
+    SELECT 1
+    FROM user_roles
+    JOIN roles ON roles.id = user_roles.role_id
+    JOIN users ON users.id = user_roles.user_id
+    WHERE roles.name = 'admin'
+      AND users.status = 'active'
+) AS active_admin_exists
+`
+
+// Only an active administrator can resend invitations, so only it makes the
+// bootstrap a no-op. A pending one (invitation never accepted) must not.
+func (q *Queries) ActiveAdminExists(ctx context.Context) (bool, error) {
+	row := q.db.QueryRow(ctx, activeAdminExists)
+	var active_admin_exists bool
+	err := row.Scan(&active_admin_exists)
+	return active_admin_exists, err
+}
+
+const addBootstrapUserRole = `-- name: AddBootstrapUserRole :execrows
+INSERT INTO user_roles (user_id, role_id, granted_by)
+SELECT $1, id, NULL
+FROM roles
+WHERE name = $2
+`
+
+type AddBootstrapUserRoleParams struct {
+	UserID uuid.UUID
+	Name   string
+}
+
+// The first administrator has no human grantor. The audit event records the
+// system/bootstrap actor instead of inventing a privileged service account.
+func (q *Queries) AddBootstrapUserRole(ctx context.Context, arg AddBootstrapUserRoleParams) (int64, error) {
+	result, err := q.db.Exec(ctx, addBootstrapUserRole, arg.UserID, arg.Name)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const addUserRole = `-- name: AddUserRole :exec
 INSERT INTO user_roles (user_id, role_id, granted_by)
 SELECT $1, id, $3
@@ -637,6 +679,26 @@ func (q *Queries) GetUserByIDForUpdate(ctx context.Context, id uuid.UUID) (User,
 	return i, err
 }
 
+const hasLiveInvitationToken = `-- name: HasLiveInvitationToken :one
+SELECT EXISTS (
+    SELECT 1
+    FROM verification_tokens
+    WHERE user_id = $1
+      AND purpose = 'invitation'
+      AND used_at IS NULL
+      AND expires_at > now()
+) AS has_live_invitation_token
+`
+
+// A usable invitation (unused and unexpired) means the bootstrap admin can
+// still accept it; reissuing then would only spam concurrent or repeated starts.
+func (q *Queries) HasLiveInvitationToken(ctx context.Context, userID uuid.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, hasLiveInvitationToken, userID)
+	var has_live_invitation_token bool
+	err := row.Scan(&has_live_invitation_token)
+	return has_live_invitation_token, err
+}
+
 const invalidateInvitationTokens = `-- name: InvalidateInvitationTokens :exec
 UPDATE verification_tokens
 SET used_at = now()
@@ -833,6 +895,17 @@ func (q *Queries) LockActiveAdminUsers(ctx context.Context) ([]uuid.UUID, error)
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockBootstrapAdmin = `-- name: LockBootstrapAdmin :exec
+SELECT pg_advisory_xact_lock(hashtextextended('identity-hub/bootstrap-admin', 0))
+`
+
+// Serializes the first-admin decision across every API process. The lock is
+// transaction-scoped, so no connection can retain it after a failed startup.
+func (q *Queries) LockBootstrapAdmin(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, lockBootstrapAdmin)
+	return err
 }
 
 const lockLoginUser = `-- name: LockLoginUser :exec
