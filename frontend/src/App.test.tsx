@@ -1,44 +1,185 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from './App'
+import { resetSessionForTests } from './api/client'
 
-/**
- * Pruebas del esqueleto. Las de los flujos de autenticación llegan en la
- * semana 2 y llevarán el identificador del requisito en el nombre
- * (`RF-003 …`), para que scripts/traceability.py las recoja.
- */
-describe('App', () => {
+const json = (status: number, body?: unknown) => new Response(body === undefined ? null : JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+const user = (roles: string[]) => ({ id: 'user-id', email: 'person@example.test', displayName: 'Persona', status: 'active', roles, mfaEnabled: true, createdAt: '2026-01-01T00:00:00Z' })
+
+describe('authentication routes', () => {
   afterEach(() => {
-    vi.restoreAllMocks()
+    resetSessionForTests()
     vi.unstubAllGlobals()
+    window.history.replaceState({}, '', '/')
   })
 
-  it('muestra la versión de la API y el estado de cada dependencia', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string) => {
-        const body =
-          url === '/healthz'
-            ? { status: 'ok', version: '0.1.0-test' }
-            : { status: 'ready', checks: { database: { status: 'up' }, broker: { status: 'up' } } }
-        return { ok: true, json: async () => body } as Response
-      }),
-    )
+  it('TestRF013_RoutesAdminAfterMfaVerification', async () => {
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(json(401, { title: 'Unauthorized', status: 401 }))
+      .mockResolvedValueOnce(json(202, { mfaToken: 'challenge', expiresIn: 300 }))
+      .mockResolvedValueOnce(json(200, { accessToken: 'access', tokenType: 'Bearer', expiresIn: 900 }))
+      .mockResolvedValueOnce(json(200, user(['admin']))))
 
     render(<App />)
+    await screen.findByLabelText('Correo electrónico')
+    fireEvent.change(screen.getByLabelText('Correo electrónico'), { target: { value: 'admin@example.test' } })
+    fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'password' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }))
+    await screen.findByLabelText('Código de verificación')
+    fireEvent.change(screen.getByLabelText('Código de verificación'), { target: { value: '123456' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Verificar' }))
 
-    await waitFor(() => expect(screen.getByText('0.1.0-test')).toBeInTheDocument())
-    expect(screen.getByText('database')).toBeInTheDocument()
-    expect(screen.getAllByText('operativa')).toHaveLength(2)
+    expect(await screen.findByRole('heading', { name: 'Usuarios' })).toBeInTheDocument()
   })
 
-  it('avisa cuando la API no responde, en vez de quedarse en blanco', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 503, statusText: 'Service Unavailable' }) as Response))
+  it('TestRF013_RoutesMemberAfterMfaVerification', async () => {
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(json(401, { title: 'Unauthorized', status: 401 }))
+      .mockResolvedValueOnce(json(202, { mfaToken: 'challenge', expiresIn: 300 }))
+      .mockResolvedValueOnce(json(200, { accessToken: 'access', tokenType: 'Bearer', expiresIn: 900 }))
+      .mockResolvedValueOnce(json(200, user(['user']))))
 
     render(<App />)
+    await screen.findByLabelText('Correo electrónico')
+    fireEvent.change(screen.getByLabelText('Correo electrónico'), { target: { value: 'person@example.test' } })
+    fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'password' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }))
+    await screen.findByLabelText('Código de verificación')
+    fireEvent.change(screen.getByLabelText('Código de verificación'), { target: { value: '123456' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Verificar' }))
 
-    await waitFor(() =>
-      expect(screen.getByText(/No se pudo contactar con la API/)).toBeInTheDocument(),
-    )
+    expect(await screen.findByRole('heading', { name: 'Mi cuenta' })).toBeInTheDocument()
   })
+
+  it.each([
+    [401, 'Correo o contraseña incorrectos.'],
+    [423, 'La cuenta está bloqueada. Inténtalo más tarde.'],
+    [429, 'Demasiados intentos. Espera antes de volver a intentarlo.'],
+    [503, 'No fue posible enviar el código. Inténtalo de nuevo.'],
+  ])('TestRF003_ShowsNeutralMessageForStatus%s', async (status, message) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(json(401, { title: 'Unauthorized', status: 401 })).mockResolvedValueOnce(json(status, { title: 'Failure', status })))
+    render(<App />)
+    await screen.findByLabelText('Correo electrónico')
+    fireEvent.change(screen.getByLabelText('Correo electrónico'), { target: { value: 'person@example.test' } })
+    fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'password' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }))
+    expect(await screen.findByText(message)).toBeInTheDocument()
+  })
+
+  it('TestRF003_ShowsNeutralNetworkMessage', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(json(401, { title: 'Unauthorized', status: 401 })).mockRejectedValueOnce(new TypeError('Failed to fetch')))
+    render(<App />)
+    await screen.findByLabelText('Correo electrónico')
+    fireEvent.change(screen.getByLabelText('Correo electrónico'), { target: { value: 'person@example.test' } })
+    fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'password' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }))
+    expect(await screen.findByText('No se pudo conectar con el servicio. Comprueba tu conexión.')).toBeInTheDocument()
+  })
+
+  it('TestRF009_RedirectsProtectedRouteWithoutSession', async () => {
+    window.history.replaceState({}, '', '/me')
+    vi.stubGlobal('fetch', vi.fn(async () => json(401, { title: 'Unauthorized', status: 401 })))
+    render(<App />)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Iniciar sesión' })).toBeInTheDocument())
+  })
+
+  it('TestRF013_ShowsMfaCodeMessageForInvalidCode', async () => {
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(json(401, { title: 'Unauthorized', status: 401 }))
+      .mockResolvedValueOnce(json(202, { mfaToken: 'challenge', expiresIn: 300 }))
+      .mockResolvedValueOnce(json(401, { title: 'Unauthorized', status: 401 })))
+
+    render(<App />)
+    await screen.findByLabelText('Correo electrónico')
+    fireEvent.change(screen.getByLabelText('Correo electrónico'), { target: { value: 'person@example.test' } })
+    fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'password' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }))
+    await screen.findByLabelText('Código de verificación')
+    fireEvent.change(screen.getByLabelText('Código de verificación'), { target: { value: '123456' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Verificar' }))
+
+    expect(await screen.findByText('El código no es válido o el desafío expiró.')).toBeInTheDocument()
+    expect(screen.queryByText('Correo o contraseña incorrectos.')).not.toBeInTheDocument()
+  })
+
+  it('TestRF013_StartsOverAfterInvalidMfaCode', async () => {
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(json(401, { title: 'Unauthorized', status: 401 }))
+      .mockResolvedValueOnce(json(202, { mfaToken: 'challenge', expiresIn: 300 }))
+      .mockResolvedValueOnce(json(401, { title: 'Unauthorized', status: 401 })))
+
+    render(<App />)
+    await screen.findByLabelText('Correo electrónico')
+    fireEvent.change(screen.getByLabelText('Correo electrónico'), { target: { value: 'person@example.test' } })
+    fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'password' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }))
+    await screen.findByLabelText('Código de verificación')
+    fireEvent.change(screen.getByLabelText('Código de verificación'), { target: { value: '123456' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Verificar' }))
+    await screen.findByText('El código no es válido o el desafío expiró.')
+    fireEvent.click(screen.getByRole('button', { name: 'Volver a iniciar sesión' }))
+
+    expect(screen.getByLabelText('Correo electrónico')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Código de verificación')).not.toBeInTheDocument()
+  })
+
+  it('TestRF013_OffersStartOverWhenResendChallengeExpires', async () => {
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(json(401, { title: 'Unauthorized', status: 401 }))
+      .mockResolvedValueOnce(json(202, { mfaToken: 'challenge', expiresIn: 300 }))
+      .mockResolvedValueOnce(json(401, { title: 'Unauthorized', status: 401 })))
+
+    render(<App />)
+    await screen.findByLabelText('Correo electrónico')
+    fireEvent.change(screen.getByLabelText('Correo electrónico'), { target: { value: 'person@example.test' } })
+    fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'password' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }))
+    await screen.findByLabelText('Código de verificación')
+    fireEvent.click(screen.getByRole('button', { name: 'Reenviar código' }))
+
+    expect(await screen.findByText('El desafío expiró. Vuelve a iniciar sesión.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Volver a iniciar sesión' })).toBeInTheDocument()
+  })
+
+  it.each([
+    [429, 'Se solicitaron demasiados códigos. Espera antes de reenviar otro.'],
+    [503, 'No se pudo enviar el código. El código anterior sigue siendo válido.'],
+  ])('TestRF013_ShowsResendMessageForStatus%s', async (status, message) => {
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(json(401, { title: 'Unauthorized', status: 401 }))
+      .mockResolvedValueOnce(json(202, { mfaToken: 'challenge', expiresIn: 300 }))
+      .mockResolvedValueOnce(json(status, { title: 'Failure', status })))
+
+    render(<App />)
+    await screen.findByLabelText('Correo electrónico')
+    fireEvent.change(screen.getByLabelText('Correo electrónico'), { target: { value: 'person@example.test' } })
+    fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'password' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }))
+    await screen.findByLabelText('Código de verificación')
+    fireEvent.click(screen.getByRole('button', { name: 'Reenviar código' }))
+
+    expect(await screen.findByText(message)).toBeInTheDocument()
+  })
+})
+
+it('TestRF007_LogsOutLocallyWhenRemoteLogoutFails', async () => {
+  vi.stubGlobal('fetch', vi.fn()
+    .mockResolvedValueOnce(json(401, { title: 'Unauthorized', status: 401 }))
+    .mockResolvedValueOnce(json(202, { mfaToken: 'challenge', expiresIn: 300 }))
+    .mockResolvedValueOnce(json(200, { accessToken: 'access', tokenType: 'Bearer', expiresIn: 900 }))
+    .mockResolvedValueOnce(json(200, user(['admin'])))
+    .mockRejectedValueOnce(new TypeError('Failed to fetch')))
+
+  render(<App />)
+  await screen.findByLabelText('Correo electrónico')
+  fireEvent.change(screen.getByLabelText('Correo electrónico'), { target: { value: 'admin@example.test' } })
+  fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'password' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }))
+  await screen.findByLabelText('Código de verificación')
+  fireEvent.change(screen.getByLabelText('Código de verificación'), { target: { value: '123456' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Verificar' }))
+  await screen.findByRole('heading', { name: 'Usuarios' })
+  fireEvent.click(screen.getByRole('button', { name: 'Cerrar sesión' }))
+
+  expect(await screen.findByRole('button', { name: 'Iniciar sesión' })).toBeInTheDocument()
 })
