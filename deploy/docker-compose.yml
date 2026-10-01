@@ -171,7 +171,9 @@ services:
 
   web:
     build:
-      context: ../frontend
+      # T13: la imagen compila frontend/ y contabilidad/, así que el contexto es la raíz.
+      context: ..
+      dockerfile: frontend/Dockerfile
       target: web
     depends_on:
       api:

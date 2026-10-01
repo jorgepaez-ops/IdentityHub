@@ -109,7 +109,9 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: |
+            frontend/package-lock.json
+            contabilidad/package-lock.json
 
       - name: Instalar dependencias del frontend
         working-directory: frontend
@@ -121,6 +123,19 @@ jobs:
 
       - name: Comprobación de tipos
         working-directory: frontend
+        run: npm run typecheck
+
+      # T13 — la SPA de Contabilidad pasa por los mismos gates que la consola.
+      - name: Instalar dependencias de Contabilidad
+        working-directory: contabilidad
+        run: npm ci || npm install
+
+      - name: ESLint (Contabilidad)
+        working-directory: contabilidad
+        run: npm run lint
+
+      - name: Comprobación de tipos (Contabilidad)
+        working-directory: contabilidad
         run: npm run typecheck
 
       - name: Hadolint sobre los Dockerfiles
@@ -241,6 +256,12 @@ jobs:
           npm install --package-lock-only
           npm audit --audit-level=high
 
+      - name: npm audit (Contabilidad)
+        working-directory: contabilidad
+        run: |
+          npm install --package-lock-only
+          npm audit --audit-level=high
+
       # v1.9.0 traía Go 1.22.7 embebido: el análisis de alcanzabilidad (govulncheck)
       # fallaba porque backend/go.mod exige >= 1.26.0 (desde T34b; >= 1.25.0 antes), y
       # el escáner degradaba a listar cada advisory de go.mod sin filtrar (ruido,
@@ -299,6 +320,12 @@ jobs:
 
       - name: Pruebas del frontend
         working-directory: frontend
+        run: |
+          npm install
+          npm run test
+
+      - name: Pruebas de Contabilidad
+        working-directory: contabilidad
         run: |
           npm install
           npm run test
@@ -405,12 +432,16 @@ jobs:
         include:
           - name: api
             context: backend
+            file: backend/Dockerfile
             target: api
           - name: worker
             context: backend
+            file: backend/Dockerfile
             target: worker
+          # T13: la imagen web compila frontend/ y contabilidad/, así que su contexto es la raíz.
           - name: web
-            context: frontend
+            context: .
+            file: frontend/Dockerfile
             target: web
     steps:
       - uses: actions/checkout@v4
@@ -421,6 +452,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
           target: ${{ matrix.target }}
           load: true
           tags: identity-hub/${{ matrix.name }}:${{ github.sha }}

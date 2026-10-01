@@ -1,5 +1,7 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react'
-import { BrowserRouter, Link, NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
+import { BrowserRouter, Link, NavLink, Navigate, Route, Routes, useNavigate, useSearchParams } from 'react-router-dom'
+import { safeContinueTarget } from './features/account/continueTarget'
+import { redirectTo } from './navigation'
 import { MyAccountPage } from './features/account/MyAccountPage'
 import { AuditLogPage } from './features/admin/AuditLogPage'
 import { UsersPage } from './features/admin/UsersPage'
@@ -27,6 +29,9 @@ function messageFor(error: unknown, step: ErrorStep = 'credentials') {
 
 function LoginPage({ onAuthenticated }: { onAuthenticated: (user: CurrentUser) => void }) {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  // RF-020: set when an OAuth client sent the user here (ADR 0009).
+  const continueTarget = safeContinueTarget(searchParams.get('continue'))
   const [challenge, setChallenge] = useState<MfaChallenge | null>(null)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -61,6 +66,12 @@ function LoginPage({ onAuthenticated }: { onAuthenticated: (user: CurrentUser) =
     try {
       await verifyMfa({ mfaToken: challenge.mfaToken, code })
       mfaVerified = true
+      if (continueTarget) {
+        // The MFA response set the hub_session cookie; /oauth/authorize needs a
+        // full top-level navigation to the Hub's own origin to read it.
+        redirectTo(continueTarget)
+        return
+      }
       const user = await getCurrentUser()
       onAuthenticated(user)
       navigate(user.roles.includes('admin') ? '/usuarios' : '/me', { replace: true })
@@ -175,6 +186,10 @@ function AppShell({ user, onLogout, onUserChange, onSessionEnded }: { user: Curr
   )
 }
 
+// A signed-in console user lands on /login?continue= only when /oauth/authorize found no
+// hub_session: show the login form so the MFA step can create one instead of looping.
+const hasContinueTarget = () => safeContinueTarget(new URLSearchParams(window.location.search).get('continue')) !== null
+
 function AppRoutes() {
   const [user, setUser] = useState<CurrentUser | null>(null)
   const [restoring, setRestoring] = useState(true)
@@ -204,7 +219,7 @@ function AppRoutes() {
       <Route path="/invitations/accept" element={<AcceptInvitationPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/password-reset" element={<ResetPasswordPage />} />
-      <Route path="/login" element={user ? <Navigate to={user.roles.includes('admin') ? '/usuarios' : '/me'} replace /> : <LoginPage onAuthenticated={setUser} />} />
+      <Route path="/login" element={user && !hasContinueTarget() ? <Navigate to={user.roles.includes('admin') ? '/usuarios' : '/me'} replace /> : <LoginPage onAuthenticated={setUser} />} />
       <Route path="/*" element={user ? <AppShell user={user} onLogout={async () => { try { await logout() } finally { setUser(null) } }} onUserChange={setUser} onSessionEnded={endSession} /> : <Navigate to="/login" replace />} />
     </Routes>
   )
