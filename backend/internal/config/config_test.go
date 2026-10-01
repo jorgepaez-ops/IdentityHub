@@ -162,8 +162,12 @@ func TestRF012_PublicBaseURLTieneValorPorDefectoYAdmiteOverride(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load default: %v", err)
 	}
-	if cfg.PublicBaseURL != "http://localhost:8080" {
+	// D10: el Hub vive en su propio dominio local, no en localhost a secas.
+	if cfg.PublicBaseURL != "http://identityhub.localhost:8080" {
 		t.Errorf("default PublicBaseURL = %q", cfg.PublicBaseURL)
+	}
+	if cfg.JWTIssuer != "http://identityhub.localhost:8080" {
+		t.Errorf("default JWTIssuer = %q", cfg.JWTIssuer)
 	}
 
 	t.Setenv("PUBLIC_BASE_URL", "https://identity.example")
@@ -233,5 +237,41 @@ func TestRF017_RechazaLimitesDeFuerzaBrutaNoPositivos(t *testing.T) {
 		if !strings.Contains(err.Error(), key) {
 			t.Errorf("Load error did not name %s: %v", key, err)
 		}
+	}
+}
+
+func TestConfig_BootstrapAdminEmailOpcionalYValidado(t *testing.T) {
+	const seed = "MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE="
+	t.Setenv("DATABASE_URL", "postgres://x")
+	t.Setenv("RABBITMQ_URL", "amqp://x")
+	t.Setenv("JWT_SIGNING_KEY", seed)
+
+	for _, tt := range []struct {
+		name    string
+		email   string
+		want    string
+		wantErr bool
+	}{
+		{name: "unset disables bootstrap", want: ""},
+		{name: "empty disables bootstrap", email: "  ", want: ""},
+		{name: "valid email enables bootstrap", email: "first-admin@example.test", want: "first-admin@example.test"},
+		{name: "invalid email is rejected", email: "not-an-email", wantErr: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("BOOTSTRAP_ADMIN_EMAIL", tt.email)
+			cfg, err := Load()
+			if tt.wantErr {
+				if err == nil || !strings.Contains(err.Error(), "BOOTSTRAP_ADMIN_EMAIL") {
+					t.Fatalf("Load() error = %v, want BOOTSTRAP_ADMIN_EMAIL validation error", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Load() error = %v", err)
+			}
+			if cfg.BootstrapAdminEmail != tt.want {
+				t.Fatalf("BootstrapAdminEmail = %q, want %q", cfg.BootstrapAdminEmail, tt.want)
+			}
+		})
 	}
 }

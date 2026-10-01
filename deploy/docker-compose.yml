@@ -113,9 +113,10 @@ services:
       SMTP_HOST: mailpit
       SMTP_PORT: 1025
       SMTP_FROM: no-reply@identity.local
-      JWT_ISSUER: http://localhost:8080
+      JWT_ISSUER: http://identityhub.localhost:8080
       JWT_SIGNING_KEY: "${JWT_SIGNING_KEY:?JWT_SIGNING_KEY must be set in the repository root .env}"
       TRUSTED_PROXIES: "${TRUSTED_PROXIES:?TRUSTED_PROXIES must be set in the repository root .env}"
+      BOOTSTRAP_ADMIN_EMAIL: "${BOOTSTRAP_ADMIN_EMAIL:-}"
     ports:
       - "8081:8081"
     healthcheck:
@@ -170,7 +171,9 @@ services:
 
   web:
     build:
-      context: ../frontend
+      # T13: la imagen compila frontend/ y contabilidad/, así que el contexto es la raíz.
+      context: ..
+      dockerfile: frontend/Dockerfile
       target: web
     depends_on:
       api:

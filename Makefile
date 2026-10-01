@@ -20,7 +20,8 @@ help: ## Muestra esta ayuda
 up: ## Levanta el stack de desarrollo
 	$(COMPOSE) up -d --build
 	@echo ""
-	@echo "  Aplicación      http://localhost:8080"
+	@echo "  Hub             http://identityhub.localhost:8080  (localhost:8080 también sirve el Hub)"
+	@echo "  Contabilidad    http://contabilidad.localhost:8080"
 	@echo "  API             http://localhost:8081/healthz"
 	@echo "  RabbitMQ        http://localhost:15672   (credentials from .env)"
 	@echo "  Mailpit         http://localhost:8025"
@@ -66,6 +67,7 @@ lint: ## Lint y comprobación de tipos
 	cd backend && go vet ./...
 	@if command -v golangci-lint >/dev/null 2>&1; then cd backend && golangci-lint run --timeout=5m; else echo "  (golangci-lint no instalado: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2)"; fi
 	cd frontend && npm run lint
+	cd contabilidad && npm run lint && npm run typecheck
 
 test: test-go test-front ## Todas las pruebas
 
@@ -77,8 +79,9 @@ test-integration: ## Pruebas de integración con PostgreSQL temporal (imprime la
 	cd backend && go test -race -tags=integration -coverprofile=coverage.out -covermode=atomic -coverpkg=./internal/... ./...
 	cd backend && go tool cover -func=coverage.out | tail -1
 
-test-front: ## Pruebas del frontend
+test-front: ## Pruebas del frontend (consola del Hub y Contabilidad)
 	cd frontend && npm run test
+	cd contabilidad && npm run test
 
 e2e: ## Pruebas de extremo a extremo contra el stack levantado
 	@echo "Pendiente para la semana 3: Playwright."
@@ -108,6 +111,7 @@ scan-deps: ## govulncheck y npm audit (RNF-004)
 	cd backend && go run golang.org/x/vuln/cmd/govulncheck@latest ./... || true
 	@echo "── npm audit ─────────────────────────────────────────────"
 	cd frontend && npm audit --audit-level=high || true
+	cd contabilidad && npm audit --audit-level=high || true
 
 scan-config: ## Trivy config y Hadolint (RNF-008)
 	@echo "── Trivy config ──────────────────────────────────────────"

@@ -192,10 +192,18 @@ dinámico de clientes, consentimiento, `id_token`), TOTP/WebAuthn, correo real p
   recuperar cuentas (incluido el desbloqueo de D13), que un broker lento retenga conexiones y que se
   envíe un aviso de un cambio revertido. Costo aceptado: un aviso puede perderse. Enmienda la
   ADR 0006 para estos dos flujos; el outbox transaccional se descarta por tamaño (mejora posible).
+- **D17 · Primer admin por invitación al arrancar (2026-10-01, usuario).** Sin autorregistro (T5)
+  ni semilla, un sistema recién levantado no tiene quien entre a la consola (lo detectó la
+  verificación de T12a, que tuvo que crear cuentas a mano en la base local). Variable opcional
+  `BOOTSTRAP_ADMIN_EMAIL`: al arrancar, si no existe ningún admin, la API crea esa cuenta como
+  pendiente con rol `admin` y le envía la invitación por el mismo camino de T5 (llega a Mailpit). Sin
+  contraseñas en variables ni en el repo (RNF-003); si ya hay un admin, no hace nada y lo registra
+  en el log. Se descartaron un comando manual (paso extra en la demo y en CI) y una semilla con
+  cuentas demo (credenciales conocidas). Lo implementa T12d.
 
 ## Preguntas abiertas
 
-Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, del usuario al cerrar T6; D15, consulta de Codex en T7; D16, de la revisión nativa de T7.
+Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, del usuario al cerrar T6; D15, consulta de Codex en T7; D16, de la revisión nativa de T7; D17, del usuario al verificar T12a.
 
 ---
 
@@ -669,7 +677,7 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 ## Fase 2 — Dominios locales y frontend
 
 ### T11 — Dos dominios locales y portabilidad
-- [ ] Estado · Ejecutor: `Claude` (Docker y navegadores; Codex no puede) · Depende de: D10
+- [x] Estado · Ejecutor: `Claude` (Docker y navegadores; Codex no puede) · Depende de: D10
 - Primero, la comprobación de D10 con Playwright en Chromium y Firefox: `*.localhost` resuelve sin
   `/etc/hosts` y una cookie `Secure` por HTTP se guarda y se envía.
 - Dos `server` en Nginx (`identityhub.localhost` y `contabilidad.localhost`), cabeceras RNF-009 en
@@ -678,22 +686,270 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
   `docker compose up -d` porque el compose vive en `deploy/` (no en la raíz) y exige un `.env` que no
   se versiona (secretos, VULN-001/003). La solución (compose en la raíz y generación de `.env` o de
   secretos de desarrollo sin reabrir esos VULN) se decide en la semana 4.
-- Commit: —
+- Ruta: delegada (Sonnet; Docker, navegadores y red). Revisó y commiteó Claude.
+- D10 comprobado (2026-10-01) con un script de Playwright desechable fuera del repo. Chromium
+  (host): `identityhub.localhost` resuelve sin `/etc/hosts`, la cookie `Secure` por HTTP se guarda y
+  se envía, y no llega a `contabilidad.localhost` (sitios distintos). Firefox: los builds de
+  Playwright no arrancan en macOS 27 (perfil/sandbox), así que se probó en
+  `mcr.microsoft.com/playwright:v1.63.0-noble` (Firefox 155.0, servidor y navegador en el mismo
+  contenedor, decisión del usuario): las mismas cuatro comprobaciones pasan.
+- Nginx: el Hub (`identityhub.localhost`) es `default_server`, así que `localhost:8080` lo sigue
+  sirviendo (CI, ZAP); nuevo proxy `/oauth/` hacia la API (antes `/oauth/authorize` caía en la SPA).
+  `contabilidad.localhost` sirve un marcador estático hasta T13. Las cinco cabeceras de RNF-009
+  viven en `security-headers.conf` con la CSP por `server` en `$csp` (Contabilidad agrega el Hub en
+  `connect-src`); el include en `/assets/` corrige además que esa `location` perdía las cabeceras.
+- `PUBLIC_BASE_URL` y `JWT_ISSUER` pasan a `http://identityhub.localhost:8080` (config, compose,
+  OpenAPI, README, guía y Makefile). TDD: RED `go test -race ./internal/config/` con los dos valores
+  por defecto viejos; GREEN `ok`.
+- Verificación (stack real con `make up`): Hub, Contabilidad y `localhost:8080` responden 200 con
+  las cinco cabeceras y su CSP; ruta profunda 200; `/healthz`, `/readyz` y JWKS 200 por el Hub;
+  login con credenciales inventadas 401 problem+json; `/oauth/token` 400 y `/oauth/authorize` sin
+  parámetros 400. Chromium carga el Hub y el marcador. `make test-go` ok, `make test-integration`
+  ok, `npm run test` ok, `golangci-lint` 0 issues, trazabilidad al día, Trivy de `web` 0
+  HIGH/CRITICAL corregibles. Nada quedó corriendo.
+- Pendiente: `.env.example` (líneas de `API_BASE_URL` y `JWT_ISSUER`) sigue con
+  `http://localhost:8080`; los permisos del entorno bloquean editarlo. Sin efecto funcional (nadie
+  lee `API_BASE_URL` y el compose fija `JWT_ISSUER`), pero el ejemplo queda desactualizado: lo
+  cambia el usuario.
+- Revisión nativa: el primer intento chocó con #4890 (la selección de archivos sin seguimiento
+  pierde `--base-ref`/`--committed-only`). Arreglo local: los archivos sin seguimiento del usuario
+  (`.atl/`, `.codegraph/`, `Claude outputs/`, `ANALISIS-REQUISITOS.md`,
+  `ENUNCIADO-TRABAJO-FINAL.md`) van en `.git/info/exclude`, así Gentle AI no pide la selección.
+  Con eso, revisión de `edec16f..f582156` (alto, 13 archivos, 187 líneas, 4 lentes) con
+  consentimiento del usuario: **aprobada** y acusada (`review-7548bec84859a73f`), sin bloqueantes.
+  Observaciones informativas: R3 (WARNING) los cambios de Nginx no tienen prueba automática
+  (cabeceras en `/assets/`, proxy `/oauth/`, el `server` de Contabilidad, que CI y ZAP no alcanzan
+  porque apuntan a `localhost:8080`): pasa a T14 como smoke test con `Host`; R3 el origen del Hub
+  en la CSP de Contabilidad está fijado a mano y repetido en config y compose; R2 el comentario
+  del `server` de Contabilidad habla de "la SPA" cuando aún es el marcador de T13; R2 el valor por
+  defecto de `JWTIssuer` se comprueba dentro de la prueba de `PublicBaseURL`.
+- Commit: `3cb30fc`
 
 ### T12 — Consola de Identity Hub (React)
-- [ ] Estado · Ejecutor: `Codex` · Depende de: T5, T7, T8, T11
+- [x] Estado · Ejecutor: `Codex` · Depende de: T5, T7, T8, T11
 - Según el mockup: login con MFA, directorio de usuarios, alta y edición (estado y roles, regla de
   auto-deshabilitado de RF-010), audit log; páginas de cuenta: verificar correo
   (`/verify-email?token=…`, Q15), definir contraseña, restablecer, perfil y sesiones. Refresh
   compartido entre pestañas (Web Locks o `BroadcastChannel`).
-- Commit: —
+- Plan (Claude, 2026-10-01), tres commits de unidad de trabajo, cada uno con sus pruebas Vitest:
+  - [x] T12a — Base: enrutado con `react-router-dom`, cliente de API tipado con `schema.d.ts`
+    (errores RFC 7807), access token solo en memoria y refresh por la cookie `HttpOnly`; refresh
+    serializado entre pestañas con Web Locks (dos pestañas que rotan a la vez dispararían la
+    detección de reuso de RF-006 y revocarían la familia); login con correo y contraseña → 202 →
+    pantalla de código MFA (verificar y reenviar; 401, 423, 429 y 503 con mensajes propios);
+    cerrar sesión. Tras el login, un admin entra a la consola y el resto a "Mi cuenta".
+    Hecho (2026-10-01, Codex; revisó, verificó y commiteó Claude). Commit `7c9c3a7`. TDD: RED
+    11/11 y luego 4/16 con las correcciones de revisión, GREEN 17/17; lint, tipos y build ok. Claude
+    corrigió en la revisión el mensaje de un 401 en el paso MFA (decía "correo o contraseña") y los
+    prefijos de requisito de las pruebas; GGA pidió usar el tipo generado `MfaChallenge`.
+    Verificación en el stack real (Sonnet, Chromium): login, código desde Mailpit, consola para el
+    admin y "Mi cuenta" para el resto, sesión restaurada al recargar, dos pestañas recargando a la
+    vez sin evento de reuso (12 rotaciones, ninguna revocación salvo el logout), logout, mensajes de
+    código y de credenciales; sin errores de consola ni violaciones de CSP. Cuentas de prueba creadas
+    a mano en la base local (de ahí D17). Revisión nativa (medio, 5 archivos, 779 líneas, una
+    lente): **aprobada** y acusada (`review-758fe75ab4475b76`), con observaciones que pasan a
+    T12a-fix.
+  - [x] T12a-fix — Observaciones de la revisión de T12a: un 2xx sin cuerpo rompe `request()`
+    (confirmado: el 202 de `mfa/resend` no tiene cuerpo, así que un reenvío correcto muestra "No se
+    pudo conectar"); el `BroadcastChannel` del token se reenvía a la misma pestaña (dos instancias
+    con el mismo nombre); si `mfa/verify` sale bien y falla `GET /me`, el mensaje culpa al código;
+    `TestRF007_LogsOutLocallyWhenRemoteLogoutFails` está fuera del `describe` y no corre su
+    `afterEach`; faltan pruebas del refresh fallido, de la sesión restaurada al montar y de la
+    guarda de `/usuarios`; el reenvío correcto no muestra confirmación. Además, el menú lateral no
+    marca la página activa (visto en la verificación).
+    Hecho (2026-10-01, Codex; revisó y commiteó Claude). Commit `8dd3794`. RED observado en el 2xx
+    sin cuerpo, el eco del canal, el fallo de `/me` tras el MFA, la confirmación del reenvío y el
+    menú activo; las pruebas que faltaban pasaron sin RED (cubrían comportamiento ya correcto).
+    GREEN 29/29; lint, tipos y build ok; GGA aprobó. Revisión nativa: `review_due: false`
+    (`under_budget`, medio, 287 líneas): queda pendiente en el tramo hasta que un commit posterior
+    alcance el presupuesto. Detalle menor anotado: si el código MFA sale bien y falla `GET /me`,
+    solo se borra el token local; la sesión del servidor sigue viva y una recarga la restauraría.
+  - [x] T12b — Cuenta: aceptar invitación y definir contraseña (`/invitations/accept?token=…`,
+    ruta fijada en T5; sustituye la página `/verify-email` de Q15, que se fue con el autorregistro),
+    solicitar y confirmar restablecimiento, perfil (`GET`/`PATCH /me`) y sesiones activas
+    (listar y revocar).
+    Hecho (2026-10-01, Sonnet porque Codex no tenía cuota; revisó y commiteó Claude). Commit
+    `8291345`. Rutas de los correos: `/invitations/accept?token=` y `/password-reset?token=`
+    (`notify.go`); solicitud en `/forgot-password`. TDD: RED 27/29, GREEN 61/61; lint, tipos y build
+    ok; GGA aprobó. E2E con Chromium en `-p t12b-check`, con el primer admin llegado por T12d:
+    aceptar invitación (reusarla, 410), MFA, editar el nombre y que persista, revocar la sesión de
+    otro contexto (sale en su siguiente refresh), restablecer la contraseña y entrar con la nueva,
+    revocar la sesión actual (cierra aquí); sin errores de consola ni de CSP. Revisión nativa
+    (medio, 7 archivos, 699 líneas, una lente): **aprobada** y acusada (`review-f619b064ab69f30d`).
+    Observaciones que pasan a T12c: un fallo de autenticación al revocar no saca al usuario;
+    nombre vacío se envía sin validar; claves de React por texto del mensaje; faltan pruebas del
+    límite de 128, del 400 sin campos y de un 500 al confirmar. Además, el user agent de las
+    sesiones se ve crudo.
+  - [x] T12c — Consola admin (incluye las observaciones de la revisión de T12b): directorio con búsqueda y estados, cajón de alta y edición (roles
+    del catálogo; un admin no puede deshabilitarse a sí mismo, RF-010), reenvío de invitación a
+    cuentas pendientes y registro de auditoría.
+    Hecho (2026-10-01, Sonnet; revisó y commiteó Claude). Commit `24bf24c`. TDD: RED 12/45 (arreglos
+    de T12b) y 39/41 (consola); GREEN 118/118; lint, tipos y build ok; GGA aprobó. El usuario
+    propio no puede cambiarse estado ni roles (el backend también lo rechaza); `user` va siempre
+    marcado (rol base obligatorio); roles con los ids del OpenAPI (`contabilidad.senior`,
+    `contabilidad.analista`). E2E con Chromium en `-p t12c-check`: alta de empleada con invitación
+    en Mailpit, reenvío (enlace viejo 410), la empleada entra y cae en "Mi cuenta" sin acceso a la
+    consola, edición de roles, deshabilitarla (ya no entra), cajón propio bloqueado, auditoría con
+    todos los eventos y filtro; sesiones con "Chrome en macOS"; sin errores de consola ni de CSP.
+    Huecos del backend anotados (sin cambiar): la auditoría trae solo UUIDs (sin nombre del actor);
+    mensajes de error en inglés; autodeshabilitarse, autoasignarse roles y quitar el último admin
+    devuelven el mismo 400 genérico; el listado de usuarios ordena por id y no trae total.
+    Revisión nativa (medio, 15 archivos, 1.358 líneas, una lente): **aprobada** y acusada
+    (`review-96aa97adcdb33fa5`). Observaciones → T12c-fix.
+  - [x] T12c-fix — "Cargar más" del directorio y de la auditoría no descarta respuestas viejas: si
+    cambia la búsqueda o el filtro mientras carga, agrega filas de la consulta anterior y deja el
+    cursor viejo; además, el `console.error` espiado en `account.test.tsx` solo se restaura si la
+    prueba pasa.
+    Hecho (2026-10-01, Sonnet; commiteó Claude). Commit `982240a`. Contador de generación compartido
+    por la carga inicial y "Cargar más"; al cambiar la búsqueda o el filtro se limpia el cursor y el
+    botón se oculta hasta la primera página nueva. RED 5/123 (tres carreras con promesas diferidas y
+    dos de botón oculto), GREEN 123/123; lint, tipos y build ok; GGA aprobó. Revisión nativa:
+    `review_due: false` (`under_budget`, medio, 185 líneas): queda en el tramo con el siguiente
+    commit.
+- Restricciones: sin dependencias nuevas (Codex no tiene red); CSP sin `unsafe-inline` ni orígenes
+  externos, así que nada de estilos inline ni Google Fonts: las familias del mockup se declaran con
+  pila de respaldo del sistema. Sistema visual del mockup "Identity Hub Console" (acento `#2d4f8f`,
+  modo oscuro). Verificación contra el stack real (Docker y Chromium): Claude, al cerrar.
+- Commit: `7c9c3a7` (T12a), `8dd3794` (T12a-fix), `8291345` (T12b), `24bf24c` (T12c), `982240a` (T12c-fix)
+
+### T12d — Primer admin por invitación al arrancar (D17)
+- [x] Estado · Ejecutor: `Codex` (Go, sin red) · Depende de: T5
+- Al arrancar la API, con `BOOTSTRAP_ADMIN_EMAIL` definido y ningún admin en la base, crear la
+  cuenta pendiente con rol `admin` y encolar su invitación (mismo flujo y auditoría que el alta de
+  T5); idempotente y segura con varias réplicas arrancando a la vez (sin dos invitaciones ni dos
+  cuentas). Variable en `config.go`, compose, `.env.example` (lo edita el usuario) y la guía.
+- Pruebas: sin variable no hace nada; con variable y sin admin crea y encola una sola vez; con un
+  admin existente no hace nada; arranques concurrentes (integración con PostgreSQL real).
+- Ruta: delegada. Codex escribió casi todo y se quedó sin cuota al final; Sonnet terminó, verificó
+  y Claude revisó y commiteó. Se borró el archivo de tareas aparte que había creado Codex.
+- Hallazgo de la revisión de Claude: contar cualquier admin (también uno pendiente) trababa la
+  instalación si el primero no aceptaba la invitación en 24 h. Ahora: admin activo → no hace nada;
+  el correo configurado es un admin pendiente con invitación vigente → no hace nada; con la
+  invitación vencida o anulada → la reemite como el reenvío de T6 (anula la anterior, auditoría
+  `bootstrap_admin_invitation_reissued`); el correo es de otra cuenta → aviso; si no, la crea. La
+  guarda de invitación vigente salió de la prueba concurrente (8 arranques mandaban 8
+  invitaciones).
+- TDD: RED en reemisión, error del broker en la reemisión e invitación vigente; GREEN. Verificación:
+  `make test-go` ok, `make test-integration` ok (arranque concurrente: una cuenta, una invitación,
+  un evento), `golangci-lint` 0 issues (con tag `integration` sigue solo el `errcheck` previo de
+  `testdb.go`), trazabilidad al día, `sqlc` sin deriva. E2E en un proyecto de compose aparte
+  (`-p t12d-check`, sin tocar el volumen del usuario): log de creación sin el correo, invitación en
+  Mailpit, aceptación 204 (segunda vez 410), login + MFA y `/me` con `admin`; reinicio sin efecto;
+  invitación vencida a mano → reemitida, token viejo 410 y nuevo 204.
+- Pendiente del usuario: agregar `BOOTSTRAP_ADMIN_EMAIL` a `.env.example`.
+- Revisión nativa de T12a-fix + T12d (`7c9c3a7..6ddfea8`, alto, 18 archivos, 1.311 líneas, 4
+  lentes): **aprobada** y acusada (`review-8124b51b54325c52`). Observaciones, pasan a T12d-fix.
+- Commit: `6ddfea8`
+
+### T12d-fix — Observaciones de la revisión de T12a-fix y T12d
+- [x] Estado · Ejecutor: `Sonnet` (Codex sin cuota hasta la tarde; necesita PostgreSQL real) · Depende de: T12d
+- R1/R3 (WARNING): `ActiveAdminExists` solo cuenta admins `active`; si todos los admins reales están
+  bloqueados (RF-017) o deshabilitados, un reinicio crea un segundo admin. D17 dice "si no existe
+  ningún admin": contar todo admin que no sea la cuenta pendiente del propio arranque.
+- R3/R4 (WARNING): `user.invited` (con el token) se publica dentro de la transacción y antes del
+  commit, con el candado tomado: si el broker se cuelga, las demás réplicas esperan; si el commit
+  falla, el correo ya salió con un enlace muerto. Es el mismo patrón de T5, `invitationresend` y
+  T6. Decisión del usuario (2026-10-01): en el arranque se publica **después del commit** (como
+  D16). Implementado así: si la publicación falla, se anula ese token en una transacción corta y el
+  arranque siguiente la reemite de inmediato; si la anulación también falla, el token sigue vigente
+  sin correo hasta vencer (24 h) y se avisa en el log. T5 y el reenvío de invitaciones quedan con el
+  patrón actual, anotados para decidir más adelante.
+- R2: la fila de `BOOTSTRAP_ADMIN_EMAIL` en la guía dice "una sola invitación" (hay reemisión);
+  tamaño del token sin constante con nombre; comprobación redundante de `@` en `config.go`; clase
+  falsa de `BroadcastChannel` duplicada en `client.test.ts`.
+- R3 (frontend): `clearSession` tras fallar `/me` anuncia `null` a las demás pestañas; `request()`
+  devuelve `undefined` para cualquier 2xx sin `application/json`, incluso en endpoints que esperan
+  cuerpo.
+- Hecho (2026-10-01, Sonnet; revisó y commiteó Claude). TDD: RED en el orden publicar/commit, en
+  admins bloqueado y deshabilitado (creaban una segunda cuenta), en el fallo de publicación y en el
+  frontend (`clearSession` anunciaba, cuerpo no JSON aceptado); GREEN. `make test-go` ok,
+  `make test-integration` ok, `golangci-lint` 0 issues (con tag solo el `errcheck` previo), frontend
+  32/32 + lint + tipos + build, trazabilidad al día, `sqlc` sin deriva, GGA aprobó. E2E
+  (`-p t12dfix-check`): con el único admin bloqueado y otro correo configurado, el reinicio no crea
+  una segunda cuenta.
+- Revisión nativa (alto, 13 archivos, 530 líneas, 4 lentes): **aprobada** y acusada
+  (`review-129c43661467fbe6`). Observaciones informativas, pendientes de decidir: R4/R2/R3
+  `publishAfterCommit` descarta las causas del error de publicación y de la anulación, así que el
+  log no distingue un broker caído de un fallo de base (registrar la causa saneada); R4 ya no hay
+  reintento tras un fallo de publicación (antes el arranque fallaba y el orquestador reintentaba);
+  R2 el nombre `OutcomeInvitationUndeliveredLive` no se explica solo; R3 `request()` ahora rechaza
+  un 2xx con texto plano no vacío (hoy ningún endpoint lo devuelve).
+- Commit: `5f66c28`
+
 
 ### T13 — Aplicación Contabilidad (React, otro dominio)
-- [ ] Estado · Ejecutor: `Codex` · Depende de: T9, T11
+- [x] Estado · Ejecutor: `Codex` → `Sonnet` (Codex sin cuota; decisión del usuario) · Depende de: T9, T11
 - Según el mockup: inicio de sesión por redirección con PKCE, verificación del JWT con el JWKS del
   Hub, vistas por rol (Resumen, Transacciones, Cierre contable, Administración) con datos de
   ejemplo. Sin usuarios propios.
-- Commit: —
+- Hecho (2026-10-01, Sonnet; revisó y commiteó Claude). Commit `eaa4670`. App aparte en
+  `contabilidad/` (Vite + React + TS, sin dependencias nuevas): PKCE S256 (verifier y `state` en
+  `sessionStorage` solo durante la ida y vuelta), canje en `/oauth/token`, token solo en memoria,
+  firma Ed25519 verificada con WebCrypto contra el JWKS del Hub (`kid`, `iss`, `aud`, `exp`),
+  vistas por rol con datos de ejemplo y nueva redirección a `/oauth/authorize` al vencer (sin
+  refresh, ADR 0009). Hueco del Hub corregido: tras el MFA la consola no volvía al
+  `/oauth/authorize`; ahora acepta `?continue=` solo si es exactamente `/oauth/authorize` del
+  mismo origen (sin redirección abierta; 21 pruebas). La imagen `web` compila las dos apps con
+  contexto en la raíz (`frontend/Dockerfile.dockerignore` excluye `.env`, `.git`, backend, etc.);
+  se quitó el marcador de T11; CI y Makefile corren para Contabilidad los mismos gates.
+- TDD: RED por comportamiento y GREEN: Contabilidad 43/43 (vector RFC 7636, firma y claims
+  inválidos, `alg none`/HS256, `state` cambiado, nada en almacenamiento), consola 144/144; lint,
+  tipos y build ok en las dos; Trivy de `web` 0 HIGH/CRITICAL; trazabilidad al día; GGA aprobó.
+- E2E SSO en Chromium (`-p t13-check`, 30/30): cada usuario entra por el Hub con MFA y vuelve sin
+  `code` en la URL ni token en almacenamiento; una segunda pestaña vuelve sin pedir contraseña;
+  analista sin Cierre y solo con sus filas; senior aprueba; cambiar el rol en la consola se ve en
+  el siguiente login. Pendiente: Firefox y la redirección real a los 15 min (solo prueba unitaria).
+- Decisión del usuario (2026-10-01): se mantiene D8. El token de Contabilidad solo lleva roles
+  `contabilidad.*`; un admin del Hub sin esos roles ve "Sin acceso". La vista "Administración" de
+  la app sobra (T13-fix). El backend emite `"roles": null` con el conjunto vacío.
+- Revisión nativa de T12c-fix + T13 (`24bf24c..eaa4670`, alto, 48 archivos, 6.758 líneas, 4
+  lentes): **aprobada** y acusada (`review-7ae0824e02b3c4d0`). Observaciones → T13-fix.
+- Commit: `eaa4670`
+
+### T13-fix — Decisión D8 en la app y observaciones de la revisión de T13
+- [x] Estado · Ejecutor: `Codex` · Depende de: T13
+- D8: quitar "Administración" de Contabilidad; "Sin acceso" con enlace al Hub.
+- R2/R3 (WARNING): el contador de generación de T12c-fix reemplazó la limpieza al desmontar en
+  `UsersPage` y `AuditLogPage`: una respuesta tardía tras salir de la página todavía llama
+  `setState` u `onSessionEnded`. Incrementar la generación al desmontar.
+- R4 (WARNING): `exp`/`nbf` sin tolerancia y temporizador armado con el mismo `exp`: con el reloj
+  del navegador adelantado, bucle de reautenticación. Tolerancia de reloj y freno al bucle.
+- R3 (WARNING): la prueba del token que vence no es determinista (reloj real); usar reloj falso.
+- R2 (WARNING): `.eslintrc.cjs` de Contabilidad apaga `react/no-danger` con un comentario que dice
+  lo contrario; la prohibición real es el `no-restricted-syntax`.
+- R4: un fallo al bajar el JWKS se muestra como credencial inválida; distinguirlo.
+- R1: CI cae de `npm ci` a `npm install` (también en la consola); usar `npm ci` a secas.
+- R2: constantes de prueba duplicadas (`ISSUER`, `AUDIENCE`, `HUB`); `nextId` con número mágico.
+- Hecho (2026-10-01, Codex; revisó y commiteó Claude). Commit `89ac1cb`. Contabilidad 49/49, consola
+  147/147; lint, tipos y build ok en las dos; GGA aprobó. RED observado en guardas al desmontar,
+  límite de reloj, fallo del JWKS y folio malformado; sin RED aislado para quitar Administración y
+  para la prueba determinista (el primer RED se colgó por el reloj falso). CI remoto sin correr.
+- Revisión nativa (alto, 18 archivos, 295 líneas, 4 lentes): **aprobada** y acusada
+  (`review-14ddf284cef4132f`). Observaciones → T13-fix2.
+
+### T13-fix2 — Observaciones de la revisión de T13-fix
+- [x] Estado · Ejecutor: `Codex` · Depende de: T13-fix
+- R2/R3/R4 (WARNING, coinciden tres lentes): `resend()` de `UsersPage` usa el mismo contador de
+  generación que recarga la lista; si la lista se recarga durante un reenvío, se pierden el aviso y
+  el cierre de sesión y `resending` queda trabado. Separar "desmontado" de "carga vigente".
+- R2 (WARNING): un 4xx o un JSON inválido del JWKS se sigue mostrando como credencial inválida.
+- R2 (WARNING): `MINIMUM_SESSION_LIFETIME_MS` y `CLOCK_LEEWAY_SECONDS` están acoplados sin
+  decirlo; derivar uno del otro.
+- R3 (WARNING): las pruebas del callback con reloj falso hacen un solo `advanceTimersByTimeAsync(0)`
+  antes de afirmar; WebCrypto no resuelve como microtarea, pueden fallar al azar.
+- R2: mensaje del reloj fuera de `CALLBACK_MESSAGES`; la prueba de `nextId` lleva la etiqueta RF009
+  y un `as never`.
+- Hecho (2026-10-01, Codex con la lista de archivos permitidos de Gentle AI 4.0; revisó y commiteó
+  Claude). Commit `d0283df`. RED/GREEN por cambio; Contabilidad 53/53 cinco corridas seguidas,
+  consola 148/148; lint, tipos y build ok; GGA aprobó.
+- Revisión nativa (alto, 8 archivos, 130 líneas, 4 lentes): **aprobada** y acusada
+  (`review-8e77444c1bb38413`). Observaciones sobre calidad de pruebas, pendientes (no bloquean el
+  corte): R3 `advanceUntil` solo reduce la fragilidad de WebCrypto con reloj falso (presupuesto de
+  ~100 ms); R3 la prueba de la vida mínima no discrimina el umbral (el token ya está vencido) y la
+  aserción de la constante es tautológica; R2 títulos de `it.each` con espacios.
+- Commit: `d0283df`
+
+
 
 ## Fase 3 — Verificación, DAST y cierre
 
@@ -729,15 +985,30 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 |---|---|---|
 | 0 — Enmiendas de spec y decisiones | T1 a T3 (3) | 3 (T1 a T3) |
 | 1 — Backend | T4 a T10 (7) | 7 (T4 a T10) |
-| 2 — Dominios locales y frontend | T11 a T13 (3) | 0 |
+| 2 — Dominios locales y frontend | T11 a T13 + T12d (4) | 4 (T11 a T13 y T12d) — fase cerrada |
 | 3 — Verificación, DAST y cierre | T14 a T17 (4) | 0 |
-| **Total** | **17** | **10** |
+| **Total** | **18** | **14** |
 
 ## Siguiente paso
 
-Fase 1 cerrada el 2026-09-30 (T9-fix y T10). PR de corte de las fases 0 y 1 abierto el
-2026-10-01: #6 (incluye `7bfc125`, falso positivo de gitleaks en `accept_invitation.go` agregado a
-`.gitleaksignore`). Después del merge, T11.
+Fase 1 cerrada el 2026-09-30 (T9-fix y T10). PR de corte de las fases 0 y 1: #6, mergeado el
+2026-10-01 en `ece7e7f` (merge commit; CI de `main` en verde). Incluye `7bfc125`, falso positivo de
+gitleaks en `accept_invitation.go` agregado a `.gitleaksignore`.
+
+Fase 2 cerrada el 2026-10-01 (T11, T12 con T12d y T13, con sus fixes; última revisión
+`review-8e77444c1bb38413`). Toca el PR de corte de la fase 2 (decisión del usuario); después la
+fase 3 (T14).
+
+- `main` protegida desde el 2026-10-01 (ruleset "Protect main", decisión del usuario): PR
+  obligatorio sin aprobaciones requeridas, los 17 checks del PR #6 obligatorios, sin force push ni
+  borrado, solo merge commit (squash y rebase deshabilitados en el repo) y sin bypass.
+- Evidencias (decisión del usuario, 2026-10-01): se toman al cambiar de semana, no por fase. El
+  cambio a Alpine no lleva captura por ahora.
+- Code scanning tras el merge: 85 alertas abiertas (antes 417; 332 eran de la imagen `web` Debian).
+- Hallazgo nuevo fuera de alcance: CodeQL reporta 33 `js/remote-property-injection` en los tres HTML
+  de `docs/diagramas/` (diagramas generados, no código de la app). El plan de la semana 2 decía no
+  commitear esa carpeta y está versionada. Pendiente decidir si se sacan del repo o se excluyen del
+  análisis.
 
 - Hallazgo nuevo fuera de alcance (CI del PR #6, run 36863251783, job "9-10 · Construir y escanear
   imágenes (web)"): Trivy encuentra 13 HIGH corregibles en la imagen base de `web`

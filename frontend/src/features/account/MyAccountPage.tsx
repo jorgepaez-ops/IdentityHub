@@ -1,0 +1,130 @@
+import { FormEvent, useEffect, useState } from 'react'
+import { ApiProblemError, type CurrentUser, type Session, listSessions, revokeSession, updateCurrentUser } from '../../api/client'
+import { formatDate } from '../format'
+import { describeUserAgent } from './userAgent'
+import { problemMessages } from './PublicPages'
+
+
+function ProfileCard({ user, onUserChange }: { user: CurrentUser; onUserChange: (user: CurrentUser) => void }) {
+  const [pending, setPending] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [problems, setProblems] = useState<string[]>([])
+  const save = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const displayName = String(new FormData(event.currentTarget).get('displayName')).trim()
+    setNotice(null)
+    if (displayName === '') {
+      setProblems(['El nombre para mostrar no puede estar vacío.'])
+      return
+    }
+    setPending(true)
+    setProblems([])
+    try {
+      onUserChange(await updateCurrentUser({ displayName }))
+      setNotice('Perfil actualizado.')
+    } catch (reason) {
+      setProblems(problemMessages(reason, 'No fue posible guardar el perfil. Inténtalo de nuevo.'))
+    } finally {
+      setPending(false)
+    }
+  }
+  return (
+    <section className="panel" aria-labelledby="profile-title">
+      <h2 id="profile-title">Perfil</h2>
+      {problems.length > 0 && <div className="error-box" role="alert">{problems.map((message, index) => <p key={index}>{message}</p>)}</div>}
+      {notice && <div className="success-box" role="status"><p>{notice}</p></div>}
+      <form onSubmit={(event) => void save(event)} noValidate>
+        <label htmlFor="profile-name">Nombre para mostrar</label>
+        <input id="profile-name" name="displayName" defaultValue={user.displayName} maxLength={100} required />
+        <label htmlFor="profile-email">Correo electrónico</label>
+        <input id="profile-email" value={user.email} readOnly />
+        <p className="field-label" id="roles-label">Roles</p>
+        <ul className="chips" aria-labelledby="roles-label">
+          {user.roles.map((role) => <li className={`chip chip-${role === 'admin' ? 'accent' : role === 'contabilidad.senior' ? 'warn' : 'neutral'}`} key={role}>{role}</li>)}
+        </ul>
+        <button className="primary-button fit" disabled={pending} type="submit">{pending ? 'Guardando…' : 'Guardar cambios'}</button>
+      </form>
+    </section>
+  )
+}
+
+function SessionsCard({ onSessionEnded }: { onSessionEnded: () => void }) {
+  const [sessions, setSessions] = useState<Session[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [busyId, setBusyId] = useState<string | null>(null)
+
+  useEffect(() => {
+    let active = true
+    void (async () => {
+      try {
+        const items = await listSessions()
+        if (active) setSessions(items)
+      } catch {
+        if (active) setError('No fue posible cargar tus sesiones. Inténtalo de nuevo.')
+      }
+    })()
+    return () => { active = false }
+  }, [])
+
+  const revoke = async (session: Session) => {
+    setBusyId(session.id)
+    setError(null)
+    try {
+      await revokeSession(session.id)
+      if (session.current) {
+        onSessionEnded()
+        return
+      }
+      setSessions((items) => (items ?? []).filter((item) => item.id !== session.id))
+    } catch (reason) {
+      // A 401 that survives the refresh retry means the session is gone: leave instead of showing a generic error.
+      if (reason instanceof ApiProblemError && reason.status === 401) {
+        onSessionEnded()
+        return
+      }
+      setError('No fue posible revocar la sesión. Inténtalo de nuevo.')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  return (
+    <section className="panel" aria-labelledby="sessions-title">
+      <h2 id="sessions-title">Sesiones activas</h2>
+      <p className="muted">Revoca las sesiones que no reconozcas. Si revocas la actual, se cerrará aquí mismo.</p>
+      {error && <div className="error-box" role="alert"><p>{error}</p></div>}
+      {sessions === null && !error && <p className="muted">Validando…</p>}
+      {sessions && (
+        <ul className="session-list" aria-label="Sesiones activas">
+          {sessions.map((session) => (
+            <li className="session-row" key={session.id} aria-label={`Sesión ${describeUserAgent(session.userAgent)}`}>
+              <div>
+                <p className="session-agent"><span title={session.userAgent}>{describeUserAgent(session.userAgent)}</span>{session.current && <span className="chip chip-ok">Esta sesión</span>}</p>
+                <p className="muted"><span>{session.ip}</span></p>
+                <p className="muted">Creada {formatDate(session.createdAt)} · Último uso {formatDate(session.lastUsedAt)}</p>
+              </div>
+              <button className="secondary-button fit" disabled={busyId !== null} onClick={() => void revoke(session)} type="button">Revocar</button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+}
+
+export function MyAccountPage({ user, onUserChange, onSessionEnded }: {
+  user: CurrentUser
+  onUserChange: (user: CurrentUser) => void
+  onSessionEnded: () => void
+}) {
+  return (
+    <section>
+      <h1>Mi cuenta</h1>
+      <p className="muted">Tu perfil y las sesiones abiertas con tu cuenta.</p>
+      <div className="account-grid">
+        <ProfileCard user={user} onUserChange={onUserChange} />
+        <SessionsCard onSessionEnded={onSessionEnded} />
+      </div>
+    </section>
+  )
+}

@@ -1,0 +1,23 @@
+# Contexto = raíz del repositorio (T13). BuildKit lee este archivo, junto al
+# Dockerfile, en lugar de un .dockerignore de la raíz.
+**/node_modules
+**/dist
+**/coverage
+.git
+**/.env
+**/*.env
+!**/.env.example
+# Esta imagen solo necesita frontend/ y contabilidad/.
+backend
+db
+deploy
+docs
+e2e
+odd
+security
+specs
+scripts
+.github
+.atl
+.codegraph
+Claude outputs

@@ -409,3 +409,41 @@ SET used_at = now()
 WHERE user_id = $1
   AND purpose = 'invitation'
   AND used_at IS NULL;
+
+-- name: LockBootstrapAdmin :exec
+-- Serializes the first-admin decision across every API process. The lock is
+-- transaction-scoped, so no connection can retain it after a failed startup.
+SELECT pg_advisory_xact_lock(hashtextextended('identity-hub/bootstrap-admin', 0));
+
+-- name: NonPendingAdminExists :one
+-- Any account holding the admin role makes the bootstrap a no-op, whatever its
+-- state (active, locked, disabled): only a pending one (invitation never
+-- accepted) does not, so the installation cannot be left without a way in.
+SELECT EXISTS (
+    SELECT 1
+    FROM user_roles
+    JOIN roles ON roles.id = user_roles.role_id
+    JOIN users ON users.id = user_roles.user_id
+    WHERE roles.name = 'admin'
+      AND users.status <> 'pending_verification'
+) AS non_pending_admin_exists;
+
+-- name: AddBootstrapUserRole :execrows
+-- The first administrator has no human grantor. The audit event records the
+-- system/bootstrap actor instead of inventing a privileged service account.
+INSERT INTO user_roles (user_id, role_id, granted_by)
+SELECT $1, id, NULL
+FROM roles
+WHERE name = $2;
+
+-- name: HasLiveInvitationToken :one
+-- A usable invitation (unused and unexpired) means the bootstrap admin can
+-- still accept it; reissuing then would only spam concurrent or repeated starts.
+SELECT EXISTS (
+    SELECT 1
+    FROM verification_tokens
+    WHERE user_id = $1
+      AND purpose = 'invitation'
+      AND used_at IS NULL
+      AND expires_at > now()
+) AS has_live_invitation_token;

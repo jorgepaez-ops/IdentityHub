@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"math"
+	"net/mail"
 	"net/netip"
 	"os"
 	"strconv"
@@ -58,6 +59,7 @@ type Config struct {
 	LoginLockoutDuration    time.Duration
 	Argon2                  PasswordConfig
 	TrustedProxies          []netip.Prefix
+	BootstrapAdminEmail     string
 }
 
 const (
@@ -131,6 +133,13 @@ func Load() (*Config, error) {
 	passwordParallelism := passwordNum("ARGON2_PARALLELISM", "2", 255)
 	passwordConcurrency := passwordNum("ARGON2_CONCURRENCY", "4", int(^uint(0)>>1))
 	trustedProxies := parseTrustedProxies(os.Getenv("TRUSTED_PROXIES"), &problems)
+	bootstrapAdminEmail := strings.TrimSpace(os.Getenv("BOOTSTRAP_ADMIN_EMAIL"))
+	if bootstrapAdminEmail != "" {
+		parsed, err := mail.ParseAddress(bootstrapAdminEmail)
+		if err != nil || parsed.Address != bootstrapAdminEmail {
+			problems = append(problems, "BOOTSTRAP_ADMIN_EMAIL debe ser un correo válido cuando está definido")
+		}
+	}
 
 	cfg := &Config{
 		Port:                    num("API_PORT", "8081"),
@@ -141,9 +150,9 @@ func Load() (*Config, error) {
 		SMTPHost:                opt("SMTP_HOST", "mailpit"),
 		SMTPPort:                num("SMTP_PORT", "1025"),
 		SMTPFrom:                opt("SMTP_FROM", "no-reply@identity.local"),
-		PublicBaseURL:           opt("PUBLIC_BASE_URL", "http://localhost:8080"),
+		PublicBaseURL:           opt("PUBLIC_BASE_URL", "http://identityhub.localhost:8080"),
 		JWTSigningKey:           Secret(jwtSigningKey),
-		JWTIssuer:               opt("JWT_ISSUER", "http://localhost:8080"),
+		JWTIssuer:               opt("JWT_ISSUER", "http://identityhub.localhost:8080"),
 		JWTAudience:             opt("JWT_AUDIENCE", "identity-hub"),
 		AccessTTL:               dur("JWT_ACCESS_TTL", "15m"),
 		RefreshTTL:              dur("JWT_REFRESH_TTL", "720h"),
@@ -156,6 +165,7 @@ func Load() (*Config, error) {
 		LoginFailureWindow:      positiveDuration("LOGIN_FAILURE_WINDOW", "15m"),
 		LoginLockoutDuration:    positiveDuration("LOGIN_LOCKOUT_DURATION", "15m"),
 		TrustedProxies:          trustedProxies,
+		BootstrapAdminEmail:     bootstrapAdminEmail,
 		Argon2: PasswordConfig{
 			MemoryKiB:   boundedUint32(passwordMemory),
 			Iterations:  boundedUint32(passwordIterations),
