@@ -928,7 +928,7 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
   (`review-14ddf284cef4132f`). Observaciones → T13-fix2.
 
 ### T13-fix2 — Observaciones de la revisión de T13-fix
-- [ ] Estado · Ejecutor: `Codex` · Depende de: T13-fix
+- [x] Estado · Ejecutor: `Codex` · Depende de: T13-fix
 - R2/R3/R4 (WARNING, coinciden tres lentes): `resend()` de `UsersPage` usa el mismo contador de
   generación que recarga la lista; si la lista se recarga durante un reenvío, se pierden el aviso y
   el cierre de sesión y `resending` queda trabado. Separar "desmontado" de "carga vigente".
@@ -939,7 +939,15 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
   antes de afirmar; WebCrypto no resuelve como microtarea, pueden fallar al azar.
 - R2: mensaje del reloj fuera de `CALLBACK_MESSAGES`; la prueba de `nextId` lleva la etiqueta RF009
   y un `as never`.
-- Commit: —
+- Hecho (2026-10-01, Codex con la lista de archivos permitidos de Gentle AI 4.0; revisó y commiteó
+  Claude). Commit `d0283df`. RED/GREEN por cambio; Contabilidad 53/53 cinco corridas seguidas,
+  consola 148/148; lint, tipos y build ok; GGA aprobó.
+- Revisión nativa (alto, 8 archivos, 130 líneas, 4 lentes): **aprobada** y acusada
+  (`review-8e77444c1bb38413`). Observaciones sobre calidad de pruebas, pendientes (no bloquean el
+  corte): R3 `advanceUntil` solo reduce la fragilidad de WebCrypto con reloj falso (presupuesto de
+  ~100 ms); R3 la prueba de la vida mínima no discrimina el umbral (el token ya está vencido) y la
+  aserción de la constante es tautológica; R2 títulos de `it.each` con espacios.
+- Commit: `d0283df`
 
 
 
@@ -977,7 +985,7 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 |---|---|---|
 | 0 — Enmiendas de spec y decisiones | T1 a T3 (3) | 3 (T1 a T3) |
 | 1 — Backend | T4 a T10 (7) | 7 (T4 a T10) |
-| 2 — Dominios locales y frontend | T11 a T13 + T12d (4) | 4 (T11, T12, T12d, T13) |
+| 2 — Dominios locales y frontend | T11 a T13 + T12d (4) | 4 (T11 a T13 y T12d) — fase cerrada |
 | 3 — Verificación, DAST y cierre | T14 a T17 (4) | 0 |
 | **Total** | **18** | **14** |
 
@@ -985,8 +993,11 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 
 Fase 1 cerrada el 2026-09-30 (T9-fix y T10). PR de corte de las fases 0 y 1: #6, mergeado el
 2026-10-01 en `ece7e7f` (merge commit; CI de `main` en verde). Incluye `7bfc125`, falso positivo de
-gitleaks en `accept_invitation.go` agregado a `.gitleaksignore`. T11 cerrada el 2026-10-01
-(`3cb30fc`); sigue T12.
+gitleaks en `accept_invitation.go` agregado a `.gitleaksignore`.
+
+Fase 2 cerrada el 2026-10-01 (T11, T12 con T12d y T13, con sus fixes; última revisión
+`review-8e77444c1bb38413`). Toca el PR de corte de la fase 2 (decisión del usuario); después la
+fase 3 (T14).
 
 - `main` protegida desde el 2026-10-01 (ruleset "Protect main", decisión del usuario): PR
   obligatorio sin aprobaciones requeridas, los 17 checks del PR #6 obligatorios, sin force push ni
