@@ -124,6 +124,56 @@ func TestRF020_VerificadorIncorrectoNoConsumeCodigo(t *testing.T) {
 	}
 }
 
+func TestRF020_FalloPosteriorAlConsumoRevierteElCodigo(t *testing.T) {
+
+	client := Client{ID: "contabilidad", RedirectURI: "http://contabilidad.localhost:8080/callback"}
+	repository := &memoryRepository{roles: []string{"user"}, rolesErr: errors.New("roles unavailable")}
+	service := New(repository, client, bytesReader(), time.Now)
+	issued, err := service.Authorize(context.Background(), uuid.New(), validAuthorizeInput(client))
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := ExchangeInput{Code: issued.Code, ClientID: client.ID, RedirectURI: client.RedirectURI, CodeVerifier: "verifier"}
+	if _, err := service.Exchange(context.Background(), input); !errors.Is(err, repository.rolesErr) {
+		t.Fatalf("first exchange error=%v, want wrapped role failure", err)
+	}
+	repository.rolesErr = nil
+	if _, err := service.Exchange(context.Background(), input); err != nil {
+		t.Fatalf("exchange after rolled-back failure: %v", err)
+	}
+}
+
+func TestRF020_FalloDeAuditoriaRevierteElCodigo(t *testing.T) {
+	client := Client{ID: "contabilidad", RedirectURI: "http://contabilidad.localhost:8080/callback"}
+	repository := &memoryRepository{roles: []string{"user"}}
+	service := New(repository, client, bytesReader(), time.Now)
+	issued, err := service.Authorize(context.Background(), uuid.New(), validAuthorizeInput(client))
+	if err != nil {
+		t.Fatal(err)
+	}
+	repository.auditErr = errors.New("audit unavailable")
+	input := ExchangeInput{Code: issued.Code, ClientID: client.ID, RedirectURI: client.RedirectURI, CodeVerifier: "verifier"}
+	if _, err := service.Exchange(context.Background(), input); !errors.Is(err, repository.auditErr) {
+		t.Fatalf("first exchange error=%v, want wrapped audit failure", err)
+	}
+	repository.auditErr = nil
+	if _, err := service.Exchange(context.Background(), input); err != nil {
+		t.Fatalf("exchange after rolled-back audit failure: %v", err)
+	}
+}
+
+func TestRF020_RegistroDelClienteDebeCoincidirConLaConfiguracion(t *testing.T) {
+	configured := Client{ID: "contabilidad", RedirectURI: "http://contabilidad.localhost:8080/oauth/callback", Origin: "http://contabilidad.localhost:8080"}
+	registered := configured
+	if err := ValidateRegisteredClient(configured, registered); err != nil {
+		t.Fatalf("matching registered client: %v", err)
+	}
+	registered.RedirectURI = "http://contabilidad.localhost:8080/other"
+	if err := ValidateRegisteredClient(configured, registered); err == nil {
+		t.Fatal("mismatched client registration was accepted")
+	}
+}
+
 func TestRF020_ErrorDeRepositorioEnCanjeEsInternoYNoAudita(t *testing.T) {
 	client := Client{ID: "contabilidad", RedirectURI: "http://contabilidad.localhost:8080/callback"}
 	outage := errors.New("database unavailable")
@@ -180,6 +230,20 @@ type memoryRepository struct {
 	auditAction string
 	auditActor  uuid.UUID
 	exchangeErr error
+	rolesErr    error
+	auditErr    error
+	inTx        bool
+}
+
+func (m *memoryRepository) WithinAuthorizationCodeTransaction(_ context.Context, fn func(ExchangeWriter) error) error {
+	before := m.code
+	m.inTx = true
+	err := fn(m)
+	m.inTx = false
+	if err != nil {
+		m.code = before
+	}
+	return err
 }
 
 func (m *memoryRepository) CreateAuthorizationCode(_ context.Context, code CreateCode) error {
@@ -200,9 +264,15 @@ func (m *memoryRepository) ExchangeAuthorizationCode(_ context.Context, hash []b
 	return m.code, nil
 }
 func (m *memoryRepository) ListRolesForUser(context.Context, uuid.UUID) ([]string, error) {
+	if m.rolesErr != nil {
+		return nil, m.rolesErr
+	}
 	return m.roles, nil
 }
 func (m *memoryRepository) InsertAuditEvent(_ context.Context, event AuditEvent) error {
+	if m.auditErr != nil {
+		return m.auditErr
+	}
 	m.auditAction, m.auditActor = event.Action, event.ActorUserID
 	return nil
 }

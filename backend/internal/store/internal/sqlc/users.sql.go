@@ -232,18 +232,24 @@ func (q *Queries) CreateAuthorizationCode(ctx context.Context, arg CreateAuthori
 }
 
 const createHubSession = `-- name: CreateHubSession :exec
-INSERT INTO hub_sessions (user_id, token_hash, expires_at)
-VALUES ($1, $2, $3)
+INSERT INTO hub_sessions (user_id, token_hash, family_id, expires_at)
+VALUES ($1, $2, $3, $4)
 `
 
 type CreateHubSessionParams struct {
 	UserID    uuid.UUID
 	TokenHash []byte
+	FamilyID  pgtype.UUID
 	ExpiresAt pgtype.Timestamptz
 }
 
 func (q *Queries) CreateHubSession(ctx context.Context, arg CreateHubSessionParams) error {
-	_, err := q.db.Exec(ctx, createHubSession, arg.UserID, arg.TokenHash, arg.ExpiresAt)
+	_, err := q.db.Exec(ctx, createHubSession,
+		arg.UserID,
+		arg.TokenHash,
+		arg.FamilyID,
+		arg.ExpiresAt,
+	)
 	return err
 }
 
@@ -518,6 +524,25 @@ func (q *Queries) GetMfaChallengeForUpdate(ctx context.Context, tokenHash []byte
 		&i.DisplayName,
 		&i.Status,
 	)
+	return i, err
+}
+
+const getOAuthApplication = `-- name: GetOAuthApplication :one
+SELECT client_id, redirect_uri, allowed_origin
+FROM applications
+WHERE client_id = $1
+`
+
+type GetOAuthApplicationRow struct {
+	ClientID      string
+	RedirectUri   string
+	AllowedOrigin string
+}
+
+func (q *Queries) GetOAuthApplication(ctx context.Context, clientID string) (GetOAuthApplicationRow, error) {
+	row := q.db.QueryRow(ctx, getOAuthApplication, clientID)
+	var i GetOAuthApplicationRow
+	err := row.Scan(&i.ClientID, &i.RedirectUri, &i.AllowedOrigin)
 	return i, err
 }
 
@@ -874,6 +899,32 @@ func (q *Queries) PasswordResetTokenIsUsable(ctx context.Context, tokenHash []by
 	return token_is_usable, err
 }
 
+const purgeAuthorizationCodes = `-- name: PurgeAuthorizationCodes :execrows
+DELETE FROM authorization_codes
+WHERE expires_at <= now() OR used_at IS NOT NULL
+`
+
+func (q *Queries) PurgeAuthorizationCodes(ctx context.Context) (int64, error) {
+	result, err := q.db.Exec(ctx, purgeAuthorizationCodes)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const purgeHubSessions = `-- name: PurgeHubSessions :execrows
+DELETE FROM hub_sessions
+WHERE expires_at <= now() OR revoked_at IS NOT NULL
+`
+
+func (q *Queries) PurgeHubSessions(ctx context.Context) (int64, error) {
+	result, err := q.db.Exec(ctx, purgeHubSessions)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const rejectMfaChallenge = `-- name: RejectMfaChallenge :one
 UPDATE mfa_challenges
 SET attempts_left = attempts_left - 1,
@@ -941,11 +992,17 @@ const revokeActiveRefreshSession = `-- name: RevokeActiveRefreshSession :one
 WITH revoked AS (
     UPDATE refresh_tokens
     SET status = 'revoked'
-    WHERE user_id = $1
-      AND family_id = $2
-      AND status = 'active'
-      AND expires_at > now()
+    WHERE refresh_tokens.user_id = $1
+      AND refresh_tokens.family_id = $2
+      AND refresh_tokens.status = 'active'
+      AND refresh_tokens.expires_at > now()
     RETURNING 1
+), revoked_hub_session AS (
+    UPDATE hub_sessions
+    SET revoked_at = now()
+    WHERE family_id = $2
+      AND revoked_at IS NULL
+      AND EXISTS (SELECT 1 FROM revoked)
 )
 SELECT EXISTS (SELECT 1 FROM revoked) AS revoked
 `
@@ -978,9 +1035,15 @@ const revokeRefreshFamily = `-- name: RevokeRefreshFamily :one
 WITH revoked AS (
     UPDATE refresh_tokens
     SET status = 'revoked'
-    WHERE family_id = $1
-      AND status <> 'revoked'
+    WHERE refresh_tokens.family_id = $1
+      AND refresh_tokens.status <> 'revoked'
     RETURNING 1
+), revoked_hub_session AS (
+    UPDATE hub_sessions
+    SET revoked_at = now()
+    WHERE family_id = $1
+      AND revoked_at IS NULL
+      AND EXISTS (SELECT 1 FROM revoked)
 )
 SELECT count(*)::bigint FROM revoked
 `

@@ -1,8 +1,10 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -27,6 +29,36 @@ func TestRF020_SinSesionRedirigeAlLoginConContinueRelativo(t *testing.T) {
 	location, _ := url.Parse(response.Header().Get("Location"))
 	if location.Host != "identityhub.localhost:8080" || !strings.HasPrefix(location.Query().Get("continue"), "/oauth/authorize?") {
 		t.Fatalf("location=%s", location)
+	}
+}
+
+func TestRF020_SesionHubAusenteRedirigePeroFalloDeStoreDa500YSeRegistra(t *testing.T) {
+	client := oauth.Client{ID: "contabilidad", RedirectURI: "http://contabilidad.localhost:8080/oauth/callback", Origin: "http://contabilidad.localhost:8080"}
+	for _, testCase := range []struct {
+		name       string
+		sessionErr error
+		wantStatus int
+	}{
+		{"missing", oauth.ErrHubSessionInvalid, http.StatusFound},
+		{"storage failure", errors.New("database unavailable"), http.StatusInternalServerError},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			var logs bytes.Buffer
+			server := NewServer(slog.New(slog.NewTextHandler(&logs, nil)), "test", nil)
+			server.SetOAuthService(oauth.New(&oauthAPIRepository{}, client, nil, time.Now), hubSessionStub{err: testCase.sessionErr}, client, "http://identityhub.localhost:8080/login", time.Hour)
+			request := httptest.NewRequest(http.MethodGet, oauthAuthorizePath(client), nil)
+			request.AddCookie(&http.Cookie{Name: hubSessionCookieName, Value: "c2VjcmV0LWh1Yi10b2tlbg"})
+			response := httptest.NewRecorder()
+			server.Routes().ServeHTTP(response, request)
+			if response.Code != testCase.wantStatus {
+				t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+			}
+			if testCase.wantStatus == http.StatusInternalServerError {
+				if !strings.Contains(logs.String(), "oauth request failed") || strings.Contains(logs.String(), "c2VjcmV0") {
+					t.Fatalf("logs=%q", logs.String())
+				}
+			}
+		})
 	}
 }
 
@@ -170,6 +202,10 @@ type exchangeRepository struct {
 	audits int
 }
 
+func (r *exchangeRepository) WithinAuthorizationCodeTransaction(_ context.Context, fn func(oauth.ExchangeWriter) error) error {
+	return fn(r)
+}
+
 func (r *exchangeRepository) CreateAuthorizationCode(context.Context, oauth.CreateCode) error {
 	return nil
 }
@@ -228,10 +264,20 @@ func mfaResultWithHubSession() mfa.Result {
 type invalidHubSession struct{}
 
 func (invalidHubSession) GetHubSessionUser(context.Context, []byte) (uuid.UUID, error) {
-	return uuid.Nil, errors.New("no session")
+	return uuid.Nil, oauth.ErrHubSessionInvalid
+}
+
+type hubSessionStub struct{ err error }
+
+func (s hubSessionStub) GetHubSessionUser(context.Context, []byte) (uuid.UUID, error) {
+	return uuid.Nil, s.err
 }
 
 type oauthAPIRepository struct{}
+
+func (*oauthAPIRepository) WithinAuthorizationCodeTransaction(_ context.Context, fn func(oauth.ExchangeWriter) error) error {
+	return fn(&oauthAPIRepository{})
+}
 
 func (*oauthAPIRepository) CreateAuthorizationCode(context.Context, oauth.CreateCode) error {
 	return nil

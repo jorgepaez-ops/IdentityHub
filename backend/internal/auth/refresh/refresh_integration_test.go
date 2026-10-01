@@ -9,6 +9,7 @@ import (
 
 	"errors"
 
+	"github.com/google/uuid"
 	"github.com/jorgepaez/identity-hub/internal/auth/lockout"
 	"github.com/jorgepaez/identity-hub/internal/auth/login"
 	"github.com/jorgepaez/identity-hub/internal/auth/password"
@@ -49,6 +50,13 @@ func TestRF006_DosRenovacionesConcurrentesUnaGana(t *testing.T) {
 		t.Fatalf("Login: %v", err)
 	}
 	service := refresh.New(repository, signer, time.Hour)
+	var familyID uuid.UUID
+	if err := pool.QueryRow(ctx, `SELECT family_id FROM refresh_tokens WHERE user_id = $1 LIMIT 1`, user.ID).Scan(&familyID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO hub_sessions (user_id, token_hash, family_id, expires_at) VALUES ($1,$2,$3,$4)`, user.ID, make([]byte, 32), familyID, time.Now().Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
 	start := make(chan struct{})
 	results := make(chan error, 2)
 	for range 2 {
@@ -78,6 +86,10 @@ func TestRF006_DosRenovacionesConcurrentesUnaGana(t *testing.T) {
 	}
 	if activeCount != 0 {
 		t.Errorf("active refresh tokens = %d, want 0 after reuse", activeCount)
+	}
+	var hubRevoked bool
+	if err := pool.QueryRow(ctx, `SELECT revoked_at IS NOT NULL FROM hub_sessions WHERE family_id = $1`, familyID).Scan(&hubRevoked); err != nil || !hubRevoked {
+		t.Fatalf("hub session revoked=%t err=%v", hubRevoked, err)
 	}
 	if err := pool.QueryRow(ctx, `SELECT count(*) FROM audit_log WHERE actor_user_id = $1 AND action = 'refresh_reuse_detected'`, user.ID).Scan(&auditCount); err != nil {
 		t.Fatalf("count reuse audits: %v", err)

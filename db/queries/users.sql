@@ -188,8 +188,8 @@ INSERT INTO refresh_tokens (user_id, token_hash, family_id, ip, user_agent, expi
 VALUES ($1, $2, $3, $4, $5, $6);
 
 -- name: CreateHubSession :exec
-INSERT INTO hub_sessions (user_id, token_hash, expires_at)
-VALUES ($1, $2, $3);
+INSERT INTO hub_sessions (user_id, token_hash, family_id, expires_at)
+VALUES ($1, $2, $3, $4);
 
 -- name: GetHubSessionUser :one
 SELECT s.user_id
@@ -210,6 +210,19 @@ INSERT INTO authorization_codes (id, user_id, application_id, code_hash, redirec
 SELECT $1, $2, id, $3, $4, $5, $6
 FROM applications
 WHERE client_id = $7 AND redirect_uri = $4;
+
+-- name: GetOAuthApplication :one
+SELECT client_id, redirect_uri, allowed_origin
+FROM applications
+WHERE client_id = $1;
+
+-- name: PurgeAuthorizationCodes :execrows
+DELETE FROM authorization_codes
+WHERE expires_at <= now() OR used_at IS NOT NULL;
+
+-- name: PurgeHubSessions :execrows
+DELETE FROM hub_sessions
+WHERE expires_at <= now() OR revoked_at IS NOT NULL;
 
 -- name: GetAuthorizationCodeForUpdate :one
 SELECT c.id, c.user_id, a.client_id, c.redirect_uri, c.code_challenge, c.expires_at
@@ -270,11 +283,17 @@ ORDER BY max(COALESCE(history.last_used_at, history.created_at)) DESC;
 WITH revoked AS (
     UPDATE refresh_tokens
     SET status = 'revoked'
-    WHERE user_id = $1
-      AND family_id = $2
-      AND status = 'active'
-      AND expires_at > now()
+    WHERE refresh_tokens.user_id = $1
+      AND refresh_tokens.family_id = $2
+      AND refresh_tokens.status = 'active'
+      AND refresh_tokens.expires_at > now()
     RETURNING 1
+), revoked_hub_session AS (
+    UPDATE hub_sessions
+    SET revoked_at = now()
+    WHERE family_id = $2
+      AND revoked_at IS NULL
+      AND EXISTS (SELECT 1 FROM revoked)
 )
 SELECT EXISTS (SELECT 1 FROM revoked) AS revoked;
 
@@ -282,9 +301,15 @@ SELECT EXISTS (SELECT 1 FROM revoked) AS revoked;
 WITH revoked AS (
     UPDATE refresh_tokens
     SET status = 'revoked'
-    WHERE family_id = $1
-      AND status <> 'revoked'
+    WHERE refresh_tokens.family_id = $1
+      AND refresh_tokens.status <> 'revoked'
     RETURNING 1
+), revoked_hub_session AS (
+    UPDATE hub_sessions
+    SET revoked_at = now()
+    WHERE family_id = $1
+      AND revoked_at IS NULL
+      AND EXISTS (SELECT 1 FROM revoked)
 )
 SELECT count(*)::bigint FROM revoked;
 

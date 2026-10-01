@@ -580,7 +580,13 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 - Commit: `9c3b070`
 
 ### T9-fix — Observaciones de la revisión nativa de T9
-- [ ] Estado · Ejecutor: por decidir · Depende de: T9
+- [x] Estado · Ejecutor: `Codex` (implementa) + Claude (integración con PostgreSQL real, lint, revisión) · Depende de: T9
+- Decisión (2026-09-30, con el usuario): el bloqueo de cuenta **no** revoca `hub_sessions` (ya lo
+  cubre `GetHubSessionUser` con `u.status = 'active'`; revocar daría a un atacante un modo de
+  cerrar el Hub de la víctima con intentos fallidos). RF-016 y la detección de reuso de refresh
+  revocan **solo** la sesión del Hub de su familia: migración `000008` agrega `family_id` a
+  `hub_sessions` (se crea junto a la familia en `mfa.go`). Logout y reseteo de contraseña siguen
+  revocando todas las del usuario.
 - Riesgo: revisar qué otros caminos que cortan sesiones (revocación de RF-016, reuso de refresh,
   bloqueo de cuenta) deben revocar también `hub_sessions` (hallazgo R1 en `mfa.go`, creación de la
   sesión del Hub).
@@ -592,7 +598,30 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
   de autorización duplicada entre handler y servicio, rama muerta al armar `continue`, centinela
   engañoso en `GetHubSessionUser` (usa `ErrAuthorizationCodeInvalid`), cotas de PKCE sin nombre,
   estado de RF-020 en la matriz de trazabilidad por revisar; prueba unitaria de MFA de la sesión Hub.
-- Commit: —
+- Resultado (2026-09-30): migración `000008_hub_session_refresh_family` (`family_id` + índice
+  parcial); `RevokeActiveRefreshSession` y `RevokeRefreshFamily` revocan en la misma sentencia la
+  sesión del Hub de esa familia; `ErrHubSessionInvalid` propio y error de base → 500 RFC 7807;
+  canje, lectura de roles y auditoría en una sola transacción (`WithinAuthorizationCodeTransaction`);
+  `writeOAuthServerError` registra los 500 sin códigos ni tokens; `ValidateOAuthClient` hace fallar
+  el arranque si el cliente configurado no coincide con la fila sembrada; validación de autorización
+  única en `oauth.Service`; constantes PKCE con nombre; rama muerta de `continue` eliminada; RF-020
+  pasa a completo en la matriz. Purga: consultas `PurgeAuthorizationCodes`/`PurgeHubSessions` y
+  métodos del store con prueba de integración; **no se cablearon** porque no existe un mecanismo
+  periódico (queda pendiente decidir dónde correrlas).
+- Ejecución: el job de Codex murió a mitad (se cortó al llegar el reenviador a su límite de 30 min)
+  y no entregó informe final; el código lo dejó completo, pero **no hay evidencia RED registrada**
+  de TDD. Claude verificó: `go build`, `go vet` (con y sin tag), `go test ./...`, integración real
+  `go test -race -tags=integration -p 1 -count=1 ./...` contra PostgreSQL desechable (todo `ok`,
+  incluidas `TestRF017_CuentaBloqueadaNoAutorizaConSesionHubExistente`,
+  `TestRF020_PostgresPurgaCodigosYSesionesHubInutilizables`,
+  `TestRF016_ListarYRevocarUnaFamiliaSinAfectarOtra` y `TestRF006_ReusoDeTokenRotadoRevocaLaFamilia`),
+  `make gen` sin diferencias, `golangci-lint` 0 issues.
+- Residual anotado: la firma del access token ocurre después del commit del canje; si fallara, el
+  código queda gastado (firma en memoria, fallo improbable). Las sesiones del Hub previas a `000008`
+  tienen `family_id` nulo y solo las revocan logout y reseteo.
+- Fuera de alcance: `golangci-lint --build-tags=integration` marca `errcheck` en
+  `internal/testdb/testdb.go:52` (`dropDatabase` sin comprobar), previo a esta tarea (`6954cba`).
+- Commit: (este)
 
 ### T10 — Pendientes chicos de la semana 2
 - [ ] Estado · Ejecutor: `Codex`
@@ -683,7 +712,7 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 
 ## Siguiente paso
 
-T9-fix (observaciones de la revisión nativa de T9) y T10 (pendientes chicos); con eso cierra la fase 1 y toca el PR de corte.
+T10 (pendientes chicos); con eso cierra la fase 1 y toca el PR de corte. T9-fix cerrada el 2026-09-30.
 
 ## Cambios de spec propuestos
 

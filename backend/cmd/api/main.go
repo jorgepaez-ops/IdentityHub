@@ -118,6 +118,10 @@ func run() error {
 		return fmt.Errorf("create token service: %w", err)
 	}
 	password.Configure(cfg.Argon2)
+	oauthClient := oauth.Client{ID: cfg.OAuthClientID, RedirectURI: cfg.OAuthRedirectURI, Origin: cfg.OAuthClientOrigin}
+	if err := db.ValidateOAuthClient(ctx, oauthClient); err != nil {
+		return fmt.Errorf("validate OAuth client registration: %w", err)
+	}
 
 	employeeService := employee.New(db, broker, passwordHasher{}, rand.Reader, time.Now)
 	invitationService := invitation.New(db, broker, passwordHasher{})
@@ -143,7 +147,6 @@ func run() error {
 	server.SetPasswordResetService(passwordreset.New(db, broker, passwordHasher{}, rand.Reader, time.Now).WithLogger(logger))
 	server.SetLoginService(loginService)
 	server.SetMFAService(mfaService, cfg.RefreshTTL)
-	oauthClient := oauth.Client{ID: cfg.OAuthClientID, RedirectURI: cfg.OAuthRedirectURI, Origin: cfg.OAuthClientOrigin}
 	server.SetOAuthService(oauth.New(db.OAuthRepository(), oauthClient, rand.Reader, time.Now), db.OAuthRepository(), oauthClient, cfg.PublicBaseURL+"/login", cfg.HubSessionTTL)
 	server.SetRefreshService(refreshService)
 	server.SetSessionService(session.New(db))

@@ -97,6 +97,7 @@ type RefreshToken struct {
 type HubSession struct {
 	UserID    uuid.UUID
 	TokenHash []byte
+	FamilyID  uuid.UUID
 	ExpiresAt time.Time
 }
 
@@ -284,7 +285,7 @@ func (s *Service) Verify(ctx context.Context, input VerifyInput) (Result, error)
 				return fmt.Errorf("generate hub session token: %w", err)
 			}
 			hubHash := sha256.Sum256(hubRaw)
-			if err := w.CreateHubSession(ctx, HubSession{UserID: challenge.User.ID, TokenHash: hubHash[:], ExpiresAt: now.Add(s.hubSessionTTL)}); err != nil {
+			if err := w.CreateHubSession(ctx, HubSession{UserID: challenge.User.ID, TokenHash: hubHash[:], FamilyID: familyID, ExpiresAt: now.Add(s.hubSessionTTL)}); err != nil {
 				return fmt.Errorf("create hub session: %w", err)
 			}
 			hubSessionToken = base64.RawURLEncoding.EncodeToString(hubRaw)

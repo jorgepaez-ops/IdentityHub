@@ -136,7 +136,7 @@ func (w *mfaWriter) CreateRefreshToken(ctx context.Context, token mfa.RefreshTok
 }
 
 func (w *mfaWriter) CreateHubSession(ctx context.Context, session mfa.HubSession) error {
-	if err := w.queries.CreateHubSession(ctx, generated.CreateHubSessionParams{UserID: session.UserID, TokenHash: session.TokenHash, ExpiresAt: pgtype.Timestamptz{Time: session.ExpiresAt, Valid: true}}); err != nil {
+	if err := w.queries.CreateHubSession(ctx, generated.CreateHubSessionParams{UserID: session.UserID, TokenHash: session.TokenHash, FamilyID: pgtype.UUID{Bytes: session.FamilyID, Valid: true}, ExpiresAt: pgtype.Timestamptz{Time: session.ExpiresAt, Valid: true}}); err != nil {
 		return fmt.Errorf("create hub session: %w", err)
 	}
 	return nil

@@ -48,6 +48,21 @@ func TestRF016_ListarYRevocarUnaFamiliaSinAfectarOtra(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	for _, item := range []struct {
+		userID, familyID uuid.UUID
+		hash             byte
+	}{
+		{owner.ID, ownerFamily, 3},
+		{other.ID, otherFamily, 4},
+	} {
+		tokenHash := make([]byte, 32)
+		for index := range tokenHash {
+			tokenHash[index] = item.hash
+		}
+		if _, err := pool.Exec(ctx, `INSERT INTO hub_sessions (user_id, token_hash, family_id, expires_at) VALUES ($1, $2, $3, $4)`, item.userID, tokenHash, item.familyID, time.Now().Add(time.Hour)); err != nil {
+			t.Fatal(err)
+		}
+	}
 
 	service := session.New(repository)
 	items, err := service.List(ctx, owner.ID)
@@ -59,6 +74,13 @@ func TestRF016_ListarYRevocarUnaFamiliaSinAfectarOtra(t *testing.T) {
 	}
 	if err := service.Revoke(ctx, owner.ID, ownerFamily); err != nil {
 		t.Fatal(err)
+	}
+	var revokedOwnerHub, revokedOtherHub bool
+	if err := pool.QueryRow(ctx, `SELECT revoked_at IS NOT NULL FROM hub_sessions WHERE family_id = $1`, ownerFamily).Scan(&revokedOwnerHub); err != nil || !revokedOwnerHub {
+		t.Fatalf("owner hub session revoked=%t err=%v", revokedOwnerHub, err)
+	}
+	if err := pool.QueryRow(ctx, `SELECT revoked_at IS NOT NULL FROM hub_sessions WHERE family_id = $1`, otherFamily).Scan(&revokedOtherHub); err != nil || revokedOtherHub {
+		t.Fatalf("other hub session revoked=%t err=%v", revokedOtherHub, err)
 	}
 	items, err = service.List(ctx, owner.ID)
 	if err != nil || len(items) != 0 {

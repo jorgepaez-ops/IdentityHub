@@ -126,6 +126,20 @@ func TestRF015_TrasRestablecerContrasenaLaSesionHubYaNoEmiteCodigos(t *testing.T
 	}
 }
 
+func TestRF017_CuentaBloqueadaNoAutorizaConSesionHubExistente(t *testing.T) {
+	fixture := newHubFixture(t, "hub-locked@example.test")
+	if _, err := fixture.pool.Exec(context.Background(), `UPDATE users SET status = 'locked' WHERE id = $1`, fixture.userID); err != nil {
+		t.Fatal(err)
+	}
+	var retainedHubSessions int
+	if err := fixture.pool.QueryRow(context.Background(), `SELECT count(*) FROM hub_sessions WHERE user_id = $1 AND revoked_at IS NULL`, fixture.userID).Scan(&retainedHubSessions); err != nil || retainedHubSessions != 1 {
+		t.Fatalf("unrevoked hub sessions=%d err=%v, want the existing session retained while locked", retainedHubSessions, err)
+	}
+	if fixture.authorize(t) {
+		t.Fatal("locked user hub session must redirect to login")
+	}
+}
+
 type resetPublisher struct{}
 
 func (resetPublisher) Publish(context.Context, string, any) error { return nil }

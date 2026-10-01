@@ -181,6 +181,7 @@ type HubSession struct {
 	ExpiresAt pgtype.Timestamptz
 	RevokedAt pgtype.Timestamptz
 	CreatedAt pgtype.Timestamptz
+	FamilyID  pgtype.UUID
 }
 
 type MfaChallenge struct {

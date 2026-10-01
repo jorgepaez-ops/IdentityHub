@@ -23,13 +23,13 @@ declaración de buenas intenciones.
 | **RF-011** | Registro de auditoría | P0 | `listAuditLog` | 1 | 9 | — | ✅ completo |
 | **RF-012** | Notificaciones asíncronas | P0 | — | 1 | 9 | — | ✅ completo |
 | **RF-013** | Segundo factor obligatorio por correo | P1 | — | 1 | 5 | — | ✅ completo |
-| **RF-014** | Inicio de sesión con segundo factor | P1 | `verifyMfa`, `resendMfaCode` | 5 | 34 | — | ✅ completo |
+| **RF-014** | Inicio de sesión con segundo factor | P1 | `verifyMfa`, `resendMfaCode` | 5 | 35 | — | ✅ completo |
 | **RF-015** | Restablecimiento de contraseña | P1 | `requestPasswordReset`, `confirmPasswordReset` | 3 | 33 | — | ✅ completo |
 | **RF-016** | Sesiones activas | P1 | `listSessions`, `revokeSession` | 1 | 8 | — | ✅ completo |
-| **RF-017** | Bloqueo por fuerza bruta | P1 | — | 4 | 21 | — | ✅ completo |
+| **RF-017** | Bloqueo por fuerza bruta | P1 | — | 4 | 22 | — | ✅ completo |
 | **RF-018** | Claves de servicio | P2 | — | — | — | — | ⏳ diferido (semana 3) |
 | **RF-019** | Exportación del audit log | P2 | — | — | — | — | ⏳ diferido (semana 3) |
-| **RF-020** | Autorización de aplicaciones cliente | P1 | `authorizeClient`, `exchangeAuthorizationCode` | 10 | 19 | — | ⏳ diferido (semana 3) |
+| **RF-020** | Autorización de aplicaciones cliente | P1 | `authorizeClient`, `exchangeAuthorizationCode` | 10 | 24 | — | ✅ completo |
 | **RNF-001** | Contenerización total | P0 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-002** | Pipeline de ciclo completo | P0 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-003** | Cero secretos en el repositorio | P0 | — | — | 4 | — | 🟡 parcial |
@@ -43,7 +43,7 @@ declaración de buenas intenciones.
 | **RNF-011** | Los specs son la fuente de verdad | P0 | — | — | 4 | — | 🟡 parcial |
 | **RNF-012** | Logs sin datos sensibles | P0 | — | — | 3 | — | 🟡 parcial |
 
-**Resumen:** 32 requisitos · 16 completos · 6 parciales · 7 sin cubrir · 3 diferidos (semana 3).
+**Resumen:** 32 requisitos · 17 completos · 6 parciales · 7 sin cubrir · 2 diferidos (semana 3).
 
 Leyenda de estado: *completo* = verificado por al menos dos de las tres
 columnas de prueba · *parcial* = una sola · *sin cubrir* = ninguna · *diferido (semana 3)* = backlog de semana 3 por decisión Q14.

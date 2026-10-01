@@ -6,7 +6,6 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
-	"strings"
 
 	"github.com/jorgepaez/identity-hub/internal/auth/oauth"
 	"github.com/jorgepaez/identity-hub/internal/auth/token"
@@ -24,8 +23,8 @@ func (s *Server) authorizeClient(w http.ResponseWriter, r *http.Request, params 
 		writeProblem(w, http.StatusBadRequest, "oauth-invalid-request", "Bad Request", "The OAuth request is invalid.")
 		return
 	}
-	if !s.validOAuthRequest(input) {
-		if input.ClientID == s.oauthClient.ID && input.RedirectURI == s.oauthClient.RedirectURI {
+	if err := s.oauth.ValidateAuthorizeInput(input); err != nil {
+		if s.oauth.IsTrustedClient(input) {
 			s.redirectOAuthInvalid(w, r, input.State)
 			return
 		}
@@ -44,38 +43,22 @@ func (s *Server) authorizeClient(w http.ResponseWriter, r *http.Request, params 
 	}
 	hash := sha256.Sum256(raw)
 	userID, err := s.hubSessions.GetHubSessionUser(r.Context(), hash[:])
-	if err != nil {
+	if errors.Is(err, oauth.ErrHubSessionInvalid) {
 		s.redirectToHubLogin(w, r)
+		return
+	}
+	if err != nil {
+		s.writeOAuthServerError(w, "hub_session_lookup", "oauth-session-failed", "The Hub session could not be verified.", err)
 		return
 	}
 	result, err := s.oauth.Authorize(r.Context(), userID, input)
 	if err != nil {
-		writeProblem(w, http.StatusInternalServerError, "oauth-authorization-failed", "Internal Server Error", "The authorization code could not be issued.")
+		s.writeOAuthServerError(w, "authorize", "oauth-authorization-failed", "The authorization code could not be issued.", err)
 		return
 	}
 	http.Redirect(w, r, s.clientRedirectURL(url.Values{"code": {result.Code}, "state": {input.State}}), http.StatusFound)
 }
 
-func (s *Server) validOAuthRequest(input oauth.AuthorizeInput) bool {
-	return input.ClientID == s.oauthClient.ID && input.RedirectURI == s.oauthClient.RedirectURI && input.ResponseType == "code" && input.State != "" && validPKCEChallenge(input.CodeChallenge) && input.CodeChallengeMethod == "S256"
-}
-func validPKCEChallenge(value string) bool {
-	return validPKCE(value, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_")
-}
-func validPKCEVerifier(value string) bool {
-	return validPKCE(value, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
-}
-func validPKCE(value, alphabet string) bool {
-	if len(value) < 43 || len(value) > 128 {
-		return false
-	}
-	for _, character := range value {
-		if !strings.ContainsRune(alphabet, character) {
-			return false
-		}
-	}
-	return true
-}
 func (s *Server) redirectOAuthError(w http.ResponseWriter, r *http.Request) bool {
 	if s.oauth == nil || s.oauthRedirect == nil {
 		return false
@@ -117,11 +100,7 @@ func hasDuplicateOAuthParameter(query url.Values) bool {
 	return false
 }
 func (s *Server) redirectToHubLogin(w http.ResponseWriter, r *http.Request) {
-	continuePath := r.URL.EscapedPath()
-	if continuePath != "/oauth/authorize" {
-		continuePath = "/oauth/authorize"
-	}
-	target := continuePath + "?" + r.URL.Query().Encode()
+	target := "/oauth/authorize?" + r.URL.Query().Encode()
 	login, err := url.Parse(s.oauthLoginURL)
 	if err != nil || !login.IsAbs() {
 		writeProblem(w, http.StatusServiceUnavailable, "oauth-unavailable", "Service Unavailable", "OAuth is temporarily unavailable.")
@@ -139,7 +118,7 @@ func (s *Server) exchangeAuthorizationCode(w http.ResponseWriter, r *http.Reques
 		writeProblem(w, http.StatusServiceUnavailable, "oauth-unavailable", "Service Unavailable", "OAuth is temporarily unavailable.")
 		return
 	}
-	if err := r.ParseForm(); err != nil || r.PostForm.Get("grant_type") != "authorization_code" || !validPKCEVerifier(r.PostForm.Get("code_verifier")) {
+	if err := r.ParseForm(); err != nil || r.PostForm.Get("grant_type") != "authorization_code" || !oauth.ValidPKCEVerifier(r.PostForm.Get("code_verifier")) {
 		writeProblem(w, http.StatusBadRequest, "oauth-invalid-request", "Bad Request", "The OAuth request is invalid.")
 		return
 	}
@@ -149,16 +128,26 @@ func (s *Server) exchangeAuthorizationCode(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	if err != nil {
-		writeProblem(w, http.StatusInternalServerError, "oauth-token-failed", "Internal Server Error", "The authorization code could not be exchanged.")
+		s.writeOAuthServerError(w, "exchange", "oauth-token-failed", "The authorization code could not be exchanged.", err)
 		return
 	}
 	access, err := s.tokens.IssueForAudience(result.UserID.String(), result.Roles, s.oauthClient.ID)
 	if err != nil {
-		writeProblem(w, http.StatusInternalServerError, "oauth-token-failed", "Internal Server Error", "The access token could not be issued.")
+		s.writeOAuthServerError(w, "issue_access_token", "oauth-token-failed", "The access token could not be issued.", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, OAuthTokenResponse{AccessToken: access, TokenType: OAuthTokenResponseTokenType("Bearer"), ExpiresIn: token.AccessTokenExpiresIn})
 }
+
+// writeOAuthServerError logs only server-side failure context. Request values
+// such as authorization codes, PKCE verifiers and tokens are never logged.
+func (s *Server) writeOAuthServerError(w http.ResponseWriter, operation, problemType, detail string, err error) {
+	if s.logger != nil {
+		s.logger.Error("oauth request failed", "operation", operation, "error", err)
+	}
+	writeProblem(w, http.StatusInternalServerError, problemType, "Internal Server Error", detail)
+}
+
 func hubSessionCookie(value string, maxAge int) *http.Cookie {
 	return &http.Cookie{Name: hubSessionCookieName, Value: value, Path: "/oauth", MaxAge: maxAge, HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode}
 }

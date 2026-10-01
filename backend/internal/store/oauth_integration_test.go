@@ -173,6 +173,34 @@ func TestRF020_PostgresReusoDeCodigoAuditaConElPropietarioComoActor(t *testing.T
 	}
 }
 
+func TestRF020_PostgresPurgaCodigosYSesionesHubInutilizables(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test requires a PostgreSQL server")
+	}
+	ctx := context.Background()
+	pool := testdb.New(t)
+	repository, err := store.NewWithPool(pool)
+	if err != nil {
+		t.Fatal(err)
+	}
+	user, err := repository.CreateUser(ctx, store.CreateUserParams{Email: "oauth-purge@example.test", PasswordHash: "$argon2id$fixed-test-value", DisplayName: "Purge"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO authorization_codes (user_id, application_id, code_hash, redirect_uri, code_challenge, expires_at, used_at) SELECT $1, id, $2, redirect_uri, 'challenge', $3, $4 FROM applications WHERE client_id = 'contabilidad'`, user.ID, bytes.Repeat([]byte{1}, 32), time.Now().Add(-time.Hour), time.Now().Add(-time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO hub_sessions (user_id, token_hash, expires_at, revoked_at) VALUES ($1,$2,$3,$4)`, user.ID, bytes.Repeat([]byte{2}, 32), time.Now().Add(-time.Hour), time.Now().Add(-time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if count, err := repository.PurgeAuthorizationCodes(ctx); err != nil || count != 1 {
+		t.Fatalf("purged authorization codes=%d err=%v", count, err)
+	}
+	if count, err := repository.PurgeHubSessions(ctx); err != nil || count != 1 {
+		t.Fatalf("purged hub sessions=%d err=%v", count, err)
+	}
+}
+
 func challengeForIntegration(verifier string) string {
 	sum := sha256.Sum256([]byte(verifier))
 	return base64.RawURLEncoding.EncodeToString(sum[:])

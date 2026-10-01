@@ -153,6 +153,17 @@ func TestRF014_CodigoCorrectoSeConsumeYEmiteTokens(t *testing.T) {
 	}
 }
 
+func TestRF014_VerificacionCreaSesionHubConLaFamiliaRefresh(t *testing.T) {
+	repo := &memoryRepository{challenge: activeChallenge("123456", MaxAttempts)}
+	service := newVerifier(t, repo, &fakePublisher{}).WithHubSessionTTL(time.Hour)
+	if _, err := service.Verify(context.Background(), VerifyInput{Token: encodedToken(), Code: "123456"}); err != nil {
+		t.Fatal(err)
+	}
+	if repo.hubSession.FamilyID == uuid.Nil || repo.hubSession.FamilyID != repo.refresh.FamilyID {
+		t.Fatalf("hub family=%s refresh family=%s", repo.hubSession.FamilyID, repo.refresh.FamilyID)
+	}
+}
+
 func TestRF014_VerificacionConservaIPConfiableYAgenteEnLaSesionRefresh(t *testing.T) {
 	ip := netip.MustParseAddr("203.0.113.8")
 	userAgent := "Identity Hub test client"
@@ -298,6 +309,7 @@ type memoryRepository struct {
 	resentHash               []byte
 	consumed                 bool
 	refresh                  RefreshToken
+	hubSession               HubSession
 	audits                   []AuditEvent
 	priorFailures            int64
 	locked                   bool
@@ -349,7 +361,10 @@ func (r *memoryRepository) ConsumeChallenge(context.Context, uuid.UUID) error {
 	r.challenge.Used = true
 	return nil
 }
-func (r *memoryRepository) CreateHubSession(context.Context, HubSession) error { return nil }
+func (r *memoryRepository) CreateHubSession(_ context.Context, session HubSession) error {
+	r.hubSession = session
+	return nil
+}
 func (r *memoryRepository) RejectChallenge(context.Context, uuid.UUID) (int, error) {
 	r.challenge.AttemptsLeft--
 	if r.challenge.AttemptsLeft == 0 {

@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -18,10 +19,21 @@ import (
 
 const AuthorizationCodeTTL = time.Minute
 
+const (
+	PKCEVerifierMinLength  = 43
+	PKCEVerifierMaxLength  = 128
+	PKCEChallengeMinLength = 43
+	PKCEChallengeMaxLength = 128
+)
+
 var (
 	ErrInvalidClient            = errors.New("oauth client is invalid")
 	ErrInvalidRequest           = errors.New("oauth request is invalid")
 	ErrAuthorizationCodeInvalid = errors.New("authorization code is invalid")
+	// ErrHubSessionInvalid intentionally does not share the authorization-code
+	// sentinel: callers redirect to login only for an absent, expired, revoked,
+	// or inactive Hub session; database failures remain server errors.
+	ErrHubSessionInvalid = errors.New("hub session is invalid")
 	// ErrAuthorizationCodeReused is returned by the repository, together with the
 	// code owner in StoredCode.UserID, when the hash matches an already used code.
 	ErrAuthorizationCodeReused = errors.New("authorization code was already used")
@@ -59,6 +71,10 @@ type AuditEvent struct {
 
 type Repository interface {
 	CreateAuthorizationCode(context.Context, CreateCode) error
+	InsertAuditEvent(context.Context, AuditEvent) error
+	WithinAuthorizationCodeTransaction(context.Context, func(ExchangeWriter) error) error
+}
+type ExchangeWriter interface {
 	ExchangeAuthorizationCode(context.Context, []byte, string, string, string, time.Time) (StoredCode, error)
 	ListRolesForUser(context.Context, uuid.UUID) ([]string, error)
 	InsertAuditEvent(context.Context, AuditEvent) error
@@ -85,11 +101,8 @@ func New(repository Repository, client Client, random io.Reader, now func() time
 }
 
 func (s *Service) Authorize(ctx context.Context, userID uuid.UUID, input AuthorizeInput) (AuthorizeResult, error) {
-	if input.ClientID != s.client.ID || input.RedirectURI != s.client.RedirectURI {
-		return AuthorizeResult{}, ErrInvalidClient
-	}
-	if input.ResponseType != "code" || input.State == "" || input.CodeChallenge == "" || input.CodeChallengeMethod != "S256" {
-		return AuthorizeResult{}, ErrInvalidRequest
+	if err := s.ValidateAuthorizeInput(input); err != nil {
+		return AuthorizeResult{}, err
 	}
 	raw := make([]byte, 32)
 	if _, err := io.ReadFull(s.random, raw); err != nil {
@@ -119,24 +132,83 @@ func (s *Service) Exchange(ctx context.Context, input ExchangeInput) (ExchangeRe
 	now := s.now().UTC()
 	challenge := sha256.Sum256([]byte(input.CodeVerifier))
 	encoded := base64.RawURLEncoding.EncodeToString(challenge[:])
-	code, err := s.repository.ExchangeAuthorizationCode(ctx, hash[:], input.ClientID, input.RedirectURI, encoded, now)
-	switch {
-	case errors.Is(err, ErrAuthorizationCodeReused):
-		if auditErr := s.repository.InsertAuditEvent(ctx, AuditEvent{ActorUserID: code.UserID, Action: "authorization_code_reused"}); auditErr != nil {
-			return ExchangeResult{}, fmt.Errorf("audit reused authorization code: %w", auditErr)
+	var result ExchangeResult
+	var domainErr error
+	err = s.repository.WithinAuthorizationCodeTransaction(ctx, func(writer ExchangeWriter) error {
+		code, exchangeErr := writer.ExchangeAuthorizationCode(ctx, hash[:], input.ClientID, input.RedirectURI, encoded, now)
+		switch {
+		case errors.Is(exchangeErr, ErrAuthorizationCodeReused):
+			if auditErr := writer.InsertAuditEvent(ctx, AuditEvent{ActorUserID: code.UserID, Action: "authorization_code_reused"}); auditErr != nil {
+				return fmt.Errorf("audit reused authorization code: %w", auditErr)
+			}
+			domainErr = ErrAuthorizationCodeInvalid
+			return nil
+		case errors.Is(exchangeErr, ErrAuthorizationCodeInvalid):
+			domainErr = ErrAuthorizationCodeInvalid
+			return nil
+		case exchangeErr != nil:
+			return fmt.Errorf("exchange authorization code: %w", exchangeErr)
 		}
-		return ExchangeResult{}, ErrAuthorizationCodeInvalid
-	case errors.Is(err, ErrAuthorizationCodeInvalid):
-		return ExchangeResult{}, ErrAuthorizationCodeInvalid
-	case err != nil:
-		return ExchangeResult{}, fmt.Errorf("exchange authorization code: %w", err)
-	}
-	userRoles, err := s.repository.ListRolesForUser(ctx, code.UserID)
+		userRoles, rolesErr := writer.ListRolesForUser(ctx, code.UserID)
+		if rolesErr != nil {
+			return fmt.Errorf("list application roles: %w", rolesErr)
+		}
+		if auditErr := writer.InsertAuditEvent(ctx, AuditEvent{ActorUserID: code.UserID, Action: "authorization_code_exchanged"}); auditErr != nil {
+			return fmt.Errorf("audit authorization code exchange: %w", auditErr)
+		}
+		result = ExchangeResult{UserID: code.UserID, Roles: roles.ForApplication(userRoles, s.client.ID)}
+		return nil
+	})
 	if err != nil {
-		return ExchangeResult{}, fmt.Errorf("list application roles: %w", err)
+		return ExchangeResult{}, err
 	}
-	if err := s.repository.InsertAuditEvent(ctx, AuditEvent{ActorUserID: code.UserID, Action: "authorization_code_exchanged"}); err != nil {
-		return ExchangeResult{}, fmt.Errorf("audit authorization code exchange: %w", err)
+	if domainErr != nil {
+		return ExchangeResult{}, domainErr
 	}
-	return ExchangeResult{UserID: code.UserID, Roles: roles.ForApplication(userRoles, s.client.ID)}, nil
+	return result, nil
+}
+
+// ValidateAuthorizeInput is the one validation source used by both the HTTP
+// adapter and the service, preventing redirect and issuance rules drifting.
+func (s *Service) ValidateAuthorizeInput(input AuthorizeInput) error {
+	if !s.IsTrustedClient(input) {
+		return ErrInvalidClient
+	}
+	if input.ResponseType != "code" || input.State == "" || !validPKCEChallenge(input.CodeChallenge) || input.CodeChallengeMethod != "S256" {
+		return ErrInvalidRequest
+	}
+	return nil
+}
+
+func (s *Service) IsTrustedClient(input AuthorizeInput) bool {
+	return input.ClientID == s.client.ID && input.RedirectURI == s.client.RedirectURI
+}
+
+// ValidateRegisteredClient prevents the fixed deployment configuration and
+// seeded application registry from silently drifting apart at startup.
+func ValidateRegisteredClient(configured, registered Client) error {
+	if configured.ID != registered.ID || configured.RedirectURI != registered.RedirectURI || configured.Origin != registered.Origin {
+		return fmt.Errorf("registered OAuth client does not match configured client")
+	}
+	return nil
+}
+
+func validPKCEChallenge(value string) bool {
+	return validPKCE(value, PKCEChallengeMinLength, PKCEChallengeMaxLength, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_")
+}
+
+func ValidPKCEVerifier(value string) bool {
+	return validPKCE(value, PKCEVerifierMinLength, PKCEVerifierMaxLength, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
+}
+
+func validPKCE(value string, minLength, maxLength int, alphabet string) bool {
+	if len(value) < minLength || len(value) > maxLength {
+		return false
+	}
+	for _, character := range value {
+		if !strings.ContainsRune(alphabet, character) {
+			return false
+		}
+	}
+	return true
 }
