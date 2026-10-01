@@ -192,10 +192,18 @@ dinámico de clientes, consentimiento, `id_token`), TOTP/WebAuthn, correo real p
   recuperar cuentas (incluido el desbloqueo de D13), que un broker lento retenga conexiones y que se
   envíe un aviso de un cambio revertido. Costo aceptado: un aviso puede perderse. Enmienda la
   ADR 0006 para estos dos flujos; el outbox transaccional se descarta por tamaño (mejora posible).
+- **D17 · Primer admin por invitación al arrancar (2026-10-01, usuario).** Sin autorregistro (T5)
+  ni semilla, un sistema recién levantado no tiene quien entre a la consola (lo detectó la
+  verificación de T12a, que tuvo que crear cuentas a mano en la base local). Variable opcional
+  `BOOTSTRAP_ADMIN_EMAIL`: al arrancar, si no existe ningún admin, la API crea esa cuenta como
+  pendiente con rol `admin` y le envía la invitación por el mismo camino de T5 (llega a Mailpit). Sin
+  contraseñas en variables ni en el repo (RNF-003); si ya hay un admin, no hace nada y lo registra
+  en el log. Se descartaron un comando manual (paso extra en la demo y en CI) y una semilla con
+  cuentas demo (credenciales conocidas). Lo implementa T12d.
 
 ## Preguntas abiertas
 
-Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, del usuario al cerrar T6; D15, consulta de Codex en T7; D16, de la revisión nativa de T7.
+Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, del usuario al cerrar T6; D15, consulta de Codex en T7; D16, de la revisión nativa de T7; D17, del usuario al verificar T12a.
 
 ---
 
@@ -724,12 +732,31 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
   (`/verify-email?token=…`, Q15), definir contraseña, restablecer, perfil y sesiones. Refresh
   compartido entre pestañas (Web Locks o `BroadcastChannel`).
 - Plan (Claude, 2026-10-01), tres commits de unidad de trabajo, cada uno con sus pruebas Vitest:
-  - [ ] T12a — Base: enrutado con `react-router-dom`, cliente de API tipado con `schema.d.ts`
+  - [x] T12a — Base: enrutado con `react-router-dom`, cliente de API tipado con `schema.d.ts`
     (errores RFC 7807), access token solo en memoria y refresh por la cookie `HttpOnly`; refresh
     serializado entre pestañas con Web Locks (dos pestañas que rotan a la vez dispararían la
     detección de reuso de RF-006 y revocarían la familia); login con correo y contraseña → 202 →
     pantalla de código MFA (verificar y reenviar; 401, 423, 429 y 503 con mensajes propios);
     cerrar sesión. Tras el login, un admin entra a la consola y el resto a "Mi cuenta".
+    Hecho (2026-10-01, Codex; revisó, verificó y commiteó Claude). Commit `7c9c3a7`. TDD: RED
+    11/11 y luego 4/16 con las correcciones de revisión, GREEN 17/17; lint, tipos y build ok. Claude
+    corrigió en la revisión el mensaje de un 401 en el paso MFA (decía "correo o contraseña") y los
+    prefijos de requisito de las pruebas; GGA pidió usar el tipo generado `MfaChallenge`.
+    Verificación en el stack real (Sonnet, Chromium): login, código desde Mailpit, consola para el
+    admin y "Mi cuenta" para el resto, sesión restaurada al recargar, dos pestañas recargando a la
+    vez sin evento de reuso (12 rotaciones, ninguna revocación salvo el logout), logout, mensajes de
+    código y de credenciales; sin errores de consola ni violaciones de CSP. Cuentas de prueba creadas
+    a mano en la base local (de ahí D17). Revisión nativa (medio, 5 archivos, 779 líneas, una
+    lente): **aprobada** y acusada (`review-758fe75ab4475b76`), con observaciones que pasan a
+    T12a-fix.
+  - [ ] T12a-fix — Observaciones de la revisión de T12a: un 2xx sin cuerpo rompe `request()`
+    (confirmado: el 202 de `mfa/resend` no tiene cuerpo, así que un reenvío correcto muestra "No se
+    pudo conectar"); el `BroadcastChannel` del token se reenvía a la misma pestaña (dos instancias
+    con el mismo nombre); si `mfa/verify` sale bien y falla `GET /me`, el mensaje culpa al código;
+    `TestRF007_LogsOutLocallyWhenRemoteLogoutFails` está fuera del `describe` y no corre su
+    `afterEach`; faltan pruebas del refresh fallido, de la sesión restaurada al montar y de la
+    guarda de `/usuarios`; el reenvío correcto no muestra confirmación. Además, el menú lateral no
+    marca la página activa (visto en la verificación).
   - [ ] T12b — Cuenta: aceptar invitación y definir contraseña (`/invitations/accept?token=…`,
     ruta fijada en T5; sustituye la página `/verify-email` de Q15, que se fue con el autorregistro),
     solicitar y confirmar restablecimiento, perfil (`GET`/`PATCH /me`) y sesiones activas
@@ -741,6 +768,16 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
   externos, así que nada de estilos inline ni Google Fonts: las familias del mockup se declaran con
   pila de respaldo del sistema. Sistema visual del mockup "Identity Hub Console" (acento `#2d4f8f`,
   modo oscuro). Verificación contra el stack real (Docker y Chromium): Claude, al cerrar.
+- Commit: —
+
+### T12d — Primer admin por invitación al arrancar (D17)
+- [ ] Estado · Ejecutor: `Codex` (Go, sin red) · Depende de: T5
+- Al arrancar la API, con `BOOTSTRAP_ADMIN_EMAIL` definido y ningún admin en la base, crear la
+  cuenta pendiente con rol `admin` y encolar su invitación (mismo flujo y auditoría que el alta de
+  T5); idempotente y segura con varias réplicas arrancando a la vez (sin dos invitaciones ni dos
+  cuentas). Variable en `config.go`, compose, `.env.example` (lo edita el usuario) y la guía.
+- Pruebas: sin variable no hace nada; con variable y sin admin crea y encola una sola vez; con un
+  admin existente no hace nada; arranques concurrentes (integración con PostgreSQL real).
 - Commit: —
 
 ### T13 — Aplicación Contabilidad (React, otro dominio)
@@ -784,9 +821,9 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 |---|---|---|
 | 0 — Enmiendas de spec y decisiones | T1 a T3 (3) | 3 (T1 a T3) |
 | 1 — Backend | T4 a T10 (7) | 7 (T4 a T10) |
-| 2 — Dominios locales y frontend | T11 a T13 (3) | 1 (T11) |
+| 2 — Dominios locales y frontend | T11 a T13 + T12d (4) | 1 (T11) |
 | 3 — Verificación, DAST y cierre | T14 a T17 (4) | 0 |
-| **Total** | **17** | **11** |
+| **Total** | **18** | **11** |
 
 ## Siguiente paso
 
