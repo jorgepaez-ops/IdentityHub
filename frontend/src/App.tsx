@@ -1,6 +1,8 @@
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useCallback, useEffect, useState } from 'react'
 import { BrowserRouter, Link, NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { MyAccountPage } from './features/account/MyAccountPage'
+import { AuditLogPage } from './features/admin/AuditLogPage'
+import { UsersPage } from './features/admin/UsersPage'
 import { AcceptInvitationPage, ForgotPasswordPage, ResetPasswordPage } from './features/account/PublicPages'
 import { ApiProblemError, clearSession, type CurrentUser, type MfaChallenge, getCurrentUser, login, logout, refreshSession, resendMfaCode, verifyMfa } from './api/client'
 
@@ -138,6 +140,8 @@ function LoginPage({ onAuthenticated }: { onAuthenticated: (user: CurrentUser) =
 
 function AppShell({ user, onLogout, onUserChange, onSessionEnded }: { user: CurrentUser; onLogout: () => Promise<void>; onUserChange: (user: CurrentUser) => void; onSessionEnded: () => void }) {
   const navigate = useNavigate()
+  const isAdmin = user.roles.includes('admin')
+  const home = isAdmin ? '/usuarios' : '/me'
   const closeSession = async () => {
     try {
       await onLogout()
@@ -152,7 +156,8 @@ function AppShell({ user, onLogout, onUserChange, onSessionEnded }: { user: Curr
       <aside className="left-rail">
         <div className="rail-brand"><span className="small-mark">IH</span><span>Identity Hub<small>Proveedor de identidad</small></span></div>
         <nav aria-label="Navegación principal">
-          {user.roles.includes('admin') && <NavLink to="/usuarios">Usuarios</NavLink>}
+          {isAdmin && <NavLink to="/usuarios">Usuarios</NavLink>}
+          {isAdmin && <NavLink to="/auditoria">Auditoría</NavLink>}
           <NavLink to="/me">Mi cuenta</NavLink>
         </nav>
         <div className="connected-apps"><strong>Aplicaciones conectadas</strong><a href="http://contabilidad.localhost:8080">Contabilidad</a></div>
@@ -160,22 +165,21 @@ function AppShell({ user, onLogout, onUserChange, onSessionEnded }: { user: Curr
       </aside>
       <main className="app-content">
         <Routes>
-          <Route path="/usuarios" element={user.roles.includes('admin') ? <Placeholder title="Usuarios" text="El directorio de usuarios estará disponible próximamente." /> : <Navigate to="/me" replace />} />
+          <Route path="/usuarios" element={isAdmin ? <UsersPage currentUserId={user.id} onSessionEnded={onSessionEnded} /> : <Navigate to="/me" replace />} />
+          <Route path="/auditoria" element={isAdmin ? <AuditLogPage onSessionEnded={onSessionEnded} /> : <Navigate to="/me" replace />} />
           <Route path="/me" element={<MyAccountPage user={user} onUserChange={onUserChange} onSessionEnded={onSessionEnded} />} />
-          <Route path="*" element={<Navigate to={user.roles.includes('admin') ? '/usuarios' : '/me'} replace />} />
+          <Route path="*" element={<Navigate to={home} replace />} />
         </Routes>
       </main>
     </div>
   )
 }
 
-function Placeholder({ title, text }: { title: string; text: string }) {
-  return <section><h1>{title}</h1><p className="muted">{text}</p></section>
-}
-
 function AppRoutes() {
   const [user, setUser] = useState<CurrentUser | null>(null)
   const [restoring, setRestoring] = useState(true)
+  // Stable identity: admin pages list it as an effect dependency.
+  const endSession = useCallback(() => { clearSession(); setUser(null) }, [])
 
   useEffect(() => {
     let active = true
@@ -201,7 +205,7 @@ function AppRoutes() {
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/password-reset" element={<ResetPasswordPage />} />
       <Route path="/login" element={user ? <Navigate to={user.roles.includes('admin') ? '/usuarios' : '/me'} replace /> : <LoginPage onAuthenticated={setUser} />} />
-      <Route path="/*" element={user ? <AppShell user={user} onLogout={async () => { try { await logout() } finally { setUser(null) } }} onUserChange={setUser} onSessionEnded={() => { clearSession(); setUser(null) }} /> : <Navigate to="/login" replace />} />
+      <Route path="/*" element={user ? <AppShell user={user} onLogout={async () => { try { await logout() } finally { setUser(null) } }} onUserChange={setUser} onSessionEnded={endSession} /> : <Navigate to="/login" replace />} />
     </Routes>
   )
 }

@@ -2,50 +2,20 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from './App'
 import { resetSessionForTests } from './api/client'
+import { type Handler, goTo, json, problem, profile, signedIn, signedOut, stubApi, type } from './test-utils'
 
-type Handler = (body: unknown, url: string) => Response | Promise<Response>
-
-const json = (status: number, body?: unknown, type = 'application/json') =>
-  new Response(body === undefined ? null : JSON.stringify(body), { status, headers: { 'Content-Type': type } })
-const problem = (status: number, extra: Record<string, unknown> = {}) =>
-  json(status, { type: 'about:blank', title: 'Problem', status, ...extra }, 'application/problem+json')
-const profile = (overrides: Record<string, unknown> = {}) => ({
-  id: 'user-id', email: 'person@example.test', displayName: 'Persona', status: 'active',
-  roles: ['user', 'contabilidad.senior'], mfaEnabled: true, createdAt: '2026-01-01T00:00:00Z', ...overrides,
-})
+const chromeMac = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
+const firefoxLinux = 'Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0'
 const sessions = [
-  { id: 's-current', ip: '10.0.0.1', userAgent: 'Chrome en macOS', createdAt: '2026-10-01T10:00:00Z', lastUsedAt: '2026-10-01T11:00:00Z', current: true },
-  { id: 's-other', ip: '10.0.0.2', userAgent: 'Firefox en Linux', createdAt: '2026-09-30T10:00:00Z', lastUsedAt: '2026-09-30T11:00:00Z', current: false },
+  { id: 's-current', ip: '10.0.0.1', userAgent: chromeMac, createdAt: '2026-10-01T10:00:00Z', lastUsedAt: '2026-10-01T11:00:00Z', current: true },
+  { id: 's-other', ip: '10.0.0.2', userAgent: firefoxLinux, createdAt: '2026-09-30T10:00:00Z', lastUsedAt: '2026-09-30T11:00:00Z', current: false },
 ]
 
-// Routes fetch by "METHOD path"; unmatched calls fail loudly so a test cannot pass by accident.
-function stubApi(routes: Record<string, Handler>) {
-  const calls: { key: string; body: unknown }[] = []
-  const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = String(input)
-    const key = `${init?.method ?? 'GET'} ${url.split('?')[0]}`
-    const body = init?.body ? JSON.parse(String(init.body)) : undefined
-    calls.push({ key, body })
-    const handler = routes[key]
-    if (!handler) throw new Error(`unexpected request ${key}`)
-    return handler(body, url)
-  })
-  vi.stubGlobal('fetch', fetch)
-  return { calls, fetch }
-}
-
-const signedOut = { 'POST /api/v1/auth/refresh': () => problem(401) }
-const signedIn = (user = profile()) => ({
-  'POST /api/v1/auth/refresh': () => json(200, { accessToken: 'access', tokenType: 'Bearer', expiresIn: 900 }),
-  'GET /api/v1/me': () => json(200, user),
-})
-const type = (label: string, value: string) => fireEvent.change(screen.getByLabelText(label), { target: { value } })
 const rowAt = (rows: HTMLElement[], index: number): HTMLElement => {
   const row = rows[index]
   if (!row) throw new Error(`missing session row ${index}`)
   return row
 }
-const goTo = (path: string) => window.history.replaceState({}, '', path)
 
 afterEach(() => {
   resetSessionForTests()
@@ -81,6 +51,27 @@ describe('invitation acceptance', () => {
     fill('correct horse battery', 'correct horse batterz')
     expect(await screen.findByText('Las contraseñas no coinciden.')).toBeInTheDocument()
     expect(api.calls.some((c) => c.key.includes('invitations/accept'))).toBe(false)
+  })
+
+  it('TestRF002_RejectsAPasswordLongerThan128BeforeCallingTheApi', async () => {
+    goTo('/invitations/accept?token=tok-123')
+    const api = stubApi(signedOut)
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Define tu contraseña' })
+    fill('a'.repeat(129))
+    expect(await screen.findByText('La contraseña debe tener entre 12 y 128 caracteres.')).toBeInTheDocument()
+    expect(api.calls.some((c) => c.key.includes('invitations/accept'))).toBe(false)
+    fill('a'.repeat(128))
+    await waitFor(() => expect(api.calls.some((c) => c.key.includes('invitations/accept'))).toBe(true))
+  })
+
+  it('TestRF002_ShowsAFallbackMessageForA400WithoutFieldErrors', async () => {
+    goTo('/invitations/accept?token=tok-123')
+    stubApi({ ...signedOut, 'POST /api/v1/auth/invitations/accept': () => problem(400) })
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Define tu contraseña' })
+    fill('correct horse battery')
+    expect(await screen.findByText('La contraseña no cumple los requisitos.')).toBeInTheDocument()
   })
 
   it('TestRF002_ShowsFieldProblemsFromA400', async () => {
@@ -180,6 +171,36 @@ describe('password reset', () => {
     expect(screen.getByRole('link', { name: 'Solicitar un enlace nuevo' })).toHaveAttribute('href', '/forgot-password')
   })
 
+  it('TestRF015_ResetConfirmRejectsAPasswordLongerThan128', async () => {
+    goTo('/password-reset?token=reset-tok')
+    const api = stubApi(signedOut)
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Elige una contraseña nueva' })
+    confirm('a'.repeat(129))
+    expect(await screen.findByText('La contraseña debe tener entre 12 y 128 caracteres.')).toBeInTheDocument()
+    expect(api.calls.some((c) => c.key.endsWith('password-reset/confirm'))).toBe(false)
+  })
+
+  it('TestRF015_ResetConfirmShowsAFallbackMessageForA400WithoutFieldErrors', async () => {
+    goTo('/password-reset?token=reset-tok')
+    stubApi({ ...signedOut, 'POST /api/v1/auth/password-reset/confirm': () => problem(400) })
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Elige una contraseña nueva' })
+    confirm('another long password')
+    expect(await screen.findByText('La contraseña no cumple los requisitos.')).toBeInTheDocument()
+  })
+
+  it('TestRF015_ResetConfirmShowsAGenericMessageForA500AndKeepsTheForm', async () => {
+    goTo('/password-reset?token=reset-tok')
+    stubApi({ ...signedOut, 'POST /api/v1/auth/password-reset/confirm': () => problem(500) })
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Elige una contraseña nueva' })
+    confirm('another long password')
+    expect(await screen.findByText('No fue posible completar la solicitud. Inténtalo de nuevo.')).toBeInTheDocument()
+    expect(screen.getByLabelText('Contraseña nueva')).toBeInTheDocument()
+    expect(screen.queryByText(/Tu contraseña se actualizó/)).not.toBeInTheDocument()
+  })
+
   it('TestRF015_ResetConfirmShowsFieldProblemsFrom400', async () => {
     goTo('/password-reset?token=reset-tok')
     stubApi({ ...signedOut, 'POST /api/v1/auth/password-reset/confirm': () => problem(400, { errors: [{ field: 'password', message: 'Contraseña rechazada.' }] }) })
@@ -226,6 +247,30 @@ describe('my account', () => {
     expect(await screen.findByText('El nombre es demasiado largo.')).toBeInTheDocument()
   })
 
+  it('TestRF008_RejectsAnEmptyOrWhitespaceDisplayNameWithoutCallingTheApi', async () => {
+    const api = await open()
+    await screen.findByDisplayValue('Persona')
+    for (const value of ['', '   ']) {
+      type('Nombre para mostrar', value)
+      fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+      expect(await screen.findByText('El nombre para mostrar no puede estar vacío.')).toBeInTheDocument()
+    }
+    expect(api.calls.some((c) => c.key === 'PATCH /api/v1/me')).toBe(false)
+  })
+
+  it('TestRF008_RendersTwoIdenticalProblemMessagesWithoutDuplicateKeys', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    await open(profile(), {
+      'PATCH /api/v1/me': () => problem(400, { errors: [{ field: 'displayName', message: 'Valor no válido.' }, { field: 'displayName', message: 'Valor no válido.' }] }),
+    })
+    await screen.findByDisplayValue('Persona')
+    type('Nombre para mostrar', 'x')
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+    expect(await screen.findAllByText('Valor no válido.')).toHaveLength(2)
+    expect(errors.mock.calls.some((call) => String(call[0]).includes('same key'))).toBe(false)
+    errors.mockRestore()
+  })
+
   it('TestRF008_RefreshesTheTokenWhenTheProfileUpdateGets401', async () => {
     let attempts = 0
     const api = await open(profile(), {
@@ -243,6 +288,7 @@ describe('my account', () => {
     const rows = await screen.findAllByRole('listitem', { name: /Sesión/ })
     expect(rows).toHaveLength(2)
     expect(within(rowAt(rows, 0)).getByText('Chrome en macOS')).toBeInTheDocument()
+    expect(within(rowAt(rows, 1)).getByText('Firefox en Linux')).toBeInTheDocument()
     expect(within(rowAt(rows, 0)).getByText('10.0.0.1')).toBeInTheDocument()
     expect(within(rowAt(rows, 0)).getByText('Esta sesión')).toBeInTheDocument()
     expect(within(rowAt(rows, 1)).queryByText('Esta sesión')).not.toBeInTheDocument()
@@ -265,6 +311,35 @@ describe('my account', () => {
     expect(await screen.findByRole('button', { name: 'Iniciar sesión' })).toBeInTheDocument()
     expect(api.calls.some((c) => c.key === 'DELETE /api/v1/me/sessions/s-current')).toBe(true)
     expect(api.calls.some((c) => c.key === 'POST /api/v1/auth/logout')).toBe(false)
+  })
+
+  it('TestRF016_ShowsAShortBrowserAndOsLabelWithTheFullUserAgentInTheTitle', async () => {
+    await open()
+    const rows = await screen.findAllByRole('listitem', { name: /Sesión/ })
+    expect(within(rowAt(rows, 0)).getByText('Chrome en macOS')).toHaveAttribute('title', chromeMac)
+    expect(within(rowAt(rows, 1)).getByText('Firefox en Linux')).toHaveAttribute('title', firefoxLinux)
+  })
+
+  it.each([
+    ['Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0', 'Edge en Windows'],
+    ['Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1', 'Safari en iOS'],
+    ['Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36', 'Chrome en Android'],
+    ['Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15', 'Safari en macOS'],
+    ['curl/8.7.1', 'curl'],
+    ['', 'Dispositivo desconocido'],
+    ['SomethingElse/1.0', 'Dispositivo desconocido'],
+  ])('TestRF016_LabelsTheUserAgentSimply %#', async (userAgent, label) => {
+    await open(profile(), { 'GET /api/v1/me/sessions': () => json(200, [{ ...sessions[0], userAgent }]) })
+    const row = (await screen.findAllByRole('listitem', { name: /Sesión/ }))[0] as HTMLElement
+    expect(within(row).getByText(label)).toBeInTheDocument()
+  })
+
+  it('TestRF016_EndsTheSessionWhenAuthenticationKeepsFailingWhileRevoking', async () => {
+    const api = await open(profile(), { 'DELETE /api/v1/me/sessions/s-other': () => problem(401) })
+    const rows = await screen.findAllByRole('listitem', { name: /Sesión/ })
+    fireEvent.click(within(rowAt(rows, 1)).getByRole('button', { name: 'Revocar' }))
+    expect(await screen.findByRole('button', { name: 'Iniciar sesión' })).toBeInTheDocument()
+    expect(api.calls.filter((c) => c.key === 'DELETE /api/v1/me/sessions/s-other')).toHaveLength(2)
   })
 
   it('TestRF016_ShowsAnErrorWhenSessionsCannotBeLoaded', async () => {

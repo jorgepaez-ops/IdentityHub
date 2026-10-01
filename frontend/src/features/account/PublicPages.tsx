@@ -30,7 +30,7 @@ function AuthCard({ title, lead, children }: { title: string; lead?: string; chi
 
 function Problems({ messages }: { messages: string[] }) {
   if (messages.length === 0) return null
-  return <div className="error-box" role="alert">{messages.map((message) => <p key={message}>{message}</p>)}</div>
+  return <div className="error-box" role="alert">{messages.map((message, index) => <p key={index}>{message}</p>)}</div>
 }
 
 function LoginLink() {

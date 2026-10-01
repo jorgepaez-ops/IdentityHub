@@ -1,12 +1,9 @@
 import { FormEvent, useEffect, useState } from 'react'
-import { type CurrentUser, type Session, listSessions, revokeSession, updateCurrentUser } from '../../api/client'
+import { ApiProblemError, type CurrentUser, type Session, listSessions, revokeSession, updateCurrentUser } from '../../api/client'
+import { formatDate } from '../format'
+import { describeUserAgent } from './userAgent'
 import { problemMessages } from './PublicPages'
 
-const dateFormat = new Intl.DateTimeFormat('es', { dateStyle: 'medium', timeStyle: 'short' })
-const formatDate = (value: string) => {
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : dateFormat.format(date)
-}
 
 function ProfileCard({ user, onUserChange }: { user: CurrentUser; onUserChange: (user: CurrentUser) => void }) {
   const [pending, setPending] = useState(false)
@@ -15,8 +12,12 @@ function ProfileCard({ user, onUserChange }: { user: CurrentUser; onUserChange: 
   const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const displayName = String(new FormData(event.currentTarget).get('displayName')).trim()
-    setPending(true)
     setNotice(null)
+    if (displayName === '') {
+      setProblems(['El nombre para mostrar no puede estar vacío.'])
+      return
+    }
+    setPending(true)
     setProblems([])
     try {
       onUserChange(await updateCurrentUser({ displayName }))
@@ -30,7 +31,7 @@ function ProfileCard({ user, onUserChange }: { user: CurrentUser; onUserChange: 
   return (
     <section className="panel" aria-labelledby="profile-title">
       <h2 id="profile-title">Perfil</h2>
-      {problems.length > 0 && <div className="error-box" role="alert">{problems.map((message) => <p key={message}>{message}</p>)}</div>}
+      {problems.length > 0 && <div className="error-box" role="alert">{problems.map((message, index) => <p key={index}>{message}</p>)}</div>}
       {notice && <div className="success-box" role="status"><p>{notice}</p></div>}
       <form onSubmit={(event) => void save(event)} noValidate>
         <label htmlFor="profile-name">Nombre para mostrar</label>
@@ -47,7 +48,7 @@ function ProfileCard({ user, onUserChange }: { user: CurrentUser; onUserChange: 
   )
 }
 
-function SessionsCard({ onCurrentSessionRevoked }: { onCurrentSessionRevoked: () => void }) {
+function SessionsCard({ onSessionEnded }: { onSessionEnded: () => void }) {
   const [sessions, setSessions] = useState<Session[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -71,11 +72,16 @@ function SessionsCard({ onCurrentSessionRevoked }: { onCurrentSessionRevoked: ()
     try {
       await revokeSession(session.id)
       if (session.current) {
-        onCurrentSessionRevoked()
+        onSessionEnded()
         return
       }
       setSessions((items) => (items ?? []).filter((item) => item.id !== session.id))
-    } catch {
+    } catch (reason) {
+      // A 401 that survives the refresh retry means the session is gone: leave instead of showing a generic error.
+      if (reason instanceof ApiProblemError && reason.status === 401) {
+        onSessionEnded()
+        return
+      }
       setError('No fue posible revocar la sesión. Inténtalo de nuevo.')
     } finally {
       setBusyId(null)
@@ -91,9 +97,9 @@ function SessionsCard({ onCurrentSessionRevoked }: { onCurrentSessionRevoked: ()
       {sessions && (
         <ul className="session-list" aria-label="Sesiones activas">
           {sessions.map((session) => (
-            <li className="session-row" key={session.id} aria-label={`Sesión ${session.userAgent || session.ip}`}>
+            <li className="session-row" key={session.id} aria-label={`Sesión ${describeUserAgent(session.userAgent)}`}>
               <div>
-                <p className="session-agent">{session.userAgent || 'Dispositivo desconocido'}{session.current && <span className="chip chip-ok">Esta sesión</span>}</p>
+                <p className="session-agent"><span title={session.userAgent}>{describeUserAgent(session.userAgent)}</span>{session.current && <span className="chip chip-ok">Esta sesión</span>}</p>
                 <p className="muted"><span>{session.ip}</span></p>
                 <p className="muted">Creada {formatDate(session.createdAt)} · Último uso {formatDate(session.lastUsedAt)}</p>
               </div>
@@ -117,7 +123,7 @@ export function MyAccountPage({ user, onUserChange, onSessionEnded }: {
       <p className="muted">Tu perfil y las sesiones abiertas con tu cuenta.</p>
       <div className="account-grid">
         <ProfileCard user={user} onUserChange={onUserChange} />
-        <SessionsCard onCurrentSessionRevoked={onSessionEnded} />
+        <SessionsCard onSessionEnded={onSessionEnded} />
       </div>
     </section>
   )

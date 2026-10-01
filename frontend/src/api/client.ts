@@ -12,6 +12,16 @@ type UpdateProfileRequest = operations['updateCurrentUser']['requestBody']['cont
 export type Session = components['schemas']['Session']
 export type CurrentUser = components['schemas']['User']
 export type Problem = components['schemas']['Problem']
+export type Role = components['schemas']['Role']
+export type UserStatus = components['schemas']['UserStatus']
+export type AdminUser = components['schemas']['User']
+export type UserPage = components['schemas']['UserPage']
+export type AuditEvent = components['schemas']['AuditEvent']
+export type AuditLogPage = components['schemas']['AuditLogPage']
+type CreateUserRequest = operations['createEmployee']['requestBody']['content']['application/json']
+type UpdateUserRequest = operations['updateUser']['requestBody']['content']['application/json']
+export type ListUsersQuery = NonNullable<operations['listUsers']['parameters']['query']>
+export type AuditLogQuery = NonNullable<operations['listAuditLog']['parameters']['query']>
 
 const refreshLockName = 'identity-hub-refresh'
 let accessToken: string | null = null
@@ -150,6 +160,24 @@ export const updateCurrentUser = (input: UpdateProfileRequest) =>
 export const listSessions = () => authenticatedRequest<Session[]>('/api/v1/me/sessions')
 export const revokeSession = (sessionId: string) =>
   authenticatedRequest<void>(`/api/v1/me/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE' })
+
+function withQuery(path: string, query: Record<string, string | number | undefined>): string {
+  const params = new URLSearchParams()
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== undefined && value !== '') params.set(key, String(value))
+  }
+  const text = params.toString()
+  return text ? `${path}?${text}` : path
+}
+
+export const listUsers = (query: ListUsersQuery = {}) => authenticatedRequest<UserPage>(withQuery('/api/v1/admin/users', query))
+export const createUser = (input: CreateUserRequest) =>
+  authenticatedRequest<AdminUser>('/api/v1/admin/users', { method: 'POST', body: JSON.stringify(input) })
+export const updateUser = (userId: string, input: UpdateUserRequest) =>
+  authenticatedRequest<AdminUser>(`/api/v1/admin/users/${encodeURIComponent(userId)}`, { method: 'PATCH', body: JSON.stringify(input) })
+export const resendInvitation = (userId: string) =>
+  authenticatedRequest<void>(`/api/v1/admin/users/${encodeURIComponent(userId)}/invitation`, { method: 'POST' })
+export const listAuditLog = (query: AuditLogQuery = {}) => authenticatedRequest<AuditLogPage>(withQuery('/api/v1/admin/audit-log', query))
 
 export async function logout(): Promise<void> {
   try {
