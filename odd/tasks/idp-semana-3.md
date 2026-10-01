@@ -878,11 +878,50 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 
 
 ### T13 — Aplicación Contabilidad (React, otro dominio)
-- [ ] Estado · Ejecutor: `Codex` · Depende de: T9, T11
+- [x] Estado · Ejecutor: `Codex` → `Sonnet` (Codex sin cuota; decisión del usuario) · Depende de: T9, T11
 - Según el mockup: inicio de sesión por redirección con PKCE, verificación del JWT con el JWKS del
   Hub, vistas por rol (Resumen, Transacciones, Cierre contable, Administración) con datos de
   ejemplo. Sin usuarios propios.
+- Hecho (2026-10-01, Sonnet; revisó y commiteó Claude). Commit `eaa4670`. App aparte en
+  `contabilidad/` (Vite + React + TS, sin dependencias nuevas): PKCE S256 (verifier y `state` en
+  `sessionStorage` solo durante la ida y vuelta), canje en `/oauth/token`, token solo en memoria,
+  firma Ed25519 verificada con WebCrypto contra el JWKS del Hub (`kid`, `iss`, `aud`, `exp`),
+  vistas por rol con datos de ejemplo y nueva redirección a `/oauth/authorize` al vencer (sin
+  refresh, ADR 0009). Hueco del Hub corregido: tras el MFA la consola no volvía al
+  `/oauth/authorize`; ahora acepta `?continue=` solo si es exactamente `/oauth/authorize` del
+  mismo origen (sin redirección abierta; 21 pruebas). La imagen `web` compila las dos apps con
+  contexto en la raíz (`frontend/Dockerfile.dockerignore` excluye `.env`, `.git`, backend, etc.);
+  se quitó el marcador de T11; CI y Makefile corren para Contabilidad los mismos gates.
+- TDD: RED por comportamiento y GREEN: Contabilidad 43/43 (vector RFC 7636, firma y claims
+  inválidos, `alg none`/HS256, `state` cambiado, nada en almacenamiento), consola 144/144; lint,
+  tipos y build ok en las dos; Trivy de `web` 0 HIGH/CRITICAL; trazabilidad al día; GGA aprobó.
+- E2E SSO en Chromium (`-p t13-check`, 30/30): cada usuario entra por el Hub con MFA y vuelve sin
+  `code` en la URL ni token en almacenamiento; una segunda pestaña vuelve sin pedir contraseña;
+  analista sin Cierre y solo con sus filas; senior aprueba; cambiar el rol en la consola se ve en
+  el siguiente login. Pendiente: Firefox y la redirección real a los 15 min (solo prueba unitaria).
+- Decisión del usuario (2026-10-01): se mantiene D8. El token de Contabilidad solo lleva roles
+  `contabilidad.*`; un admin del Hub sin esos roles ve "Sin acceso". La vista "Administración" de
+  la app sobra (T13-fix). El backend emite `"roles": null` con el conjunto vacío.
+- Revisión nativa de T12c-fix + T13 (`24bf24c..eaa4670`, alto, 48 archivos, 6.758 líneas, 4
+  lentes): **aprobada** y acusada (`review-7ae0824e02b3c4d0`). Observaciones → T13-fix.
+- Commit: `eaa4670`
+
+### T13-fix — Decisión D8 en la app y observaciones de la revisión de T13
+- [ ] Estado · Ejecutor: `Codex` · Depende de: T13
+- D8: quitar "Administración" de Contabilidad; "Sin acceso" con enlace al Hub.
+- R2/R3 (WARNING): el contador de generación de T12c-fix reemplazó la limpieza al desmontar en
+  `UsersPage` y `AuditLogPage`: una respuesta tardía tras salir de la página todavía llama
+  `setState` u `onSessionEnded`. Incrementar la generación al desmontar.
+- R4 (WARNING): `exp`/`nbf` sin tolerancia y temporizador armado con el mismo `exp`: con el reloj
+  del navegador adelantado, bucle de reautenticación. Tolerancia de reloj y freno al bucle.
+- R3 (WARNING): la prueba del token que vence no es determinista (reloj real); usar reloj falso.
+- R2 (WARNING): `.eslintrc.cjs` de Contabilidad apaga `react/no-danger` con un comentario que dice
+  lo contrario; la prohibición real es el `no-restricted-syntax`.
+- R4: un fallo al bajar el JWKS se muestra como credencial inválida; distinguirlo.
+- R1: CI cae de `npm ci` a `npm install` (también en la consola); usar `npm ci` a secas.
+- R2: constantes de prueba duplicadas (`ISSUER`, `AUDIENCE`, `HUB`); `nextId` con número mágico.
 - Commit: —
+
 
 ## Fase 3 — Verificación, DAST y cierre
 
@@ -918,9 +957,9 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 |---|---|---|
 | 0 — Enmiendas de spec y decisiones | T1 a T3 (3) | 3 (T1 a T3) |
 | 1 — Backend | T4 a T10 (7) | 7 (T4 a T10) |
-| 2 — Dominios locales y frontend | T11 a T13 + T12d (4) | 3 (T11, T12, T12d) |
+| 2 — Dominios locales y frontend | T11 a T13 + T12d (4) | 4 (T11, T12, T12d, T13) |
 | 3 — Verificación, DAST y cierre | T14 a T17 (4) | 0 |
-| **Total** | **18** | **13** |
+| **Total** | **18** | **14** |
 
 ## Siguiente paso
 
