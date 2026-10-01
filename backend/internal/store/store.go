@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/netip"
 	"time"
 
@@ -21,6 +22,7 @@ import (
 type Store struct {
 	pool    *pgxpool.Pool
 	queries *generated.Queries
+	logger  *slog.Logger
 }
 
 // CreateUserParams contains the attributes accepted by the user creation
@@ -111,6 +113,12 @@ func NewWithPool(pool *pgxpool.Pool) (*Store, error) {
 }
 
 func (s *Store) Pool() *pgxpool.Pool { return s.pool }
+
+// WithLogger injects the logger used for persistence warnings. Nil disables logging.
+func (s *Store) WithLogger(logger *slog.Logger) *Store {
+	s.logger = logger
+	return s
+}
 
 // CreateUser persists a user through the generated parameterized query.
 func (s *Store) CreateUser(ctx context.Context, params CreateUserParams) (User, error) {

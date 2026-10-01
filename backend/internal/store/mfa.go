@@ -25,7 +25,7 @@ func (s *Store) WithinMFATransaction(ctx context.Context, fn func(mfa.Writer) er
 		return fmt.Errorf("begin mfa transaction: %w", err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	if err := fn(&mfaWriter{queries: generated.New(tx)}); err != nil {
+	if err := fn(&mfaWriter{queries: generated.New(tx), logger: s.logger}); err != nil {
 		return err
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -34,7 +34,10 @@ func (s *Store) WithinMFATransaction(ctx context.Context, fn func(mfa.Writer) er
 	return nil
 }
 
-type mfaWriter struct{ queries *generated.Queries }
+type mfaWriter struct {
+	queries *generated.Queries
+	logger  *slog.Logger
+}
 
 func (w *mfaWriter) LockChallengeIssuance(ctx context.Context, userID uuid.UUID) error {
 	if err := w.queries.LockMfaChallengeIssuance(ctx, userID); err != nil {
@@ -85,8 +88,8 @@ func (w *mfaWriter) RestoreResend(ctx context.Context, id uuid.UUID, expectedHas
 	if err != nil {
 		return fmt.Errorf("restore failed mfa resend: %w", err)
 	}
-	if restored == 0 {
-		slog.Warn("mfa resend compensation restored no challenge", "challenge_id", id)
+	if restored == 0 && w.logger != nil {
+		w.logger.Warn("mfa resend compensation restored no challenge", "challenge_id", id)
 	}
 	return nil
 }

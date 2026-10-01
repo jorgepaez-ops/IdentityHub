@@ -20,6 +20,8 @@ import (
 
 // New creates a database dedicated to one test, applies every up migration, and
 // registers cleanup that closes connections before dropping the database.
+const migrationAdvisoryLockID int64 = 2_000_002
+
 func New(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 
@@ -38,10 +40,32 @@ func New(t *testing.T) *pgxpool.Pool {
 	if err != nil {
 		t.Fatalf("connect integration database server: %v", err)
 	}
+	closeAdmin := true
+	defer func() {
+		if closeAdmin {
+			adminPool.Close()
+		}
+	}()
+
+	adminConn, err := adminPool.Acquire(ctx)
+	if err != nil {
+		t.Fatalf("acquire migration lock connection: %v", err)
+	}
+	defer adminConn.Release()
+	if _, err := adminConn.Exec(ctx, "SELECT pg_advisory_lock($1)", migrationAdvisoryLockID); err != nil {
+		t.Fatalf("acquire migration advisory lock: %v", err)
+	}
+	locked := true
+	defer func() {
+		if locked {
+			if _, err := adminConn.Exec(ctx, "SELECT pg_advisory_unlock($1)", migrationAdvisoryLockID); err != nil {
+				t.Errorf("release migration advisory lock: %v", err)
+			}
+		}
+	}()
 
 	databaseName := temporaryDatabaseName(t)
 	if _, err := adminPool.Exec(ctx, "CREATE DATABASE "+databaseIdentifier(databaseName)); err != nil {
-		adminPool.Close()
 		t.Fatalf("create temporary database: %v", err)
 	}
 
@@ -50,10 +74,10 @@ func New(t *testing.T) *pgxpool.Pool {
 	testPool, err := pgxpool.NewWithConfig(ctx, testConfig)
 	if err != nil {
 		dropDatabase(ctx, adminPool, databaseName)
-		adminPool.Close()
 		t.Fatalf("connect temporary database: %v", err)
 	}
 
+	closeAdmin = false
 	t.Cleanup(func() {
 		testPool.Close()
 		if err := dropDatabase(ctx, adminPool, databaseName); err != nil {
@@ -63,6 +87,10 @@ func New(t *testing.T) *pgxpool.Pool {
 	})
 
 	applyMigrations(t, ctx, testPool)
+	if _, err := adminConn.Exec(ctx, "SELECT pg_advisory_unlock($1)", migrationAdvisoryLockID); err != nil {
+		t.Fatalf("release migration advisory lock: %v", err)
+	}
+	locked = false
 	return testPool
 }
 

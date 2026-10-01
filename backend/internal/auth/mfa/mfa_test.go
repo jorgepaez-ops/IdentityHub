@@ -326,6 +326,7 @@ type memoryRepository struct {
 	deletedChallenge         uuid.UUID
 	requireLiveDeleteContext bool
 	deleteContextErr         error
+	deleteErr                error
 }
 
 func (r *memoryRepository) WithinMFATransaction(_ context.Context, fn func(Writer) error) error {
@@ -380,6 +381,9 @@ func (r *memoryRepository) DeleteChallenge(ctx context.Context, id uuid.UUID) er
 	r.deleteContextErr = ctx.Err()
 	if r.requireLiveDeleteContext && r.deleteContextErr != nil {
 		return r.deleteContextErr
+	}
+	if r.deleteErr != nil {
+		return r.deleteErr
 	}
 	r.deletedChallenge = id
 	return nil
@@ -667,5 +671,17 @@ func TestRF014_SuperacionUsaElRelojDelServicio(t *testing.T) {
 	}
 	if !repo.supersededAt.Equal(now) {
 		t.Fatalf("superseded at=%s, want service clock %s", repo.supersededAt, now)
+	}
+}
+
+func TestRF014_FalloDeCompensacionDeEmisionSeRegistra(t *testing.T) {
+	var logs bytes.Buffer
+	repository := &memoryRepository{deleteErr: errors.New("database unavailable")}
+	service := New(repository, &fakePublisher{err: errors.New("broker unavailable")}, bytes.NewReader(bytes.Repeat([]byte{7}, 64)), time.Now).WithLogger(slog.New(slog.NewTextHandler(&logs, nil)))
+
+	_, err := service.Issue(context.Background(), User{ID: uuid.New(), Email: "ada@example.test"})
+
+	if err == nil || !strings.Contains(logs.String(), "delete_mfa_challenge") || !strings.Contains(logs.String(), "database unavailable") {
+		t.Fatalf("err=%v log=%q, want logged compensation failure", err, logs.String())
 	}
 }

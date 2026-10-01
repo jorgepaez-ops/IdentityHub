@@ -12,7 +12,7 @@ declaración de buenas intenciones.
 |---|---|---|---|---|---|---|---|
 | **RF-001** | Alta de empleados por administración | P0 | `createEmployee`, `resendInvitation` | 4 | 34 | — | ✅ completo |
 | **RF-002** | Aceptación de invitación y verificación de correo | P0 | `acceptInvitation` | 4 | 16 | — | ✅ completo |
-| **RF-003** | Inicio de sesión | P0 | `login` | 2 | 9 | — | ✅ completo |
+| **RF-003** | Inicio de sesión | P0 | `login` | 2 | 10 | — | ✅ completo |
 | **RF-004** | Emisión y validación de JWT | P0 | `getJwks` | 1 | 8 | — | ✅ completo |
 | **RF-005** | Renovación de sesión | P0 | `refreshSession` | 1 | 7 | — | ✅ completo |
 | **RF-006** | Detección de reuso de refresh token | P0 | — | 1 | 5 | — | ✅ completo |
@@ -23,7 +23,7 @@ declaración de buenas intenciones.
 | **RF-011** | Registro de auditoría | P0 | `listAuditLog` | 1 | 9 | — | ✅ completo |
 | **RF-012** | Notificaciones asíncronas | P0 | — | 1 | 9 | — | ✅ completo |
 | **RF-013** | Segundo factor obligatorio por correo | P1 | — | 1 | 5 | — | ✅ completo |
-| **RF-014** | Inicio de sesión con segundo factor | P1 | `verifyMfa`, `resendMfaCode` | 5 | 35 | — | ✅ completo |
+| **RF-014** | Inicio de sesión con segundo factor | P1 | `verifyMfa`, `resendMfaCode` | 5 | 36 | — | ✅ completo |
 | **RF-015** | Restablecimiento de contraseña | P1 | `requestPasswordReset`, `confirmPasswordReset` | 3 | 33 | — | ✅ completo |
 | **RF-016** | Sesiones activas | P1 | `listSessions`, `revokeSession` | 1 | 8 | — | ✅ completo |
 | **RF-017** | Bloqueo por fuerza bruta | P1 | — | 4 | 22 | — | ✅ completo |
@@ -40,8 +40,8 @@ declaración de buenas intenciones.
 | **RNF-008** | Contenedores endurecidos | P0 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-009** | Cabeceras de seguridad | P0 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-010** | Latencia | P1 | — | — | — | — | 🔴 sin cubrir |
-| **RNF-011** | Los specs son la fuente de verdad | P0 | — | — | 4 | — | 🟡 parcial |
-| **RNF-012** | Logs sin datos sensibles | P0 | — | — | 3 | — | 🟡 parcial |
+| **RNF-011** | Los specs son la fuente de verdad | P0 | — | — | 5 | — | 🟡 parcial |
+| **RNF-012** | Logs sin datos sensibles | P0 | — | — | 5 | — | 🟡 parcial |
 
 **Resumen:** 32 requisitos · 17 completos · 6 parciales · 7 sin cubrir · 2 diferidos (semana 3).
 

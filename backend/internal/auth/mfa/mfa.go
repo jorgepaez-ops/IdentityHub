@@ -33,7 +33,10 @@ const (
 	// one is tuned for wrong credentials, this one bounds successful ones.
 	IssuanceWindow        = 15 * time.Minute
 	MaxIssuancesPerWindow = 5
-	compensationTimeout   = 5 * time.Second
+	// compensationTimeout bounds cleanup after a failed broker publish: five
+	// seconds permits a brief database delay without letting request cleanup
+	// retain resources indefinitely.
+	compensationTimeout = 5 * time.Second
 	// StatusActive is the only account status that may verify or resend a code.
 	StatusActive       = "active"
 	challengeExpiresIn = int(ChallengeTTL / time.Second)

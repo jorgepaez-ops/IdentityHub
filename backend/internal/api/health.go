@@ -13,7 +13,6 @@ type Checker interface {
 
 type checkResult struct {
 	Status string `json:"status"`
-	Error  string `json:"error,omitempty"`
 }
 
 type readiness struct {
@@ -40,7 +39,10 @@ func (s *Server) Readiness(w http.ResponseWriter, r *http.Request) {
 	for name, dep := range s.deps {
 		if err := dep.Ping(r.Context()); err != nil {
 			out.Status = "degraded"
-			out.Checks[name] = checkResult{Status: "down", Error: err.Error()}
+			out.Checks[name] = checkResult{Status: "down"}
+			if s.logger != nil {
+				s.logger.Error("readiness dependency check failed", "dependency", name, "error", err)
+			}
 			continue
 		}
 		out.Checks[name] = checkResult{Status: "up"}

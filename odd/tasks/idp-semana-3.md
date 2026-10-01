@@ -629,7 +629,7 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 - Commit: `d1c566d`
 
 ### T10 — Pendientes chicos de la semana 2
-- [ ] Estado · Ejecutor: `Codex`
+- [x] Estado · Ejecutor: `Codex` (implementa) + Claude (integración con PostgreSQL real, lint, revisión)
 - Integración intermitente: `TestRF002_AceptarPersisteHashArgon2idYActivaLaCuenta` y
   `TestRF006_DosRenovacionesConcurrentesUnaGana` fallaron una vez en T5 (pasaron en tres corridas
   más); investigar junto con la de `TestRF001_UsersAceptaArgon2idYRechazaMD5`.
@@ -642,7 +642,22 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
   `POST /api/v1/auth/login` con `{}` responde 500 en vez de 400; `/readyz` devuelve
   `err.Error()` por dependencia (puede filtrar host/usuario/base); investigar la intermitencia de
   `TestRF001_UsersAceptaArgon2idYRechazaMD5`.
-- Commit: —
+- Resultado (2026-09-30): `testdb.New` toma un advisory lock de sesión
+  (`migrationAdvisoryLockID`) en una conexión de admin durante la creación y migración de la base
+  temporal, sin tocar la migración `000002`; `handleBindingError` responde RFC 7807 400 sin
+  detalle interno; `POST /api/v1/auth/login` con `{}` da 400 RFC 7807 antes de mirar si el
+  servicio está disponible; `/readyz` solo expone `up`/`down` y registra el detalle con el logger
+  inyectado; `Store.WithLogger` inyecta el logger en `mfaWriter` (`RestoreResend` ya no usa el
+  `slog` global); pruebas del caso sin fila y del fallo de la compensación; comentario del plazo de
+  5 s. Los parámetros de `RestoreResend` ya tenían nombre.
+- TDD: RED/GREEN de Codex para binding, login, readiness y compensación. RED de la carrera
+  observado por Claude con el `testdb.go` anterior sobre un clúster nuevo
+  (`23505 pg_authid_rolname_index`); GREEN en tres clústeres nuevos. La carrera solo se reproduce
+  mientras el rol `identity_app` no existe todavía en el clúster.
+- Verificación (Claude): suite de integración completa **en paralelo** (sin `-p 1`) con
+  `-race` sobre un clúster nuevo, todo `ok`; `go test -race ./...` `ok`; `golangci-lint` 0 issues
+  (con tag `integration` sigue solo el `errcheck` previo de `testdb.go`, ahora línea 76).
+- Commit: (este)
 - Observaciones de la revisión nativa de T8-fix: `RestoreResend` del store registra con el
   `slog` global y no con un logger inyectado, y el caso en que no restaura nada no tiene prueba;
   falta prueba del camino en que la compensación misma falla (`logCompensationFailure`); documentar
@@ -710,14 +725,14 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 | Fase | Tareas | Hechas |
 |---|---|---|
 | 0 — Enmiendas de spec y decisiones | T1 a T3 (3) | 3 (T1 a T3) |
-| 1 — Backend | T4 a T10 (7) | 6 (T4 a T9) |
+| 1 — Backend | T4 a T10 (7) | 7 (T4 a T10) |
 | 2 — Dominios locales y frontend | T11 a T13 (3) | 0 |
 | 3 — Verificación, DAST y cierre | T14 a T17 (4) | 0 |
-| **Total** | **17** | **9** |
+| **Total** | **17** | **10** |
 
 ## Siguiente paso
 
-T10 (pendientes chicos); con eso cierra la fase 1 y toca el PR de corte. T9-fix cerrada el 2026-09-30.
+Fase 1 cerrada el 2026-09-30 (T9-fix y T10). Toca el PR de corte de la fase 1 (decisión del usuario); después T11.
 
 ## Cambios de spec propuestos
 

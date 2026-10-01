@@ -12,15 +12,19 @@ import (
 // Login verifies the password and starts the mandatory email MFA challenge
 // (D11). No session exists until POST /auth/mfa/verify accepts the code.
 func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
-	if s.login == nil {
-		writeProblem(w, http.StatusServiceUnavailable, "login-unavailable", "Service Unavailable", "Login is temporarily unavailable.")
-		return
-	}
 	var request LoginRequest
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&request); err != nil {
 		writeValidationProblem(w, "body", "must be valid JSON")
+		return
+	}
+	if request.Email == "" || request.Password == "" {
+		writeValidationProblem(w, "body", "email and password are required")
+		return
+	}
+	if s.login == nil {
+		writeProblem(w, http.StatusServiceUnavailable, "login-unavailable", "Service Unavailable", "Login is temporarily unavailable.")
 		return
 	}
 	result, err := s.login.Login(r.Context(), login.Input{Email: string(request.Email), Password: request.Password, IP: requestClientIP(r), UserAgent: optionalRequestUserAgent(r)})

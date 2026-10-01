@@ -100,6 +100,7 @@ func run() error {
 		return err
 	}
 	defer db.Close()
+	db.WithLogger(logger)
 	logger.Info("conectado a postgres")
 
 	broker, err := events.Connect(cfg.RabbitURL.Reveal())

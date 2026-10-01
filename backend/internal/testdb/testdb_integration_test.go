@@ -55,3 +55,16 @@ func TestRNF011_MigracionesSeAplicanSobreBaseVacia(t *testing.T) {
 		t.Fatalf("insert Argon2id password hash: %v", err)
 	}
 }
+
+func TestRNF011_MigracionesConcurrentesNoCompitenPorRol(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test requires a PostgreSQL server")
+	}
+
+	for _, name := range []string{"first", "second"} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			testdb.New(t)
+		})
+	}
+}

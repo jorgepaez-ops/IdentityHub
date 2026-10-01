@@ -365,3 +365,17 @@ func TestRF013_LoginRealMapeaLimiteYFalloDeEntregaMFA(t *testing.T) {
 		})
 	}
 }
+
+func TestRF003_LoginConObjetoVacioDevuelveProblem400(t *testing.T) {
+	server := NewServer(nil, "test", nil)
+	response := httptest.NewRecorder()
+
+	server.Routes().ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", strings.NewReader(`{}`)))
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d body=%s, want 400", response.Code, response.Body.String())
+	}
+	if contentType := response.Header().Get("Content-Type"); !strings.HasPrefix(contentType, "application/problem+json") {
+		t.Fatalf("Content-Type=%q, want application/problem+json", contentType)
+	}
+}
