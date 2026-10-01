@@ -715,6 +715,24 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
   auto-deshabilitado de RF-010), audit log; páginas de cuenta: verificar correo
   (`/verify-email?token=…`, Q15), definir contraseña, restablecer, perfil y sesiones. Refresh
   compartido entre pestañas (Web Locks o `BroadcastChannel`).
+- Plan (Claude, 2026-10-01), tres commits de unidad de trabajo, cada uno con sus pruebas Vitest:
+  - [ ] T12a — Base: enrutado con `react-router-dom`, cliente de API tipado con `schema.d.ts`
+    (errores RFC 7807), access token solo en memoria y refresh por la cookie `HttpOnly`; refresh
+    serializado entre pestañas con Web Locks (dos pestañas que rotan a la vez dispararían la
+    detección de reuso de RF-006 y revocarían la familia); login con correo y contraseña → 202 →
+    pantalla de código MFA (verificar y reenviar; 401, 423, 429 y 503 con mensajes propios);
+    cerrar sesión. Tras el login, un admin entra a la consola y el resto a "Mi cuenta".
+  - [ ] T12b — Cuenta: aceptar invitación y definir contraseña (`/invitations/accept?token=…`,
+    ruta fijada en T5; sustituye la página `/verify-email` de Q15, que se fue con el autorregistro),
+    solicitar y confirmar restablecimiento, perfil (`GET`/`PATCH /me`) y sesiones activas
+    (listar y revocar).
+  - [ ] T12c — Consola admin: directorio con búsqueda y estados, cajón de alta y edición (roles
+    del catálogo; un admin no puede deshabilitarse a sí mismo, RF-010), reenvío de invitación a
+    cuentas pendientes y registro de auditoría.
+- Restricciones: sin dependencias nuevas (Codex no tiene red); CSP sin `unsafe-inline` ni orígenes
+  externos, así que nada de estilos inline ni Google Fonts: las familias del mockup se declaran con
+  pila de respaldo del sistema. Sistema visual del mockup "Identity Hub Console" (acento `#2d4f8f`,
+  modo oscuro). Verificación contra el stack real (Docker y Chromium): Claude, al cerrar.
 - Commit: —
 
 ### T13 — Aplicación Contabilidad (React, otro dominio)
