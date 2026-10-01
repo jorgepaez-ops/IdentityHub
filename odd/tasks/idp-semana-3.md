@@ -780,9 +780,26 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
     nombre vacío se envía sin validar; claves de React por texto del mensaje; faltan pruebas del
     límite de 128, del 400 sin campos y de un 500 al confirmar. Además, el user agent de las
     sesiones se ve crudo.
-  - [ ] T12c — Consola admin (incluye las observaciones de la revisión de T12b): directorio con búsqueda y estados, cajón de alta y edición (roles
+  - [x] T12c — Consola admin (incluye las observaciones de la revisión de T12b): directorio con búsqueda y estados, cajón de alta y edición (roles
     del catálogo; un admin no puede deshabilitarse a sí mismo, RF-010), reenvío de invitación a
     cuentas pendientes y registro de auditoría.
+    Hecho (2026-10-01, Sonnet; revisó y commiteó Claude). Commit `24bf24c`. TDD: RED 12/45 (arreglos
+    de T12b) y 39/41 (consola); GREEN 118/118; lint, tipos y build ok; GGA aprobó. El usuario
+    propio no puede cambiarse estado ni roles (el backend también lo rechaza); `user` va siempre
+    marcado (rol base obligatorio); roles con los ids del OpenAPI (`contabilidad.senior`,
+    `contabilidad.analista`). E2E con Chromium en `-p t12c-check`: alta de empleada con invitación
+    en Mailpit, reenvío (enlace viejo 410), la empleada entra y cae en "Mi cuenta" sin acceso a la
+    consola, edición de roles, deshabilitarla (ya no entra), cajón propio bloqueado, auditoría con
+    todos los eventos y filtro; sesiones con "Chrome en macOS"; sin errores de consola ni de CSP.
+    Huecos del backend anotados (sin cambiar): la auditoría trae solo UUIDs (sin nombre del actor);
+    mensajes de error en inglés; autodeshabilitarse, autoasignarse roles y quitar el último admin
+    devuelven el mismo 400 genérico; el listado de usuarios ordena por id y no trae total.
+    Revisión nativa (medio, 15 archivos, 1.358 líneas, una lente): **aprobada** y acusada
+    (`review-96aa97adcdb33fa5`). Observaciones → T12c-fix.
+  - [ ] T12c-fix — "Cargar más" del directorio y de la auditoría no descarta respuestas viejas: si
+    cambia la búsqueda o el filtro mientras carga, agrega filas de la consulta anterior y deja el
+    cursor viejo; además, el `console.error` espiado en `account.test.tsx` solo se restaura si la
+    prueba pasa.
 - Restricciones: sin dependencias nuevas (Codex no tiene red); CSP sin `unsafe-inline` ni orígenes
   externos, así que nada de estilos inline ni Google Fonts: las familias del mockup se declaran con
   pila de respaldo del sistema. Sistema visual del mockup "Identity Hub Console" (acento `#2d4f8f`,
