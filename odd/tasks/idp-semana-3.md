@@ -996,8 +996,14 @@ Fase 1 cerrada el 2026-09-30 (T9-fix y T10). PR de corte de las fases 0 y 1: #6,
 gitleaks en `accept_invitation.go` agregado a `.gitleaksignore`.
 
 Fase 2 cerrada el 2026-10-01 (T11, T12 con T12d y T13, con sus fixes; última revisión
-`review-8e77444c1bb38413`). Toca el PR de corte de la fase 2 (decisión del usuario); después la
-fase 3 (T14).
+`review-8e77444c1bb38413`). PR de corte de la fase 2: #7, mergeado el 2026-10-01 en `2806a37`
+(merge commit; CI del PR 17/17, run 36939947063). Antes del merge: tres falsos positivos de
+gitleaks a `.gitleaksignore` (`85b8cc0`) y `0cd9cd1` (revisión nativa aprobada,
+`review-f4cb1ae541fa4cb2`): CVE-2026-103111 (HIGH, `pcre2` 10.48-r0 de la base Alpine, sin imagen
+nueva de upstream) parcheado con `apk upgrade --no-cache pcre2` en la etapa final (decisión del
+usuario; quitar esa capa cuando el digest lo incluya; Trivy de CI la rechaza si no corrige), `npm ci
+--ignore-scripts` sin fallback (SonarCloud S6505/S8543) y nombre explícito del job de imágenes para
+conservar los checks obligatorios del ruleset. Sigue la fase 3 (T14).
 
 - `main` protegida desde el 2026-10-01 (ruleset "Protect main", decisión del usuario): PR
   obligatorio sin aprobaciones requeridas, los 17 checks del PR #6 obligatorios, sin force push ni

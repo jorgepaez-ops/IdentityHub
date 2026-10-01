@@ -50,20 +50,28 @@ async function signInAs(roles: string[] | null, landing: 'shell' | 'denied' = 's
   else await screen.findByRole('heading', { name: 'Sin acceso a Contabilidad' })
 }
 
+const realSetTimeout = globalThis.setTimeout.bind(globalThis)
+
 const rail = () => screen.getByRole('navigation', { name: 'Secciones' })
 const goTo = (name: RegExp | string) => fireEvent.click(within(rail()).getByRole('button', { name }))
 const rowOf = (folio: string) => screen.getByText(folio).closest('tr') as HTMLElement
 
+// WebCrypto (token verification, PKCE digest) resolves on the host's real event
+// loop, not on fake timers. vi.waitFor waits in real time between checks and, with
+// fake timers on, also advances them, so the assertion sees the settled state.
 async function advanceUntil(assertion: () => void) {
-  for (let attempt = 0; attempt < 20; attempt += 1) {
+  const deadline = performance.now() + 5_000
+  for (;;) {
     try {
       assertion()
       return
-    } catch {
+    } catch (error) {
+      if (performance.now() > deadline) throw error
       await act(async () => { await vi.advanceTimersByTimeAsync(5) })
+      // Yield one real macrotask so pending WebCrypto work can settle.
+      await new Promise<void>((resolve) => { realSetTimeout(resolve, 0) })
     }
   }
-  assertion()
 }
 
 describe('login screen', () => {
@@ -127,7 +135,8 @@ describe('callback screen', () => {
     render(<App />)
     await advanceUntil(() => expect(screen.getByRole('navigation', { name: 'Secciones' })).toBeInTheDocument())
     await act(async () => { await vi.advanceTimersByTimeAsync(61_000) })
-    expect(redirect).toHaveBeenCalledTimes(1)
+    // beginLogin awaits the PKCE digest (WebCrypto) before redirecting.
+    await advanceUntil(() => expect(redirect).toHaveBeenCalledTimes(1))
     expect(String(redirect.mock.calls[0]?.[0])).toContain(`${HUB}/oauth/authorize?`)
   })
   it('TestRF020_ShowsHubUnavailableMessageAndRetryWhenJwksFails', async () => {
