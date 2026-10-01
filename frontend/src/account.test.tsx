@@ -260,15 +260,18 @@ describe('my account', () => {
 
   it('TestRF008_RendersTwoIdenticalProblemMessagesWithoutDuplicateKeys', async () => {
     const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
-    await open(profile(), {
-      'PATCH /api/v1/me': () => problem(400, { errors: [{ field: 'displayName', message: 'Valor no válido.' }, { field: 'displayName', message: 'Valor no válido.' }] }),
-    })
-    await screen.findByDisplayValue('Persona')
-    type('Nombre para mostrar', 'x')
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
-    expect(await screen.findAllByText('Valor no válido.')).toHaveLength(2)
-    expect(errors.mock.calls.some((call) => String(call[0]).includes('same key'))).toBe(false)
-    errors.mockRestore()
+    try {
+      await open(profile(), {
+        'PATCH /api/v1/me': () => problem(400, { errors: [{ field: 'displayName', message: 'Valor no válido.' }, { field: 'displayName', message: 'Valor no válido.' }] }),
+      })
+      await screen.findByDisplayValue('Persona')
+      type('Nombre para mostrar', 'x')
+      fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+      expect(await screen.findAllByText('Valor no válido.')).toHaveLength(2)
+      expect(errors.mock.calls.some((call) => String(call[0]).includes('same key'))).toBe(false)
+    } finally {
+      errors.mockRestore()
+    }
   })
 
   it('TestRF008_RefreshesTheTokenWhenTheProfileUpdateGets401', async () => {

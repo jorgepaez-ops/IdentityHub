@@ -1,8 +1,14 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from './App'
 import { resetSessionForTests } from './api/client'
 import { type Handler, goTo, json, problem, profile, signedIn, stubApi, type } from './test-utils'
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((done) => { resolve = done })
+  return { promise, resolve }
+}
 
 const adminUser = profile({ id: 'admin-id', email: 'admin@example.test', displayName: 'Admina Root', roles: ['user', 'admin'] })
 const person = (overrides: Record<string, unknown>) => profile({ mfaEnabled: true, lastLoginAt: '2026-10-01T09:30:00Z', ...overrides })
@@ -98,6 +104,44 @@ describe('user directory', () => {
     expect(screen.getByText('Ana Pérez')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Cargar más' })).not.toBeInTheDocument()
     expect(api.calls.at(-1)?.url).toContain('cursor=ana-id')
+  })
+
+  it('TestRF010_DiscardsALateLoadMoreFromAnOlderSearchAndKeepsTheNewCursor', async () => {
+    const late = deferred<Response>()
+    const api = await openUsers({
+      'GET /api/v1/admin/users': (_body, url) => {
+        const params = new URL(url, 'http://localhost').searchParams
+        if (params.get('cursor') === 'ana-id') return late.promise
+        if (params.get('q') === 'carla') return json(200, { items: [directory[3]], nextCursor: 'carla-cursor' })
+        return json(200, { items: [directory[0], directory[1]], nextCursor: 'ana-id' })
+      },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Cargar más' }))
+    type('Buscar por correo o nombre', 'carla')
+    await waitFor(() => expect(screen.queryByText('Ana Pérez')).not.toBeInTheDocument())
+    expect(await screen.findByText('Carla Soto')).toBeInTheDocument()
+    await act(async () => { late.resolve(json(200, { items: [directory[2]], nextCursor: 'stale-cursor' })) })
+    expect(screen.queryByText('Beto Ruiz')).not.toBeInTheDocument()
+    expect(screen.getByText('Carla Soto')).toBeInTheDocument()
+    const more = screen.getByRole('button', { name: 'Cargar más' })
+    expect(more).toBeEnabled()
+    fireEvent.click(more)
+    await waitFor(() => expect(api.calls.at(-1)?.url).toContain('cursor=carla-cursor'))
+    expect(api.calls.at(-1)?.url).toContain('q=carla')
+    expect(api.calls.some((c) => c.url.includes('stale-cursor'))).toBe(false)
+  })
+
+  it('TestRF010_HidesLoadMoreUntilTheFirstPageOfTheNewSearchArrives', async () => {
+    const search = deferred<Response>()
+    const api = await openUsers({
+      'GET /api/v1/admin/users': (_body, url) => (url.includes('q=carla') ? search.promise : json(200, { items: [directory[0], directory[1]], nextCursor: 'ana-id' })),
+    })
+    expect(screen.getByRole('button', { name: 'Cargar más' })).toBeInTheDocument()
+    type('Buscar por correo o nombre', 'carla')
+    await waitFor(() => expect(api.calls.at(-1)?.url).toContain('q=carla'))
+    expect(screen.queryByRole('button', { name: 'Cargar más' })).not.toBeInTheDocument()
+    await act(async () => { search.resolve(json(200, { items: [directory[3]], nextCursor: null })) })
+    expect(await screen.findByText('Carla Soto')).toBeInTheDocument()
   })
 
   it('TestRF010_ShowsAnErrorWhenTheListCannotBeLoaded', async () => {
@@ -419,6 +463,72 @@ describe('audit log', () => {
     expect(await screen.findByText('login_succeeded')).toBeInTheDocument()
     expect(screen.getByText('employee_created')).toBeInTheDocument()
     expect(api.calls.at(-1)?.url).toContain('cursor=11')
+  })
+
+  it('TestRF011_DiscardsALateLoadMoreAfterTheFilterChangesAndNeverSendsTheOldCursor', async () => {
+    const late = deferred<Response>()
+    const older = { ...events[1], id: 10, action: 'stale_event', metadata: {} }
+    const filtered = { ...events[1], id: 9, action: 'login_failed', metadata: {} }
+    const api = await openAudit({
+      'GET /api/v1/admin/audit-log': (_body, url) => {
+        const params = new URL(url, 'http://localhost').searchParams
+        if (params.get('cursor') === '11') return late.promise
+        if (params.get('action') === 'login_failed') return json(200, { items: [filtered], nextCursor: 'filtered-cursor' })
+        return json(200, { items: events, nextCursor: '11' })
+      },
+    })
+    await screen.findByText('employee_created')
+    fireEvent.click(screen.getByRole('button', { name: 'Cargar más' }))
+    type('Acción', 'login_failed')
+    fireEvent.click(screen.getByRole('button', { name: 'Filtrar' }))
+    await waitFor(() => expect(within(table()).queryByText('employee_created')).not.toBeInTheDocument())
+    await act(async () => { late.resolve(json(200, { items: [older], nextCursor: 'stale-cursor' })) })
+    expect(screen.queryByText('stale_event')).not.toBeInTheDocument()
+    const more = await screen.findByRole('button', { name: 'Cargar más' })
+    expect(more).toBeEnabled()
+    fireEvent.click(more)
+    await waitFor(() => expect(api.calls.at(-1)?.url).toContain('cursor=filtered-cursor'))
+    expect(api.calls.at(-1)?.url).toContain('action=login_failed')
+    expect(api.calls.some((c) => c.url.includes('stale-cursor'))).toBe(false)
+  })
+
+  it('TestRF011_HidesLoadMoreUntilTheFirstPageOfTheNewFilterArrives', async () => {
+    const filtered = deferred<Response>()
+    const api = await openAudit({
+      'GET /api/v1/admin/audit-log': (_body, url) => (url.includes('action=login_failed') ? filtered.promise : json(200, { items: events, nextCursor: '11' })),
+    })
+    await screen.findByText('employee_created')
+    type('Acción', 'login_failed')
+    fireEvent.click(screen.getByRole('button', { name: 'Filtrar' }))
+    await waitFor(() => expect(api.calls.at(-1)?.url).toContain('action=login_failed'))
+    expect(screen.queryByRole('button', { name: 'Cargar más' })).not.toBeInTheDocument()
+    await act(async () => { filtered.resolve(json(200, { items: [], nextCursor: null })) })
+  })
+
+  it('TestRF011_DiscardsALateLoadMoreAfterClearingTheFilters', async () => {
+    const late = deferred<Response>()
+    const older = { ...events[1], id: 10, action: 'stale_event', metadata: {} }
+    const api = await openAudit({
+      'GET /api/v1/admin/audit-log': (_body, url) => {
+        const params = new URL(url, 'http://localhost').searchParams
+        if (params.get('cursor') === '11-filtered') return late.promise
+        if (params.get('action') === 'login_failed') return json(200, { items: [events[1]], nextCursor: '11-filtered' })
+        return json(200, { items: events, nextCursor: '11' })
+      },
+    })
+    await screen.findByText('employee_created')
+    type('Acción', 'login_failed')
+    fireEvent.click(screen.getByRole('button', { name: 'Filtrar' }))
+    await waitFor(() => expect(within(table()).queryByText('employee_created')).not.toBeInTheDocument())
+    fireEvent.click(await screen.findByRole('button', { name: 'Cargar más' }))
+    await waitFor(() => expect(api.calls.at(-1)?.url).toContain('cursor=11-filtered'))
+    fireEvent.click(screen.getByRole('button', { name: 'Limpiar' }))
+    expect(await screen.findByText('employee_created')).toBeInTheDocument()
+    await act(async () => { late.resolve(json(200, { items: [older], nextCursor: 'stale-cursor' })) })
+    expect(screen.queryByText('stale_event')).not.toBeInTheDocument()
+    fireEvent.click(await screen.findByRole('button', { name: 'Cargar más' }))
+    await waitFor(() => expect(api.calls.at(-1)?.url).toContain('cursor=11'))
+    expect(api.calls.at(-1)?.url).not.toContain('action=')
   })
 
   it('TestRF011_ShowsAnEmptyMessage', async () => {

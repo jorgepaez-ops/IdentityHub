@@ -33,6 +33,7 @@ export function UsersPage({ currentUserId, onSessionEnded }: { currentUserId: st
   const [drawer, setDrawer] = useState<DrawerTarget | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   const [resending, setResending] = useState<string | null>(null)
+  const generation = useRef(0)
   const opener = useRef<HTMLElement | null>(null)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -49,35 +50,40 @@ export function UsersPage({ currentUserId, onSessionEnded }: { currentUserId: st
   }, [search])
 
   useEffect(() => {
-    let active = true
+    const mine = ++generation.current
+    const current = () => mine === generation.current
     setLoadError(null)
+    setNextCursor(null)
+    setLoadingMore(false)
     void (async () => {
       try {
         const page = await listUsers({ limit: PAGE_SIZE, ...(appliedSearch ? { q: appliedSearch } : {}) })
-        if (!active) return
+        if (!current()) return
         setUsers(page.items)
         setNextCursor(page.nextCursor ?? null)
       } catch (reason) {
-        if (!active) return
+        if (!current()) return
         if (isAuthFailure(reason)) onSessionEnded()
         else setLoadError('No fue posible cargar el directorio. Inténtalo de nuevo.')
       }
     })()
-    return () => { active = false }
   }, [appliedSearch, onSessionEnded])
 
   const loadMore = async () => {
     if (!nextCursor) return
+    const mine = generation.current
     setLoadingMore(true)
     try {
       const page = await listUsers({ limit: PAGE_SIZE, cursor: nextCursor, ...(appliedSearch ? { q: appliedSearch } : {}) })
+      if (mine !== generation.current) return
       setUsers((current) => [...(current ?? []), ...page.items])
       setNextCursor(page.nextCursor ?? null)
     } catch (reason) {
+      if (mine !== generation.current) return
       if (isAuthFailure(reason)) onSessionEnded()
       else setLoadError('No fue posible cargar el directorio. Inténtalo de nuevo.')
     } finally {
-      setLoadingMore(false)
+      if (mine === generation.current) setLoadingMore(false)
     }
   }
 

@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useRef, useState } from 'react'
 import { type AuditEvent, type AuditLogQuery, listAuditLog } from '../../api/client'
 import { formatDate } from '../format'
 import { Problems, isAuthFailure } from './shared'
@@ -31,23 +31,25 @@ export function AuditLogPage({ onSessionEnded }: { onSessionEnded: () => void })
   const [error, setError] = useState<string | null>(null)
   const [filterError, setFilterError] = useState<string | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
+  const generation = useRef(0)
 
   useEffect(() => {
-    let active = true
+    const mine = ++generation.current
     setError(null)
+    setNextCursor(null)
+    setLoadingMore(false)
     void (async () => {
       try {
         const page = await listAuditLog({ limit: PAGE_SIZE, ...toQuery(applied) })
-        if (!active) return
+        if (mine !== generation.current) return
         setEvents(page.items)
         setNextCursor(page.nextCursor ?? null)
       } catch (reason) {
-        if (!active) return
+        if (mine !== generation.current) return
         if (isAuthFailure(reason)) onSessionEnded()
         else setError('No fue posible cargar el registro de auditoría. Inténtalo de nuevo.')
       }
     })()
-    return () => { active = false }
   }, [applied, onSessionEnded])
 
   const filter = (event: FormEvent<HTMLFormElement>) => {
@@ -69,16 +71,19 @@ export function AuditLogPage({ onSessionEnded }: { onSessionEnded: () => void })
 
   const loadMore = async () => {
     if (!nextCursor) return
+    const mine = generation.current
     setLoadingMore(true)
     try {
       const page = await listAuditLog({ limit: PAGE_SIZE, cursor: nextCursor, ...toQuery(applied) })
+      if (mine !== generation.current) return
       setEvents((current) => [...(current ?? []), ...page.items])
       setNextCursor(page.nextCursor ?? null)
     } catch (reason) {
+      if (mine !== generation.current) return
       if (isAuthFailure(reason)) onSessionEnded()
       else setError('No fue posible cargar el registro de auditoría. Inténtalo de nuevo.')
     } finally {
-      setLoadingMore(false)
+      if (mine === generation.current) setLoadingMore(false)
     }
   }
 
