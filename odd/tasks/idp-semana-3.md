@@ -735,7 +735,22 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 
 ## Siguiente paso
 
-Fase 1 cerrada el 2026-09-30 (T9-fix y T10). Toca el PR de corte de la fase 1 (decisión del usuario); después T11.
+Fase 1 cerrada el 2026-09-30 (T9-fix y T10). PR de corte de las fases 0 y 1 abierto el
+2026-10-01: #6 (incluye `7bfc125`, falso positivo de gitleaks en `accept_invitation.go` agregado a
+`.gitleaksignore`). Después del merge, T11.
+
+- Hallazgo nuevo fuera de alcance (CI del PR #6, run 36863251783, job "9-10 · Construir y escanear
+  imágenes (web)"): Trivy encuentra 13 HIGH corregibles en la imagen base de `web`
+  (`nginxinc/nginx-unprivileged`, Debian 13.7, fijada por digest en `8f3d461`): `libheif1` y sus
+  plugins (CVE-2026-84450, CVE-2026-84451), `openssl`/`libssl3t64`/`openssl-provider-legacy` y
+  `libpcre2-8-0` (CVE-2026-103111, CVE-2026-75804, CVE-2026-84782). No lo introduce este PR
+  (`frontend/Dockerfile` sin cambios desde el 2026-09-26): son avisos publicados después de fijar el
+  digest. Remediado antes del merge (decisión del usuario, 2026-10-01): el digest más reciente
+  de `stable` (2026-09-28) seguía con las 13, así que la base pasó a
+  `nginx-unprivileged:stable-alpine` (Alpine 3.24.2, `sha256:ed04ec1f...`). Verificado en local:
+  Trivy con los parámetros de CI da 0 HIGH/CRITICAL corregibles; el contenedor corre como uid 101,
+  sirve la SPA (ruta profunda 200) y responde las cinco cabeceras de RNF-009. Anotado en la ficha
+  de VULN-017. Sin ficha VULN nueva: queda a decisión del usuario si la lleva.
 
 ## Cambios de spec propuestos
 
