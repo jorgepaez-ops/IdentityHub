@@ -749,7 +749,7 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
     a mano en la base local (de ahí D17). Revisión nativa (medio, 5 archivos, 779 líneas, una
     lente): **aprobada** y acusada (`review-758fe75ab4475b76`), con observaciones que pasan a
     T12a-fix.
-  - [ ] T12a-fix — Observaciones de la revisión de T12a: un 2xx sin cuerpo rompe `request()`
+  - [x] T12a-fix — Observaciones de la revisión de T12a: un 2xx sin cuerpo rompe `request()`
     (confirmado: el 202 de `mfa/resend` no tiene cuerpo, así que un reenvío correcto muestra "No se
     pudo conectar"); el `BroadcastChannel` del token se reenvía a la misma pestaña (dos instancias
     con el mismo nombre); si `mfa/verify` sale bien y falla `GET /me`, el mensaje culpa al código;
@@ -757,6 +757,13 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
     `afterEach`; faltan pruebas del refresh fallido, de la sesión restaurada al montar y de la
     guarda de `/usuarios`; el reenvío correcto no muestra confirmación. Además, el menú lateral no
     marca la página activa (visto en la verificación).
+    Hecho (2026-10-01, Codex; revisó y commiteó Claude). Commit `8dd3794`. RED observado en el 2xx
+    sin cuerpo, el eco del canal, el fallo de `/me` tras el MFA, la confirmación del reenvío y el
+    menú activo; las pruebas que faltaban pasaron sin RED (cubrían comportamiento ya correcto).
+    GREEN 29/29; lint, tipos y build ok; GGA aprobó. Revisión nativa: `review_due: false`
+    (`under_budget`, medio, 287 líneas): queda pendiente en el tramo hasta que un commit posterior
+    alcance el presupuesto. Detalle menor anotado: si el código MFA sale bien y falla `GET /me`,
+    solo se borra el token local; la sesión del servidor sigue viva y una recarga la restauraría.
   - [ ] T12b — Cuenta: aceptar invitación y definir contraseña (`/invitations/accept?token=…`,
     ruta fijada en T5; sustituye la página `/verify-email` de Q15, que se fue con el autorregistro),
     solicitar y confirmar restablecimiento, perfil (`GET`/`PATCH /me`) y sesiones activas
