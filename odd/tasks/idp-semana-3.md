@@ -778,14 +778,51 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 - Commit: —
 
 ### T12d — Primer admin por invitación al arrancar (D17)
-- [ ] Estado · Ejecutor: `Codex` (Go, sin red) · Depende de: T5
+- [x] Estado · Ejecutor: `Codex` (Go, sin red) · Depende de: T5
 - Al arrancar la API, con `BOOTSTRAP_ADMIN_EMAIL` definido y ningún admin en la base, crear la
   cuenta pendiente con rol `admin` y encolar su invitación (mismo flujo y auditoría que el alta de
   T5); idempotente y segura con varias réplicas arrancando a la vez (sin dos invitaciones ni dos
   cuentas). Variable en `config.go`, compose, `.env.example` (lo edita el usuario) y la guía.
 - Pruebas: sin variable no hace nada; con variable y sin admin crea y encola una sola vez; con un
   admin existente no hace nada; arranques concurrentes (integración con PostgreSQL real).
+- Ruta: delegada. Codex escribió casi todo y se quedó sin cuota al final; Sonnet terminó, verificó
+  y Claude revisó y commiteó. Se borró el archivo de tareas aparte que había creado Codex.
+- Hallazgo de la revisión de Claude: contar cualquier admin (también uno pendiente) trababa la
+  instalación si el primero no aceptaba la invitación en 24 h. Ahora: admin activo → no hace nada;
+  el correo configurado es un admin pendiente con invitación vigente → no hace nada; con la
+  invitación vencida o anulada → la reemite como el reenvío de T6 (anula la anterior, auditoría
+  `bootstrap_admin_invitation_reissued`); el correo es de otra cuenta → aviso; si no, la crea. La
+  guarda de invitación vigente salió de la prueba concurrente (8 arranques mandaban 8
+  invitaciones).
+- TDD: RED en reemisión, error del broker en la reemisión e invitación vigente; GREEN. Verificación:
+  `make test-go` ok, `make test-integration` ok (arranque concurrente: una cuenta, una invitación,
+  un evento), `golangci-lint` 0 issues (con tag `integration` sigue solo el `errcheck` previo de
+  `testdb.go`), trazabilidad al día, `sqlc` sin deriva. E2E en un proyecto de compose aparte
+  (`-p t12d-check`, sin tocar el volumen del usuario): log de creación sin el correo, invitación en
+  Mailpit, aceptación 204 (segunda vez 410), login + MFA y `/me` con `admin`; reinicio sin efecto;
+  invitación vencida a mano → reemitida, token viejo 410 y nuevo 204.
+- Pendiente del usuario: agregar `BOOTSTRAP_ADMIN_EMAIL` a `.env.example`.
+- Revisión nativa de T12a-fix + T12d (`7c9c3a7..6ddfea8`, alto, 18 archivos, 1.311 líneas, 4
+  lentes): **aprobada** y acusada (`review-8124b51b54325c52`). Observaciones, pasan a T12d-fix.
+- Commit: `6ddfea8`
+
+### T12d-fix — Observaciones de la revisión de T12a-fix y T12d
+- [ ] Estado · Ejecutor: `Codex` · Depende de: T12d
+- R1/R3 (WARNING): `ActiveAdminExists` solo cuenta admins `active`; si todos los admins reales están
+  bloqueados (RF-017) o deshabilitados, un reinicio crea un segundo admin. D17 dice "si no existe
+  ningún admin": contar todo admin que no sea la cuenta pendiente del propio arranque.
+- R3/R4 (WARNING): `user.invited` (con el token) se publica dentro de la transacción y antes del
+  commit, con el candado tomado: si el broker se cuelga, las demás réplicas esperan; si el commit
+  falla, el correo ya salió con un enlace muerto. Es el mismo patrón de T5, `invitationresend` y
+  T6; decidir si se adopta D16 (publicar después del commit) aquí o se documenta el riesgo.
+- R2: la fila de `BOOTSTRAP_ADMIN_EMAIL` en la guía dice "una sola invitación" (hay reemisión);
+  tamaño del token sin constante con nombre; comprobación redundante de `@` en `config.go`; clase
+  falsa de `BroadcastChannel` duplicada en `client.test.ts`.
+- R3 (frontend): `clearSession` tras fallar `/me` anuncia `null` a las demás pestañas; `request()`
+  devuelve `undefined` para cualquier 2xx sin `application/json`, incluso en endpoints que esperan
+  cuerpo.
 - Commit: —
+
 
 ### T13 — Aplicación Contabilidad (React, otro dominio)
 - [ ] Estado · Ejecutor: `Codex` · Depende de: T9, T11
@@ -828,9 +865,9 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 |---|---|---|
 | 0 — Enmiendas de spec y decisiones | T1 a T3 (3) | 3 (T1 a T3) |
 | 1 — Backend | T4 a T10 (7) | 7 (T4 a T10) |
-| 2 — Dominios locales y frontend | T11 a T13 + T12d (4) | 1 (T11) |
+| 2 — Dominios locales y frontend | T11 a T13 + T12d (4) | 2 (T11, T12d) |
 | 3 — Verificación, DAST y cierre | T14 a T17 (4) | 0 |
-| **Total** | **18** | **11** |
+| **Total** | **18** | **12** |
 
 ## Siguiente paso
 
