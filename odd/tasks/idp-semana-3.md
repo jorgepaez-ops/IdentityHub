@@ -703,10 +703,18 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
   `http://localhost:8080`; los permisos del entorno bloquean editarlo. Sin efecto funcional (nadie
   lee `API_BASE_URL` y el compose fija `JWT_ISSUER`), pero el ejemplo queda desactualizado: lo
   cambia el usuario.
-- Revisión nativa: evaluación **alta** (12 rutas, 114 líneas; `security-headers.conf` y
-  `Makefile`). **No disponible** por el mismo defecto #4890 (la selección de archivos sin
-  seguimiento pierde `--base-ref`/`--committed-only`). El usuario eligió continuar sin reportar; no
-  se ejecutó START.
+- Revisión nativa: el primer intento chocó con #4890 (la selección de archivos sin seguimiento
+  pierde `--base-ref`/`--committed-only`). Arreglo local: los archivos sin seguimiento del usuario
+  (`.atl/`, `.codegraph/`, `Claude outputs/`, `ANALISIS-REQUISITOS.md`,
+  `ENUNCIADO-TRABAJO-FINAL.md`) van en `.git/info/exclude`, así Gentle AI no pide la selección.
+  Con eso, revisión de `edec16f..f582156` (alto, 13 archivos, 187 líneas, 4 lentes) con
+  consentimiento del usuario: **aprobada** y acusada (`review-7548bec84859a73f`), sin bloqueantes.
+  Observaciones informativas: R3 (WARNING) los cambios de Nginx no tienen prueba automática
+  (cabeceras en `/assets/`, proxy `/oauth/`, el `server` de Contabilidad, que CI y ZAP no alcanzan
+  porque apuntan a `localhost:8080`): pasa a T14 como smoke test con `Host`; R3 el origen del Hub
+  en la CSP de Contabilidad está fijado a mano y repetido en config y compose; R2 el comentario
+  del `server` de Contabilidad habla de "la SPA" cuando aún es el marcador de T13; R2 el valor por
+  defecto de `JWTIssuer` se comprueba dentro de la prueba de `PublicBaseURL`.
 - Commit: `3cb30fc`
 
 ### T12 — Consola de Identity Hub (React)
