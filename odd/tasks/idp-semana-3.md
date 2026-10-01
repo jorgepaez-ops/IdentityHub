@@ -726,7 +726,7 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 - Commit: `3cb30fc`
 
 ### T12 — Consola de Identity Hub (React)
-- [ ] Estado · Ejecutor: `Codex` · Depende de: T5, T7, T8, T11
+- [x] Estado · Ejecutor: `Codex` · Depende de: T5, T7, T8, T11
 - Según el mockup: login con MFA, directorio de usuarios, alta y edición (estado y roles, regla de
   auto-deshabilitado de RF-010), audit log; páginas de cuenta: verificar correo
   (`/verify-email?token=…`, Q15), definir contraseña, restablecer, perfil y sesiones. Refresh
@@ -796,15 +796,21 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
     devuelven el mismo 400 genérico; el listado de usuarios ordena por id y no trae total.
     Revisión nativa (medio, 15 archivos, 1.358 líneas, una lente): **aprobada** y acusada
     (`review-96aa97adcdb33fa5`). Observaciones → T12c-fix.
-  - [ ] T12c-fix — "Cargar más" del directorio y de la auditoría no descarta respuestas viejas: si
+  - [x] T12c-fix — "Cargar más" del directorio y de la auditoría no descarta respuestas viejas: si
     cambia la búsqueda o el filtro mientras carga, agrega filas de la consulta anterior y deja el
     cursor viejo; además, el `console.error` espiado en `account.test.tsx` solo se restaura si la
     prueba pasa.
+    Hecho (2026-10-01, Sonnet; commiteó Claude). Commit `982240a`. Contador de generación compartido
+    por la carga inicial y "Cargar más"; al cambiar la búsqueda o el filtro se limpia el cursor y el
+    botón se oculta hasta la primera página nueva. RED 5/123 (tres carreras con promesas diferidas y
+    dos de botón oculto), GREEN 123/123; lint, tipos y build ok; GGA aprobó. Revisión nativa:
+    `review_due: false` (`under_budget`, medio, 185 líneas): queda en el tramo con el siguiente
+    commit.
 - Restricciones: sin dependencias nuevas (Codex no tiene red); CSP sin `unsafe-inline` ni orígenes
   externos, así que nada de estilos inline ni Google Fonts: las familias del mockup se declaran con
   pila de respaldo del sistema. Sistema visual del mockup "Identity Hub Console" (acento `#2d4f8f`,
   modo oscuro). Verificación contra el stack real (Docker y Chromium): Claude, al cerrar.
-- Commit: —
+- Commit: `7c9c3a7` (T12a), `8dd3794` (T12a-fix), `8291345` (T12b), `24bf24c` (T12c), `982240a` (T12c-fix)
 
 ### T12d — Primer admin por invitación al arrancar (D17)
 - [x] Estado · Ejecutor: `Codex` (Go, sin red) · Depende de: T5
@@ -912,9 +918,9 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 |---|---|---|
 | 0 — Enmiendas de spec y decisiones | T1 a T3 (3) | 3 (T1 a T3) |
 | 1 — Backend | T4 a T10 (7) | 7 (T4 a T10) |
-| 2 — Dominios locales y frontend | T11 a T13 + T12d (4) | 2 (T11, T12d) |
+| 2 — Dominios locales y frontend | T11 a T13 + T12d (4) | 3 (T11, T12, T12d) |
 | 3 — Verificación, DAST y cierre | T14 a T17 (4) | 0 |
-| **Total** | **18** | **12** |
+| **Total** | **18** | **13** |
 
 ## Siguiente paso
 
