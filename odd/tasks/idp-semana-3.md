@@ -1003,7 +1003,14 @@ gitleaks a `.gitleaksignore` (`85b8cc0`) y `0cd9cd1` (revisión nativa aprobada,
 nueva de upstream) parcheado con `apk upgrade --no-cache pcre2` en la etapa final (decisión del
 usuario; quitar esa capa cuando el digest lo incluya; Trivy de CI la rechaza si no corrige), `npm ci
 --ignore-scripts` sin fallback (SonarCloud S6505/S8543) y nombre explícito del job de imágenes para
-conservar los checks obligatorios del ruleset. Sigue la fase 3 (T14).
+conservar los checks obligatorios del ruleset. Tras el merge, el CI de `main` falló en una prueba
+frágil de Contabilidad (WebCrypto con reloj falso, la que marcó R3 en T13-fix2); arreglada en
+`89d6051` (el helper cede un macrotask real en cada vuelta; 53/53 diez veces y doce bajo carga) y
+mergeada por el PR #8 en `795b30d`; CI de `main` en verde (run 36941918054).
+
+Siguiente sesión: fase 3, empezando por T14 (E2E con Playwright, incluido el smoke test de Nginx
+con cabecera `Host` pendiente de T11). Para delegar con Gentle AI 4.0, cada tarea a un agente que
+escribe lleva su `## Allowed edit surfaces`.
 
 - `main` protegida desde el 2026-10-01 (ruleset "Protect main", decisión del usuario): PR
   obligatorio sin aprobaciones requeridas, los 17 checks del PR #6 obligatorios, sin force push ni
