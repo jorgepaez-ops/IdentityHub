@@ -621,7 +621,12 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
   tienen `family_id` nulo y solo las revocan logout y reseteo.
 - Fuera de alcance: `golangci-lint --build-tags=integration` marca `errcheck` en
   `internal/testdb/testdb.go:52` (`dropDatabase` sin comprobar), previo a esta tarea (`6954cba`).
-- Commit: (este)
+- Revisión nativa: evaluación **alta** (`review_due: high_risk`, 21 rutas). **No disponible**: el
+  envío de la selección de archivos sin seguimiento pierde `--base-ref`/`--committed-only` y el
+  START ofrecido cubría toda la rama (137 rutas). No se ejecutó START. Defecto de Gentle AI 3.7.0
+  ya reportado (#4890, abierto, sin arreglo publicado); con consentimiento del usuario se agregó un
+  comentario de ocurrencia. El commit queda sin revisión nativa; se sigue con la política normal.
+- Commit: `d1c566d`
 
 ### T10 — Pendientes chicos de la semana 2
 - [ ] Estado · Ejecutor: `Codex`
