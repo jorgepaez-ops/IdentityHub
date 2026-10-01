@@ -1,4 +1,4 @@
-const PLACEHOLDER_ORIGIN = 'http://continue.invalid'
+const PLACEHOLDER_ORIGIN = 'https://continue.invalid'
 const AUTHORIZE_PATH = '/oauth/authorize'
 
 /**

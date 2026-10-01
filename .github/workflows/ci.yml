@@ -115,7 +115,7 @@ jobs:
 
       - name: Instalar dependencias del frontend
         working-directory: frontend
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: ESLint
         working-directory: frontend
@@ -128,7 +128,7 @@ jobs:
       # T13 — la SPA de Contabilidad pasa por los mismos gates que la consola.
       - name: Instalar dependencias de Contabilidad
         working-directory: contabilidad
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: ESLint (Contabilidad)
         working-directory: contabilidad
@@ -253,13 +253,13 @@ jobs:
       - name: npm audit
         working-directory: frontend
         run: |
-          npm install --package-lock-only
+          npm install --package-lock-only --ignore-scripts
           npm audit --audit-level=high
 
       - name: npm audit (Contabilidad)
         working-directory: contabilidad
         run: |
-          npm install --package-lock-only
+          npm install --package-lock-only --ignore-scripts
           npm audit --audit-level=high
 
       # v1.9.0 traía Go 1.22.7 embebido: el análisis de alcanzabilidad (govulncheck)
@@ -321,13 +321,13 @@ jobs:
       - name: Pruebas del frontend
         working-directory: frontend
         run: |
-          npm install
+          npm ci --ignore-scripts
           npm run test
 
       - name: Pruebas de Contabilidad
         working-directory: contabilidad
         run: |
-          npm install
+          npm ci --ignore-scripts
           npm run test
 
   # ── 6b. Pruebas de integración ─────────────────────────────────────────
@@ -419,7 +419,9 @@ jobs:
 
   # ── 9 y 10. Construcción y escaneo de imágenes ──────────────────────────
   image:
-    name: 9-10 · Construir y escanear imágenes
+    # Nombre explícito: estos checks son obligatorios en el ruleset de main y deben
+    # conservar el nombre "(nombre, carpeta, target)" que tenían antes de T13.
+    name: 9-10 · Construir y escanear imágenes (${{ matrix.name }}, ${{ matrix.label }}, ${{ matrix.target }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: [lint]
@@ -431,15 +433,18 @@ jobs:
       matrix:
         include:
           - name: api
+            label: backend
             context: backend
             file: backend/Dockerfile
             target: api
           - name: worker
+            label: backend
             context: backend
             file: backend/Dockerfile
             target: worker
           # T13: la imagen web compila frontend/ y contabilidad/, así que su contexto es la raíz.
           - name: web
+            label: frontend
             context: .
             file: frontend/Dockerfile
             target: web
