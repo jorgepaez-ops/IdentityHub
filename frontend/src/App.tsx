@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react'
-import { BrowserRouter, Link, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
-import { ApiProblemError, type CurrentUser, type MfaChallenge, getCurrentUser, login, logout, refreshSession, resendMfaCode, verifyMfa } from './api/client'
+import { BrowserRouter, NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
+import { ApiProblemError, clearSession, type CurrentUser, type MfaChallenge, getCurrentUser, login, logout, refreshSession, resendMfaCode, verifyMfa } from './api/client'
 
 type ErrorStep = 'credentials' | 'verify' | 'resend'
 
@@ -26,6 +26,7 @@ function LoginPage({ onAuthenticated }: { onAuthenticated: (user: CurrentUser) =
   const [challenge, setChallenge] = useState<MfaChallenge | null>(null)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   const [canStartOver, setCanStartOver] = useState(false)
 
   const completeLogin = async (event: FormEvent<HTMLFormElement>) => {
@@ -33,6 +34,7 @@ function LoginPage({ onAuthenticated }: { onAuthenticated: (user: CurrentUser) =
     const data = new FormData(event.currentTarget)
     setPending(true)
     setError(null)
+    setNotice(null)
     setCanStartOver(false)
     try {
       setChallenge(await login({ email: String(data.get('email')), password: String(data.get('password')) }))
@@ -49,13 +51,22 @@ function LoginPage({ onAuthenticated }: { onAuthenticated: (user: CurrentUser) =
     const code = String(new FormData(event.currentTarget).get('code'))
     setPending(true)
     setError(null)
+    setNotice(null)
     setCanStartOver(false)
+    let mfaVerified = false
     try {
       await verifyMfa({ mfaToken: challenge.mfaToken, code })
+      mfaVerified = true
       const user = await getCurrentUser()
       onAuthenticated(user)
       navigate(user.roles.includes('admin') ? '/usuarios' : '/me', { replace: true })
     } catch (reason) {
+      if (mfaVerified) {
+        clearSession()
+        setChallenge(null)
+        setError('No se pudo cargar tu sesión. Vuelve a iniciar sesión.')
+        return
+      }
       setError(messageFor(reason, 'verify'))
       setCanStartOver(reason instanceof ApiProblemError && reason.status === 401)
     } finally {
@@ -67,9 +78,11 @@ function LoginPage({ onAuthenticated }: { onAuthenticated: (user: CurrentUser) =
     if (!challenge) return
     setPending(true)
     setError(null)
+    setNotice(null)
     setCanStartOver(false)
     try {
       await resendMfaCode({ mfaToken: challenge.mfaToken })
+      setNotice('Te enviamos un código nuevo.')
     } catch (reason) {
       setError(messageFor(reason, 'resend'))
       setCanStartOver(reason instanceof ApiProblemError && reason.status === 401)
@@ -81,6 +94,7 @@ function LoginPage({ onAuthenticated }: { onAuthenticated: (user: CurrentUser) =
   const startOver = () => {
     setChallenge(null)
     setError(null)
+    setNotice(null)
     setCanStartOver(false)
   }
 
@@ -96,6 +110,7 @@ function LoginPage({ onAuthenticated }: { onAuthenticated: (user: CurrentUser) =
             {canStartOver && <button className="secondary-button" onClick={startOver} type="button">Volver a iniciar sesión</button>}
           </div>
         )}
+        {notice && <div className="success-box" role="status"><p>{notice}</p></div>}
         {challenge ? (
           <form onSubmit={verify}>
             <p className="muted">Enviamos un código de seis dígitos a tu correo electrónico.</p>
@@ -134,8 +149,8 @@ function AppShell({ user, onLogout }: { user: CurrentUser; onLogout: () => Promi
       <aside className="left-rail">
         <div className="rail-brand"><span className="small-mark">IH</span><span>Identity Hub<small>Proveedor de identidad</small></span></div>
         <nav aria-label="Navegación principal">
-          {user.roles.includes('admin') && <Link to="/usuarios">Usuarios</Link>}
-          <Link to="/me">Mi cuenta</Link>
+          {user.roles.includes('admin') && <NavLink to="/usuarios">Usuarios</NavLink>}
+          <NavLink to="/me">Mi cuenta</NavLink>
         </nav>
         <div className="connected-apps"><strong>Aplicaciones conectadas</strong><a href="http://contabilidad.localhost:8080">Contabilidad</a></div>
         <button className="logout-button" onClick={() => void closeSession()} type="button">Cerrar sesión</button>

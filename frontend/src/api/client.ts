@@ -11,6 +11,7 @@ export type Problem = components['schemas']['Problem']
 const refreshLockName = 'identity-hub-refresh'
 let accessToken: string | null = null
 let refreshInFlight: Promise<void> | null = null
+let tokenChannel: BroadcastChannel | null = null
 
 export class ApiProblemError extends Error {
   readonly status: number
@@ -26,20 +27,18 @@ export class ApiProblemError extends Error {
   }
 }
 
-function setAccessToken(token: string | null, announce = true) {
-  accessToken = token
-  if (announce && typeof BroadcastChannel !== 'undefined') {
-    const channel = new BroadcastChannel(refreshLockName)
-    channel.postMessage({ token })
-    channel.close()
-  }
-}
-
-if (typeof BroadcastChannel !== 'undefined') {
-  const channel = new BroadcastChannel(refreshLockName)
-  channel.onmessage = (event: MessageEvent<{ token?: unknown }>) => {
+function getTokenChannel(): BroadcastChannel | null {
+  if (tokenChannel || typeof BroadcastChannel === 'undefined') return tokenChannel
+  tokenChannel = new BroadcastChannel(refreshLockName)
+  tokenChannel.onmessage = (event: MessageEvent<{ token?: unknown }>) => {
     setAccessToken(typeof event.data.token === 'string' ? event.data.token : null, false)
   }
+  return tokenChannel
+}
+
+function setAccessToken(token: string | null, announce = true) {
+  accessToken = token
+  if (announce) getTokenChannel()?.postMessage({ token })
 }
 
 async function parseError(response: Response): Promise<ApiProblemError> {
@@ -68,8 +67,10 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (init.body) headers.set('Content-Type', 'application/json')
   const response = await fetch(path, { ...init, headers, credentials: 'same-origin' })
   if (!response.ok) throw await parseError(response)
-  if (response.status === 204) return undefined as T
-  return (await response.json()) as T
+  if (response.status === 204 || !response.headers.get('content-type')?.includes('application/json')) return undefined as T
+  const body = await response.text()
+  if (!body.trim()) return undefined as T
+  return JSON.parse(body) as T
 }
 
 async function post<T>(path: string, body?: unknown): Promise<T> {
@@ -82,6 +83,7 @@ async function runExclusive<T>(operation: () => Promise<T>): Promise<T> {
 }
 
 export async function refreshSession(): Promise<void> {
+  getTokenChannel()
   if (refreshInFlight) return refreshInFlight
   const tokenBeforeRefresh = accessToken
   const operation = runExclusive(async () => {
@@ -135,8 +137,14 @@ export async function logout(): Promise<void> {
   }
 }
 
+export function clearSession() {
+  setAccessToken(null)
+}
+
 // Test-only reset; session state is module memory and never uses Web Storage.
 export function resetSessionForTests() {
   accessToken = null
   refreshInFlight = null
+  tokenChannel?.close()
+  tokenChannel = null
 }

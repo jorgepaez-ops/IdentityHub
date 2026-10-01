@@ -49,13 +49,16 @@ button { cursor: pointer; border: 0; border-radius: .55rem; font-weight: 600; }
 .secondary-button { margin-top: .65rem; border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
 button:disabled { cursor: wait; opacity: .7; }
 .error-box { padding: .75rem; color: var(--danger); background: var(--danger-soft); border-radius: .55rem; }
+.success-box { padding: .75rem; color: var(--ok); background: var(--ok-soft); border-radius: .55rem; }
+.success-box p { margin: 0; }
 .app-shell { min-height: 100vh; display: grid; grid-template-columns: 15rem minmax(0, 1fr); }
 .left-rail { display: flex; flex-direction: column; gap: 1.5rem; padding: 1.25rem; background: var(--panel); border-right: 1px solid var(--line); }
 .rail-brand { display: flex; align-items: center; gap: .65rem; font-family: var(--display); font-weight: 700; }
 .rail-brand small { display: block; color: var(--muted); font-family: var(--body); font-size: .72rem; font-weight: 400; }
 nav { display: grid; gap: .25rem; }
-nav a { padding: .55rem .65rem; border-radius: .45rem; color: var(--ink); font-weight: 600; text-decoration: none; }
+nav a { padding: .55rem .65rem; border-radius: .45rem; color: var(--ink); text-decoration: none; }
 nav a:hover, nav a:focus-visible { background: var(--accent-soft); color: var(--accent); }
+nav a.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
 .connected-apps { display: grid; gap: .35rem; padding: .85rem; color: var(--muted); background: var(--bg); border: 1px solid var(--line); border-radius: .55rem; }
 .connected-apps strong { color: var(--ink); font-size: .78rem; }
 .logout-button { margin-top: auto; padding: .65rem; color: var(--ink); background: var(--panel); border: 1px solid var(--line); }
