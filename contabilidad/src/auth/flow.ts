@@ -87,17 +87,20 @@ export async function completeCallback(search: string): Promise<Session> {
     throw new CallbackError('exchange', reason instanceof Error ? reason.message : 'token exchange failed')
   }
 
-  let jwksResponse: Response
+  let jwks: Jwks
   try {
-    jwksResponse = await fetch(`${HUB_ORIGIN}/.well-known/jwks.json`, { credentials: 'omit' })
+    const response = await fetch(`${HUB_ORIGIN}/.well-known/jwks.json`, { credentials: 'omit' })
+    if (!response.ok) throw new Error(`jwks answered ${response.status}`)
+    const body: unknown = await response.json()
+    if (typeof body !== 'object' || body === null || !Array.isArray((body as { keys?: unknown }).keys)) {
+      throw new Error('jwks response without keys array')
+    }
+    jwks = body as Jwks
   } catch (reason) {
-    throw new CallbackError('hub_unavailable', reason instanceof Error ? reason.message : 'JWKS fetch failed')
+    throw new CallbackError('hub_unavailable', reason instanceof Error ? reason.message : 'JWKS retrieval failed')
   }
-  if (jwksResponse.status >= 500) throw new CallbackError('hub_unavailable', `jwks answered ${jwksResponse.status}`)
 
   try {
-    if (!jwksResponse.ok) throw new Error(`jwks answered ${jwksResponse.status}`)
-    const jwks = (await jwksResponse.json()) as Jwks
     const verified = await verifyAccessToken(accessToken, jwks, { issuer: ISSUER, audience: AUDIENCE })
     return { accessToken, verified }
   } catch (reason) {

@@ -34,9 +34,16 @@ export function UsersPage({ currentUserId, onSessionEnded }: { currentUserId: st
   const [toast, setToast] = useState<string | null>(null)
   const [resending, setResending] = useState<string | null>(null)
   const generation = useRef(0)
+  const mounted = useRef(true)
 
   useEffect(() => () => {
     generation.current += 1
+  }, [])
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
   }, [])
   const opener = useRef<HTMLElement | null>(null)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -110,18 +117,17 @@ export function UsersPage({ currentUserId, onSessionEnded }: { currentUserId: st
   }
 
   const resend = async (user: AdminUser) => {
-    const mine = generation.current
     setResending(user.id)
     try {
       await resendInvitation(user.id)
-      if (mine !== generation.current) return
+      if (!mounted.current) return
       showToast(`Invitación reenviada a ${user.email}.`)
     } catch (reason) {
-      if (mine !== generation.current) return
+      if (!mounted.current) return
       if (isAuthFailure(reason)) onSessionEnded()
       else showToast(adminProblems(reason, RESEND_COPY, 'No fue posible reenviar la invitación. Inténtalo de nuevo.')[0] ?? '')
     } finally {
-      if (mine === generation.current) setResending(null)
+      if (mounted.current) setResending(null)
     }
   }
 

@@ -157,6 +157,20 @@ describe('completeCallback: code exchange and token handling', () => {
     await expect(completeCallback(`?code=c&state=${state}`)).rejects.toMatchObject({ kind: 'hub_unavailable' })
   })
 
+  it.each([
+    ['404 response', () => jsonResponse(404, { title: 'Not found' })],
+    ['invalid JSON', () => new Response('{', { status: 200, headers: { 'Content-Type': 'application/json' } })],
+    ['missing keys array', () => jsonResponse(200, {})],
+  ])('TestRF020_CallbackReportsJwks%sAsHubUnavailable', async (_case, jwksResponse) => {
+    const { state } = await startedFlow()
+    const access = await signToken(key, validClaims({ exp: Math.floor(Date.now() / 1000) + 900 }))
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === `${HUB}/oauth/token`) return jsonResponse(200, { access_token: access })
+      return jwksResponse()
+    }))
+    await expect(completeCallback(`?code=c&state=${state}`)).rejects.toMatchObject({ kind: 'hub_unavailable' })
+  })
+
   it('TestRF020_CallbackReportsNetworkFailureAsExchangeError', async () => {
     const { state } = await startedFlow()
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))

@@ -1,7 +1,8 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { App } from './App'
+import { App, MINIMUM_SESSION_LIFETIME_MS } from './App'
 import { beginLogin } from './auth/flow'
+import { CLOCK_LEEWAY_SECONDS } from './auth/jwt'
 import * as navigation from './navigation'
 import { AUDIENCE, HUB_ORIGIN, ISSUER } from './config'
 import { makeKey, signToken, validClaims, type TestKey } from './testing'
@@ -52,6 +53,18 @@ async function signInAs(roles: string[] | null, landing: 'shell' | 'denied' = 's
 const rail = () => screen.getByRole('navigation', { name: 'Secciones' })
 const goTo = (name: RegExp | string) => fireEvent.click(within(rail()).getByRole('button', { name }))
 const rowOf = (folio: string) => screen.getByText(folio).closest('tr') as HTMLElement
+
+async function advanceUntil(assertion: () => void) {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    try {
+      assertion()
+      return
+    } catch {
+      await act(async () => { await vi.advanceTimersByTimeAsync(5) })
+    }
+  }
+  assertion()
+}
 
 describe('login screen', () => {
   it('TestRF020_LoginOffersOnlyContinueWithIdentityHub', () => {
@@ -112,8 +125,7 @@ describe('callback screen', () => {
     window.history.replaceState({}, '', `/oauth/callback?code=c&state=${sessionStorage.getItem('contabilidad.oauth_state')}`)
     redirect.mockClear()
     render(<App />)
-    await act(async () => { await vi.advanceTimersByTimeAsync(0) })
-    expect(screen.getByRole('navigation', { name: 'Secciones' })).toBeInTheDocument()
+    await advanceUntil(() => expect(screen.getByRole('navigation', { name: 'Secciones' })).toBeInTheDocument())
     await act(async () => { await vi.advanceTimersByTimeAsync(61_000) })
     expect(redirect).toHaveBeenCalledTimes(1)
     expect(String(redirect.mock.calls[0]?.[0])).toContain(`${HUB}/oauth/authorize?`)
@@ -144,8 +156,21 @@ describe('callback screen', () => {
     window.history.replaceState({}, '', `/oauth/callback?code=c&state=${sessionStorage.getItem('contabilidad.oauth_state')}`)
     redirect.mockClear()
     render(<App />)
-    await act(async () => { await vi.advanceTimersByTimeAsync(0) })
-    expect(screen.getByRole('alert')).toHaveTextContent('reloj')
+    await advanceUntil(() => expect(screen.getByRole('alert')).toHaveTextContent('reloj'))
+    expect(redirect).not.toHaveBeenCalled()
+  })
+
+  it('TestRF020_UsesClockLeewayLifetimeToAvoidRedirectLoops', async () => {
+    expect(MINIMUM_SESSION_LIFETIME_MS).toBe(CLOCK_LEEWAY_SECONDS * 1000)
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-01T12:00:00Z'))
+    await beginLogin()
+    const nowSeconds = Math.floor(Date.now() / 1000)
+    stubHub({ roles: ['contabilidad.senior'], exp: nowSeconds - CLOCK_LEEWAY_SECONDS + 1 })
+    window.history.replaceState({}, '', `/oauth/callback?code=c&state=${sessionStorage.getItem('contabilidad.oauth_state')}`)
+    redirect.mockClear()
+    render(<App />)
+    await advanceUntil(() => expect(screen.getByRole('alert')).toHaveTextContent('reloj'))
     expect(redirect).not.toHaveBeenCalled()
   })
 

@@ -1,18 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { accessFor } from './access'
 import { beginLogin, completeCallback, type CallbackError, type Session } from './auth/flow'
+import { CLOCK_LEEWAY_SECONDS } from './auth/jwt'
 import { CALLBACK_PATH } from './config'
 import { AccessDenied, LoginScreen, type LoginState } from './Login'
 import { Shell } from './Shell'
 
-const MINIMUM_SESSION_LIFETIME_MS = 60_000
+export const MINIMUM_SESSION_LIFETIME_MS = CLOCK_LEEWAY_SECONDS * 1000
 
-const CALLBACK_MESSAGES: Record<CallbackError['kind'], string> = {
+type CallbackMessageKind = CallbackError['kind'] | 'clock'
+
+const CALLBACK_MESSAGES: Record<CallbackMessageKind, string> = {
   state: 'No se pudo validar el inicio de sesión (la respuesta no corresponde a esta solicitud). Inténtalo de nuevo.',
   denied: 'Identity Hub no autorizó el acceso. Inténtalo de nuevo.',
   exchange: 'No se pudo completar el inicio de sesión con Identity Hub. Inténtalo de nuevo.',
   token: 'La credencial recibida de Identity Hub no es válida. Inténtalo de nuevo.',
   hub_unavailable: 'Identity Hub no está disponible en este momento. Inténtalo de nuevo.',
+  clock: 'No se pudo iniciar sesión por un problema de reloj. Verifica la hora de tu dispositivo e inténtalo de nuevo.',
 }
 
 export function App() {
@@ -29,7 +33,7 @@ export function App() {
     completeCallback(window.location.search).then(
       (result) => {
         if (result.verified.expiresAt * 1000 - Date.now() <= MINIMUM_SESSION_LIFETIME_MS) {
-          setLogin({ kind: 'error', message: 'No se pudo iniciar sesión por un problema de reloj. Verifica la hora de tu dispositivo e inténtalo de nuevo.' })
+          setLogin({ kind: 'error', message: CALLBACK_MESSAGES.clock })
           return
         }
         setSession(result)

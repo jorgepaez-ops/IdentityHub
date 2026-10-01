@@ -415,6 +415,18 @@ describe('resend invitation', () => {
     expect(api.calls.some((c) => c.key === 'POST /api/v1/admin/users/beto-id/invitation')).toBe(true)
   })
 
+  it('TestRF001_KeepsResendCompletionAfterReloadingTheDirectory', async () => {
+    const invitation = deferred<Response>()
+    const api = await openUsers({ 'POST /api/v1/admin/users/beto-id/invitation': () => invitation.promise })
+    resend('Beto Ruiz')
+    await waitFor(() => expect(api.calls.some((call) => call.key === 'POST /api/v1/admin/users/beto-id/invitation')).toBe(true))
+    type('Buscar por correo o nombre', 'beto')
+    await waitFor(() => expect(api.calls.at(-1)?.url).toContain('q=beto'))
+    await act(async () => { invitation.resolve(json(204)) })
+    expect(await screen.findByText('Invitación reenviada a beto@example.test.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Reenviar invitación a Beto Ruiz' })).toBeEnabled()
+  })
+
   it.each([
     [409, 'La cuenta ya no está pendiente: no hace falta reenviar la invitación.'],
     [404, 'La cuenta ya no existe.'],
