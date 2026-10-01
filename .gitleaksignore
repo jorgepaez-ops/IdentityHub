@@ -86,3 +86,10 @@ ac159e86dc206f84a8f2163ace4f13682f3e2e22:docs/guia-desarrollo.md:url-de-conexion
 # handler de aceptación de invitaciones. Es el valor que llega en el request, no un
 # secreto en el código; la regla genérica toma cualquier "password: <valor>".
 28293ddebaeaa94a978556c9ee52eb20c3f8254e:backend/internal/api/accept_invitation.go:contrasena-en-variable-de-entorno:29
+
+# Falsos positivos: lectura del campo de contraseña de un formulario
+# (`password: String(data.get('password'))`) en el login y en las páginas de
+# invitación/restablecimiento de la consola. Es el valor que escribe el usuario,
+# no un secreto en el código; la regla genérica toma cualquier "password: <valor>".
+8291345ac882b2c6a4998b312727a1a6c5ea1052:frontend/src/features/account/PublicPages.tsx:contrasena-en-variable-de-entorno:50
+7c9c3a7d3ee95e3946f4df16f50de26e77f37f67:frontend/src/App.tsx:contrasena-en-variable-de-entorno:38
