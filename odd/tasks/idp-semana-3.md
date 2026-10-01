@@ -907,7 +907,7 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 - Commit: `eaa4670`
 
 ### T13-fix — Decisión D8 en la app y observaciones de la revisión de T13
-- [ ] Estado · Ejecutor: `Codex` · Depende de: T13
+- [x] Estado · Ejecutor: `Codex` · Depende de: T13
 - D8: quitar "Administración" de Contabilidad; "Sin acceso" con enlace al Hub.
 - R2/R3 (WARNING): el contador de generación de T12c-fix reemplazó la limpieza al desmontar en
   `UsersPage` y `AuditLogPage`: una respuesta tardía tras salir de la página todavía llama
@@ -920,7 +920,27 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 - R4: un fallo al bajar el JWKS se muestra como credencial inválida; distinguirlo.
 - R1: CI cae de `npm ci` a `npm install` (también en la consola); usar `npm ci` a secas.
 - R2: constantes de prueba duplicadas (`ISSUER`, `AUDIENCE`, `HUB`); `nextId` con número mágico.
+- Hecho (2026-10-01, Codex; revisó y commiteó Claude). Commit `89ac1cb`. Contabilidad 49/49, consola
+  147/147; lint, tipos y build ok en las dos; GGA aprobó. RED observado en guardas al desmontar,
+  límite de reloj, fallo del JWKS y folio malformado; sin RED aislado para quitar Administración y
+  para la prueba determinista (el primer RED se colgó por el reloj falso). CI remoto sin correr.
+- Revisión nativa (alto, 18 archivos, 295 líneas, 4 lentes): **aprobada** y acusada
+  (`review-14ddf284cef4132f`). Observaciones → T13-fix2.
+
+### T13-fix2 — Observaciones de la revisión de T13-fix
+- [ ] Estado · Ejecutor: `Codex` · Depende de: T13-fix
+- R2/R3/R4 (WARNING, coinciden tres lentes): `resend()` de `UsersPage` usa el mismo contador de
+  generación que recarga la lista; si la lista se recarga durante un reenvío, se pierden el aviso y
+  el cierre de sesión y `resending` queda trabado. Separar "desmontado" de "carga vigente".
+- R2 (WARNING): un 4xx o un JSON inválido del JWKS se sigue mostrando como credencial inválida.
+- R2 (WARNING): `MINIMUM_SESSION_LIFETIME_MS` y `CLOCK_LEEWAY_SECONDS` están acoplados sin
+  decirlo; derivar uno del otro.
+- R3 (WARNING): las pruebas del callback con reloj falso hacen un solo `advanceTimersByTimeAsync(0)`
+  antes de afirmar; WebCrypto no resuelve como microtarea, pueden fallar al azar.
+- R2: mensaje del reloj fuera de `CALLBACK_MESSAGES`; la prueba de `nextId` lleva la etiqueta RF009
+  y un `as never`.
 - Commit: —
+
 
 
 ## Fase 3 — Verificación, DAST y cierre
