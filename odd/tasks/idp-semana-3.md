@@ -764,11 +764,23 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
     (`under_budget`, medio, 287 líneas): queda pendiente en el tramo hasta que un commit posterior
     alcance el presupuesto. Detalle menor anotado: si el código MFA sale bien y falla `GET /me`,
     solo se borra el token local; la sesión del servidor sigue viva y una recarga la restauraría.
-  - [ ] T12b — Cuenta: aceptar invitación y definir contraseña (`/invitations/accept?token=…`,
+  - [x] T12b — Cuenta: aceptar invitación y definir contraseña (`/invitations/accept?token=…`,
     ruta fijada en T5; sustituye la página `/verify-email` de Q15, que se fue con el autorregistro),
     solicitar y confirmar restablecimiento, perfil (`GET`/`PATCH /me`) y sesiones activas
     (listar y revocar).
-  - [ ] T12c — Consola admin: directorio con búsqueda y estados, cajón de alta y edición (roles
+    Hecho (2026-10-01, Sonnet porque Codex no tenía cuota; revisó y commiteó Claude). Commit
+    `8291345`. Rutas de los correos: `/invitations/accept?token=` y `/password-reset?token=`
+    (`notify.go`); solicitud en `/forgot-password`. TDD: RED 27/29, GREEN 61/61; lint, tipos y build
+    ok; GGA aprobó. E2E con Chromium en `-p t12b-check`, con el primer admin llegado por T12d:
+    aceptar invitación (reusarla, 410), MFA, editar el nombre y que persista, revocar la sesión de
+    otro contexto (sale en su siguiente refresh), restablecer la contraseña y entrar con la nueva,
+    revocar la sesión actual (cierra aquí); sin errores de consola ni de CSP. Revisión nativa
+    (medio, 7 archivos, 699 líneas, una lente): **aprobada** y acusada (`review-f619b064ab69f30d`).
+    Observaciones que pasan a T12c: un fallo de autenticación al revocar no saca al usuario;
+    nombre vacío se envía sin validar; claves de React por texto del mensaje; faltan pruebas del
+    límite de 128, del 400 sin campos y de un 500 al confirmar. Además, el user agent de las
+    sesiones se ve crudo.
+  - [ ] T12c — Consola admin (incluye las observaciones de la revisión de T12b): directorio con búsqueda y estados, cajón de alta y edición (roles
     del catálogo; un admin no puede deshabilitarse a sí mismo, RF-010), reenvío de invitación a
     cuentas pendientes y registro de auditoría.
 - Restricciones: sin dependencias nuevas (Codex no tiene red); CSP sin `unsafe-inline` ni orígenes
