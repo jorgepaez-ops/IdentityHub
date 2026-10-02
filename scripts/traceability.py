@@ -52,8 +52,6 @@ class Scenario(NamedTuple):
 
 
 GHERKIN_SCENARIO = re.compile(r"(Escenario|Esquema del escenario):")
-# Keywords that open a new scope: tags collected so far must not leak past them.
-GHERKIN_SCOPE = re.compile(r"(Característica|Regla|Antecedentes|Fondo):")
 
 
 def load_requirements() -> dict[str, tuple[str, str]]:

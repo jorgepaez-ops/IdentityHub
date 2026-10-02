@@ -1053,6 +1053,10 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
     se arrastran entre bloques, escenarios duplicados como error y pruebas de esas ramas; comentario de
     `advanceUntil` corregido. Evidencia: `make e2e` 45/45 dos veces, límite de vuelta en 20,
     `make spec-drift` ok (3 pruebas + matriz idéntica), Contabilidad 53/53, `tsc` ok.
+    Revisión de `e28d3cf` aprobada; se quitó la constante muerta `GHERKIN_SCOPE` (el reinicio real
+    de etiquetas es la rama `else` del parser). Decisión consciente: "no aceptó la invitación"
+    fabrica el estado por SQL (contraseña conocida + `pending_verification`), porque un invitado
+    real nunca tiene una contraseña conocida y solo así se prueba que el 401 viene del estado.
   - [ ] T14e — Job E2E en CI (stack con `.env` generado), sin renombrar los 17 checks
     obligatorios; verificarlo requiere push (decisión del usuario).
 
