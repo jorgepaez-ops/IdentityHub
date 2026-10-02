@@ -1,4 +1,6 @@
-# ZAP rules: pluginid<TAB>action<TAB>comment. Used by zap-baseline/zap-api-scan (-c) and scripts/zap-gate.py.
+# ZAP rules: pluginid<TAB>action<TAB>comment. Passed to zap-baseline with -c and always applied by
+# scripts/zap-gate.py. zap-api-scan deliberately gets NO -c: with -c it switches to the full Default
+# Policy and runs out of memory (see the scan-dast target in the Makefile); the gate covers it.
 # Medium/High alerts break the build (T15). Only IGNORE (with justification) suppresses one; none today.
 # 10055 (CSP: Failure to Define Directive with No Fallback) is deliberately NOT listed: it must break
 # the gate until T15b remediates it.

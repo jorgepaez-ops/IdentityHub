@@ -88,6 +88,15 @@ class GateTest(unittest.TestCase):
             rep = self.write("empty.json", content)
             self.assertEqual(self.run_gate([rep]), 2)
 
+    def test_malformed_report_is_an_input_error_not_a_finding(self):
+        for content in ({"site": ["not-a-dict"]}, {"site": [{"alerts": [{"riskcode": "high"}]}]}):
+            rep = self.write("bad.json", content)
+            self.assertEqual(self.run_gate([rep]), 2)
+
+    def test_single_site_object_is_accepted(self):
+        rep = self.write("one.json", {"site": {"alerts": [{"pluginid": "10055", "alert": "CSP", "riskcode": "2", "count": "1", "instances": []}]}})
+        self.assertEqual(self.run_gate([rep]), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

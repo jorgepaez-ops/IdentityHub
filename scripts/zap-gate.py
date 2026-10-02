@@ -56,18 +56,24 @@ def load_alerts(path):
         # A ZAP run that never reached its target can still write a report; treating it as
         # "no alerts" would let the gate pass without anything having been scanned.
         raise InputError(f"report {path} has no scanned sites")
+    if isinstance(sites, dict):
+        sites = [sites]
     alerts = []
-    for site in sites:
-        for a in site.get("alerts", []):
-            instances = a.get("instances") or []
-            count = int(a.get("count") or len(instances) or 1)
-            alerts.append({
-                "risk": int(a.get("riskcode", 0)),
-                "plugin": str(a.get("pluginid", "?")),
-                "name": a.get("alert") or a.get("name") or "?",
-                "count": count,
-                "url": instances[0].get("uri", "") if instances else "",
-            })
+    try:
+        for site in sites:
+            for a in site.get("alerts", []):
+                instances = a.get("instances") or []
+                count = int(a.get("count") or len(instances) or 1)
+                alerts.append({
+                    "risk": int(a.get("riskcode", 0)),
+                    "plugin": str(a.get("pluginid", "?")),
+                    "name": a.get("alert") or a.get("name") or "?",
+                    "count": count,
+                    "url": instances[0].get("uri", "") if instances else "",
+                })
+    except (AttributeError, TypeError, ValueError, IndexError) as exc:
+        # A malformed report is an input error (exit 2), never a "finding" (exit 1).
+        raise InputError(f"report {path} has an unexpected shape: {exc}")
     return alerts
 
 

@@ -657,8 +657,8 @@ jobs:
         run: make scan-dast
 
       - name: Subir informes de ZAP
-        # cancelled(): al vencer timeout-minutes GitHub cancela el job; sin esto, justo ese
-        # caso se quedaría sin informes.
+        # always(): los informes se guardan pase, falle o se cancele el job (al vencer
+        # timeout-minutes GitHub lo cancela, no lo marca como fallido).
         if: always()
         uses: actions/upload-artifact@v4
         with:

@@ -1142,6 +1142,10 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
     `actionlint` ok; `make spec-drift` ok. Sin verificar hasta CI: `host-gateway`, permisos del
     directorio de informes y alcance a Nginx desde el contenedor. Candidato a acción compuesta:
     los pasos de arranque del stack están duplicados entre los jobs 7 y 11.
+    Revisión de `d2db463` aprobada; sus tres advertencias corregidas: un informe malformado es
+    error de entrada (exit 2), nunca "hallazgo" (exit 1), y se acepta `site` como objeto único (RED
+    contra la versión anterior: 2 errores → GREEN 11/11); el encabezado de `rules.tsv` ya no dice
+    que el escaneo de API use `-c`; el comentario del paso de informes explica `always()`.
   - [ ] T15b — Ficha de la CSP sin `form-action` (id lo asigna Codex al crearla; afecta a los dos
     `server`, Hub y Contabilidad) y remediación en `frontend/nginx/default.conf`; run en verde como evidencia "después" (requiere push).
 
