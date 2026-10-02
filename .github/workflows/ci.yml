@@ -6,8 +6,8 @@
 #  se sembró para ellos. Pasará a verde durante la fase de remediación.
 #  Para ver los hallazgos sin bloquear, está baseline-scan.yml.
 #
-#  Jobs 1–10 de la tabla del plan, más el job 7 (E2E con Playwright contra el
-#  stack completo de docker compose, T14e). Los de release (SBOM, firma,
+#  Jobs 1–10 de la tabla del plan; el 7 (E2E con Playwright contra el stack
+#  completo de docker compose) se agregó en T14e. Los de release (SBOM, firma,
 #  publicación) y DAST se incorporan en la semana 3.
 # ═══════════════════════════════════════════════════════════════════════════
 name: CI
@@ -462,7 +462,9 @@ jobs:
         run: make e2e
 
       - name: Subir informe y trazas de Playwright
-        if: failure()
+        # cancelled(): al vencer timeout-minutes GitHub cancela el job (no lo marca como
+        # fallido); sin esto, justo ese caso se quedaría sin informe ni logs.
+        if: failure() || cancelled()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-${{ github.run_id }}
@@ -473,7 +475,7 @@ jobs:
           retention-days: 7
 
       - name: Volcar los logs del stack
-        if: failure()
+        if: failure() || cancelled()
         run: docker compose --env-file .env -f deploy/docker-compose.yml logs --no-color --tail=300
 
       - name: Derribar el stack
