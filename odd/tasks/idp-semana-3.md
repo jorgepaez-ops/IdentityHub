@@ -1156,7 +1156,14 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
     el stack local hasta 15 min al restaurar el límite a 20 (solo local); `scan-dast` duplica el
     bloque de restauración de `e2e` y reutiliza `E2E_LOGIN_IP_MAX_FAILURES`; `advanceUntil` de
     `contabilidad/src/App.test.tsx` espera 5 s, igual que el timeout de Vitest.
-  - [ ] T15b — Ficha de la CSP sin `form-action` (id lo asigna Codex al crearla; afecta a los dos
+    **T15b (2026-10-02, Codex escribió; Claude verificó y commiteó)**: VULN-030 (id asignado por
+    Codex al crear la ficha), `form-action 'self'` en las dos CSP (Codex comprobó que ningún
+    formulario publica a otro origen: las SPA usan `fetch` y OAuth es navegación de nivel superior),
+    aserción en `nginx.spec.ts`, `docs/evidencia/VULN-030/evidencia.json`. Remediación en `61df987`.
+    Verificado en local con la imagen `web` reconstruida: ambas cabeceras traen `form-action 'self'`;
+    `make scan-dast` → 10055 PASS en los tres escaneos, "Gate passed"; `make e2e` 46/46. Falta el run
+    "después" en CI (requiere push).
+  - [x] T15b — Ficha de la CSP sin `form-action` (id lo asigna Codex al crearla; afecta a los dos
     `server`, Hub y Contabilidad) y remediación en `frontend/nginx/default.conf`; run en verde como evidencia "después" (requiere push).
     Avance (2026-10-02, sin marcar hasta la verificación de Claude): asignado VULN-030; ficha y
     evidencia antes creadas desde el run 37055543540 (`133aa8b`, job 11), y `form-action 'self'`

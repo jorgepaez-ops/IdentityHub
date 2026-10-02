@@ -10,7 +10,7 @@
 | **Amenaza** | AM-015 (XSS que roba el token del `localStorage`) |
 | **Sembrada** | no |
 | **Evidencia antes** | `docs/evidencia/VULN-030/evidencia.json` — run 37055543540 |
-| **Commit de remediación** | pendiente |
+| **Commit de remediación** | `61df987` |
 | **Evidencia después** | pendiente (run verde de CI posterior a la remediación) |
 | **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/37055543540 / pendiente |
 

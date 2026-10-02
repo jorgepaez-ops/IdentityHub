@@ -19,7 +19,7 @@
   },
   "remediacion": {
     "tarea": "T15b",
-    "commit": null,
+    "commit": "61df987",
     "ficha": "security/findings/VULN-030-csp-sin-form-action.md"
   },
   "despues": {
