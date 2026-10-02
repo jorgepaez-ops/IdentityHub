@@ -1008,7 +1008,26 @@ frágil de Contabilidad (WebCrypto con reloj falso, la que marcó R3 en T13-fix2
 `89d6051` (el helper cede un macrotask real en cada vuelta; 53/53 diez veces y doce bajo carga) y
 mergeada por el PR #8 en `795b30d`; CI de `main` en verde (run 36941918054).
 
-Siguiente sesión: fase 3, empezando por T14 (E2E con Playwright, incluido el smoke test de Nginx
+Bugs reportados por el usuario al probar a mano (2026-10-01, `make up`, base local), a resolver
+antes de T14 como **BUG-1** y **BUG-2** (evidencia de los logs de Nginx/API tomada en el momento):
+- **BUG-1 — aceptar invitación falla con "No se pudo conectar con el servicio".** El admin creó la
+  cuenta (`POST /api/v1/admin/users` 201, 00:23:08 UTC), llegó el correo, el enlace abrió
+  `/invitations/accept?token=…` (00:23:30) y al enviar la contraseña salió ese mensaje. En los logs
+  de Nginx **nunca llega** un `POST /api/v1/auth/invitations/accept`: el fallo ocurre en el
+  navegador antes o al hacer el `fetch` (ese mensaje es el de un error que no es RFC 7807). En
+  cambio, restablecer contraseña sí funciona (`request` 202, `confirm` 204).
+- **BUG-2 — `t12a-user@example.test` (analista) no entra a Contabilidad** tras restablecer la
+  contraseña (el restablecimiento funcionó). El Hub emite el código: hay tres
+  `/oauth/authorize` → `/oauth/callback?code=…` (00:21:19, 00:21:30, 00:28:56), pero **nunca llega**
+  un `POST /oauth/token` (ni un `OPTIONS` previo) a Nginx: Contabilidad falla en el navegador antes
+  de canjear el código. La E2E de T13 pasó en Chromium headless con el mismo flujo, así que puede
+  depender del navegador o del estado (pestañas, `sessionStorage`, extensiones). Dato aparte: esa
+  cuenta se creó a mano por SQL en T12a y no tiene el rol base `user` (solo
+  `contabilidad.analista`); no explica que falte el canje, pero conviene descartarlo.
+- Plan: reproducir con Playwright en Chromium y Firefox mirando consola, red y CSP; preguntar al
+  usuario el navegador y lo que muestra la consola; prueba que falle primero (TDD) y arreglo.
+
+Siguiente sesión: BUG-1 y BUG-2; después fase 3, empezando por T14 (E2E con Playwright, incluido el smoke test de Nginx
 con cabecera `Host` pendiente de T11). Para delegar con Gentle AI 4.0, cada tarea a un agente que
 escribe lleva su `## Allowed edit surfaces`.
 
