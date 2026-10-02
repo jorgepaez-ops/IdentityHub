@@ -6,6 +6,7 @@ const inCI = Boolean(process.env.CI)
 export default defineConfig({
   testDir: 'tests',
   globalSetup: './support/global-setup.ts',
+  globalTeardown: './support/global-teardown.ts',
   // Serial on purpose: Nginx rate-limits /api/v1/auth/ and the tests share one local database.
   // Flows chain several mail waits (up to 20 s each), so the 30 s default is too tight.
   timeout: 120_000,

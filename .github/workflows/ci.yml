@@ -81,6 +81,10 @@ jobs:
       - name: Pruebas del verificador de trazabilidad
         run: python3 scripts/traceability_test.py
 
+      # Pruebas del gate de ZAP (stdlib, sin red): el gate decide el job 11.
+      - name: Pruebas del gate de ZAP
+        run: python3 scripts/zap_gate_test.py
+
       - name: Regenerar la matriz de trazabilidad
         run: python3 scripts/traceability.py
 
@@ -398,54 +402,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Todo lo que sigue es desechable: el .env solo existe en este runner y vive lo que
-      # dura el job. Cada secreto se enmascara antes de escribirse.
-      # Las contraseñas son hex para que valgan tal cual dentro de las URLs de conexión.
-      - name: Generar un .env desechable
-        run: |
-          gen_hex() { openssl rand -hex 24; }
-          PG_PASS="$(gen_hex)"; APP_PASS="$(gen_hex)"; MQ_PASS="$(gen_hex)"; GF_PASS="$(gen_hex)"
-          JWT_KEY="$(openssl rand -base64 32)"
-          for secret in "$PG_PASS" "$APP_PASS" "$MQ_PASS" "$GF_PASS" "$JWT_KEY"; do
-            echo "::add-mask::${secret}"
-          done
-          umask 077
-          {
-            echo "POSTGRES_USER=identity"
-            echo "POSTGRES_PASSWORD=${PG_PASS}"
-            echo "POSTGRES_DB=identity"
-            echo "IDENTITY_APP_PASSWORD=${APP_PASS}"
-            echo "RABBITMQ_DEFAULT_USER=identity"
-            echo "RABBITMQ_DEFAULT_PASS=${MQ_PASS}"
-            echo "MIGRATE_DATABASE_URL=postgres://identity:${PG_PASS}@db:5432/identity?sslmode=disable"
-            echo "DATABASE_URL=postgres://identity_app:${APP_PASS}@db:5432/identity?sslmode=disable"
-            echo "RABBITMQ_URL=amqp://identity:${MQ_PASS}@broker:5672/"
-            echo "JWT_SIGNING_KEY=${JWT_KEY}"
-            # Subred de la red por defecto de docker-compose.yml (nginx llega a la API desde ahí).
-            echo "TRUSTED_PROXIES=172.28.0.0/16"
-            # Compose interpola el archivo entero, también los servicios de perfiles inactivos.
-            echo "GRAFANA_ADMIN_USER=admin"
-            echo "GRAFANA_ADMIN_PASSWORD=${GF_PASS}"
-          } > .env
-
-      # Los navegadores y Node usan *.localhost; systemd-resolved lo resuelve a 127.0.0.1,
-      # pero el /etc/hosts explícito quita la dependencia de ese comportamiento del runner.
-      - name: Resolver los hosts *.localhost
-        run: echo "127.0.0.1 identityhub.localhost contabilidad.localhost" | sudo tee -a /etc/hosts
-
-      - name: Levantar el stack (make up)
-        run: make up
-
-      # `up -d` no espera. `web` no tiene healthcheck pero depende de `api` sana (que a su vez
-      # espera a db, broker y migrate), así que responder en :8080 implica el stack listo.
-      # --retry-all-errors: mientras Nginx arranca, el puerto puede aceptar y cortar la conexión
-      # (curl 56, "connection reset"), que --retry-connrefused no reintenta (run 37055543540).
-      - name: Esperar a que el stack esté sano
-        run: |
-          curl --fail --silent --show-error --retry 30 --retry-delay 2 --retry-all-errors \
-            http://identityhub.localhost:8080/ > /dev/null
-          curl --fail --silent --show-error --retry 30 --retry-delay 2 --retry-all-errors \
-            http://contabilidad.localhost:8080/ > /dev/null
+      # .env desechable, hosts *.localhost, make up y espera de salud (acción compuesta local).
+      - name: Levantar el stack
+        uses: ./.github/actions/stack-up
 
       - uses: actions/setup-node@v4
         with:
@@ -598,7 +557,7 @@ jobs:
   # Mismo arranque del stack que el job 7. `make scan-dast` corre ZAP (baseline del Hub y de
   # Contabilidad + escaneo de API con el OpenAPI) y scripts/zap-gate.py rompe la build con
   # hallazgos de severidad media o más (T15; las reglas aceptadas viven en .zap/rules.tsv).
-  # El arranque duplica el del job 7; candidato a acción compuesta más adelante.
+  # El arranque es el mismo del job 7: acción compuesta .github/actions/stack-up.
   dast:
     name: 11 · DAST (OWASP ZAP)
     runs-on: ubuntu-latest
@@ -608,54 +567,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Todo lo que sigue es desechable: el .env solo existe en este runner y vive lo que
-      # dura el job. Cada secreto se enmascara antes de escribirse.
-      # Las contraseñas son hex para que valgan tal cual dentro de las URLs de conexión.
-      - name: Generar un .env desechable
-        run: |
-          gen_hex() { openssl rand -hex 24; }
-          PG_PASS="$(gen_hex)"; APP_PASS="$(gen_hex)"; MQ_PASS="$(gen_hex)"; GF_PASS="$(gen_hex)"
-          JWT_KEY="$(openssl rand -base64 32)"
-          for secret in "$PG_PASS" "$APP_PASS" "$MQ_PASS" "$GF_PASS" "$JWT_KEY"; do
-            echo "::add-mask::${secret}"
-          done
-          umask 077
-          {
-            echo "POSTGRES_USER=identity"
-            echo "POSTGRES_PASSWORD=${PG_PASS}"
-            echo "POSTGRES_DB=identity"
-            echo "IDENTITY_APP_PASSWORD=${APP_PASS}"
-            echo "RABBITMQ_DEFAULT_USER=identity"
-            echo "RABBITMQ_DEFAULT_PASS=${MQ_PASS}"
-            echo "MIGRATE_DATABASE_URL=postgres://identity:${PG_PASS}@db:5432/identity?sslmode=disable"
-            echo "DATABASE_URL=postgres://identity_app:${APP_PASS}@db:5432/identity?sslmode=disable"
-            echo "RABBITMQ_URL=amqp://identity:${MQ_PASS}@broker:5672/"
-            echo "JWT_SIGNING_KEY=${JWT_KEY}"
-            # Subred de la red por defecto de docker-compose.yml (nginx llega a la API desde ahí).
-            echo "TRUSTED_PROXIES=172.28.0.0/16"
-            # Compose interpola el archivo entero, también los servicios de perfiles inactivos.
-            echo "GRAFANA_ADMIN_USER=admin"
-            echo "GRAFANA_ADMIN_PASSWORD=${GF_PASS}"
-          } > .env
-
-      # Los navegadores y Node usan *.localhost; systemd-resolved lo resuelve a 127.0.0.1,
-      # pero el /etc/hosts explícito quita la dependencia de ese comportamiento del runner.
-      - name: Resolver los hosts *.localhost
-        run: echo "127.0.0.1 identityhub.localhost contabilidad.localhost" | sudo tee -a /etc/hosts
-
-      - name: Levantar el stack (make up)
-        run: make up
-
-      # `up -d` no espera. `web` no tiene healthcheck pero depende de `api` sana (que a su vez
-      # espera a db, broker y migrate), así que responder en :8080 implica el stack listo.
-      # --retry-all-errors: mientras Nginx arranca, el puerto puede aceptar y cortar la conexión
-      # (curl 56, "connection reset"), que --retry-connrefused no reintenta (run 37055543540).
-      - name: Esperar a que el stack esté sano
-        run: |
-          curl --fail --silent --show-error --retry 30 --retry-delay 2 --retry-all-errors \
-            http://identityhub.localhost:8080/ > /dev/null
-          curl --fail --silent --show-error --retry 30 --retry-delay 2 --retry-all-errors \
-            http://contabilidad.localhost:8080/ > /dev/null
+      # .env desechable, hosts *.localhost, make up y espera de salud (acción compuesta local).
+      - name: Levantar el stack
+        uses: ./.github/actions/stack-up
 
       - name: Escaneo DAST (make scan-dast)
         run: make scan-dast

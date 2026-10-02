@@ -2,10 +2,11 @@ import { createHash, randomBytes } from 'node:crypto'
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
 import { createActiveUser, seedAdmin, strongPassword } from '../support/accounts'
 import { paced } from '../support/api'
+import { browserLoginWithMfa } from '../support/browser'
 import { contextApi, loginWithMfaContext } from '../support/auth'
 import { contabilidadUrl, hubUrl } from '../support/config'
 import { assertEmail, psql } from '../support/db'
-import { extractCode, mailIds, waitForMail } from '../support/mailpit'
+import { mailIds } from '../support/mailpit'
 
 const clientID = 'contabilidad'
 const redirectURI = `${contabilidadUrl}/oauth/callback`
@@ -71,16 +72,6 @@ async function contextSession(playwright: Parameters<typeof loginWithMfaContext>
   return { email, ...(await loginWithMfaContext(playwright, email, strongPassword)) }
 }
 
-async function completeBrowserMfa(email: string, existingMailIds: ReadonlySet<string>, since: Date, page: Page) {
-  await page.locator('#email').fill(email)
-  await page.locator('#password').fill(strongPassword)
-  await page.getByRole('button', { name: 'Iniciar sesión' }).click()
-  await expect(page.locator('#mfa-code')).toBeVisible()
-  const code = extractCode((await waitForMail(email, 'sign-in code', since, existingMailIds)).text)
-  await page.locator('#mfa-code').fill(code)
-  await page.getByRole('button', { name: 'Verificar' }).click()
-}
-
 function expectSafeCallbackAddress(address: string): void {
   const url = new URL(address)
   expect(url.searchParams.get('code')).toBeNull()
@@ -108,7 +99,7 @@ test('RF-020 Flujo OAuth correcto con PKCE S256', async ({ page }) => {
       // Skip the unauthenticated hop to the login page: only the redirect to the registered URI counts.
       (response.headers().location ?? '').startsWith(`${redirectURI}?`))
   const tokenResponse = page.waitForResponse((response) => response.url() === `${hubUrl}/oauth/token` && response.request().method() === 'POST')
-  await completeBrowserMfa(email, existingMailIds, since, page)
+  await browserLoginWithMfa(page, email, strongPassword, { existingMailIds, since })
 
   const redirectLocation = (await authorizeRedirect).headers().location
   expect(redirectLocation).toBeTruthy()
@@ -137,7 +128,7 @@ test('RF-020 Un segundo acceso usa la sesión SSO del Hub', async ({ page }) => 
 
   await page.goto(contabilidadUrl)
   await page.getByRole('button', { name: 'Continuar con Identity Hub' }).click()
-  await completeBrowserMfa(email, initialMailIds, since, page)
+  await browserLoginWithMfa(page, email, strongPassword, { existingMailIds: initialMailIds, since })
   await expect(page.getByText('Analista contable', { exact: true })).toBeVisible()
   const mailAfterMfa = await mailIds(email)
 
@@ -240,7 +231,7 @@ test('RF-020 Sin sesión en el Hub se pasa por el login y se vuelve a la autoriz
   expect(continueParams.get('redirect_uri')).toBe(redirectURI)
   expect(continueParams.get('state')).toBeTruthy()
 
-  await completeBrowserMfa(email, existingMailIds, since, page)
+  await browserLoginWithMfa(page, email, strongPassword, { existingMailIds, since })
   await expect(page.getByText('Analista contable', { exact: true })).toBeVisible()
   await expect(page).toHaveURL(`${contabilidadUrl}/`)
   expectSafeCallbackAddress(page.url())
@@ -255,7 +246,7 @@ test('RF-020 Un "continue" absoluto o externo no provoca una redirección abiert
   const external = 'https://sitio-malicioso.example/robo'
 
   await page.goto(`${hubUrl}/login?continue=${encodeURIComponent(external)}`)
-  await completeBrowserMfa(email, existingMailIds, since, page)
+  await browserLoginWithMfa(page, email, strongPassword, { existingMailIds, since })
   await expect(page.getByRole('heading', { name: 'Mi cuenta' })).toBeVisible()
   expect(page.url()).toMatch(new RegExp(`^${hubUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`))
   expect(page.url()).not.toContain(external)

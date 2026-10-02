@@ -1,10 +1,11 @@
 import { expect, test, type PlaywrightWorkerArgs } from '@playwright/test'
 import { createActiveUser, inviteUser, seedAdmin, strongPassword } from '../support/accounts'
 import { api } from '../support/api'
+import { browserLoginWithMfa } from '../support/browser'
 import { contextApi, loginWithMfaContext } from '../support/auth'
 import { contabilidadUrl } from '../support/config'
 import { psql } from '../support/db'
-import { extractCode, mailIds, waitForMail } from '../support/mailpit'
+import { mailIds } from '../support/mailpit'
 
 type Playwright = PlaywrightWorkerArgs['playwright']
 
@@ -43,12 +44,7 @@ test('RF-009 Un empleado sin rol de aplicación no accede a Contabilidad', async
 
   await page.goto(contabilidadUrl)
   await page.getByRole('button', { name: 'Continuar con Identity Hub' }).click()
-  await page.locator('#email').fill(email)
-  await page.locator('#password').fill(strongPassword)
-  await page.getByRole('button', { name: 'Iniciar sesión' }).click()
-  await expect(page.locator('#mfa-code')).toBeVisible()
-  await page.locator('#mfa-code').fill(extractCode((await waitForMail(email, 'sign-in code', since, existingMailIds)).text))
-  await page.getByRole('button', { name: 'Verificar' }).click()
+  await browserLoginWithMfa(page, email, strongPassword, { existingMailIds, since })
 
   await expect(page.getByRole('heading', { name: 'Sin acceso a Contabilidad', exact: true })).toHaveText('Sin acceso a Contabilidad')
 })

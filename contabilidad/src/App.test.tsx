@@ -59,9 +59,13 @@ const rowOf = (folio: string) => screen.getByText(folio).closest('tr') as HTMLEl
 // WebCrypto (token verification, PKCE digest) resolves on the host's real event
 // loop, not on fake timers. This is a hand-written deadline loop: it retries the
 // assertion, and between attempts advances the fake timers by 5 ms inside act(),
-// until the assertion passes or 5 s of real time elapse (then it rethrows).
+// until the assertion passes or 3 s of real time elapse (then it rethrows). The
+// deadline stays well under Vitest's default 5 s per-test timeout so a real
+// failure surfaces this assertion's error instead of a generic timeout.
+const ADVANCE_DEADLINE_MS = 3_000
+
 async function advanceUntil(assertion: () => void) {
-  const deadline = performance.now() + 5_000
+  const deadline = performance.now() + ADVANCE_DEADLINE_MS
   for (;;) {
     try {
       assertion()

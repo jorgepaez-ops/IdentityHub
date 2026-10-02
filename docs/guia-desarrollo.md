@@ -147,13 +147,23 @@ make e2e     # npm ci + npx playwright test
 - Requieren Node.js y los navegadores de Playwright (`npx playwright install chromium`, una vez).
 - Las pruebas crean sus propias cuentas `e2e-*@example.test` en la base local (un administrador
   sembrado por SQL con `docker exec` y las invitaciones que cada escenario necesita); no tocan
-  las demás cuentas, pero tampoco las borran.
+  las demás cuentas y tampoco las borran. Al terminar, `e2e/support/global-teardown.ts` pasa a
+  `disabled` todas las cuentas `e2e-%@example.test` (solo ese patrón, con parámetros, contra el
+  contenedor de `E2E_DB_CONTAINER`), para que los administradores sembrados con la contraseña
+  del repositorio no queden activos. Las filas no se eliminan (`audit_log` las referencia).
 - Se ejecutan en serie porque Nginx limita `/api/v1/auth/` a 5 peticiones por segundo.
 - Todas las peticiones salen de la misma IP y varios escenarios fallan logins a propósito. Por eso
   `make e2e` recrea la API con `LOGIN_IP_MAX_FAILURES=1000` (variable `E2E_LOGIN_IP_MAX_FAILURES`)
-  mientras corre la suite y la restaura al terminar, pase o falle. El límite por cuenta no se
-  relaja. Si se corre `npx playwright test` directamente, la segunda corrida dentro de
+  mientras corre la suite y la restaura al terminar, pase o falle (variable
+  `LOCAL_TEST_LOGIN_IP_MAX_FAILURES`; `E2E_LOGIN_IP_MAX_FAILURES` sigue valiendo como alias). El
+  límite por cuenta no se relaja. La lógica compartida con `make scan-dast` vive en
+  `scripts/with-raised-login-limit.sh`. Si se corre `npx playwright test` directamente, la segunda corrida dentro de
   `LOGIN_FAILURE_WINDOW` (15 min) choca con el límite por IP; el chequeo previo lo avisa.
+- Al terminar, `scripts/ip-lockout-warning.sh` consulta `audit_log` (solo lectura) y, si alguna IP
+  tiene 20 o más `login_failed`/`mfa_code_rejected` en los últimos 15 min, imprime un aviso con la
+  IP, el conteo y la hora local aproximada en que bajará del límite. Esos fallos no se pueden borrar
+  (`audit_log` es append-only), así que hasta entonces tu navegador puede recibir 423. El aviso
+  nunca cambia el código de salida.
 - Variables opcionales: `E2E_HUB_URL`, `E2E_MAILPIT_URL`, `E2E_DB_CONTAINER` (por defecto
   `identity-hub-db-1`).
 - CI corre esta misma suite en el job `7 · E2E (Playwright)`: genera un `.env` desechable, levanta el
@@ -173,10 +183,12 @@ del Hub (`identityhub.localhost:8080`), baseline de Contabilidad y escaneo de la
 - Debe terminar en verde. La CSP sin `form-action` (10055) lo rompía hasta VULN-030; si vuelve a
   aparecer un hallazgo medio o alto, el gate rompe la build.
 - El escaneo de API golpea `/api/v1/auth/` desde una sola IP, así que `make scan-dast` sube
-  `LOGIN_IP_MAX_FAILURES` en la API mientras corre y la restaura al terminar (como `make e2e`).
+  `LOGIN_IP_MAX_FAILURES` en la API mientras corre y la restaura al terminar (como `make e2e`,
+  con el mismo script y el mismo aviso de bloqueo por IP al final).
 - Los informes (JSON y HTML) quedan en `security/zap-reports/` (ignorado por git). CI corre lo
   mismo en el job `11 · DAST (OWASP ZAP)` y sube esa carpeta como artefacto.
-- Pruebas del gate: `python3 scripts/zap_gate_test.py`.
+- Pruebas del gate: `python3 scripts/zap_gate_test.py` (también corre en `make spec-drift` y en el
+  job `1 · Deriva entre specs y código`).
 
 ## 4. GoLand
 

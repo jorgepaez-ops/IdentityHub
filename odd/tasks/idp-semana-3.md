@@ -1210,6 +1210,18 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
     Contabilidad, 30002 y 40018 PASS en la API, "Gate passed". Cierra VULN-030 y VULN-031 y es el
     "después" con gate real de VULN-013 y VULN-014 (sus capturas del run 37055543540 quedan como
     `run_rojo_previo`). Las capturas de este run quedan en `null` hasta que Desktop las confirme.
+- Limpieza tras T15 (2026-10-02, Sonnet; revisó y commiteó Claude), las advertencias acumuladas de
+  las revisiones de T14 y T15: (1) `scripts/ip-lockout-warning.sh` avisa al terminar `make e2e` o
+  `make scan-dast` qué IP quedó sobre el límite y hasta qué hora (solo lectura de `audit_log`, que no
+  se puede borrar); (2) `globalTeardown` deshabilita las cuentas `e2e-%@example.test`; (3)
+  `zap_gate_test.py` corre en spec-drift (CI y `make spec-drift`); (4) un solo
+  `scripts/with-raised-login-limit.sh` para `e2e` y `scan-dast`, variable
+  `LOCAL_TEST_LOGIN_IP_MAX_FAILURES` (con alias del nombre viejo); (5) acción compuesta
+  `.github/actions/stack-up` para los jobs 7 y 11; (6) `advanceUntil` con plazo de 3 s frente a los
+  5 s de Vitest; (7) un solo helper `browserLoginWithMfa`. Evidencia local: `actionlint` ok, `tsc`
+  ok, `make spec-drift` ok, `make e2e` 46/46 con 0 cuentas `e2e-%` activas, `make scan-dast` "Gate
+  passed" (el aviso de IP salió para 192.168.65.1), Contabilidad 53/53, interrupción con SIGINT
+  restaura el límite a 20. Sin verificar hasta CI: la acción compuesta.
 
 ### T16 — Hook de pre-commit real
 - [ ] Estado · Ejecutor: `Claude`

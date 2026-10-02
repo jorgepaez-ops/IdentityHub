@@ -1,24 +1,12 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 import { seedAdmin, strongPassword, uniqueEmail } from '../support/accounts'
+import { browserLoginWithMfa } from '../support/browser'
 import { contabilidadUrl, hubUrl } from '../support/config'
-import { extractCode, extractLink, mailIds, waitForMail } from '../support/mailpit'
+import { extractLink, mailIds, waitForMail } from '../support/mailpit'
 
 const analystRole = 'contabilidad.analista'
 const seniorRole = 'contabilidad.senior'
 const continueButton = 'Continuar con Identity Hub'
-
-/** Fills the Hub login form and the emailed MFA code the way a person would. */
-async function signInOnHub(page: Page, email: string): Promise<void> {
-  const before = await mailIds(email)
-  const since = new Date()
-  await page.locator('#email').fill(email)
-  await page.locator('#password').fill(strongPassword)
-  await page.getByRole('button', { name: 'Iniciar sesión' }).click()
-  await expect(page.locator('#mfa-code')).toBeVisible()
-  const mail = await waitForMail(email, 'sign-in code', since, before)
-  await page.locator('#mfa-code').fill(extractCode(mail.text))
-  await page.getByRole('button', { name: 'Verificar' }).click()
-}
 
 test('DEMO Guion de la demo en vivo: alta, invitación, MFA, SSO y vistas por rol', async ({ browser }) => {
   test.setTimeout(180_000)
@@ -33,7 +21,7 @@ test('DEMO Guion de la demo en vivo: alta, invitación, MFA, SSO y vistas por ro
   try {
     await test.step('1. El admin entra a la consola del Hub con MFA', async () => {
       await adminPage.goto(`${hubUrl}/login`)
-      await signInOnHub(adminPage, admin.email)
+      await browserLoginWithMfa(adminPage, admin.email, strongPassword)
       await expect(adminPage.getByRole('heading', { name: 'Usuarios' })).toBeVisible()
     })
 
@@ -62,7 +50,7 @@ test('DEMO Guion de la demo en vivo: alta, invitación, MFA, SSO y vistas por ro
 
     await test.step('4. El empleado inicia sesión en el Hub con el código MFA', async () => {
       await employeePage.goto(`${hubUrl}/login`)
-      await signInOnHub(employeePage, employee)
+      await browserLoginWithMfa(employeePage, employee, strongPassword)
       await expect(employeePage).toHaveURL(`${hubUrl}/me`)
     })
 

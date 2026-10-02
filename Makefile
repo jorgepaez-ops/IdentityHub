@@ -10,7 +10,7 @@ SQLC_VERSION := v1.31.1
 SQLC         ?= sqlc
 
 .DEFAULT_GOAL := help
-.PHONY: help up down logs ps restart build test test-go test-integration test-front e2e scan-dast spec-drift lint fmt gen scan scan-secrets scan-deps scan-image scan-config migrate psql rabbit mail clean
+.PHONY: help up down logs ps restart build test test-go test-integration test-front e2e _e2e-run scan-dast _scan-dast-run spec-drift lint fmt gen scan scan-secrets scan-deps scan-image scan-config migrate psql rabbit mail clean
 
 help: ## Muestra esta ayuda
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -83,20 +83,22 @@ test-front: ## Pruebas del frontend (consola del Hub y Contabilidad)
 	cd frontend && npm run test
 	cd contabilidad && npm run test
 
-E2E_LOGIN_IP_MAX_FAILURES ?= 1000
+# Límite por IP mientras corren las suites locales (e2e, scan-dast). E2E_LOGIN_IP_MAX_FAILURES
+# sigue funcionando como alias retrocompatible.
+LOCAL_TEST_LOGIN_IP_MAX_FAILURES ?= $(or $(E2E_LOGIN_IP_MAX_FAILURES),1000)
+
+# Envuelve un objetivo interno: sube solo el límite por IP (RF-017), lo restaura con trap en
+# EXIT/INT/TERM y avisa si alguna IP quedó bloqueada. Ver scripts/with-raised-login-limit.sh.
+WITH_RAISED_LIMIT = COMPOSE='$(COMPOSE)' LOCAL_TEST_LOGIN_IP_MAX_FAILURES=$(LOCAL_TEST_LOGIN_IP_MAX_FAILURES) \
+    scripts/with-raised-login-limit.sh $(MAKE) --no-print-directory
 
 e2e: ## Pruebas de extremo a extremo contra el stack levantado
 	@# Todas las peticiones salen de la misma IP: se sube solo el límite por IP
 	@# (RF-017) mientras corre la suite y se restaura al terminar, pase o falle.
-	@cleanup() { status=$$?; trap - EXIT INT TERM; \
-	    if ! $(COMPOSE) up -d --no-deps --wait api; then \
-	      echo "ERROR: no se pudo restaurar la API con el límite por defecto; puede seguir con LOGIN_IP_MAX_FAILURES elevado. Ejecuta 'make up' para restaurarla." >&2; \
-	      [ $$status -ne 0 ] || status=1; \
-	    fi; \
-	    exit $$status; }; \
-	  trap cleanup EXIT INT TERM; \
-	  LOGIN_IP_MAX_FAILURES=$(E2E_LOGIN_IP_MAX_FAILURES) $(COMPOSE) up -d --no-deps --wait api && \
-	  (cd e2e && npm ci --ignore-scripts && npx playwright test)
+	@$(WITH_RAISED_LIMIT) _e2e-run
+
+_e2e-run:
+	cd e2e && npm ci --ignore-scripts && npx playwright test
 
 ZAP_IMAGE ?= ghcr.io/zaproxy/zaproxy:2.17.0
 ZAP_REPORTS := security/zap-reports
@@ -117,15 +119,10 @@ scan-dast: ## DAST con OWASP ZAP (baseline Hub y Contabilidad + API) contra el s
 	@# cortaba respuestas a mitad del escaneo (410 → 429) y ZAP lo leía como inyección SQL booleana
 	@# (falso positivo 40018, run 37058826831). Nginx sigue cubierto por los dos baseline y por E2E.
 	@rm -rf $(ZAP_REPORTS) && mkdir -p $(ZAP_REPORTS) && chmod 777 $(ZAP_REPORTS)
-	@cleanup() { status=$$?; trap - EXIT INT TERM; \
-	    if ! $(COMPOSE) up -d --no-deps --wait api; then \
-	      echo "ERROR: no se pudo restaurar la API con el límite por defecto; puede seguir con LOGIN_IP_MAX_FAILURES elevado. Ejecuta 'make up' para restaurarla." >&2; \
-	      [ $$status -ne 0 ] || status=1; \
-	    fi; \
-	    exit $$status; }; \
-	  trap cleanup EXIT INT TERM; \
-	  LOGIN_IP_MAX_FAILURES=$(E2E_LOGIN_IP_MAX_FAILURES) $(COMPOSE) up -d --no-deps --wait api && \
-	  $(ZAP_RUN) zap-baseline.py -t http://identityhub.localhost:8080 -c rules.tsv -I \
+	@$(WITH_RAISED_LIMIT) _scan-dast-run
+
+_scan-dast-run:
+	$(ZAP_RUN) zap-baseline.py -t http://identityhub.localhost:8080 -c rules.tsv -I \
 	    -J hub.json -r hub.html && \
 	  $(ZAP_RUN) zap-baseline.py -t http://contabilidad.localhost:8080 -c rules.tsv -I \
 	    -J contabilidad.json -r contabilidad.html && \
@@ -136,6 +133,7 @@ scan-dast: ## DAST con OWASP ZAP (baseline Hub y Contabilidad + API) contra el s
 
 spec-drift: ## Verifica sin red la matriz y escenarios Gherkin contra E2E
 	python3 scripts/traceability_test.py
+	python3 scripts/zap_gate_test.py
 	python3 scripts/traceability.py --check
 
 migrate: ## Aplica las migraciones pendientes
