@@ -1,6 +1,8 @@
 {
   "vuln": "VULN-014",
-  "gate": [],
+  "gate": [
+    "OWASP ZAP baseline del Hub (job 11 · DAST)"
+  ],
   "antes": {
     "commit_linea_base": "053e15fb27b1aaf974c7c818108eee64628973e9",
     "commit_main": null,
@@ -29,6 +31,19 @@
     "hallazgos": [
       "curl -sI http://localhost:8080/: cabecera 'Server: nginx' sin número de versión (server_tokens off)"
     ],
-    "observacion": "Sin gate hoy. Misma ejecución local que VULN-013. Sin gate de CI (ZAP llega en semana 3): la evidencia después es la ejecución local documentada; run_url se mantiene en null."
+    "observacion": "Evidencia original: ejecución local con curl del 2026-09-26 (entonces no había gate de CI). Desde T15 hay gate real: ver despues.gate_ci (OWASP ZAP baseline del Hub, job 11 · DAST, run 37055543540).",
+    "gate_ci": {
+      "workflow": "CI",
+      "run_id": "37055543540",
+      "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/37055543540",
+      "commit": "133aa8b384f2ba93142a03f79126e6880460ebc3",
+      "job": "11 · DAST (OWASP ZAP) (id 110999227390)",
+      "bloque": "primer baseline del log (hub.json, 6 URLs, sin \"Using override\")",
+      "hallazgos": [
+        "PASS: HTTP Server Response Header [10036]"
+      ],
+      "captura": "informe §VULN-014 — después (gate ZAP): 10036 (discrepancia #11 del informe: antes se había capturado 10037 por error)",
+      "observacion": "Primer gate real en CI (antes la evidencia después era solo curl local). En ese run el job 11 rompe por VULN-030 (10055), no por estas reglas."
+    }
   }
 }

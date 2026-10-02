@@ -1168,6 +1168,22 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
     Estado (2026-10-02): VULN-030 creada y remediada en `61df987`, verificada en local y revisión
     nativa aprobada (sus tres advertencias corregidas: casilla marcada antes de tiempo y dos textos
     que contradecían el estado). Queda sin marcar hasta el run "después" en verde en CI.
+    **Run "después" 37058826831 (`4d647ca`)**: 10055 resuelto (Hub y Contabilidad sin medios), E2E
+    verde, pero el job 11 rompió con **40018 SQL Injection (High) en `POST
+    /api/v1/auth/password-reset/confirm`, parámetro `token`**. Analizado: **falso positivo**. El token
+    se decodifica en base64 (la carga con comillas ni decodifica) y se hashea con SHA-256 antes de una
+    consulta parametrizada (`PasswordResetTokenIsUsable`, `$1`); directo a la API las cargas `AND`/`OR`
+    dan la misma respuesta (410, idéntica, 3 rondas); a través de Nginx el `limit_req` pasa de 410 a
+    429 al sexto pedido, y ZAP leyó esa diferencia como inyección booleana. Decisión del usuario
+    (opción a): el escaneo de API va directo a la API (`-O http://identityhub.localhost:8081`); Nginx
+    queda cubierto por los dos baseline y por E2E. Con eso 40018 da PASS.
+    **Hallazgo nuevo, real, sin id** (lo asigna el usuario o Codex): yendo directo a la API, ZAP marca
+    30002 "Format String Error" (Medium) en `POST /api/v1/auth/login`, parámetro `password`.
+    Reproducido a mano: no tiene que ver con `%`, es el **largo**: hasta 128 caracteres el login da 401;
+    con 129 o más da **500** "Login could not be completed", porque `password.Verify` devuelve
+    `InvalidPasswordError` ("longer than 128 characters") y el login no lo contempla; además ese 500 no
+    deja ninguna línea en el log de la API. Componentes: `backend/internal/auth/login` y
+    `backend/internal/api` (login). El gate queda en rojo hasta remediarlo.
 
 ### T16 — Hook de pre-commit real
 - [ ] Estado · Ejecutor: `Claude`

@@ -4,18 +4,19 @@
     "OWASP ZAP baseline 10055 (job 11 · DAST)"
   ],
   "antes": {
-    "commit_linea_base": "133aa8b",
+    "commit_linea_base": "133aa8b384f2ba93142a03f79126e6880460ebc3",
     "commit_main": null,
     "workflow": "CI",
     "run_id": "37055543540",
     "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/37055543540",
     "artefacto": "zap-reports-37055543540 (artefacto de Actions)",
-    "captura": null,
+    "captura": "informe §VULN-030 — antes",
     "hallazgos": [
       "CSP: Failure to Define Directive with No Fallback (10055) | URL: http://identityhub.localhost:8080 | Count: 3 | Other Info: The directive(s): form-action is/are among the directives that do not fallback to default-src.",
       "CSP: Failure to Define Directive with No Fallback (10055) | URL: http://contabilidad.localhost:8080 | Count: 3 | Other Info: The directive(s): form-action is/are among the directives that do not fallback to default-src."
     ],
-    "observacion": "El run workflow_dispatch sobre 133aa8b dejó el job 11 en rojo: GATE BROKEN: 2 alert(s). Cada baseline informó la alerta 10055 Medium tres veces; la directiva ausente es form-action."
+    "observacion": "El run workflow_dispatch sobre 133aa8b dejó el job 11 en rojo: GATE BROKEN: 2 alert(s). Cada baseline informó la alerta 10055 Medium tres veces; la directiva ausente es form-action.",
+    "job": "11 · DAST (OWASP ZAP) (id 110999227390), paso \"Escaneo DAST (make scan-dast)\""
   },
   "remediacion": {
     "tarea": "T15b",

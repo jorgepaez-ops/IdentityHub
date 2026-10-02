@@ -113,6 +113,9 @@ scan-dast: ## DAST con OWASP ZAP (baseline Hub y Contabilidad + API) contra el s
 	@# Al API scan NO se le pasa -c: con un archivo de reglas ZAP cambia a la política "Default Policy"
 	@# con todas las reglas activas (DOM XSS lanza navegadores y agota la memoria del contenedor);
 	@# sin él usa API-Minimal. Las reglas WARN/IGNORE las aplica scripts/zap-gate.py sobre el JSON.
+	@# El escaneo de API va directo a la API (:8081), sin Nginx: su limit_req (5r/s en /api/v1/auth/)
+	@# cortaba respuestas a mitad del escaneo (410 → 429) y ZAP lo leía como inyección SQL booleana
+	@# (falso positivo 40018, run 37058826831). Nginx sigue cubierto por los dos baseline y por E2E.
 	@rm -rf $(ZAP_REPORTS) && mkdir -p $(ZAP_REPORTS) && chmod 777 $(ZAP_REPORTS)
 	@cleanup() { status=$$?; trap - EXIT INT TERM; \
 	    if ! $(COMPOSE) up -d --no-deps --wait api; then \
@@ -126,7 +129,7 @@ scan-dast: ## DAST con OWASP ZAP (baseline Hub y Contabilidad + API) contra el s
 	    -J hub.json -r hub.html && \
 	  $(ZAP_RUN) zap-baseline.py -t http://contabilidad.localhost:8080 -c rules.tsv -I \
 	    -J contabilidad.json -r contabilidad.html && \
-	  $(ZAP_RUN) zap-api-scan.py -t openapi.yaml -f openapi -O http://identityhub.localhost:8080 \
+	  $(ZAP_RUN) zap-api-scan.py -t openapi.yaml -f openapi -O http://identityhub.localhost:8081 \
 	    -I -J api.json -r api.html && \
 	  python3 scripts/zap-gate.py --rules .zap/rules.tsv \
 	    $(ZAP_REPORTS)/hub.json $(ZAP_REPORTS)/contabilidad.json $(ZAP_REPORTS)/api.json
