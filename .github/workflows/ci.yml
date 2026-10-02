@@ -450,12 +450,12 @@ jobs:
           cache: npm
           cache-dependency-path: e2e/package-lock.json
 
-      # `make e2e` ejecuta `npm ci`; los navegadores van antes porque necesitan las
+      # `make e2e` ejecuta `npm ci --ignore-scripts`; los navegadores van antes porque necesitan las
       # dependencias de sistema (--with-deps usa sudo) y el paquete ya instalado.
       - name: Instalar Chromium de Playwright
         working-directory: e2e
         run: |
-          npm ci
+          npm ci --ignore-scripts
           npx playwright install --with-deps chromium
 
       - name: Pruebas E2E (make e2e)

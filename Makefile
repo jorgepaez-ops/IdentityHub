@@ -96,7 +96,7 @@ e2e: ## Pruebas de extremo a extremo contra el stack levantado
 	    exit $$status; }; \
 	  trap cleanup EXIT INT TERM; \
 	  LOGIN_IP_MAX_FAILURES=$(E2E_LOGIN_IP_MAX_FAILURES) $(COMPOSE) up -d --no-deps --wait api && \
-	  (cd e2e && npm ci && npx playwright test)
+	  (cd e2e && npm ci --ignore-scripts && npx playwright test)
 
 spec-drift: ## Verifica sin red la matriz y escenarios Gherkin contra E2E
 	python3 scripts/traceability_test.py
