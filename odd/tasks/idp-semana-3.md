@@ -980,7 +980,7 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
     se endureció la prueba de `/oauth/` (exige 400 `application/problem+json` de la API, no solo
     "no es HTML"). Evidencia: `make e2e` 7/7 tres veces seguidas (idempotente), `tsc --noEmit` ok,
     gitleaks sobre `e2e/` sin hallazgos, matriz regenerada (`traceability.py --check` al día).
-  - [ ] T14b — Escenarios restantes de las 6 features. Ruta: delegada (Codex escribe, Claude corre).
+  - [x] T14b — Escenarios restantes de las 6 features. Ruta: delegada (Codex escribe, Claude corre).
     - Lote 1 (2026-10-02, Codex escribió, Claude corrió y revisó): autenticación (8), rotación de
       sesión (4) y restablecimiento (3). Revisión de Claude: "Agotar los intentos" ahora prueba que
       el `mfaToken` agotado rechaza el código **correcto** y que los 5 rechazos quedan en
@@ -1017,6 +1017,18 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
       timeout en `api.ts`/`mailpit.ts`, helpers de login duplicados entre `api.ts` y `auth.ts`, URL
       base del Hub en dos lugares (`playwright.config.ts` y `support/config.ts`), prueba débil de
       `nginx.spec.ts:63-72`.
+    - Más advertencias de la revisión del rango con el lote 2 (aprobada): `make e2e` no avisa si falla
+      la restauración del límite; el 429 de "ventana mínima" no distingue RF-014 del limitador de
+      Nginx (afirmar el tipo de problema); falta un timeout por prueba acorde a los flujos con varios
+      correos (hoy, 30 s por defecto).
+    - Lote 3 (2026-10-02, Codex escribió, Claude corrió y revisó): OAuth (9), cuatro por navegador
+      (PKCE completo, segundo acceso por SSO sin contraseña ni correo nuevo, login con `continue`,
+      `continue` externo sin redirección abierta) y cinco de protocolo. Al correrlo, 2 fallaban por
+      exigir `aud` como texto: el backend lo emite como lista de un elemento, que RFC 7519 admite y la
+      spec ("identifica a Contabilidad") también; la prueba ahora exige exactamente `[contabilidad]`.
+      Evidencia: `make e2e` 45/45 (39 escenarios Gherkin + 6 RNF-009 de Nginx); matriz al día.
+    - Cierre de T14b: los 39 escenarios Gherkin tienen exactamente una prueba con su título (el mapa
+      inicial decía 37; recuento real con `grep`/`comm`: 39, sin faltantes ni sobrantes).
   - [ ] T14c — Guion de la demo como prueba (criterio de aceptación 1). Ruta: delegada.
   - [ ] T14d — `spec-drift` comprueba la correspondencia escenario↔prueba (falla si falta o sobra)
     y `make spec-drift`. Ruta: delegada (Codex, sin red).

@@ -18,7 +18,7 @@ declaración de buenas intenciones.
 | **RF-006** | Detección de reuso de refresh token | P0 | — | 1 | 5 | 1 | ✅ completo |
 | **RF-007** | Cierre de sesión | P0 | `logout` | 1 | 9 | 1 | ✅ completo |
 | **RF-008** | Perfil propio | P0 | `getCurrentUser`, `updateCurrentUser` | — | 7 | — | 🟡 parcial |
-| **RF-009** | Control de acceso por roles | P0 | — | 5 | 20 | 4 | ✅ completo |
+| **RF-009** | Control de acceso por roles | P0 | — | 5 | 20 | 5 | ✅ completo |
 | **RF-010** | Administración de usuarios | P0 | `listUsers`, `getUser`, `updateUser` | 3 | 12 | 3 | ✅ completo |
 | **RF-011** | Registro de auditoría | P0 | `listAuditLog` | 1 | 9 | 1 | ✅ completo |
 | **RF-012** | Notificaciones asíncronas | P0 | — | 1 | 9 | — | ✅ completo |
@@ -29,7 +29,7 @@ declaración de buenas intenciones.
 | **RF-017** | Bloqueo por fuerza bruta | P1 | — | 4 | 22 | 1 | ✅ completo |
 | **RF-018** | Claves de servicio | P2 | — | — | — | — | ⏳ diferido (semana 3) |
 | **RF-019** | Exportación del audit log | P2 | — | — | — | — | ⏳ diferido (semana 3) |
-| **RF-020** | Autorización de aplicaciones cliente | P1 | `authorizeClient`, `exchangeAuthorizationCode` | 10 | 24 | — | ✅ completo |
+| **RF-020** | Autorización de aplicaciones cliente | P1 | `authorizeClient`, `exchangeAuthorizationCode` | 10 | 24 | 8 | ✅ completo |
 | **RNF-001** | Contenerización total | P0 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-002** | Pipeline de ciclo completo | P0 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-003** | Cero secretos en el repositorio | P0 | — | — | 4 | — | 🟡 parcial |
