@@ -1094,7 +1094,12 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
       incorrectas a propósito de los escenarios (`'una-contraseña-cualquiera'`,
       `'incorrect-password-value'`). Ninguno es un secreto. Como el job escanea todo el historial ya
       subido, la única salida es registrar las 28 huellas exactas en `.gitleaksignore`, que por la
-      decisión Q20 requiere aprobación explícita del usuario. **Pendiente de decisión del usuario.**
+      decisión Q20 requiere aprobación explícita del usuario. **Aprobado por el usuario
+      (2026-10-02)**: las 28 huellas exactas quedan en `.gitleaksignore` con su justificación;
+      `make scan-secrets` local: 243 commits, sin hallazgos.
+    - Revisión del rango tras el run (aprobada): `npm ci` del job E2E sin `--ignore-scripts`;
+      corregido en `fc466a7` (CI y Makefile), `make e2e` 46/46. Pendiente menor de legibilidad: el
+      login por navegador con MFA está escrito a mano en tres sitios (unificar al volver a tocar E2E).
 
 ### T15 — DAST con OWASP ZAP en CI
 - [ ] Estado · Ejecutor: `Claude`
