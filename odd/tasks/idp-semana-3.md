@@ -1196,6 +1196,13 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
     escaneo ya apuntando a `:8081`); su antes es la evidencia local.
     Revisión nativa de T15c aprobada; corregidos dos textos viejos que decían "pendiente". Solo
     falta el run "después" en verde en CI (común a VULN-030 y VULN-031).
+    Run 37063807973 (`687fb16`): job 11 **en verde** (10055, 30002 y 40018 PASS; "Gate passed"),
+    pero fallaron spec-drift (la matriz no se regeneró tras las pruebas de Go de T15c; corregido en
+    `b2705d7`) y secretos (8 falsos positivos nuevos: 3 líneas "PASS: …" de
+    `docs/evidencia/VULN-013/evidencia.json` y 5 contraseñas de prueba en los tests de VULN-031;
+    huellas exactas aprobadas por el usuario el 2026-10-02 y registradas; `make scan-secrets` local:
+    256 commits, sin hallazgos). Lección: correr `make spec-drift` y `make scan-secrets` antes de
+    cada push, no solo `make e2e`.
 
 ### T16 — Hook de pre-commit real
 - [ ] Estado · Ejecutor: `Claude`

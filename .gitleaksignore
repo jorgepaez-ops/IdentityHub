@@ -126,3 +126,16 @@ e28d3cfae71b4c0457a3ae66a5ea91466bc9471d:e2e/tests/registro-y-verificacion.spec.
 e435d0910dc0c97d132b382811b3ee2a0331a40d:e2e/support/accounts.ts:contrasena-en-variable-de-entorno:45
 e435d0910dc0c97d132b382811b3ee2a0331a40d:e2e/support/api.ts:contrasena-en-variable-de-entorno:46
 e435d0910dc0c97d132b382811b3ee2a0331a40d:e2e/tests/registro-y-verificacion.spec.ts:contrasena-en-variable-de-entorno:21
+
+# T15 (2026-10-02, aprobado por el usuario): falsos positivos de contrasena-en-variable-de-entorno.
+# 3 en docs/evidencia/VULN-013/evidencia.json: líneas "PASS: <regla ZAP>" (la regla toma "PASS:" como
+# "pass: valor"). 5 en las pruebas de Go de VULN-031: Password: strings.Repeat(...), Password:
+# passwordValue y cuerpos JSON de prueba con contraseñas inventadas. Ninguno es un secreto.
+4afd5636f7e4657295ae07a5a5fa58fe81763c65:backend/internal/api/login_test.go:contrasena-en-variable-de-entorno:141
+4afd5636f7e4657295ae07a5a5fa58fe81763c65:backend/internal/api/login_test.go:contrasena-en-variable-de-entorno:155
+4afd5636f7e4657295ae07a5a5fa58fe81763c65:backend/internal/auth/login/login_test.go:contrasena-en-variable-de-entorno:191
+4afd5636f7e4657295ae07a5a5fa58fe81763c65:backend/internal/auth/login/login_test.go:contrasena-en-variable-de-entorno:217
+4afd5636f7e4657295ae07a5a5fa58fe81763c65:backend/internal/auth/login/login_test.go:contrasena-en-variable-de-entorno:236
+7db44a84bafe2db38dcfa61cd383ecd35b49d05b:docs/evidencia/VULN-013/evidencia.json:contrasena-en-variable-de-entorno:43
+7db44a84bafe2db38dcfa61cd383ecd35b49d05b:docs/evidencia/VULN-013/evidencia.json:contrasena-en-variable-de-entorno:44
+7db44a84bafe2db38dcfa61cd383ecd35b49d05b:docs/evidencia/VULN-013/evidencia.json:contrasena-en-variable-de-entorno:45
