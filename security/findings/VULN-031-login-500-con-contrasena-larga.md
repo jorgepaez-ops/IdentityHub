@@ -4,15 +4,15 @@
 |---|---|
 | **Severidad** | MEDIUM |
 | **Confianza** | HIGH |
-| **Estado** | en remediación |
+| **Estado** | remediado |
 | **Detectado por** | OWASP ZAP API scan (30002) · job 11 · DAST (OWASP ZAP) |
 | **Componente** | Servicio de login (`backend/internal/auth/login`) y handler de API (`backend/internal/api/login.go`) |
 | **Amenaza** | AM-001 (fuerza bruta sobre contraseñas; bloqueo tras 5 fallos) |
 | **Sembrada** | no |
 | **Evidencia antes** | `make scan-dast` local y reproducción manual documentados en `odd/tasks/idp-semana-3.md`, T15 |
-| **Commit de remediación** | pendiente |
+| **Commit de remediación** | `4afd563` |
 | **Evidencia después** | pendiente |
-| **Run de Actions (antes/después)** | pendiente / pendiente |
+| **Run de Actions (antes/después)** | sin run de CI "antes": se detectó al llevar el escaneo de API a `:8081`, ya con el arreglo en preparación; el antes es la evidencia local / pendiente |
 
 ## Evidencia
 

@@ -19,7 +19,7 @@
   },
   "remediacion": {
     "tarea": "T15c",
-    "commit": null,
+    "commit": "4afd563",
     "ficha": "security/findings/VULN-031-login-500-con-contrasena-larga.md"
   },
   "despues": {

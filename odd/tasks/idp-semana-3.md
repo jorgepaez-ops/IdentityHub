@@ -1184,6 +1184,16 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
     `InvalidPasswordError` ("longer than 128 characters") y el login no lo contempla; además ese 500 no
     deja ninguna línea en el log de la API. Componentes: `backend/internal/auth/login` y
     `backend/internal/api` (login). El gate queda en rojo hasta remediarlo.
+    **T15c (2026-10-02, decisión del usuario: remediar ya; Codex escribió, Claude verificó y
+    commiteó)**: VULN-031 (id asignado por Codex; amenaza AM-001 porque las contraseñas largas no
+    contaban para el bloqueo). `login.go` trata `InvalidPasswordError` de `Verify` y `VerifyDecoy`
+    como credenciales inválidas (mismo 401, se audita y cuenta para el bloqueo, igual con correo
+    existente o no) y el handler registra con `slog` los 500 inesperados (error y request id, sin la
+    contraseña). Remediación en `4afd563`. Evidencia: RED reproducido por Claude (las dos pruebas nuevas
+    fallan sin el arreglo) → GREEN; `go test` de login y api ok; `golangci-lint` 0 issues; `go vet` ok;
+    API reconstruida: 128, 129 y 300 caracteres → 401; `make scan-dast` "Gate passed" (10055, 30002 y
+    40018 en PASS); `make e2e` 46/46. No hay run de CI "antes" para VULN-031 (se detectó con el
+    escaneo ya apuntando a `:8081`); su antes es la evidencia local.
     **T15c en curso (2026-10-02):** VULN-031 documenta el hallazgo. Las pruebas cubren 129
     caracteres para cuentas existente e inexistente, conservan auditoría y bloqueo, y mantienen
     válido el límite de 128; el handler devuelve el problema genérico y registra los fallos internos
