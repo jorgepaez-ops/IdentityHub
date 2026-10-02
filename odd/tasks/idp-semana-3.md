@@ -1163,15 +1163,11 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
     Verificado en local con la imagen `web` reconstruida: ambas cabeceras traen `form-action 'self'`;
     `make scan-dast` → 10055 PASS en los tres escaneos, "Gate passed"; `make e2e` 46/46. Falta el run
     "después" en CI (requiere push).
-  - [x] T15b — Ficha de la CSP sin `form-action` (id lo asigna Codex al crearla; afecta a los dos
+  - [ ] T15b — Ficha de la CSP sin `form-action` (id lo asigna Codex al crearla; afecta a los dos
     `server`, Hub y Contabilidad) y remediación en `frontend/nginx/default.conf`; run en verde como evidencia "después" (requiere push).
-    Avance (2026-10-02, sin marcar hasta la verificación de Claude): asignado VULN-030; ficha y
-    evidencia antes creadas desde el run 37055543540 (`133aa8b`, job 11), y `form-action 'self'`
-    añadido a las CSP de Hub y Contabilidad. La aserción E2E conserva los títulos existentes y
-    exige la directiva en ambos hosts. Se comprobó que los formularios previenen el envío nativo;
-    `/oauth/authorize` es navegación y el canje OAuth entre orígenes es `fetch`, no un POST de
-    formulario. Pendientes: commit, revisión de Claude y evidencia después en CI (Docker/red no
-    ejecutados por esta tarea).
+    Estado (2026-10-02): VULN-030 creada y remediada en `61df987`, verificada en local y revisión
+    nativa aprobada (sus tres advertencias corregidas: casilla marcada antes de tiempo y dos textos
+    que contradecían el estado). Queda sin marcar hasta el run "después" en verde en CI.
 
 ### T16 — Hook de pre-commit real
 - [ ] Estado · Ejecutor: `Claude`

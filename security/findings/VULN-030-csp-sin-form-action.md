@@ -49,4 +49,4 @@ T15b añade `form-action 'self'` a la variable `$csp` de ambos bloques `server` 
 solicitudes programáticas; el flujo OAuth `/oauth/authorize` es una navegación y el canje
 del código usa `fetch`, por lo que no requiere permitir un `form-action` entre orígenes.
 
-El commit de remediación y la evidencia después quedan pendientes del run de CI en verde.
+La remediación está en `61df987`; la evidencia después queda pendiente del run de CI en verde.
