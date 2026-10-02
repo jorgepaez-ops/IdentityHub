@@ -88,7 +88,12 @@ E2E_LOGIN_IP_MAX_FAILURES ?= 1000
 e2e: ## Pruebas de extremo a extremo contra el stack levantado
 	@# Todas las peticiones salen de la misma IP: se sube solo el límite por IP
 	@# (RF-017) mientras corre la suite y se restaura al terminar, pase o falle.
-	@cleanup() { status=$$?; trap - EXIT INT TERM; $(COMPOSE) up -d --no-deps --wait api; exit $$status; }; \
+	@cleanup() { status=$$?; trap - EXIT INT TERM; \
+	    if ! $(COMPOSE) up -d --no-deps --wait api; then \
+	      echo "ERROR: no se pudo restaurar la API con el límite por defecto; puede seguir con LOGIN_IP_MAX_FAILURES elevado. Ejecuta 'make up' para restaurarla." >&2; \
+	      [ $$status -ne 0 ] || status=1; \
+	    fi; \
+	    exit $$status; }; \
 	  trap cleanup EXIT INT TERM; \
 	  LOGIN_IP_MAX_FAILURES=$(E2E_LOGIN_IP_MAX_FAILURES) $(COMPOSE) up -d --no-deps --wait api && \
 	  (cd e2e && npm ci && npx playwright test)

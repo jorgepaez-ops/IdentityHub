@@ -1,5 +1,8 @@
 import { mailpitUrl } from './config'
 
+const FETCH_TIMEOUT_MS = 10_000
+const get = (url: string) => fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) })
+
 export interface Mail {
   id: string
   subject: string
@@ -16,7 +19,7 @@ interface Summary {
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 async function messagesFor(to: string): Promise<Summary[]> {
-  const response = await fetch(`${mailpitUrl}/api/v1/search?query=${encodeURIComponent(`to:${to}`)}`)
+  const response = await get(`${mailpitUrl}/api/v1/search?query=${encodeURIComponent(`to:${to}`)}`)
   if (!response.ok) throw new Error(`Mailpit search for ${to} returned ${response.status}`)
   const body = (await response.json()) as { messages?: Summary[] }
   return body.messages ?? []
@@ -58,7 +61,7 @@ export async function waitForMail(
         .filter((message) => message.Subject.includes(subject) && new Date(message.Created).getTime() >= floor)
         .sort((a, b) => new Date(b.Created).getTime() - new Date(a.Created).getTime())[0]
       if (match) {
-        const full = await fetch(`${mailpitUrl}/api/v1/message/${match.ID}`)
+        const full = await get(`${mailpitUrl}/api/v1/message/${match.ID}`)
         if (!full.ok) throw new Error(`Mailpit message ${match.ID} returned ${full.status}`)
         const detail = (await full.json()) as { Text: string }
         return { id: match.ID, subject: match.Subject, created: new Date(match.Created), text: detail.Text }

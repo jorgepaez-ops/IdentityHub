@@ -94,6 +94,8 @@ test('RF-010 Un administrador no puede asignarse roles a sí mismo', async () =>
     token: admin.accessToken,
     json: { roles: ['user', 'admin', 'contabilidad.senior'] },
   })).status).toBe(400)
+  // Exactly one: seedAdmin() creates a brand-new admin on every call, so no earlier test can have
+  // produced this event for this actor.
   expect(psql(`SELECT count(*) FROM audit_log a
                JOIN users actor ON actor.id = a.actor_user_id
                WHERE actor.email = :'email' AND a.action = 'role_assignment_rejected' AND a.resource_id = :'resource_id';`, {

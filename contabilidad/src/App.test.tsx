@@ -57,8 +57,9 @@ const goTo = (name: RegExp | string) => fireEvent.click(within(rail()).getByRole
 const rowOf = (folio: string) => screen.getByText(folio).closest('tr') as HTMLElement
 
 // WebCrypto (token verification, PKCE digest) resolves on the host's real event
-// loop, not on fake timers. vi.waitFor waits in real time between checks and, with
-// fake timers on, also advances them, so the assertion sees the settled state.
+// loop, not on fake timers. This is a hand-written deadline loop: it retries the
+// assertion, and between attempts advances the fake timers by 5 ms inside act(),
+// until the assertion passes or 5 s of real time elapse (then it rethrows).
 async function advanceUntil(assertion: () => void) {
   const deadline = performance.now() + 5_000
   for (;;) {

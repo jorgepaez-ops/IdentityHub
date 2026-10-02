@@ -64,8 +64,11 @@ test('RF-014 El reenvío respeta la ventana mínima', async ({ playwright }) => 
   const context = await playwright.request.newContext()
   const login = await contextApi<{ mfaToken: string }>(context, 'POST', `${hubUrl}/api/v1/auth/login`, { data: { email, password: strongPassword } })
   expect(login.status).toBe(202)
-  const resent = await contextApi(context, 'POST', `${hubUrl}/api/v1/auth/mfa/resend`, { data: { mfaToken: login.body.mfaToken } })
+  const resent = await contextApi<{ type: string }>(context, 'POST', `${hubUrl}/api/v1/auth/mfa/resend`, { data: { mfaToken: login.body.mfaToken } })
   expect(resent.status).toBe(429)
+  // A bare 429 could come from the Nginx rate limiter; assert the application's own RFC 7807 problem.
+  expect(resent.response.headers()['content-type']).toContain('application/problem+json')
+  expect(resent.body.type).toBe('https://identity.local/problems/mfa-resend-rate-limited')
   await context.dispose()
 })
 

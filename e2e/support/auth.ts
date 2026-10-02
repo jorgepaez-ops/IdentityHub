@@ -2,8 +2,7 @@ import type { APIRequestContext, APIResponse, PlaywrightWorkerArgs } from '@play
 
 type Playwright = PlaywrightWorkerArgs['playwright']
 import { hubUrl } from './config'
-import { LoginRejectedError, paced } from './api'
-import { extractCode, mailIds, waitForMail } from './mailpit'
+import { paced, passwordThenMfa } from './api'
 
 export interface ContextResult<T = unknown> {
   status: number
@@ -39,18 +38,10 @@ export async function loginWithMfaContext(
   password: string,
 ): Promise<{ context: APIRequestContext; accessToken: string }> {
   const context = await playwright.request.newContext({ baseURL: hubUrl })
-  const existingMailIds = await mailIds(email)
-  const since = new Date()
-  const login = await contextApi<{ mfaToken: string }>(context, 'POST', '/api/v1/auth/login', {
-    data: { email, password },
-  })
-  if (login.status !== 202) throw new LoginRejectedError(login.status, email)
-  const mail = await waitForMail(email, 'sign-in code', since, existingMailIds)
-  const verified = await contextApi<{ accessToken: string }>(context, 'POST', '/api/v1/auth/mfa/verify', {
-    data: { mfaToken: login.body.mfaToken, code: extractCode(mail.text) },
-  })
-  if (verified.status !== 200) throw new Error(`MFA verification for ${email} returned ${verified.status}`)
-  return { context, accessToken: verified.body.accessToken }
+  const accessToken = await passwordThenMfa(email, password, (path, data) =>
+    contextApi(context, 'POST', path, { data }),
+  )
+  return { context, accessToken }
 }
 
 export async function refreshCookie(context: APIRequestContext): Promise<string> {

@@ -103,7 +103,10 @@ test('RF-020 Flujo OAuth correcto con PKCE S256', async ({ page }) => {
   await page.getByRole('button', { name: 'Continuar con Identity Hub' }).click()
   const requestedState = new URL((await authorizeRequest).url()).searchParams.get('state')
   expect(requestedState).toBeTruthy()
-  const authorizeRedirect = page.waitForResponse((response) => response.url().startsWith(`${hubUrl}/oauth/authorize?`) && response.status() === 302)
+  const authorizeRedirect = page.waitForResponse((response) => response.url().startsWith(`${hubUrl}/oauth/authorize?`) &&
+      response.status() === 302 &&
+      // Skip the unauthenticated hop to the login page: only the redirect to the registered URI counts.
+      (response.headers().location ?? '').startsWith(`${redirectURI}?`))
   const tokenResponse = page.waitForResponse((response) => response.url() === `${hubUrl}/oauth/token` && response.request().method() === 'POST')
   await completeBrowserMfa(email, existingMailIds, since, page)
 

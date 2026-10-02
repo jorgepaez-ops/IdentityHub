@@ -38,11 +38,22 @@ DEFERRED = {
 
 
 class Scenario(NamedTuple):
-    """A Gherkin scenario and the first RF tag that owns its E2E title."""
+    """A tagged Gherkin scenario.
+
+    ``requirement`` is the first RF tag (it owns the E2E title); ``tags`` keeps every RF/RNF tag
+    in source order, which the traceability matrix needs.
+    """
 
     requirement: str
     name: str
     source: str
+    tags: tuple[str, ...] = ()
+    line: int = 0
+
+
+GHERKIN_SCENARIO = re.compile(r"(Escenario|Esquema del escenario):")
+# Keywords that open a new scope: tags collected so far must not leak past them.
+GHERKIN_SCOPE = re.compile(r"(Característica|Regla|Antecedentes|Fondo):")
 
 
 def load_requirements() -> dict[str, tuple[str, str]]:
@@ -69,38 +80,39 @@ def load_operations() -> dict[str, list[str]]:
 
 
 def load_gherkin_scenarios() -> list[Scenario]:
-    """Return every tagged scenario using the first RF tag in source order."""
+    """The single Gherkin parser: every scenario that carries at least one RF/RNF tag.
+
+    Tags only apply to the scenario that immediately follows them: any scope keyword
+    (Característica, Regla, Antecedentes) or step line discards the tags collected so far.
+    """
     scenarios: list[Scenario] = []
     for path in sorted((ROOT / "specs" / "06-acceptance").glob("*.feature")):
         pending: list[str] = []
-        for line in path.read_text(encoding="utf-8").splitlines():
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
             stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
             if stripped.startswith("@"):
                 pending.extend(RF_TAG.findall(stripped))
-            elif re.match(r"(Escenario|Esquema del escenario):", stripped):
+            elif GHERKIN_SCENARIO.match(stripped):
                 name = stripped.split(":", 1)[1].strip()
-                first_rf = next((tag for tag in pending if tag.startswith("RF-")), None)
-                if first_rf:
-                    scenarios.append(Scenario(first_rf, name, path.name))
+                first_rf = next((tag for tag in pending if tag.startswith("RF-")), "")
+                if pending:
+                    scenarios.append(Scenario(first_rf, name, path.name, tuple(pending), number))
+                pending = []
+            else:
+                # Scope keywords, steps, tables and docstrings all end the tag run.
                 pending = []
     return scenarios
 
 
-def load_scenarios() -> dict[str, list[str]]:
-    """@RF-NNN -> [nombre del escenario]."""
-    scenarios: dict[str, list[str]] = defaultdict(list)
-    for path in sorted((ROOT / "specs" / "06-acceptance").glob("*.feature")):
-        pending: list[str] = []
-        for line in path.read_text(encoding="utf-8").splitlines():
-            stripped = line.strip()
-            if stripped.startswith("@"):
-                pending.extend(RF_TAG.findall(stripped))
-            elif re.match(r"(Escenario|Esquema del escenario):", stripped):
-                name = stripped.split(":", 1)[1].strip()
-                for rf in pending:
-                    scenarios[rf].append(f"{path.name} — {name}")
-                pending = []
-    return scenarios
+def load_scenarios(scenarios: list[Scenario]) -> dict[str, list[str]]:
+    """@RF-NNN -> [nombre del escenario], derived from the single Gherkin parse."""
+    by_requirement: dict[str, list[str]] = defaultdict(list)
+    for scenario in scenarios:
+        for tag in scenario.tags:
+            by_requirement[tag].append(f"{scenario.source} — {scenario.name}")
+    return by_requirement
 
 
 def load_e2e_test_titles() -> dict[str, list[str]]:
@@ -143,13 +155,22 @@ def computed_requirement_titles() -> list[str]:
 def e2e_correspondence_errors(scenarios: list[Scenario]) -> list[str]:
     """Return actionable errors for the scenario-to-E2E one-to-one mapping."""
     titles = load_e2e_test_titles()
-    expected = {f"{scenario.requirement} {scenario.name}": scenario for scenario in scenarios}
+    expected: dict[str, Scenario] = {}
+    duplicate_scenarios: list[tuple[str, Scenario, Scenario]] = []
+    for scenario in scenarios:
+        if not scenario.requirement:
+            continue
+        title = f"{scenario.requirement} {scenario.name}"
+        if title in expected:
+            duplicate_scenarios.append((title, expected[title], scenario))
+        else:
+            expected[title] = scenario
     computed = computed_requirement_titles()
 
     missing = [title for title in expected if title not in titles]
     orphan = [title for title in titles if title.startswith("RF-") and title not in expected]
     duplicates = [title for title in expected if len(titles.get(title, [])) > 1]
-    if not (missing or orphan or duplicates or computed):
+    if not (missing or orphan or duplicates or computed or duplicate_scenarios):
         return []
 
     errors = ["La correspondencia escenario↔prueba E2E no es uno a uno."]
@@ -168,6 +189,10 @@ def e2e_correspondence_errors(scenarios: list[Scenario]) -> list[str]:
         for title in duplicates:
             scenario = expected[title]
             errors.append(f"  - {title} ({scenario.source}): {', '.join(titles[title])}")
+    if duplicate_scenarios:
+        errors.append("Escenarios Gherkin repetidos (misma etiqueta RF y mismo nombre):")
+        for title, first, second in duplicate_scenarios:
+            errors.append(f"  - {title}: {first.source}:{first.line}, {second.source}:{second.line}")
     if computed:
         errors.append("Títulos RF/RNF no literales (template o calculados), invisibles para este chequeo:")
         errors.extend(f"  - {location}" for location in computed)
@@ -175,10 +200,10 @@ def e2e_correspondence_errors(scenarios: list[Scenario]) -> list[str]:
     return errors
 
 
-def render() -> str:
+def render(gherkin: list[Scenario]) -> str:
     reqs = load_requirements()
     ops = load_operations()
-    scenarios = load_scenarios()
+    scenarios = load_scenarios(gherkin)
 
     # Los nombres Go usan TestRF003_ / TestRNF012_, sin guion; aquí se normalizan.
     go_by_req: dict[str, list[str]] = defaultdict(list)
@@ -252,12 +277,13 @@ def main() -> int:
     parser.add_argument("--check", action="store_true", help="falla si el archivo está desactualizado")
     args = parser.parse_args()
 
-    errors = e2e_correspondence_errors(load_gherkin_scenarios())
+    gherkin = load_gherkin_scenarios()
+    errors = e2e_correspondence_errors(gherkin)
     if errors:
         print("\n".join(errors), file=sys.stderr)
         return 1
 
-    content = render()
+    content = render(gherkin)
     if args.check:
         current = OUT.read_text(encoding="utf-8") if OUT.exists() else ""
         if current != content:

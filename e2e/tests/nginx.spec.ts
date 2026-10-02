@@ -1,10 +1,8 @@
 import { expect, request, test } from '@playwright/test'
 import { nginxAddress } from '../support/config'
 
-const hosts = [
-  { host: 'identityhub.localhost', connect: "connect-src 'self';" },
-  { host: 'contabilidad.localhost', connect: "connect-src 'self' http://identityhub.localhost:8080;" },
-]
+const hub = { host: 'identityhub.localhost', connect: "connect-src 'self';" }
+const contabilidad = { host: 'contabilidad.localhost', connect: "connect-src 'self' http://identityhub.localhost:8080;" }
 
 const staticHeaders = {
   'strict-transport-security': 'max-age=31536000; includeSubDomains',
@@ -48,19 +46,19 @@ async function expectAssetHeaders(host: string, connect: string) {
 }
 
 test('RNF-009 identityhub.localhost sends the five security headers on the SPA', async () => {
-  await expectSpaHeaders(hosts[0].host, hosts[0].connect)
+  await expectSpaHeaders(hub.host, hub.connect)
 })
 
 test('RNF-009 identityhub.localhost keeps the security headers on /assets/ files', async () => {
-  await expectAssetHeaders(hosts[0].host, hosts[0].connect)
+  await expectAssetHeaders(hub.host, hub.connect)
 })
 
 test('RNF-009 contabilidad.localhost sends the five security headers on the SPA', async () => {
-  await expectSpaHeaders(hosts[1].host, hosts[1].connect)
+  await expectSpaHeaders(contabilidad.host, contabilidad.connect)
 })
 
 test('RNF-009 contabilidad.localhost keeps the security headers on /assets/ files', async () => {
-  await expectAssetHeaders(hosts[1].host, hosts[1].connect)
+  await expectAssetHeaders(contabilidad.host, contabilidad.connect)
 })
 
 test('RNF-009 the Hub proxies /oauth/ to the API instead of the SPA index', async () => {
@@ -73,12 +71,17 @@ test('RNF-009 the Hub proxies /oauth/ to the API instead of the SPA index', asyn
 })
 
 test('RNF-009 Contabilidad serves its own SPA, distinct from the Hub', async () => {
-  const hub = await request.newContext({ baseURL: nginxAddress, extraHTTPHeaders: { Host: 'identityhub.localhost' } })
-  const conta = await request.newContext({ baseURL: nginxAddress, extraHTTPHeaders: { Host: 'contabilidad.localhost' } })
-  const hubIndex = await (await hub.get('/')).text()
-  const contaIndex = await (await conta.get('/oauth/callback')).text()
+  const hubCtx = await request.newContext({ baseURL: nginxAddress, extraHTTPHeaders: { Host: hub.host } })
+  const contaCtx = await request.newContext({ baseURL: nginxAddress, extraHTTPHeaders: { Host: contabilidad.host } })
+  const hubIndex = await (await hubCtx.get('/')).text()
+  const contaResponse = await contaCtx.get('/oauth/callback')
+  const contaIndex = await contaResponse.text()
+  expect(contaResponse.status()).toBe(200)
   expect(contaIndex).toContain('<div id="root"')
+  // Specific to the Contabilidad build, not just "different bytes".
+  expect(contaIndex).toContain('<title>Contabilidad</title>')
+  expect(hubIndex).toContain('<title>Identity Hub</title>')
   expect(contaIndex).not.toBe(hubIndex)
-  await hub.dispose()
-  await conta.dispose()
+  await hubCtx.dispose()
+  await contaCtx.dispose()
 })

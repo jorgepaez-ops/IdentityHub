@@ -1041,6 +1041,18 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
     escenario faltante y el título no literal), GREEN tras restaurarlo; `make spec-drift` ok; 6/6
     de Nginx. El job de CI ya corre `traceability.py`, así que lo exige sin renombrarse; sumar
     `traceability_test.py` al job queda para T14e.
+  - [x] Limpieza de advertencias de las revisiones de T14 (2026-10-02, Sonnet porque Codex estaba sin
+    cupo; revisó y commiteó Claude): timeouts en los `fetch` de `api.ts`/`mailpit.ts`; un solo flujo
+    de login con MFA (`passwordThenMfa`); `hubUrl` como única fuente de la URL; timeout de 120 s por
+    prueba; `make e2e` avisa y sale con error si falla la restauración del límite (rama escrita pero
+    no ejercitada); el 429 de "ventana mínima" exige el problema `mfa-resend-rate-limited` de la app;
+    "no aceptó la invitación" ya no es vacía (contraseña conocida y cuenta devuelta a pendiente por
+    SQL → 401 `invalid-credentials` sin revelar el estado); el reenvío acepta el token nuevo (204);
+    la espera de la redirección OAuth solo acepta el 302 hacia el `redirect_uri`; Nginx por hosts con
+    nombre y Contabilidad identificada por su `<title>`; un solo parser de Gherkin, etiquetas que no
+    se arrastran entre bloques, escenarios duplicados como error y pruebas de esas ramas; comentario de
+    `advanceUntil` corregido. Evidencia: `make e2e` 45/45 dos veces, límite de vuelta en 20,
+    `make spec-drift` ok (3 pruebas + matriz idéntica), Contabilidad 53/53, `tsc` ok.
   - [ ] T14e — Job E2E en CI (stack con `.env` generado), sin renombrar los 17 checks
     obligatorios; verificarlo requiere push (decisión del usuario).
 

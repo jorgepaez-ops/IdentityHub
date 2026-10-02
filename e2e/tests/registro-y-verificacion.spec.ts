@@ -34,7 +34,8 @@ test('RF-001 Alta administrativa con datos válidos', async () => {
   })
 
   expect(created.status).toBe(201)
-  expect(created.body).toMatchObject({ email, status: 'pending_verification', roles: ['user', 'contabilidad.analista'] })
+  expect(created.body).toMatchObject({ email, status: 'pending_verification' })
+  expect([...created.body.roles].sort()).toEqual(['contabilidad.analista', 'user'])
   expect(created.body.id).toEqual(expect.any(String))
   await expect.poll(() => psql(`SELECT status FROM users WHERE email = :'email';`, { email: assertEmail(email) })).toBe('pending_verification')
   await waitForMail(email, 'invited', since, existingMailIds)
@@ -73,12 +74,24 @@ test('RF-002 La invitación es de un solo uso', async () => {
 })
 
 test('RF-002 Una cuenta que no aceptó la invitación no puede iniciar sesión', async () => {
+  // Give the account a known password, then put it back to pending: only the pending status can
+  // explain the rejection, not a missing password.
   const invitee = await inviteUser(admin)
-  const login = await api('POST', '/api/v1/auth/login', {
+  const accepted = await api('POST', '/api/v1/auth/invitations/accept', {
+    json: { token: invitee.token, password: strongPassword },
+  })
+  expect(accepted.status).toBe(204)
+  psql(`UPDATE users SET status = 'pending_verification' WHERE email = :'email';`, { email: assertEmail(invitee.email) })
+  expect(psql(`SELECT status FROM users WHERE email = :'email';`, { email: assertEmail(invitee.email) })).toBe('pending_verification')
+
+  const login = await api<{ type: string }>('POST', '/api/v1/auth/login', {
     json: { email: invitee.email, password: strongPassword },
   })
 
   expect(login.status).toBe(401)
+  // The problem is the generic one, so it does not reveal that the account exists but is pending.
+  expect(login.body.type).toBe('https://identity.local/problems/invalid-credentials')
+  expect(JSON.stringify(login.body)).not.toMatch(/pending|verif|invitation/i)
 })
 
 test('RF-001 Un admin reenvía una invitación pendiente', async () => {
@@ -95,9 +108,14 @@ test('RF-001 Un admin reenvía una invitación pendiente', async () => {
     json: { token: invitee.token, password: strongPassword },
   })).status).toBe(410)
   const replacement = await waitForMail(invitee.email, 'invited', since, existingMailIds)
-  expect(new URL(extractLink(replacement.text)).searchParams.get('token')).not.toBe(invitee.token)
+  const replacementToken = new URL(extractLink(replacement.text)).searchParams.get('token')
+  expect(replacementToken).not.toBe(invitee.token)
   expect(psql(`SELECT (expires_at > now() + interval '23 hours 59 minutes'
                        AND expires_at < now() + interval '24 hours 1 minute')::text
                FROM verification_tokens
                WHERE user_id = :'user_id' AND purpose = 'invitation' AND used_at IS NULL;`, { user_id: invitee.id })).toBe('true')
+  // The replacement token actually works.
+  expect((await api('POST', '/api/v1/auth/invitations/accept', {
+    json: { token: replacementToken, password: strongPassword },
+  })).status).toBe(204)
 })
