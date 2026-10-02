@@ -1029,7 +1029,15 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
       Evidencia: `make e2e` 45/45 (39 escenarios Gherkin + 6 RNF-009 de Nginx); matriz al día.
     - Cierre de T14b: los 39 escenarios Gherkin tienen exactamente una prueba con su título (el mapa
       inicial decía 37; recuento real con `grep`/`comm`: 39, sin faltantes ni sobrantes).
-  - [ ] T14c — Guion de la demo como prueba (criterio de aceptación 1). Ruta: delegada.
+  - [x] T14c — Guion de la demo como prueba (criterio de aceptación 1). Ruta: delegada.
+    Hecho (2026-10-02, Sonnet porque Codex estaba sin cupo; revisó y commiteó Claude):
+    `e2e/tests/demo.spec.ts`, una prueba "DEMO …" (sin prefijo RF, no es escenario Gherkin) con un
+    `test.step` por paso del guion, todo por la UI real con dos navegadores (admin y empleado): alta
+    desde el cajón de Usuarios, invitación en Mailpit, contraseña, login con MFA, Contabilidad por
+    SSO sin contraseña ni correo nuevo, analista con "Cierre contable" bloqueado, cambio a senior en
+    la consola y el siguiente acceso lo refleja. `docs/guion-demo.md` es el guion para presentar en
+    vivo (insumo para T17). Evidencia: la demo pasó 2/2 sola; `make e2e` 46/46; `make spec-drift`
+    ok; la API quedó con `LOGIN_IP_MAX_FAILURES=20`.
   - [x] T14d — `spec-drift` comprueba la correspondencia escenario↔prueba (falla si falta o sobra)
     y `make spec-drift`. Ruta: delegada (Codex, sin red).
     Hecho (2026-10-02): Codex escribió casi todo y se cortó por su límite de uso antes de regenerar
