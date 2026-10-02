@@ -11,7 +11,7 @@ declaración de buenas intenciones.
 | Requisito | Título | Pri | Operaciones de la API | Escenarios | Pruebas Go | E2E | Estado |
 |---|---|---|---|---|---|---|---|
 | **RF-001** | Alta de empleados por administración | P0 | `createEmployee`, `resendInvitation` | 4 | 34 | — | ✅ completo |
-| **RF-002** | Aceptación de invitación y verificación de correo | P0 | `acceptInvitation` | 4 | 16 | — | ✅ completo |
+| **RF-002** | Aceptación de invitación y verificación de correo | P0 | `acceptInvitation` | 4 | 16 | 1 | ✅ completo |
 | **RF-003** | Inicio de sesión | P0 | `login` | 2 | 10 | — | ✅ completo |
 | **RF-004** | Emisión y validación de JWT | P0 | `getJwks` | 1 | 8 | — | ✅ completo |
 | **RF-005** | Renovación de sesión | P0 | `refreshSession` | 1 | 7 | — | ✅ completo |
@@ -38,12 +38,12 @@ declaración de buenas intenciones.
 | **RNF-006** | Procedencia verificable | P0 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-007** | Observabilidad | P0 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-008** | Contenedores endurecidos | P0 | — | — | — | — | 🔴 sin cubrir |
-| **RNF-009** | Cabeceras de seguridad | P0 | — | — | — | — | 🔴 sin cubrir |
+| **RNF-009** | Cabeceras de seguridad | P0 | — | — | — | 4 | 🟡 parcial |
 | **RNF-010** | Latencia | P1 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-011** | Los specs son la fuente de verdad | P0 | — | — | 5 | — | 🟡 parcial |
 | **RNF-012** | Logs sin datos sensibles | P0 | — | — | 5 | — | 🟡 parcial |
 
-**Resumen:** 32 requisitos · 17 completos · 6 parciales · 7 sin cubrir · 2 diferidos (semana 3).
+**Resumen:** 32 requisitos · 17 completos · 7 parciales · 6 sin cubrir · 2 diferidos (semana 3).
 
 Leyenda de estado: *completo* = verificado por al menos dos de las tres
 columnas de prueba · *parcial* = una sola · *sin cubrir* = ninguna · *diferido (semana 3)* = backlog de semana 3 por decisión Q14.

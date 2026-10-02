@@ -84,7 +84,7 @@ test-front: ## Pruebas del frontend (consola del Hub y Contabilidad)
 	cd contabilidad && npm run test
 
 e2e: ## Pruebas de extremo a extremo contra el stack levantado
-	@echo "Pendiente para la semana 3: Playwright."
+	cd e2e && npm ci && npx playwright test
 
 migrate: ## Aplica las migraciones pendientes
 	$(COMPOSE) run --rm migrate

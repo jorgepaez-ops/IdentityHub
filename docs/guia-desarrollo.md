@@ -134,6 +134,24 @@ pero **no cuenta** en `specs/07-traceability.md` — es el error más común al
 delegar una tarea y el que más veces corrigió el hook de revisión antes del
 commit (ver `odd/tasks/idp-semana-2.md`, notas de T19).
 
+### Pruebas E2E
+
+Las pruebas de extremo a extremo (Playwright, solo Chromium por ahora) viven en `e2e/` y corren
+contra el stack ya levantado.
+
+```bash
+make up      # el stack debe estar sano antes
+make e2e     # npm ci + npx playwright test
+```
+
+- Requieren Node.js y los navegadores de Playwright (`npx playwright install chromium`, una vez).
+- Las pruebas crean sus propias cuentas `e2e-*@example.test` en la base local (un administrador
+  sembrado por SQL con `docker exec` y las invitaciones que cada escenario necesita); no tocan
+  las demás cuentas, pero tampoco las borran.
+- Se ejecutan en serie porque Nginx limita `/api/v1/auth/` a 5 peticiones por segundo.
+- Variables opcionales: `E2E_HUB_URL`, `E2E_MAILPIT_URL`, `E2E_DB_CONTAINER` (por defecto
+  `identity-hub-db-1`).
+
 ## 4. GoLand
 
 El repo no trae configuraciones de ejecución compartidas (`.idea/` está fuera

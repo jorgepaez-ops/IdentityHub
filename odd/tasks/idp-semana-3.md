@@ -958,6 +958,34 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 - Una prueba por escenario Gherkin, lectura de correos por la API de Mailpit, el guion de la demo
   como prueba; `make e2e` real y job en CI; `spec-drift` comprueba la correspondencia.
 - Commit: —
+- Mapa (explorador, 2026-10-02): 37 escenarios en 6 features (`specs/06-acceptance/`, etiquetas
+  `@RF-NNN`); `scripts/traceability.py` solo cuenta pruebas por RF (no falla si falta una);
+  `make spec-drift` no existe; ningún job de CI levanta el stack; el admin inicial no tiene
+  contraseña (solo invitación por correo); `/api/v1/auth/` limitado a 5r/s burst 5 (429).
+- Decisión del usuario (2026-10-02): los escenarios sin camino E2E puro (auditoría inmutable,
+  invitación vencida, encolado) se cubren con acceso directo controlado (`docker exec … psql`) para
+  que los 37 tengan prueba E2E real, no con exenciones. Las pruebas crean su propio admin
+  (`e2e-admin-*@example.test`, invitación sembrada por SQL y aceptada por la API real), sin tocar
+  las cuentas del usuario.
+- Convención: un `test()` por escenario titulado `RF-NNN <nombre exacto del escenario>` (primera
+  etiqueta RF), en `e2e/tests/<feature>.spec.ts`.
+- Subtareas:
+  - [x] T14a — Andamiaje: `e2e/package.json` + lockfile (`@playwright/test` 1.63.0), config,
+    helpers (Mailpit, API, admin sembrado, correos únicos, ritmo bajo el límite de 5r/s),
+    `make e2e`, smoke test de Nginx con cabecera `Host` (deuda de T11) y el escenario "aceptar
+    invitación" como prueba del arnés. Ruta: delegada (Sonnet: red y Docker).
+    Hecho (2026-10-02): `e2e/` con `@playwright/test` 1.63.0 fijo, helpers (`support/`: Mailpit,
+    API con ritmo de 300 ms, psql por `execFile` con variables `-v`, admin sembrado), 6 pruebas
+    RNF-009 de Nginx por `Host` y RF-002 "Aceptar la invitación…" por la UI. Revisión de Claude:
+    se endureció la prueba de `/oauth/` (exige 400 `application/problem+json` de la API, no solo
+    "no es HTML"). Evidencia: `make e2e` 7/7 tres veces seguidas (idempotente), `tsc --noEmit` ok,
+    gitleaks sobre `e2e/` sin hallazgos, matriz regenerada (`traceability.py --check` al día).
+  - [ ] T14b — Escenarios restantes de las 6 features. Ruta: delegada (Codex escribe, Claude corre).
+  - [ ] T14c — Guion de la demo como prueba (criterio de aceptación 1). Ruta: delegada.
+  - [ ] T14d — `spec-drift` comprueba la correspondencia escenario↔prueba (falla si falta o sobra)
+    y `make spec-drift`. Ruta: delegada (Codex, sin red).
+  - [ ] T14e — Job E2E en CI (stack con `.env` generado), sin renombrar los 17 checks
+    obligatorios; verificarlo requiere push (decisión del usuario).
 
 ### T15 — DAST con OWASP ZAP en CI
 - [ ] Estado · Ejecutor: `Claude`
