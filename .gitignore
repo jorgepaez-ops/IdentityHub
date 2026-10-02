@@ -33,3 +33,7 @@ gitleaks-report.json
 .DS_Store
 .idea/
 .vscode/
+
+# Python bytecode (scripts/traceability_test.py imports the script on CI runners).
+__pycache__/
+*.pyc

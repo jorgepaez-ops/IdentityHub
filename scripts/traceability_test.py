@@ -4,9 +4,14 @@ from __future__ import annotations
 
 import importlib.util
 import pathlib
+import sys
 import tempfile
 import unittest
 
+
+# Loading the script as a module would otherwise leave scripts/__pycache__/ behind on
+# Linux runners, and the spec-drift job requires a clean working tree.
+sys.dont_write_bytecode = True
 
 SCRIPT = pathlib.Path(__file__).with_name("traceability.py")
 SPEC = importlib.util.spec_from_file_location("traceability", SCRIPT)
