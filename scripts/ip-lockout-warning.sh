@@ -15,7 +15,12 @@ container="${E2E_DB_CONTAINER:-identity-hub-db-1}"
 db_user="${E2E_DB_USER:-identity}"
 db_name="${E2E_DB_NAME:-identity}"
 docker_bin="${E2E_DOCKER:-docker}"
-limit="${LOGIN_IP_LIMIT:-20}"
+# The effective limit is read from the (already restored) API container, so the warning follows the
+# API's real configuration; LOGIN_IP_LIMIT overrides it and 20 is only the last-resort default.
+api_container="${E2E_API_CONTAINER:-identity-hub-api-1}"
+api_limit="$("$docker_bin" inspect "$api_container" --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null \
+  | sed -n 's/^LOGIN_IP_MAX_FAILURES=//p' | head -n 1)"
+limit="${LOGIN_IP_LIMIT:-${api_limit:-20}}"
 window_minutes="${LOGIN_FAILURE_WINDOW_MINUTES:-15}"
 
 case "$limit$window_minutes" in
