@@ -160,6 +160,23 @@ make e2e     # npm ci + npx playwright test
   stack con `make up`, instala Chromium y ejecuta `make e2e`; si falla, sube `e2e/playwright-report`
   y `e2e/test-results` como artefactos.
 
+### DAST con ZAP
+
+`make scan-dast` corre OWASP ZAP (imagen fijada en `ZAP_IMAGE`) contra el stack ya levantado: baseline
+del Hub (`identityhub.localhost:8080`), baseline de Contabilidad y escaneo de la API con
+`specs/03-api/openapi.yaml`. Requiere Docker y Python 3.
+
+- `scripts/zap-gate.py` es el único punto de decisión: rompe la build (código de salida 1) con
+  cualquier alerta de riesgo **medio o alto** de los informes JSON. Los bajos e informativos se
+  imprimen pero no rompen. Solo una entrada `IGNORE` con justificación en `.zap/rules.tsv` suprime
+  una alerta media o alta; `WARN` documenta bajos aceptados.
+- Hoy termina en rojo a propósito: la CSP sin `form-action` (10055) se remedia en T15b.
+- El escaneo de API golpea `/api/v1/auth/` desde una sola IP, así que `make scan-dast` sube
+  `LOGIN_IP_MAX_FAILURES` en la API mientras corre y la restaura al terminar (como `make e2e`).
+- Los informes (JSON y HTML) quedan en `security/zap-reports/` (ignorado por git). CI corre lo
+  mismo en el job `11 · DAST (OWASP ZAP)` y sube esa carpeta como artefacto.
+- Pruebas del gate: `python3 scripts/zap_gate_test.py`.
+
 ## 4. GoLand
 
 El repo no trae configuraciones de ejecución compartidas (`.idea/` está fuera

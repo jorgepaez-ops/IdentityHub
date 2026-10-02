@@ -1122,6 +1122,28 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
     mano: las rutas desconocidas bajo `/api/v1/` responden 404 `text/plain` (el 404 por defecto del
     router), no RFC 7807 como el resto de la API (componente `backend/internal/api`); `/api` sin barra
     da un 301 HTML de Nginx.
+- Decisión del usuario (2026-10-02, opción a): el job de ZAP rompe la build con hallazgos de
+  severidad **media o más**; los bajos quedan como advertencia con justificación en `.zap/rules.tsv`.
+  El job nace en rojo por el medio de la CSP, que se remedia con su propia ficha.
+- Subtareas:
+  - [x] T15a — Job de ZAP en CI (baseline del Hub y de Contabilidad por `Host`, API con el OpenAPI;
+    umbral medio+ verificado sobre el informe JSON), `.zap/rules.tsv`, `make scan-dast`. Ruta:
+    delegada (Sonnet: Docker y red). Su primer run en rojo es la evidencia "antes" (requiere push).
+    Escrito (2026-10-02, Sonnet; revisó y commiteó Claude): `scripts/zap-gate.py` (stdlib) rompe
+    con riskcode >= 2 salvo IGNORE justificado en `.zap/rules.tsv` (hoy WARN para 90004, 10063 y
+    100001; 10055 a propósito fuera); Claude añadió que un informe sin sitios escaneados sea error
+    (antes un ZAP que no llegaba al objetivo daba "verde" sin escanear; RED 0≠2 → GREEN, 9/9).
+    `make scan-dast` con `ghcr.io/zaproxy/zaproxy:2.17.0` fijo: baseline del Hub y de Contabilidad
+    y escaneo de API (sin `-c`: con `-c` la API usa la política completa y el contenedor muere por
+    memoria; el gate aplica `rules.tsv` al JSON), con el límite por IP elevado y restaurado como en
+    `make e2e`. Job "11 · DAST (OWASP ZAP)" (`contents: read`, 30 min, informes siempre como
+    artefacto). Evidencia local: `make scan-dast` falla por 10055 en el **Hub y en Contabilidad**
+    (nuevo: la exploración inicial solo miró el Hub), API sin medios; límite de vuelta en 20;
+    `actionlint` ok; `make spec-drift` ok. Sin verificar hasta CI: `host-gateway`, permisos del
+    directorio de informes y alcance a Nginx desde el contenedor. Candidato a acción compuesta:
+    los pasos de arranque del stack están duplicados entre los jobs 7 y 11.
+  - [ ] T15b — Ficha de la CSP sin `form-action` (id lo asigna Codex al crearla; afecta a los dos
+    `server`, Hub y Contabilidad) y remediación en `frontend/nginx/default.conf`; run en verde como evidencia "después" (requiere push).
 
 ### T16 — Hook de pre-commit real
 - [ ] Estado · Ejecutor: `Claude`

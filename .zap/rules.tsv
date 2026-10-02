@@ -1,0 +1,7 @@
+# ZAP rules: pluginid<TAB>action<TAB>comment. Used by zap-baseline/zap-api-scan (-c) and scripts/zap-gate.py.
+# Medium/High alerts break the build (T15). Only IGNORE (with justification) suppresses one; none today.
+# 10055 (CSP: Failure to Define Directive with No Fallback) is deliberately NOT listed: it must break
+# the gate until T15b remediates it.
+90004	WARN	COEP/COOP/CORP absent (Low). Accepted until hardening; see odd/tasks/idp-semana-3.md T15.
+10063	WARN	Permissions-Policy absent (Low). Accepted until hardening; see odd/tasks/idp-semana-3.md T15.
+100001	WARN	Unexpected Content-Type: unknown /api/v1/ routes return 404 text/plain (Low); see odd/tasks/idp-semana-3.md T15.

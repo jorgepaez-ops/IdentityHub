@@ -28,6 +28,7 @@ e2e/.auth/
 *.sarif
 trivy-report.json
 gitleaks-report.json
+security/zap-reports/
 
 # SO / editores
 .DS_Store
