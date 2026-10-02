@@ -1184,6 +1184,11 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
     `InvalidPasswordError` ("longer than 128 characters") y el login no lo contempla; además ese 500 no
     deja ninguna línea en el log de la API. Componentes: `backend/internal/auth/login` y
     `backend/internal/api` (login). El gate queda en rojo hasta remediarlo.
+    **T15c en curso (2026-10-02):** VULN-031 documenta el hallazgo. Las pruebas cubren 129
+    caracteres para cuentas existente e inexistente, conservan auditoría y bloqueo, y mantienen
+    válido el límite de 128; el handler devuelve el problema genérico y registra los fallos internos
+    inesperados sin secretos. Las pruebas unitarias, `go vet` y el formato quedaron verificados;
+    quedan pendientes las comprobaciones con Docker y la evidencia después en CI.
 
 ### T16 — Hook de pre-commit real
 - [ ] Estado · Ejecutor: `Claude`

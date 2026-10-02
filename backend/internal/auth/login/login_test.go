@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/netip"
+	"strings"
 	"testing"
 	"time"
 
@@ -161,6 +162,80 @@ func TestRF003_AM004EmailInexistenteYPasswordIncorrectoCompartenError(t *testing
 	_, wrongPasswordErr := withMFA(wrongPassword).Login(context.Background(), Input{Email: "known@example.com", Password: "wrong password"})
 	if !errors.Is(unknownErr, ErrInvalidCredentials) || !errors.Is(wrongPasswordErr, ErrInvalidCredentials) || unknownErr.Error() != wrongPasswordErr.Error() {
 		t.Fatalf("unknown=%v wrong-password=%v", unknownErr, wrongPasswordErr)
+	}
+}
+
+func TestRF003_ContrasenaLargaDevuelveCredencialesInvalidasYSeAudita(t *testing.T) {
+	hash, err := password.Hash("correct horse battery")
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := uuid.New()
+	cases := []struct {
+		name       string
+		repository *repositoryStub
+		actorID    *uuid.UUID
+	}{
+		{
+			name:       "known email",
+			repository: &repositoryStub{user: User{ID: id, PasswordHash: hash, Status: StatusActive}},
+			actorID:    &id,
+		},
+		{
+			name:       "unknown email",
+			repository: &repositoryStub{lookupErr: pgx.ErrNoRows},
+		},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			_, err := withMFA(testCase.repository).Login(context.Background(), Input{Email: "ada@example.com", Password: strings.Repeat("a", 129)})
+			if !errors.Is(err, ErrInvalidCredentials) {
+				t.Fatalf("Login() error = %v, want invalid credentials", err)
+			}
+			if len(testCase.repository.audits) != 1 || testCase.repository.audits[0].Action != "login_failed" {
+				t.Fatalf("audits=%+v", testCase.repository.audits)
+			}
+			gotActorID := testCase.repository.audits[0].ActorUserID
+			if testCase.actorID == nil && gotActorID != nil {
+				t.Fatalf("actor ID = %v, want nil", gotActorID)
+			}
+			if testCase.actorID != nil && (gotActorID == nil || *gotActorID != *testCase.actorID) {
+				t.Fatalf("actor ID = %v, want %v", gotActorID, testCase.actorID)
+			}
+		})
+	}
+}
+
+func TestRF017_ContrasenaLargaCuentaParaBloqueo(t *testing.T) {
+	hash, err := password.Hash("correct horse battery")
+	if err != nil {
+		t.Fatal(err)
+	}
+	repository := &repositoryStub{user: User{ID: uuid.New(), PasswordHash: hash, Status: StatusActive}}
+	service := withMFA(repository)
+	for attempt := 1; attempt <= 5; attempt++ {
+		if _, err := service.Login(context.Background(), Input{Password: strings.Repeat("a", 129)}); !errors.Is(err, ErrInvalidCredentials) {
+			t.Fatalf("attempt %d error = %v, want invalid credentials", attempt, err)
+		}
+	}
+	if _, err := service.Login(context.Background(), Input{Password: "correct horse battery"}); !errors.Is(err, ErrAccountLocked) {
+		t.Fatalf("login after long-password failures error = %v, want account locked", err)
+	}
+	if repository.user.Status != StatusLocked {
+		t.Fatalf("user status = %q, want %q", repository.user.Status, StatusLocked)
+	}
+}
+
+func TestRF003_ContrasenaDe128CaracteresSeVerifica(t *testing.T) {
+	passwordValue := strings.Repeat("a", 128)
+	hash, err := password.Hash(passwordValue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	repository := &repositoryStub{user: User{ID: uuid.New(), PasswordHash: hash, Status: StatusActive}}
+	result, err := withMFA(repository).Login(context.Background(), Input{Password: passwordValue})
+	if err != nil || result.MfaToken == "" {
+		t.Fatalf("result=%+v err=%v", result, err)
 	}
 }
 

@@ -148,7 +148,9 @@ func (s *Service) Login(ctx context.Context, input Input) (Result, error) {
 		user, err := writer.GetLoginUserByEmail(ctx, input.Email)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				if decoyErr := password.VerifyDecoy(input.Password); decoyErr != nil {
+				decoyErr := password.VerifyDecoy(input.Password)
+				var invalidPasswordErr *password.InvalidPasswordError
+				if decoyErr != nil && !errors.As(decoyErr, &invalidPasswordErr) {
 					return fmt.Errorf("verify decoy password: %w", decoyErr)
 				}
 				if err := s.recordFailure(ctx, writer, nil, input, "invalid_credentials"); err != nil {
@@ -172,7 +174,8 @@ func (s *Service) Login(ctx context.Context, input Input) (Result, error) {
 		}
 
 		valid, err := password.Verify(input.Password, user.PasswordHash)
-		if err != nil {
+		var invalidPasswordErr *password.InvalidPasswordError
+		if err != nil && !errors.As(err, &invalidPasswordErr) {
 			return fmt.Errorf("verify password: %w", err)
 		}
 		if !valid || user.Status != StatusActive {

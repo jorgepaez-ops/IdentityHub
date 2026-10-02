@@ -1,8 +1,11 @@
 package api
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
@@ -122,6 +125,43 @@ func TestRF003_PasswordIncorrectoDevuelve401Generico(t *testing.T) {
 	server.Login(response, request)
 	if response.Code != http.StatusUnauthorized || strings.Contains(response.Body.String(), "ada@example.com") {
 		t.Fatalf("response = %d %s", response.Code, response.Body.String())
+	}
+}
+
+func TestRF003_ContrasenaLargaDevuelve401ProblemGenerico(t *testing.T) {
+	passwordValue := strings.Repeat("a", 129)
+	hash, err := password.Hash("correct horse battery")
+	if err != nil {
+		t.Fatal(err)
+	}
+	repository := &realLoginRepositoryStub{user: login.User{ID: uuid.New(), PasswordHash: hash, Status: login.StatusActive}}
+	server := NewServer(nil, "test", nil)
+	server.SetLoginService(login.New(repository).WithMFA(mfaIssuerStub{}))
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", strings.NewReader(`{"email":"ada@example.com","password":"`+passwordValue+`"}`))
+
+	server.Routes().ServeHTTP(response, request)
+
+	if response.Code != http.StatusUnauthorized || !strings.Contains(response.Body.String(), `"type":"https://identity.local/problems/invalid-credentials"`) {
+		t.Fatalf("status=%d body=%s, want generic invalid-credentials problem", response.Code, response.Body.String())
+	}
+}
+
+func TestRF003_LoginFalloInesperadoRegistraErrorYRequestID(t *testing.T) {
+	var logs bytes.Buffer
+	server := NewServer(slog.New(slog.NewTextHandler(&logs, nil)), "test", nil)
+	server.SetLoginService(loginStub{err: errors.New("database unavailable")})
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", strings.NewReader(`{"email":"ada@example.com","password":"do-not-log-password"}`))
+	request.Header.Set("X-Request-Id", "login-request-id")
+
+	server.Routes().ServeHTTP(response, request)
+
+	if response.Code != http.StatusInternalServerError {
+		t.Fatalf("status=%d body=%s, want 500", response.Code, response.Body.String())
+	}
+	if output := logs.String(); !strings.Contains(output, "level=ERROR") || !strings.Contains(output, "error=\"database unavailable\"") || !strings.Contains(output, "request_id=login-request-id") || strings.Contains(output, "do-not-log-password") {
+		t.Fatalf("logs=%q", output)
 	}
 }
 

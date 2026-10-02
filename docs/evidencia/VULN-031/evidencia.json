@@ -1,0 +1,35 @@
+{
+  "vuln": "VULN-031",
+  "gate": [
+    "OWASP ZAP API scan 30002 (job 11 · DAST)"
+  ],
+  "antes": {
+    "commit_linea_base": null,
+    "commit_main": null,
+    "workflow": null,
+    "run_id": null,
+    "run_url": null,
+    "artefacto": null,
+    "captura": null,
+    "hallazgos": [
+      "Format String Error (30002) | POST /api/v1/auth/login | parámetro password | MEDIUM"
+    ],
+    "observacion": "La reproducción manual documentada en T15 confirmó 401 con 128 caracteres y 500 con 129, sin línea de log de la API. El escaneo local make scan-dast informó la alerta 30002.",
+    "job": "11 · DAST (OWASP ZAP)"
+  },
+  "remediacion": {
+    "tarea": "T15c",
+    "commit": null,
+    "ficha": "security/findings/VULN-031-login-500-con-contrasena-larga.md"
+  },
+  "despues": {
+    "commit": null,
+    "workflow": null,
+    "run_id": null,
+    "run_url": null,
+    "artefacto": null,
+    "captura": null,
+    "hallazgos": [],
+    "observacion": "Pendiente de la verificación local y del run de CI posterior a la remediación."
+  }
+}
