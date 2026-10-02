@@ -1026,8 +1026,24 @@ antes de T14 como **BUG-1** y **BUG-2** (evidencia de los logs de Nginx/API toma
   `contabilidad.analista`); no explica que falte el canje, pero conviene descartarlo.
 - Plan: reproducir con Playwright en Chromium y Firefox mirando consola, red y CSP; preguntar al
   usuario el navegador y lo que muestra la consola; prueba que falle primero (TDD) y arreglo.
+- Avance (2026-10-02): **no se reproducen** con un script de Playwright desechable (scratchpad)
+  contra el stack del usuario, ni en Chromium ni en WebKit 26.6 headless, ni con el admin logueado en
+  otra pestaña del mismo navegador: `invitations/accept` responde 204 con "Tu cuenta quedó activada";
+  Contabilidad canjea el código (`/oauth/token` 200) y carga el panel del analista. El usuario
+  confirmó que usó **Safari** y que Contabilidad mostró un "error de sesión" (`state` o `exchange` en
+  `contabilidad/src/App.tsx`). En sus logs el Hub emitió códigos, así que Safari sí envió
+  `hub_session`; el fallo ocurre en Contabilidad antes del `fetch`. Hipótesis: Safari pierde
+  `state`/`verifier` de `sessionStorage`, o rechaza el `fetch` cruzado antes de enviarlo. Siguiente
+  paso, aplazado por el usuario: reproducir en Safari real con `safaridriver` (requiere `sudo
+  safaridriver --enable` y "Permitir automatización remota"). Datos de prueba que quedan en la base
+  local: usuarios `bug-*@example.test` y la contraseña cambiada de `t34a-check3@example.com` (el rol
+  `admin` temporal ya se quitó).
+- Hallazgo aparte (no es un VULN, sin id): WebKit registra en la consola de
+  `/invitations/accept` "Refused to apply a stylesheet because its hash, its nonce, or
+  'unsafe-inline' does not appear in the style-src directive". La CSP del Hub bloquea un estilo
+  inline; falta ver qué lo inyecta y decidir en qué tarea se corrige.
 
-Siguiente sesión: BUG-1 y BUG-2; después fase 3, empezando por T14 (E2E con Playwright, incluido el smoke test de Nginx
+Siguiente: fase 3 empezando por T14 (BUG-1/BUG-2 quedan pendientes de la prueba en Safari real) (E2E con Playwright, incluido el smoke test de Nginx
 con cabecera `Host` pendiente de T11). Para delegar con Gentle AI 4.0, cada tarea a un agente que
 escribe lleva su `## Allowed edit surfaces`.
 
