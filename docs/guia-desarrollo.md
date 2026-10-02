@@ -170,7 +170,8 @@ del Hub (`identityhub.localhost:8080`), baseline de Contabilidad y escaneo de la
   cualquier alerta de riesgo **medio o alto** de los informes JSON. Los bajos e informativos se
   imprimen pero no rompen. Solo una entrada `IGNORE` con justificación en `.zap/rules.tsv` suprime
   una alerta media o alta; `WARN` documenta bajos aceptados.
-- Hoy termina en rojo a propósito: la CSP sin `form-action` (10055) se remedia en T15b.
+- Debe terminar en verde. La CSP sin `form-action` (10055) lo rompía hasta VULN-030; si vuelve a
+  aparecer un hallazgo medio o alto, el gate rompe la build.
 - El escaneo de API golpea `/api/v1/auth/` desde una sola IP, así que `make scan-dast` sube
   `LOGIN_IP_MAX_FAILURES` en la API mientras corre y la restaura al terminar (como `make e2e`).
 - Los informes (JSON y HTML) quedan en `security/zap-reports/` (ignorado por git). CI corre lo
