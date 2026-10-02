@@ -1067,6 +1067,18 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
     real nunca tiene una contraseña conocida y solo así se prueba que el 401 viene del estado.
   - [ ] T14e — Job E2E en CI (stack con `.env` generado), sin renombrar los 17 checks
     obligatorios; verificarlo requiere push (decisión del usuario).
+    Escrito (2026-10-02, Sonnet; revisó y commiteó Claude): job `e2e` "7 · E2E (Playwright)"
+    (`contents: read`, 30 min): `.env` desechable con secretos aleatorios enmascarados (dueño
+    `identity` para migraciones y el helper `psql`; `identity_app` con `IDENTITY_APP_PASSWORD`, como
+    `deploy/postgres-init`), `/etc/hosts` para `*.localhost` como respaldo, `make up`, espera por
+    HTTP, Chromium con `--with-deps`, `make e2e`, artefactos y logs si falla, `down -v` siempre.
+    `spec-drift` corre además `traceability_test.py`. Ningún job renombrado. Verificado en local:
+    `actionlint` sin hallazgos, YAML válido, el paso del `.env` ejecutado en un directorio aparte
+    resuelve todo `docker compose config`. **Sin verificar hasta el push**: que corra en GitHub,
+    resolución de `*.localhost` en el runner, tiempo de build dentro de 30 min. El check nuevo no
+    está en la lista obligatoria del ruleset (decisión del usuario si se agrega).
+    Advertencia de la revisión del rango (aprobada), hoy sin efecto: un escenario etiquetado solo
+    con RNF no entraría en la correspondencia uno a uno; no existe ninguno en las features.
 
 ### T15 — DAST con OWASP ZAP en CI
 - [ ] Estado · Ejecutor: `Claude`

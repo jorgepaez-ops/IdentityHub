@@ -6,8 +6,9 @@
 #  se sembró para ellos. Pasará a verde durante la fase de remediación.
 #  Para ver los hallazgos sin bloquear, está baseline-scan.yml.
 #
-#  Jobs 1–10 de la tabla del plan. Los de release (SBOM, firma, publicación),
-#  E2E y DAST se incorporan en la semana 3.
+#  Jobs 1–10 de la tabla del plan, más el job 7 (E2E con Playwright contra el
+#  stack completo de docker compose, T14e). Los de release (SBOM, firma,
+#  publicación) y DAST se incorporan en la semana 3.
 # ═══════════════════════════════════════════════════════════════════════════
 name: CI
 
@@ -74,6 +75,10 @@ jobs:
         run: |
           npm install --no-package-lock --ignore-scripts
           npm run gen:api
+
+      # T14d — correspondencia 1 a 1 escenario Gherkin ↔ prueba E2E (stdlib, sin red).
+      - name: Pruebas del verificador de trazabilidad
+        run: python3 scripts/traceability_test.py
 
       - name: Regenerar la matriz de trazabilidad
         run: python3 scripts/traceability.py
@@ -381,6 +386,99 @@ jobs:
           }'
           echo "coverage=${COVERAGE}" >> "$GITHUB_OUTPUT"
         id: coverage
+
+  # ── 7. Pruebas de extremo a extremo ─────────────────────────────────────
+  e2e:
+    name: 7 · E2E (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      # Todo lo que sigue es desechable: el .env solo existe en este runner y vive lo que
+      # dura el job. Cada secreto se enmascara antes de escribirse.
+      # Las contraseñas son hex para que valgan tal cual dentro de las URLs de conexión.
+      - name: Generar un .env desechable
+        run: |
+          gen_hex() { openssl rand -hex 24; }
+          PG_PASS="$(gen_hex)"; APP_PASS="$(gen_hex)"; MQ_PASS="$(gen_hex)"; GF_PASS="$(gen_hex)"
+          JWT_KEY="$(openssl rand -base64 32)"
+          for secret in "$PG_PASS" "$APP_PASS" "$MQ_PASS" "$GF_PASS" "$JWT_KEY"; do
+            echo "::add-mask::${secret}"
+          done
+          umask 077
+          {
+            echo "POSTGRES_USER=identity"
+            echo "POSTGRES_PASSWORD=${PG_PASS}"
+            echo "POSTGRES_DB=identity"
+            echo "IDENTITY_APP_PASSWORD=${APP_PASS}"
+            echo "RABBITMQ_DEFAULT_USER=identity"
+            echo "RABBITMQ_DEFAULT_PASS=${MQ_PASS}"
+            echo "MIGRATE_DATABASE_URL=postgres://identity:${PG_PASS}@db:5432/identity?sslmode=disable"
+            echo "DATABASE_URL=postgres://identity_app:${APP_PASS}@db:5432/identity?sslmode=disable"
+            echo "RABBITMQ_URL=amqp://identity:${MQ_PASS}@broker:5672/"
+            echo "JWT_SIGNING_KEY=${JWT_KEY}"
+            # Subred de la red por defecto de docker-compose.yml (nginx llega a la API desde ahí).
+            echo "TRUSTED_PROXIES=172.28.0.0/16"
+            # Compose interpola el archivo entero, también los servicios de perfiles inactivos.
+            echo "GRAFANA_ADMIN_USER=admin"
+            echo "GRAFANA_ADMIN_PASSWORD=${GF_PASS}"
+          } > .env
+
+      # Los navegadores y Node usan *.localhost; systemd-resolved lo resuelve a 127.0.0.1,
+      # pero el /etc/hosts explícito quita la dependencia de ese comportamiento del runner.
+      - name: Resolver los hosts *.localhost
+        run: echo "127.0.0.1 identityhub.localhost contabilidad.localhost" | sudo tee -a /etc/hosts
+
+      - name: Levantar el stack (make up)
+        run: make up
+
+      # `up -d` no espera. `web` no tiene healthcheck pero depende de `api` sana (que a su vez
+      # espera a db, broker y migrate), así que responder en :8080 implica el stack listo.
+      - name: Esperar a que el stack esté sano
+        run: |
+          curl --fail --silent --show-error --retry 30 --retry-delay 2 --retry-connrefused \
+            http://identityhub.localhost:8080/ > /dev/null
+          curl --fail --silent --show-error --retry 30 --retry-delay 2 --retry-connrefused \
+            http://contabilidad.localhost:8080/ > /dev/null
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+
+      # `make e2e` ejecuta `npm ci`; los navegadores van antes porque necesitan las
+      # dependencias de sistema (--with-deps usa sudo) y el paquete ya instalado.
+      - name: Instalar Chromium de Playwright
+        working-directory: e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Pruebas E2E (make e2e)
+        run: make e2e
+
+      - name: Subir informe y trazas de Playwright
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-${{ github.run_id }}
+          path: |
+            e2e/playwright-report
+            e2e/test-results
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Volcar los logs del stack
+        if: failure()
+        run: docker compose --env-file .env -f deploy/docker-compose.yml logs --no-color --tail=300
+
+      - name: Derribar el stack
+        if: always()
+        run: docker compose --env-file .env -f deploy/docker-compose.yml down -v
 
   # ── 8. Configuración e infraestructura ──────────────────────────────────
   iac-scan:

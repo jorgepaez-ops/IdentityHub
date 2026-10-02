@@ -156,6 +156,9 @@ make e2e     # npm ci + npx playwright test
   `LOGIN_FAILURE_WINDOW` (15 min) choca con el límite por IP; el chequeo previo lo avisa.
 - Variables opcionales: `E2E_HUB_URL`, `E2E_MAILPIT_URL`, `E2E_DB_CONTAINER` (por defecto
   `identity-hub-db-1`).
+- CI corre esta misma suite en el job `7 · E2E (Playwright)`: genera un `.env` desechable, levanta el
+  stack con `make up`, instala Chromium y ejecuta `make e2e`; si falla, sube `e2e/playwright-report`
+  y `e2e/test-results` como artefactos.
 
 ## 4. GoLand
 
