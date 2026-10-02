@@ -128,9 +128,10 @@ e435d0910dc0c97d132b382811b3ee2a0331a40d:e2e/support/api.ts:contrasena-en-variab
 e435d0910dc0c97d132b382811b3ee2a0331a40d:e2e/tests/registro-y-verificacion.spec.ts:contrasena-en-variable-de-entorno:21
 
 # T15 (2026-10-02, aprobado por el usuario): falsos positivos de contrasena-en-variable-de-entorno.
-# 3 en docs/evidencia/VULN-013/evidencia.json: líneas "PASS: <regla ZAP>" (la regla toma "PASS:" como
-# "pass: valor"). 5 en las pruebas de Go de VULN-031: Password: strings.Repeat(...), Password:
-# passwordValue y cuerpos JSON de prueba con contraseñas inventadas. Ninguno es un secreto.
+# 3 en docs/evidencia/VULN-013/evidencia.json: líneas de resultado PASS de reglas ZAP (la regla
+# confunde la palabra PASS seguida de dos puntos con una asignación de contraseña). 5 en las pruebas
+# de Go de VULN-031: el campo de contraseña recibe un valor generado con strings.Repeat, una variable
+# o un cuerpo JSON de prueba con una contraseña inventada. Ninguno es un secreto.
 4afd5636f7e4657295ae07a5a5fa58fe81763c65:backend/internal/api/login_test.go:contrasena-en-variable-de-entorno:141
 4afd5636f7e4657295ae07a5a5fa58fe81763c65:backend/internal/api/login_test.go:contrasena-en-variable-de-entorno:155
 4afd5636f7e4657295ae07a5a5fa58fe81763c65:backend/internal/auth/login/login_test.go:contrasena-en-variable-de-entorno:191
@@ -139,3 +140,8 @@ e435d0910dc0c97d132b382811b3ee2a0331a40d:e2e/tests/registro-y-verificacion.spec.
 7db44a84bafe2db38dcfa61cd383ecd35b49d05b:docs/evidencia/VULN-013/evidencia.json:contrasena-en-variable-de-entorno:43
 7db44a84bafe2db38dcfa61cd383ecd35b49d05b:docs/evidencia/VULN-013/evidencia.json:contrasena-en-variable-de-entorno:44
 7db44a84bafe2db38dcfa61cd383ecd35b49d05b:docs/evidencia/VULN-013/evidencia.json:contrasena-en-variable-de-entorno:45
+
+# T15 (2026-10-02, aprobado por el usuario): el propio comentario anterior, tal como quedó en
+# ed0d2fd, citaba el campo de contraseña de las pruebas de Go y disparó la misma regla. El comentario
+# ya se reescribió; esta huella cubre solo esa línea del historial.
+ed0d2fd375b1e96f853c4f08c6fa8e165a0a1180:.gitleaksignore:contrasena-en-variable-de-entorno:132
