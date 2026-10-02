@@ -1194,11 +1194,8 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
     API reconstruida: 128, 129 y 300 caracteres → 401; `make scan-dast` "Gate passed" (10055, 30002 y
     40018 en PASS); `make e2e` 46/46. No hay run de CI "antes" para VULN-031 (se detectó con el
     escaneo ya apuntando a `:8081`); su antes es la evidencia local.
-    **T15c en curso (2026-10-02):** VULN-031 documenta el hallazgo. Las pruebas cubren 129
-    caracteres para cuentas existente e inexistente, conservan auditoría y bloqueo, y mantienen
-    válido el límite de 128; el handler devuelve el problema genérico y registra los fallos internos
-    inesperados sin secretos. Las pruebas unitarias, `go vet` y el formato quedaron verificados;
-    quedan pendientes las comprobaciones con Docker y la evidencia después en CI.
+    Revisión nativa de T15c aprobada; corregidos dos textos viejos que decían "pendiente". Solo
+    falta el run "después" en verde en CI (común a VULN-030 y VULN-031).
 
 ### T16 — Hook de pre-commit real
 - [ ] Estado · Ejecutor: `Claude`

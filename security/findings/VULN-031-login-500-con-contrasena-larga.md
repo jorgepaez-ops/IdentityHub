@@ -35,5 +35,5 @@ manteniendo el endpoint en un estado de error observable.
 T15c trata `password.InvalidPasswordError` como credenciales inválidas tanto para cuentas existentes
 como inexistentes. El camino de cuenta existente conserva el registro de fallo y la evaluación de
 bloqueo. El handler devuelve el problema genérico `invalid-credentials` y registra únicamente el
-error y el identificador de petición cuando existe un fallo interno inesperado. El commit de
-remediación y la evidencia posterior quedan pendientes.
+error y el identificador de petición cuando existe un fallo interno inesperado. Remediación en
+`4afd563`; la evidencia después queda pendiente del run de CI en verde.
