@@ -1,0 +1,35 @@
+{
+  "vuln": "VULN-030",
+  "gate": [
+    "OWASP ZAP baseline 10055 (job 11 · DAST)"
+  ],
+  "antes": {
+    "commit_linea_base": "133aa8b",
+    "commit_main": null,
+    "workflow": "CI",
+    "run_id": "37055543540",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/37055543540",
+    "artefacto": "zap-reports-37055543540 (artefacto de Actions)",
+    "captura": null,
+    "hallazgos": [
+      "CSP: Failure to Define Directive with No Fallback (10055) | URL: http://identityhub.localhost:8080 | Count: 3 | Other Info: The directive(s): form-action is/are among the directives that do not fallback to default-src.",
+      "CSP: Failure to Define Directive with No Fallback (10055) | URL: http://contabilidad.localhost:8080 | Count: 3 | Other Info: The directive(s): form-action is/are among the directives that do not fallback to default-src."
+    ],
+    "observacion": "El run workflow_dispatch sobre 133aa8b dejó el job 11 en rojo: GATE BROKEN: 2 alert(s). Cada baseline informó la alerta 10055 Medium tres veces; la directiva ausente es form-action."
+  },
+  "remediacion": {
+    "tarea": "T15b",
+    "commit": null,
+    "ficha": "security/findings/VULN-030-csp-sin-form-action.md"
+  },
+  "despues": {
+    "commit": null,
+    "workflow": null,
+    "run_id": null,
+    "run_url": null,
+    "artefacto": null,
+    "captura": null,
+    "hallazgos": [],
+    "observacion": "Pendiente del run verde de CI posterior a la remediación."
+  }
+}
