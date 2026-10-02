@@ -23,8 +23,18 @@ async function messagesFor(to: string): Promise<Summary[]> {
 }
 
 /** Returns the Mailpit message IDs present for an address before an email-triggering action. */
-export async function mailIds(to: string): Promise<Set<string>> {
-  return new Set((await messagesFor(to)).map((message) => message.ID))
+export async function mailIds(to: string, timeoutMs = 20_000): Promise<Set<string>> {
+  const deadline = Date.now() + timeoutMs
+  for (;;) {
+    try {
+      return new Set((await messagesFor(to)).map((message) => message.ID))
+    } catch (error) {
+      // Mailpit can briefly restart while the compose stack is becoming ready.
+      if (Date.now() > deadline) throw error
+    }
+    if (Date.now() > deadline) throw new Error(`Mailpit IDs for ${to} were unavailable within ${timeoutMs} ms`)
+    await sleep(500)
+  }
 }
 
 /**

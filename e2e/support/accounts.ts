@@ -49,18 +49,21 @@ export async function seedAdmin(): Promise<Admin> {
 }
 
 /** Invites a new user through the admin API and returns the raw token read from the emailed link. */
-export async function inviteUser(admin: Admin, roles: string[] = ['user']): Promise<{ email: string; token: string; link: string }> {
-  const email = uniqueEmail('invitee')
+export async function inviteUser(
+  admin: Admin,
+  roles: string[] = ['user'],
+  email = uniqueEmail('invitee'),
+): Promise<{ id: string; email: string; token: string; link: string }> {
   const existingMailIds = await mailIds(email)
   const since = new Date()
-  const created = await api('POST', '/api/v1/admin/users', {
+  const created = await api<{ id: string }>('POST', '/api/v1/admin/users', {
     token: admin.accessToken,
     json: { email, displayName: 'E2E User', roles },
   })
   if (created.status !== 201) throw new Error(`invite returned ${created.status}`)
   const mail = await waitForMail(email, 'invited', since, existingMailIds)
   const link = extractLink(mail.text)
-  return { email, token: tokenFromLink(link), link }
+  return { id: created.body.id, email, token: tokenFromLink(link), link }
 }
 
 /** Creates an isolated active account through the actual invitation endpoint. */

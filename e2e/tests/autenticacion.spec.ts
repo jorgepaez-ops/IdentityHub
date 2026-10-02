@@ -77,6 +77,10 @@ test('RF-014 Agotar los intentos MFA anula el desafío', async ({ playwright }) 
   const login = await contextApi<{ mfaToken: string }>(context, 'POST', `${hubUrl}/api/v1/auth/login`, { data: { email, password: strongPassword } })
   expect(login.status).toBe(202)
   const correctCode = extractCode((await waitForMail(email, 'sign-in code', since, existingMailIds)).text)
+  expect(psql(`SELECT attempts_left FROM mfa_challenges
+               WHERE user_id = (SELECT id FROM users WHERE email = :'email')
+                 AND attempts_left > 0 AND used_at IS NULL;`, { email: assertEmail(email) })).toBe('5')
+  // Challenge and account limits are both five, so reducing this isolates challenge exhaustion without locking the account.
   psql(`UPDATE mfa_challenges
         SET attempts_left = 1
         WHERE user_id = (SELECT id FROM users WHERE email = :'email')

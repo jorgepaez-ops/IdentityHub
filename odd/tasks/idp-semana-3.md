@@ -1006,6 +1006,17 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
       restaura el límite con `trap` en EXIT/INT/TERM; `psql` con timeout de 30 s; tipos desde
       `@playwright/test` (no de `playwright-core`, que no está declarado). Evidencia: `make e2e` 22/22
       dos veces seguidas; interrumpido con SIGINT a mitad de la suite, el límite vuelve de 1000 a 20.
+    - Lote 2 (2026-10-02, Codex escribió, Claude corrió y revisó): registro (6 restantes) y control de
+      acceso (8), incluida "sin acceso a Contabilidad" por navegador. Revisión de Claude: la prueba
+      de auditoría inalterable ahora hace `SET ROLE identity_app` (el escenario habla de la
+      aplicación; Codex la corría como dueño de la tabla) y espera `insufficient_privilege` en UPDATE
+      y DELETE; "conserva sus roles anteriores" compara la lista exacta. Codex añadió además lo que
+      pidió la revisión de `e319485` (comentario del atajo SQL, `attempts_left` inicial = 5, reintento
+      del snapshot de Mailpit). Evidencia: `make e2e` 36/36 dos veces; matriz al día.
+    - Advertencias abiertas de la revisión del rango (para la limpieza al cerrar T14): `fetch` sin
+      timeout en `api.ts`/`mailpit.ts`, helpers de login duplicados entre `api.ts` y `auth.ts`, URL
+      base del Hub en dos lugares (`playwright.config.ts` y `support/config.ts`), prueba débil de
+      `nginx.spec.ts:63-72`.
   - [ ] T14c — Guion de la demo como prueba (criterio de aceptación 1). Ruta: delegada.
   - [ ] T14d — `spec-drift` comprueba la correspondencia escenario↔prueba (falla si falta o sobra)
     y `make spec-drift`. Ruta: delegada (Codex, sin red).
