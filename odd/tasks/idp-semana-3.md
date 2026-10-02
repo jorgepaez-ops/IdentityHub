@@ -1222,6 +1222,16 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
   ok, `make spec-drift` ok, `make e2e` 46/46 con 0 cuentas `e2e-%` activas, `make scan-dast` "Gate
   passed" (el aviso de IP salió para 192.168.65.1), Contabilidad 53/53, interrupción con SIGINT
   restaura el límite a 20. Sin verificar hasta CI: la acción compuesta.
+  Revisión nativa de `c2effc5` aprobada; su advertencia corregida en `12a31c4` (el aviso lee el
+  límite efectivo del contenedor de la API). **Sin subir**: `c2effc5`, `12a31c4` y este registro.
+- Capturas de Desktop confirmadas (2026-10-02) para el run verde 37065094942: VULN-030 (log 147 y
+  234), VULN-031 (354), VULN-013 (10020, 10021, 10035, 10038) y VULN-014 (10036) "después"; las
+  secciones del run 37055543540 renombradas a "run previo"; el run 37063807973 queda como
+  discrepancia #12 del informe (descartado). Los `captura` de los `evidencia.json` ya apuntan ahí.
+- **Siguiente sesión**: push de los commits pendientes y CI para verificar la acción compuesta
+  `stack-up` (requiere autorización del usuario); después T16 (hook de pre-commit real) y T17
+  (cierre de fase y PR, que abre el usuario o se abre con su confirmación). Pendiente aparte:
+  BUG-1/BUG-2 en Safari real con `safaridriver`.
 
 ### T16 — Hook de pre-commit real
 - [ ] Estado · Ejecutor: `Claude`

@@ -28,7 +28,7 @@
     "run_id": "37065094942",
     "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/37065094942",
     "artefacto": "zap-reports-37065094942 (artefacto de Actions)",
-    "captura": null,
+    "captura": "informe §VULN-031 — después (run 37065094942; log línea 354)",
     "hallazgos": [
       "PASS: Format String Error [30002] (escaneo de API directo a :8081)",
       "Gate passed: no alerts of severity Medium or higher."

@@ -42,13 +42,13 @@
       "hallazgos": [
         "PASS: HTTP Server Response Header [10036]"
       ],
-      "captura": null,
+      "captura": "informe §VULN-014 — después (run 37065094942, run verde): 10036",
       "observacion": "Run con los 15 jobs en verde (job 11 \"Gate passed\"). Las capturas ya tomadas del run 37055543540 quedan en run_rojo_previo: mismas reglas en PASS, pero ese job terminó en rojo por VULN-030.",
       "run_rojo_previo": {
         "run_id": "37055543540",
         "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/37055543540",
         "commit": "133aa8b384f2ba93142a03f79126e6880460ebc3",
-        "captura": "informe §VULN-014 — después (gate ZAP): 10036 (discrepancia #11 del informe: antes se había capturado 10037 por error)"
+        "captura": "informe §VULN-014 — run previo (job 11 en rojo por VULN-030)"
       }
     }
   }

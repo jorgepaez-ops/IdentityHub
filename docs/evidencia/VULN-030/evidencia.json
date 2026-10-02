@@ -29,7 +29,7 @@
     "run_id": "37065094942",
     "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/37065094942",
     "artefacto": "zap-reports-37065094942 (artefacto de Actions)",
-    "captura": null,
+    "captura": "informe §VULN-030 — después (run 37065094942; log líneas 147 Hub y 234 Contabilidad)",
     "hallazgos": [
       "PASS: CSP [10055] (baseline del Hub)",
       "PASS: CSP [10055] (baseline de Contabilidad)",
