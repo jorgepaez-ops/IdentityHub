@@ -1101,6 +1101,22 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 - ZAP contra el stack levantado en CI (baseline y escaneo de API con el OpenAPI); umbral que rompe
   la build; hallazgos a fichas.
 - Commit: —
+- Mapa (explorador, 2026-10-02): no existe nada de ZAP (ni job, ni `.zap/rules.tsv`, ni target en
+  el Makefile); la plantilla del curso usa `fail_action: warn`, que choca con "umbral que rompe".
+  El arranque del stack del job 7 es reutilizable. La API exige bearer salvo 13 operaciones públicas.
+- Escaneo exploratorio local (2026-10-02, `ghcr.io/zaproxy/zaproxy:stable`, solo para conocer el
+  punto de partida; nada commiteado). Hallazgos nuevos, **sin id** (los asigna el usuario o Codex al
+  crear la ficha):
+  - Baseline (`zap-baseline.py`, Hub): **ninguno alto**. Medio: 10055 "CSP: Failure to Define
+    Directive with No Fallback" (Hub, la CSP no define una directiva sin respaldo en `default-src`,
+    probablemente `form-action`; componente `frontend/nginx/default.conf`). Bajos: 90004 COEP, COOP y
+    CORP ausentes; 10063 `Permissions-Policy` ausente (componente Nginx). Informativos: 10027
+    comentario sospechoso en el bundle, 10109, 10049.
+  - API (`zap-api-scan.py` con `specs/03-api/openapi.yaml`, sin token): **ninguno alto ni medio**.
+    Bajo: 90004 CORP en `/.well-known/jwks.json`; 100001 "Unexpected Content-Type" ×41. Comprobado a
+    mano: las rutas desconocidas bajo `/api/v1/` responden 404 `text/plain` (el 404 por defecto del
+    router), no RFC 7807 como el resto de la API (componente `backend/internal/api`); `/api` sin barra
+    da un 301 HTML de Nginx.
 
 ### T16 — Hook de pre-commit real
 - [ ] Estado · Ejecutor: `Claude`
