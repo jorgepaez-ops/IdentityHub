@@ -12,7 +12,7 @@ declaración de buenas intenciones.
 |---|---|---|---|---|---|---|---|
 | **RF-001** | Alta de empleados por administración | P0 | `createEmployee`, `resendInvitation` | 4 | 34 | 4 | ✅ completo |
 | **RF-002** | Aceptación de invitación y verificación de correo | P0 | `acceptInvitation` | 4 | 16 | 3 | ✅ completo |
-| **RF-003** | Inicio de sesión | P0 | `login` | 2 | 10 | 2 | ✅ completo |
+| **RF-003** | Inicio de sesión | P0 | `login` | 2 | 14 | 2 | ✅ completo |
 | **RF-004** | Emisión y validación de JWT | P0 | `getJwks` | 1 | 8 | 1 | ✅ completo |
 | **RF-005** | Renovación de sesión | P0 | `refreshSession` | 1 | 7 | 1 | ✅ completo |
 | **RF-006** | Detección de reuso de refresh token | P0 | — | 1 | 5 | 1 | ✅ completo |
@@ -26,7 +26,7 @@ declaración de buenas intenciones.
 | **RF-014** | Inicio de sesión con segundo factor | P1 | `verifyMfa`, `resendMfaCode` | 5 | 36 | 4 | ✅ completo |
 | **RF-015** | Restablecimiento de contraseña | P1 | `requestPasswordReset`, `confirmPasswordReset` | 3 | 33 | 3 | ✅ completo |
 | **RF-016** | Sesiones activas | P1 | `listSessions`, `revokeSession` | 1 | 8 | 1 | ✅ completo |
-| **RF-017** | Bloqueo por fuerza bruta | P1 | — | 4 | 22 | 1 | ✅ completo |
+| **RF-017** | Bloqueo por fuerza bruta | P1 | — | 4 | 23 | 1 | ✅ completo |
 | **RF-018** | Claves de servicio | P2 | — | — | — | — | ⏳ diferido (semana 3) |
 | **RF-019** | Exportación del audit log | P2 | — | — | — | — | ⏳ diferido (semana 3) |
 | **RF-020** | Autorización de aplicaciones cliente | P1 | `authorizeClient`, `exchangeAuthorizationCode` | 10 | 24 | 8 | ✅ completo |
