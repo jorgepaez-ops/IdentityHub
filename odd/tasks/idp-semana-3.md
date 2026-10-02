@@ -998,6 +998,14 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
       `psql` de `db.ts:32` y la prueba débil de `nginx.spec.ts:63-72`.
     - Evidencia: `make e2e` 22/22 en tres corridas seguidas (antes del ajuste, la segunda daba 423);
       tras cada corrida la API vuelve a `LOGIN_IP_MAX_FAILURES=20`; `tsc --noEmit` ok.
+    - Correcciones tras la revisión de 4 lentes de `7b45057` (Codex escribió; Claude corrió y añadió
+      lo último): los correos se esperan excluyendo los ID que ya existían antes de la acción (las
+      carreras de login doble, reenvío y desafíos sucesivos); "Agotar los intentos" deja 1 intento
+      por SQL para aislar el agotamiento del bloqueo de la cuenta (ambos umbrales son 5) y comprueba
+      que la cuenta sigue `active`; `LoginRejectedError` tipado para el chequeo previo; `make e2e`
+      restaura el límite con `trap` en EXIT/INT/TERM; `psql` con timeout de 30 s; tipos desde
+      `@playwright/test` (no de `playwright-core`, que no está declarado). Evidencia: `make e2e` 22/22
+      dos veces seguidas; interrumpido con SIGINT a mitad de la suite, el límite vuelve de 1000 a 20.
   - [ ] T14c — Guion de la demo como prueba (criterio de aceptación 1). Ruta: delegada.
   - [ ] T14d — `spec-drift` comprueba la correspondencia escenario↔prueba (falla si falta o sobra)
     y `make spec-drift`. Ruta: delegada (Codex, sin red).

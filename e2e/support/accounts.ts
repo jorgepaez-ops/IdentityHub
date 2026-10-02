@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto'
 import { api, loginWithMfa } from './api'
 import { assertEmail, assertHex, psql } from './db'
-import { extractLink, waitForMail } from './mailpit'
+import { extractLink, mailIds, waitForMail } from './mailpit'
 
 export const strongPassword = 'correcta-horse-battery'
 
@@ -51,13 +51,14 @@ export async function seedAdmin(): Promise<Admin> {
 /** Invites a new user through the admin API and returns the raw token read from the emailed link. */
 export async function inviteUser(admin: Admin, roles: string[] = ['user']): Promise<{ email: string; token: string; link: string }> {
   const email = uniqueEmail('invitee')
+  const existingMailIds = await mailIds(email)
   const since = new Date()
   const created = await api('POST', '/api/v1/admin/users', {
     token: admin.accessToken,
     json: { email, displayName: 'E2E User', roles },
   })
   if (created.status !== 201) throw new Error(`invite returned ${created.status}`)
-  const mail = await waitForMail(email, 'invited', since)
+  const mail = await waitForMail(email, 'invited', since, existingMailIds)
   const link = extractLink(mail.text)
   return { email, token: tokenFromLink(link), link }
 }

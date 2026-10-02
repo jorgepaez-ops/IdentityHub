@@ -3,14 +3,15 @@ import { createActiveUser, seedAdmin, strongPassword, uniqueEmail } from '../sup
 import { api } from '../support/api'
 import { contextApi, loginWithMfaContext } from '../support/auth'
 import { assertEmail, psql } from '../support/db'
-import { extractLink, waitForMail } from '../support/mailpit'
+import { extractLink, mailIds, waitForMail } from '../support/mailpit'
 
 const replacementPassword = 'new-correct-horse-battery'
 
 async function resetLink(email: string): Promise<string> {
+  const existingMailIds = await mailIds(email)
   const since = new Date()
   expect((await api('POST', '/api/v1/auth/password-reset/request', { json: { email } })).status).toBe(202)
-  return extractLink((await waitForMail(email, 'password', since)).text)
+  return extractLink((await waitForMail(email, 'password', since, existingMailIds)).text)
 }
 
 test('RF-015 La solicitud no enumera cuentas', async ({ playwright }) => {

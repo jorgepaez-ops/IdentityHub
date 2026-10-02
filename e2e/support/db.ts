@@ -29,5 +29,7 @@ export function psql(script: string, vars: Record<string, string> = {}): string 
     if (!/^[a-z_][a-z0-9_]*$/i.test(key)) throw new Error(`Invalid psql variable name: ${key}`)
     args.push('-v', `${key}=${value}`)
   }
-  return execFileSync(docker, args, { input: script, encoding: 'utf8' }).trim()
+  // execFileSync blocks the worker, so Playwright's own test timeout cannot interrupt a hung
+  // docker exec; bound it here instead.
+  return execFileSync(docker, args, { input: script, encoding: 'utf8', timeout: 30_000 }).trim()
 }

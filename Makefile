@@ -88,9 +88,10 @@ E2E_LOGIN_IP_MAX_FAILURES ?= 1000
 e2e: ## Pruebas de extremo a extremo contra el stack levantado
 	@# Todas las peticiones salen de la misma IP: se sube solo el límite por IP
 	@# (RF-017) mientras corre la suite y se restaura al terminar, pase o falle.
-	LOGIN_IP_MAX_FAILURES=$(E2E_LOGIN_IP_MAX_FAILURES) $(COMPOSE) up -d --no-deps --wait api
-	(cd e2e && npm ci && npx playwright test); status=$$?; \
-	  $(COMPOSE) up -d --no-deps --wait api; exit $$status
+	@cleanup() { status=$$?; trap - EXIT INT TERM; $(COMPOSE) up -d --no-deps --wait api; exit $$status; }; \
+	  trap cleanup EXIT INT TERM; \
+	  LOGIN_IP_MAX_FAILURES=$(E2E_LOGIN_IP_MAX_FAILURES) $(COMPOSE) up -d --no-deps --wait api && \
+	  (cd e2e && npm ci && npx playwright test)
 
 migrate: ## Aplica las migraciones pendientes
 	$(COMPOSE) run --rm migrate

@@ -15,25 +15,43 @@ interface Summary {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
-/** Waits for the newest message to `to` whose subject contains `subject`, created at or after `since`. */
-export async function waitForMail(to: string, subject: string, since: Date, timeoutMs = 20_000): Promise<Mail> {
+async function messagesFor(to: string): Promise<Summary[]> {
+  const response = await fetch(`${mailpitUrl}/api/v1/search?query=${encodeURIComponent(`to:${to}`)}`)
+  if (!response.ok) throw new Error(`Mailpit search for ${to} returned ${response.status}`)
+  const body = (await response.json()) as { messages?: Summary[] }
+  return body.messages ?? []
+}
+
+/** Returns the Mailpit message IDs present for an address before an email-triggering action. */
+export async function mailIds(to: string): Promise<Set<string>> {
+  return new Set((await messagesFor(to)).map((message) => message.ID))
+}
+
+/**
+ * Waits for the newest message to `to` whose subject contains `subject`, was not already present
+ * in `excludedIds`, and was created at or after `since`.
+ */
+export async function waitForMail(
+  to: string,
+  subject: string,
+  since: Date,
+  excludedIds: ReadonlySet<string> = new Set(),
+  timeoutMs = 20_000,
+): Promise<Mail> {
   const deadline = Date.now() + timeoutMs
   // Mailpit timestamps are server-side; allow a little clock skew between host and container.
   const floor = since.getTime() - 2_000
   for (;;) {
     try {
-      const response = await fetch(`${mailpitUrl}/api/v1/search?query=${encodeURIComponent(`to:${to}`)}`)
-      if (response.ok) {
-        const body = (await response.json()) as { messages?: Summary[] }
-        const match = (body.messages ?? [])
-          .filter((m) => m.Subject.includes(subject) && new Date(m.Created).getTime() >= floor)
-          .sort((a, b) => new Date(b.Created).getTime() - new Date(a.Created).getTime())[0]
-        if (match) {
-          const full = await fetch(`${mailpitUrl}/api/v1/message/${match.ID}`)
-          if (!full.ok) throw new Error(`Mailpit message ${match.ID} returned ${full.status}`)
-          const detail = (await full.json()) as { Text: string }
-          return { id: match.ID, subject: match.Subject, created: new Date(match.Created), text: detail.Text }
-        }
+      const match = (await messagesFor(to))
+        .filter((message) => !excludedIds.has(message.ID))
+        .filter((message) => message.Subject.includes(subject) && new Date(message.Created).getTime() >= floor)
+        .sort((a, b) => new Date(b.Created).getTime() - new Date(a.Created).getTime())[0]
+      if (match) {
+        const full = await fetch(`${mailpitUrl}/api/v1/message/${match.ID}`)
+        if (!full.ok) throw new Error(`Mailpit message ${match.ID} returned ${full.status}`)
+        const detail = (await full.json()) as { Text: string }
+        return { id: match.ID, subject: match.Subject, created: new Date(match.Created), text: detail.Text }
       }
     } catch (error) {
       // Mailpit can briefly restart while the compose stack is becoming ready.

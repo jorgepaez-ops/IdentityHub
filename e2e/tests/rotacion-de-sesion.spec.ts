@@ -1,10 +1,10 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type PlaywrightWorkerArgs } from '@playwright/test'
 import { hubUrl } from '../support/config'
-type Playwright = typeof import('playwright-core')
+type Playwright = PlaywrightWorkerArgs['playwright']
 import { createActiveUser, seedAdmin, strongPassword } from '../support/accounts'
 import { contextApi, loginWithMfaContext, refreshCookie } from '../support/auth'
 import { assertEmail, psql } from '../support/db'
-import { waitForMail } from '../support/mailpit'
+import { mailIds, waitForMail } from '../support/mailpit'
 
 async function signedIn(playwright: Playwright) {
   const email = await createActiveUser(await seedAdmin())
@@ -28,12 +28,13 @@ test('RF-006 Reutilizar un refresh token rotado revoca toda la familia', async (
   const session = await signedIn(playwright)
   const oldCookie = await refreshCookie(session.context)
   expect((await contextApi(session.context, 'POST', '/api/v1/auth/refresh')).status).toBe(200)
+  const existingMailIds = await mailIds(session.email)
   const since = new Date()
   const thief = await playwright.request.newContext({ extraHTTPHeaders: { Cookie: `refresh_token=${oldCookie}` } })
   expect((await contextApi(thief, 'POST', `${hubUrl}/api/v1/auth/refresh`)).status).toBe(401)
   expect((await contextApi(session.context, 'POST', '/api/v1/auth/refresh')).status).toBe(401)
   expect(psql(`SELECT count(*) FROM audit_log a JOIN users u ON u.id = a.actor_user_id WHERE u.email = :'email' AND a.action = 'refresh_reuse_detected';`, { email: assertEmail(session.email) })).toBe('1')
-  await waitForMail(session.email, 'refresh token reuse detected', since)
+  await waitForMail(session.email, 'refresh token reuse detected', since, existingMailIds)
   await thief.dispose()
   await session.context.dispose()
 })

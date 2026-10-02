@@ -1,5 +1,5 @@
 import { hubUrl } from './config'
-import { extractCode, waitForMail } from './mailpit'
+import { extractCode, mailIds, waitForMail } from './mailpit'
 
 // Nginx allows 5 r/s (burst 5) on /api/v1/auth/. Keep calls at least 300 ms apart.
 const PACE_MS = 300
@@ -10,6 +10,16 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 export interface ApiResult<T = unknown> {
   status: number
   body: T
+}
+
+export class LoginRejectedError extends Error {
+  constructor(
+    public readonly status: number,
+    email: string,
+  ) {
+    super(`login for ${email} returned ${status}`)
+    this.name = 'LoginRejectedError'
+  }
 }
 
 export async function paced(): Promise<void> {
@@ -44,10 +54,11 @@ export async function api<T = unknown>(
 
 /** Password login plus the emailed MFA code; returns the access token. */
 export async function loginWithMfa(email: string, password: string): Promise<string> {
+  const existingMailIds = await mailIds(email)
   const since = new Date()
   const login = await api<{ mfaToken: string }>('POST', '/api/v1/auth/login', { json: { email, password } })
-  if (login.status !== 202) throw new Error(`login for ${email} returned ${login.status}`)
-  const mail = await waitForMail(email, 'sign-in code', since)
+  if (login.status !== 202) throw new LoginRejectedError(login.status, email)
+  const mail = await waitForMail(email, 'sign-in code', since, existingMailIds)
   const verify = await api<{ accessToken: string }>('POST', '/api/v1/auth/mfa/verify', {
     json: { mfaToken: login.body.mfaToken, code: extractCode(mail.text) },
   })

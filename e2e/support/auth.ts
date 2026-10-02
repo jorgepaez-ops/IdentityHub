@@ -1,8 +1,9 @@
-import type { APIRequestContext, APIResponse } from 'playwright'
-type Playwright = typeof import('playwright-core')
+import type { APIRequestContext, APIResponse, PlaywrightWorkerArgs } from '@playwright/test'
+
+type Playwright = PlaywrightWorkerArgs['playwright']
 import { hubUrl } from './config'
-import { paced } from './api'
-import { extractCode, waitForMail } from './mailpit'
+import { LoginRejectedError, paced } from './api'
+import { extractCode, mailIds, waitForMail } from './mailpit'
 
 export interface ContextResult<T = unknown> {
   status: number
@@ -38,12 +39,13 @@ export async function loginWithMfaContext(
   password: string,
 ): Promise<{ context: APIRequestContext; accessToken: string }> {
   const context = await playwright.request.newContext({ baseURL: hubUrl })
+  const existingMailIds = await mailIds(email)
   const since = new Date()
   const login = await contextApi<{ mfaToken: string }>(context, 'POST', '/api/v1/auth/login', {
     data: { email, password },
   })
-  if (login.status !== 202) throw new Error(`login for ${email} returned ${login.status}`)
-  const mail = await waitForMail(email, 'sign-in code', since)
+  if (login.status !== 202) throw new LoginRejectedError(login.status, email)
+  const mail = await waitForMail(email, 'sign-in code', since, existingMailIds)
   const verified = await contextApi<{ accessToken: string }>(context, 'POST', '/api/v1/auth/mfa/verify', {
     data: { mfaToken: login.body.mfaToken, code: extractCode(mail.text) },
   })
