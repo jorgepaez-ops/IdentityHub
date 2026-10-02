@@ -29,27 +29,39 @@ async function assetPath(host: string): Promise<string> {
   return match[0]
 }
 
-for (const { host, connect } of hosts) {
-  test.describe(host, () => {
-    test(`RNF-009 ${host} sends the five security headers on the SPA`, async () => {
-      const ctx = await request.newContext({ baseURL: nginxAddress, extraHTTPHeaders: { Host: host } })
-      const response = await ctx.get('/')
-      expect(response.status()).toBe(200)
-      expectSecurityHeaders(response.headers(), connect)
-      expect(response.headers()['server']).toBe('nginx')
-      await ctx.dispose()
-    })
-
-    test(`RNF-009 ${host} keeps the security headers on /assets/ files`, async () => {
-      const ctx = await request.newContext({ baseURL: nginxAddress, extraHTTPHeaders: { Host: host } })
-      const response = await ctx.get(await assetPath(host))
-      expect(response.status()).toBe(200)
-      expectSecurityHeaders(response.headers(), connect)
-      expect(response.headers()['cache-control']).toContain('immutable')
-      await ctx.dispose()
-    })
-  })
+async function expectSpaHeaders(host: string, connect: string) {
+  const ctx = await request.newContext({ baseURL: nginxAddress, extraHTTPHeaders: { Host: host } })
+  const response = await ctx.get('/')
+  expect(response.status()).toBe(200)
+  expectSecurityHeaders(response.headers(), connect)
+  expect(response.headers()['server']).toBe('nginx')
+  await ctx.dispose()
 }
+
+async function expectAssetHeaders(host: string, connect: string) {
+  const ctx = await request.newContext({ baseURL: nginxAddress, extraHTTPHeaders: { Host: host } })
+  const response = await ctx.get(await assetPath(host))
+  expect(response.status()).toBe(200)
+  expectSecurityHeaders(response.headers(), connect)
+  expect(response.headers()['cache-control']).toContain('immutable')
+  await ctx.dispose()
+}
+
+test('RNF-009 identityhub.localhost sends the five security headers on the SPA', async () => {
+  await expectSpaHeaders(hosts[0].host, hosts[0].connect)
+})
+
+test('RNF-009 identityhub.localhost keeps the security headers on /assets/ files', async () => {
+  await expectAssetHeaders(hosts[0].host, hosts[0].connect)
+})
+
+test('RNF-009 contabilidad.localhost sends the five security headers on the SPA', async () => {
+  await expectSpaHeaders(hosts[1].host, hosts[1].connect)
+})
+
+test('RNF-009 contabilidad.localhost keeps the security headers on /assets/ files', async () => {
+  await expectAssetHeaders(hosts[1].host, hosts[1].connect)
+})
 
 test('RNF-009 the Hub proxies /oauth/ to the API instead of the SPA index', async () => {
   const ctx = await request.newContext({ baseURL: nginxAddress, extraHTTPHeaders: { Host: 'identityhub.localhost' } })

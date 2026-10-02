@@ -1030,8 +1030,17 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
     - Cierre de T14b: los 39 escenarios Gherkin tienen exactamente una prueba con su título (el mapa
       inicial decía 37; recuento real con `grep`/`comm`: 39, sin faltantes ni sobrantes).
   - [ ] T14c — Guion de la demo como prueba (criterio de aceptación 1). Ruta: delegada.
-  - [ ] T14d — `spec-drift` comprueba la correspondencia escenario↔prueba (falla si falta o sobra)
+  - [x] T14d — `spec-drift` comprueba la correspondencia escenario↔prueba (falla si falta o sobra)
     y `make spec-drift`. Ruta: delegada (Codex, sin red).
+    Hecho (2026-10-02): Codex escribió casi todo y se cortó por su límite de uso antes de regenerar
+    la matriz; Claude lo revisó y terminó. `scripts/traceability.py` exige uno a uno escenario↔prueba
+    (falta, sobra o duplicada → error con archivo:línea) y, añadido por Claude, también falla si un
+    título RF/RNF no es literal (antes quedaba invisible). `nginx.spec.ts` con títulos literales: la
+    matriz cuenta 6 en RNF-009 (antes 4). `scripts/traceability_test.py` (stdlib) y `make
+    spec-drift`. Evidencia: RED sobre el repo real (un título pasado a template → exit 1 con el
+    escenario faltante y el título no literal), GREEN tras restaurarlo; `make spec-drift` ok; 6/6
+    de Nginx. El job de CI ya corre `traceability.py`, así que lo exige sin renombrarse; sumar
+    `traceability_test.py` al job queda para T14e.
   - [ ] T14e — Job E2E en CI (stack con `.env` generado), sin renombrar los 17 checks
     obligatorios; verificarlo requiere push (decisión del usuario).
 

@@ -20,12 +20,14 @@ import pathlib
 import re
 import sys
 from collections import defaultdict
+from typing import NamedTuple
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 OUT = ROOT / "specs" / "07-traceability.md"
 
 RF_HEADING = re.compile(r"^### (R[FN]-\d{3}) — (.+?) · (P\d)$", re.M)
 RF_TAG = re.compile(r"\b((?:RNF|RF)-\d{3})\b")
+E2E_TEST = re.compile(r"\btest\(\s*'((?:RNF|RF)-\d{3}[^']*)'\s*,")
 
 # Requisitos pendientes de implementación. T3 define sus contratos, pero la matriz los
 # mantiene diferidos hasta que sus tareas de backend/frontend queden cerradas.
@@ -33,6 +35,14 @@ DEFERRED = {
     "RF-018": "Backlog de semana 3 por decisión Q14.",
     "RF-019": "Backlog de semana 3 por decisión Q14.",
 }
+
+
+class Scenario(NamedTuple):
+    """A Gherkin scenario and the first RF tag that owns its E2E title."""
+
+    requirement: str
+    name: str
+    source: str
 
 
 def load_requirements() -> dict[str, tuple[str, str]]:
@@ -58,21 +68,111 @@ def load_operations() -> dict[str, list[str]]:
     return ops
 
 
+def load_gherkin_scenarios() -> list[Scenario]:
+    """Return every tagged scenario using the first RF tag in source order."""
+    scenarios: list[Scenario] = []
+    for path in sorted((ROOT / "specs" / "06-acceptance").glob("*.feature")):
+        pending: list[str] = []
+        for line in path.read_text(encoding="utf-8").splitlines():
+            stripped = line.strip()
+            if stripped.startswith("@"):
+                pending.extend(RF_TAG.findall(stripped))
+            elif re.match(r"(Escenario|Esquema del escenario):", stripped):
+                name = stripped.split(":", 1)[1].strip()
+                first_rf = next((tag for tag in pending if tag.startswith("RF-")), None)
+                if first_rf:
+                    scenarios.append(Scenario(first_rf, name, path.name))
+                pending = []
+    return scenarios
+
+
 def load_scenarios() -> dict[str, list[str]]:
     """@RF-NNN -> [nombre del escenario]."""
     scenarios: dict[str, list[str]] = defaultdict(list)
     for path in sorted((ROOT / "specs" / "06-acceptance").glob("*.feature")):
-        pending: set[str] = set()
+        pending: list[str] = []
         for line in path.read_text(encoding="utf-8").splitlines():
             stripped = line.strip()
             if stripped.startswith("@"):
-                pending = set(RF_TAG.findall(stripped))
+                pending.extend(RF_TAG.findall(stripped))
             elif re.match(r"(Escenario|Esquema del escenario):", stripped):
                 name = stripped.split(":", 1)[1].strip()
                 for rf in pending:
                     scenarios[rf].append(f"{path.name} — {name}")
-                pending = set()
+                pending = []
     return scenarios
+
+
+def load_e2e_test_titles() -> dict[str, list[str]]:
+    """RF/RNF Playwright test titles -> ``file:line`` locations.
+
+    Only a plain single-quoted literal directly passed to ``test(`` is a title.
+    Template strings and computed titles are intentionally ignored so CI can
+    enforce an auditable one-to-one mapping to Gherkin scenarios.
+    """
+    titles: dict[str, list[str]] = defaultdict(list)
+    base = ROOT / "e2e" / "tests"
+    if not base.exists():
+        return titles
+    for path in sorted(base.rglob("*.spec.ts")):
+        text = path.read_text(encoding="utf-8")
+        for match in E2E_TEST.finditer(text):
+            line = text.count("\n", 0, match.start(1)) + 1
+            titles[match.group(1)].append(f"{path.relative_to(base)}:{line}")
+    return titles
+
+
+def computed_requirement_titles() -> list[str]:
+    """``file:line`` of RF/RNF test titles written as template or double-quoted strings.
+
+    Those would escape the literal-title scan above, so a test could be missing
+    from the mapping without anyone noticing; they are reported as errors.
+    """
+    locations: list[str] = []
+    base = ROOT / "e2e" / "tests"
+    if not base.exists():
+        return locations
+    for path in sorted(base.rglob("*.spec.ts")):
+        text = path.read_text(encoding="utf-8")
+        for match in re.finditer(r"""\btest\(\s*[`"](?:RNF|RF)-\d{3}""", text):
+            line = text.count("\n", 0, match.start()) + 1
+            locations.append(f"{path.relative_to(base)}:{line}")
+    return locations
+
+
+def e2e_correspondence_errors(scenarios: list[Scenario]) -> list[str]:
+    """Return actionable errors for the scenario-to-E2E one-to-one mapping."""
+    titles = load_e2e_test_titles()
+    expected = {f"{scenario.requirement} {scenario.name}": scenario for scenario in scenarios}
+    computed = computed_requirement_titles()
+
+    missing = [title for title in expected if title not in titles]
+    orphan = [title for title in titles if title.startswith("RF-") and title not in expected]
+    duplicates = [title for title in expected if len(titles.get(title, [])) > 1]
+    if not (missing or orphan or duplicates or computed):
+        return []
+
+    errors = ["La correspondencia escenario↔prueba E2E no es uno a uno."]
+    if missing:
+        errors.append("Faltan pruebas E2E para escenarios:")
+        for title in missing:
+            scenario = expected[title]
+            errors.append(f"  - {title} ({scenario.source})")
+    if orphan:
+        errors.append("Títulos E2E con prefijo RF sin escenario:")
+        for title in orphan:
+            for location in titles[title]:
+                errors.append(f"  - {location}: {title}")
+    if duplicates:
+        errors.append("Escenarios con más de una prueba E2E:")
+        for title in duplicates:
+            scenario = expected[title]
+            errors.append(f"  - {title} ({scenario.source}): {', '.join(titles[title])}")
+    if computed:
+        errors.append("Títulos RF/RNF no literales (template o calculados), invisibles para este chequeo:")
+        errors.extend(f"  - {location}" for location in computed)
+    errors.append("Usa títulos literales: 'RF-NNN <nombre exacto del escenario>'.")
+    return errors
 
 
 def render() -> str:
@@ -90,11 +190,9 @@ def render() -> str:
                     go_by_req[f"{m.group(2)}-{m.group(3)}"].append(m.group(1))
 
     e2e_by_req: dict[str, list[str]] = defaultdict(list)
-    base = ROOT / "e2e"
-    if base.exists():
-        for path in sorted(base.rglob("*.spec.ts")):
-            for m in re.finditer(r"""test\(\s*['"`]((?:RNF|RF)-\d{3})""", path.read_text(encoding="utf-8")):
-                e2e_by_req[m.group(1)].append(path.name)
+    for title, locations in load_e2e_test_titles().items():
+        requirement = title.split(" ", 1)[0]
+        e2e_by_req[requirement].extend(locations)
 
     lines = [
         "# 07 — Matriz de trazabilidad",
@@ -153,6 +251,11 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", action="store_true", help="falla si el archivo está desactualizado")
     args = parser.parse_args()
+
+    errors = e2e_correspondence_errors(load_gherkin_scenarios())
+    if errors:
+        print("\n".join(errors), file=sys.stderr)
+        return 1
 
     content = render()
     if args.check:

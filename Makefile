@@ -10,7 +10,7 @@ SQLC_VERSION := v1.31.1
 SQLC         ?= sqlc
 
 .DEFAULT_GOAL := help
-.PHONY: help up down logs ps restart build test test-go test-integration test-front e2e lint fmt gen scan scan-secrets scan-deps scan-image scan-config migrate psql rabbit mail clean
+.PHONY: help up down logs ps restart build test test-go test-integration test-front e2e spec-drift lint fmt gen scan scan-secrets scan-deps scan-image scan-config migrate psql rabbit mail clean
 
 help: ## Muestra esta ayuda
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -92,6 +92,10 @@ e2e: ## Pruebas de extremo a extremo contra el stack levantado
 	  trap cleanup EXIT INT TERM; \
 	  LOGIN_IP_MAX_FAILURES=$(E2E_LOGIN_IP_MAX_FAILURES) $(COMPOSE) up -d --no-deps --wait api && \
 	  (cd e2e && npm ci && npx playwright test)
+
+spec-drift: ## Verifica sin red la matriz y escenarios Gherkin contra E2E
+	python3 scripts/traceability_test.py
+	python3 scripts/traceability.py --check
 
 migrate: ## Aplica las migraciones pendientes
 	$(COMPOSE) run --rm migrate

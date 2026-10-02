@@ -38,7 +38,7 @@ declaración de buenas intenciones.
 | **RNF-006** | Procedencia verificable | P0 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-007** | Observabilidad | P0 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-008** | Contenedores endurecidos | P0 | — | — | — | — | 🔴 sin cubrir |
-| **RNF-009** | Cabeceras de seguridad | P0 | — | — | — | 4 | 🟡 parcial |
+| **RNF-009** | Cabeceras de seguridad | P0 | — | — | — | 6 | 🟡 parcial |
 | **RNF-010** | Latencia | P1 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-011** | Los specs son la fuente de verdad | P0 | — | — | 5 | — | 🟡 parcial |
 | **RNF-012** | Logs sin datos sensibles | P0 | — | — | 5 | — | 🟡 parcial |
