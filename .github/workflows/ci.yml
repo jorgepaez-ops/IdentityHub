@@ -438,11 +438,13 @@ jobs:
 
       # `up -d` no espera. `web` no tiene healthcheck pero depende de `api` sana (que a su vez
       # espera a db, broker y migrate), así que responder en :8080 implica el stack listo.
+      # --retry-all-errors: mientras Nginx arranca, el puerto puede aceptar y cortar la conexión
+      # (curl 56, "connection reset"), que --retry-connrefused no reintenta (run 37055543540).
       - name: Esperar a que el stack esté sano
         run: |
-          curl --fail --silent --show-error --retry 30 --retry-delay 2 --retry-connrefused \
+          curl --fail --silent --show-error --retry 30 --retry-delay 2 --retry-all-errors \
             http://identityhub.localhost:8080/ > /dev/null
-          curl --fail --silent --show-error --retry 30 --retry-delay 2 --retry-connrefused \
+          curl --fail --silent --show-error --retry 30 --retry-delay 2 --retry-all-errors \
             http://contabilidad.localhost:8080/ > /dev/null
 
       - uses: actions/setup-node@v4
@@ -646,11 +648,13 @@ jobs:
 
       # `up -d` no espera. `web` no tiene healthcheck pero depende de `api` sana (que a su vez
       # espera a db, broker y migrate), así que responder en :8080 implica el stack listo.
+      # --retry-all-errors: mientras Nginx arranca, el puerto puede aceptar y cortar la conexión
+      # (curl 56, "connection reset"), que --retry-connrefused no reintenta (run 37055543540).
       - name: Esperar a que el stack esté sano
         run: |
-          curl --fail --silent --show-error --retry 30 --retry-delay 2 --retry-connrefused \
+          curl --fail --silent --show-error --retry 30 --retry-delay 2 --retry-all-errors \
             http://identityhub.localhost:8080/ > /dev/null
-          curl --fail --silent --show-error --retry 30 --retry-delay 2 --retry-connrefused \
+          curl --fail --silent --show-error --retry 30 --retry-delay 2 --retry-all-errors \
             http://contabilidad.localhost:8080/ > /dev/null
 
       - name: Escaneo DAST (make scan-dast)

@@ -1146,6 +1146,16 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
     error de entrada (exit 2), nunca "hallazgo" (exit 1), y se acepta `site` como objeto único (RED
     contra la versión anterior: 2 errores → GREEN 11/11); el encabezado de `rules.tsv` ya no dice
     que el escaneo de API use `-c`; el comentario del paso de informes explica `always()`.
+    **Run "antes" (2026-10-02, run 37055543540, `workflow_dispatch` sobre `133aa8b`)**: job 11 en
+    rojo, `GATE BROKEN: 2 alert(s)`: 10055 Medium ×3 en el Hub y ×3 en Contabilidad; API sin medios.
+    En el mismo run falló el job 7 en "Esperar a que el stack esté sano" (`curl: (56) Connection
+    reset by peer` mientras Nginx arrancaba; `--retry-connrefused` no reintenta ese caso), no en las
+    pruebas: corregido con `--retry-all-errors` en los jobs 7 y 11.
+    Advertencias de la revisión del rango con T15a (aprobada), pendientes: tras `make e2e` o
+    `make scan-dast`, los fallos que quedan en `audit_log` pueden dejar bloqueada la IP del host en
+    el stack local hasta 15 min al restaurar el límite a 20 (solo local); `scan-dast` duplica el
+    bloque de restauración de `e2e` y reutiliza `E2E_LOGIN_IP_MAX_FAILURES`; `advanceUntil` de
+    `contabilidad/src/App.test.tsx` espera 5 s, igual que el timeout de Vitest.
   - [ ] T15b — Ficha de la CSP sin `form-action` (id lo asigna Codex al crearla; afecta a los dos
     `server`, Hub y Contabilidad) y remediación en `frontend/nginx/default.conf`; run en verde como evidencia "después" (requiere push).
 
