@@ -1102,7 +1102,7 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
       login por navegador con MFA está escrito a mano en tres sitios (unificar al volver a tocar E2E).
 
 ### T15 — DAST con OWASP ZAP en CI
-- [ ] Estado · Ejecutor: `Claude`
+- [x] Estado · Ejecutor: `Claude`
 - ZAP contra el stack levantado en CI (baseline y escaneo de API con el OpenAPI); umbral que rompe
   la build; hallazgos a fichas.
 - Commit: —
@@ -1163,7 +1163,7 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
     Verificado en local con la imagen `web` reconstruida: ambas cabeceras traen `form-action 'self'`;
     `make scan-dast` → 10055 PASS en los tres escaneos, "Gate passed"; `make e2e` 46/46. Falta el run
     "después" en CI (requiere push).
-  - [ ] T15b — Ficha de la CSP sin `form-action` (id lo asigna Codex al crearla; afecta a los dos
+  - [x] T15b — Ficha de la CSP sin `form-action` (id lo asigna Codex al crearla; afecta a los dos
     `server`, Hub y Contabilidad) y remediación en `frontend/nginx/default.conf`; run en verde como evidencia "después" (requiere push).
     Estado (2026-10-02): VULN-030 creada y remediada en `61df987`, verificada en local y revisión
     nativa aprobada (sus tres advertencias corregidas: casilla marcada antes de tiempo y dos textos
@@ -1203,6 +1203,13 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
     huellas exactas aprobadas por el usuario el 2026-10-02 y registradas; `make scan-secrets` local:
     256 commits, sin hallazgos). Lección: correr `make spec-drift` y `make scan-secrets` antes de
     cada push, no solo `make e2e`.
+    El comentario de esas huellas citaba un campo de contraseña y disparó la regla en `ed0d2fd`;
+    reescrito y su huella aprobada por el usuario (`16ab347`); `make scan-secrets` corrido **después**
+    del commit: 258 commits, sin hallazgos.
+    **Run "después" 37065094942 (`16ab347`): los 15 jobs en verde**; job 11: 10055 PASS en Hub y
+    Contabilidad, 30002 y 40018 PASS en la API, "Gate passed". Cierra VULN-030 y VULN-031 y es el
+    "después" con gate real de VULN-013 y VULN-014 (sus capturas del run 37055543540 quedan como
+    `run_rojo_previo`). Las capturas de este run quedan en `null` hasta que Desktop las confirme.
 
 ### T16 — Hook de pre-commit real
 - [ ] Estado · Ejecutor: `Claude`

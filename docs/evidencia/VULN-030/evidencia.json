@@ -24,13 +24,18 @@
     "ficha": "security/findings/VULN-030-csp-sin-form-action.md"
   },
   "despues": {
-    "commit": null,
-    "workflow": null,
-    "run_id": null,
-    "run_url": null,
-    "artefacto": null,
+    "commit": "16ab347c941ea174f03899e79a6618b8dac399ac",
+    "workflow": "CI",
+    "run_id": "37065094942",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/37065094942",
+    "artefacto": "zap-reports-37065094942 (artefacto de Actions)",
     "captura": null,
-    "hallazgos": [],
-    "observacion": "Pendiente del run verde de CI posterior a la remediación."
+    "hallazgos": [
+      "PASS: CSP [10055] (baseline del Hub)",
+      "PASS: CSP [10055] (baseline de Contabilidad)",
+      "Gate passed: no alerts of severity Medium or higher."
+    ],
+    "observacion": "Los 15 jobs en verde; job 11 sin alertas medias ni altas.",
+    "job": "11 · DAST (OWASP ZAP) (id 111031306475), paso \"Escaneo DAST (make scan-dast)\""
   }
 }

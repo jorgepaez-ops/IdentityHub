@@ -34,10 +34,10 @@
     "observacion": "Evidencia original: ejecución local con curl del 2026-09-26 (entonces no había gate de CI). Desde T15 hay gate real: ver despues.gate_ci (OWASP ZAP baseline del Hub, job 11 · DAST, run 37055543540).",
     "gate_ci": {
       "workflow": "CI",
-      "run_id": "37055543540",
-      "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/37055543540",
-      "commit": "133aa8b384f2ba93142a03f79126e6880460ebc3",
-      "job": "11 · DAST (OWASP ZAP) (id 110999227390)",
+      "run_id": "37065094942",
+      "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/37065094942",
+      "commit": "16ab347c941ea174f03899e79a6618b8dac399ac",
+      "job": "11 · DAST (OWASP ZAP) (id 111031306475)",
       "bloque": "primer baseline del log (hub.json, 6 URLs, sin \"Using override\")",
       "hallazgos": [
         "PASS: Anti-clickjacking Header [10020]",
@@ -45,8 +45,14 @@
         "PASS: Strict-Transport-Security Header [10035]",
         "PASS: Content Security Policy (CSP) Header Not Set [10038]"
       ],
-      "captura": "informe §VULN-013 — después (gate ZAP): 10020, 10021, 10035, 10038",
-      "observacion": "Primer gate real en CI (antes la evidencia después era solo curl local). En ese run el job 11 rompe por VULN-030 (10055), no por estas reglas."
+      "captura": null,
+      "observacion": "Run con los 15 jobs en verde (job 11 \"Gate passed\"). Las capturas ya tomadas del run 37055543540 quedan en run_rojo_previo: mismas reglas en PASS, pero ese job terminó en rojo por VULN-030.",
+      "run_rojo_previo": {
+        "run_id": "37055543540",
+        "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/37055543540",
+        "commit": "133aa8b384f2ba93142a03f79126e6880460ebc3",
+        "captura": "informe §VULN-013 — después (gate ZAP): 10020, 10021, 10035, 10038"
+      }
     }
   }
 }

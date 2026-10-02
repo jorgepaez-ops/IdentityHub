@@ -23,13 +23,17 @@
     "ficha": "security/findings/VULN-031-login-500-con-contrasena-larga.md"
   },
   "despues": {
-    "commit": null,
-    "workflow": null,
-    "run_id": null,
-    "run_url": null,
-    "artefacto": null,
+    "commit": "16ab347c941ea174f03899e79a6618b8dac399ac",
+    "workflow": "CI",
+    "run_id": "37065094942",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/37065094942",
+    "artefacto": "zap-reports-37065094942 (artefacto de Actions)",
     "captura": null,
-    "hallazgos": [],
-    "observacion": "Pendiente de la verificación local y del run de CI posterior a la remediación."
+    "hallazgos": [
+      "PASS: Format String Error [30002] (escaneo de API directo a :8081)",
+      "Gate passed: no alerts of severity Medium or higher."
+    ],
+    "observacion": "Los 15 jobs en verde. No hubo run de CI \"antes\": el antes es la reproducción local.",
+    "job": "11 · DAST (OWASP ZAP) (id 111031306475), paso \"Escaneo DAST (make scan-dast)\""
   }
 }
