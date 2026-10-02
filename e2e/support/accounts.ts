@@ -61,3 +61,13 @@ export async function inviteUser(admin: Admin, roles: string[] = ['user']): Prom
   const link = extractLink(mail.text)
   return { email, token: tokenFromLink(link), link }
 }
+
+/** Creates an isolated active account through the actual invitation endpoint. */
+export async function createActiveUser(admin: Admin, roles: string[] = ['user']): Promise<string> {
+  const invitee = await inviteUser(admin, roles)
+  const accepted = await api('POST', '/api/v1/auth/invitations/accept', {
+    json: { token: invitee.token, password: strongPassword },
+  })
+  if (accepted.status !== 204) throw new Error(`invite acceptance returned ${accepted.status}`)
+  return invitee.email
+}

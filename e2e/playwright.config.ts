@@ -4,6 +4,7 @@ const inCI = Boolean(process.env.CI)
 
 export default defineConfig({
   testDir: 'tests',
+  globalSetup: './support/global-setup.ts',
   // Serial on purpose: Nginx rate-limits /api/v1/auth/ and the tests share one local database.
   workers: 1,
   fullyParallel: false,

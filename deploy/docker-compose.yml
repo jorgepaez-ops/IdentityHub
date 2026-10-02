@@ -117,6 +117,11 @@ services:
       JWT_SIGNING_KEY: "${JWT_SIGNING_KEY:?JWT_SIGNING_KEY must be set in the repository root .env}"
       TRUSTED_PROXIES: "${TRUSTED_PROXIES:?TRUSTED_PROXIES must be set in the repository root .env}"
       BOOTSTRAP_ADMIN_EMAIL: "${BOOTSTRAP_ADMIN_EMAIL:-}"
+      # RF-017 per-IP limit. Same default as the code; `make e2e` raises it while
+      # the suite runs, because every E2E request comes from one IP and the
+      # failures counted in audit_log cannot be deleted. The per-account limit
+      # (LOGIN_ACCOUNT_MAX_FAILURES) is never relaxed.
+      LOGIN_IP_MAX_FAILURES: "${LOGIN_IP_MAX_FAILURES:-20}"
     ports:
       - "8081:8081"
     healthcheck:

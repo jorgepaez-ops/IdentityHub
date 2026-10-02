@@ -149,6 +149,11 @@ make e2e     # npm ci + npx playwright test
   sembrado por SQL con `docker exec` y las invitaciones que cada escenario necesita); no tocan
   las demás cuentas, pero tampoco las borran.
 - Se ejecutan en serie porque Nginx limita `/api/v1/auth/` a 5 peticiones por segundo.
+- Todas las peticiones salen de la misma IP y varios escenarios fallan logins a propósito. Por eso
+  `make e2e` recrea la API con `LOGIN_IP_MAX_FAILURES=1000` (variable `E2E_LOGIN_IP_MAX_FAILURES`)
+  mientras corre la suite y la restaura al terminar, pase o falle. El límite por cuenta no se
+  relaja. Si se corre `npx playwright test` directamente, la segunda corrida dentro de
+  `LOGIN_FAILURE_WINDOW` (15 min) choca con el límite por IP; el chequeo previo lo avisa.
 - Variables opcionales: `E2E_HUB_URL`, `E2E_MAILPIT_URL`, `E2E_DB_CONTAINER` (por defecto
   `identity-hub-db-1`).
 

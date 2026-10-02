@@ -981,6 +981,23 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
     "no es HTML"). Evidencia: `make e2e` 7/7 tres veces seguidas (idempotente), `tsc --noEmit` ok,
     gitleaks sobre `e2e/` sin hallazgos, matriz regenerada (`traceability.py --check` al día).
   - [ ] T14b — Escenarios restantes de las 6 features. Ruta: delegada (Codex escribe, Claude corre).
+    - Lote 1 (2026-10-02, Codex escribió, Claude corrió y revisó): autenticación (8), rotación de
+      sesión (4) y restablecimiento (3). Revisión de Claude: "Agotar los intentos" ahora prueba que
+      el `mfaToken` agotado rechaza el código **correcto** y que los 5 rechazos quedan en
+      `audit_log` (antes repetía un código incorrecto, que pasaría igual con el desafío vivo); la URL
+      del Hub sale de `support/config.ts` en vez de 22 literales. Codex endureció `mailpit.ts`
+      (`full.ok`, reintento ante errores de red), advertencias de la revisión de T14a.
+    - Problema hallado: el límite por IP de RF-017 (20 fallos en 15 min, contados en `audit_log`, que
+      no se puede borrar) bloqueaba la segunda corrida con 423. Decisión del usuario (opción a):
+      `make e2e` recrea la API con `LOGIN_IP_MAX_FAILURES=1000` mientras corre y la restaura al
+      terminar (compose pasa la variable con default 20); el límite por cuenta no se toca; chequeo
+      previo (`support/global-setup.ts`) que falla con un mensaje claro si la IP ya está bloqueada.
+    - Deriva spec↔código (sin id, a decidir): `autenticacion.feature` espera el evento de auditoría
+      `mfa_succeeded`; el backend emite `mfa_code_accepted` y `login_succeeded`. La prueba afirma lo
+      real (`login_succeeded`). Hallazgos de la revisión de T14a/rango aún abiertos: timeout en
+      `psql` de `db.ts:32` y la prueba débil de `nginx.spec.ts:63-72`.
+    - Evidencia: `make e2e` 22/22 en tres corridas seguidas (antes del ajuste, la segunda daba 423);
+      tras cada corrida la API vuelve a `LOGIN_IP_MAX_FAILURES=20`; `tsc --noEmit` ok.
   - [ ] T14c — Guion de la demo como prueba (criterio de aceptación 1). Ruta: delegada.
   - [ ] T14d — `spec-drift` comprueba la correspondencia escenario↔prueba (falla si falta o sobra)
     y `make spec-drift`. Ruta: delegada (Codex, sin red).
