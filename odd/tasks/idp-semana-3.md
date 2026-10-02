@@ -1079,6 +1079,22 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
     está en la lista obligatoria del ruleset (decisión del usuario si se agrega).
     Advertencia de la revisión del rango (aprobada), hoy sin efecto: un escenario etiquetado solo
     con RNF no entraría en la correspondencia uno a uno; no existe ninguno en las features.
+    Primer run real (2026-10-02, `workflow_dispatch` sobre la rama tras el push autorizado por el
+    usuario; el CI no corre en pushes fuera de `main`): run 37044020903. **Job 7 en verde**: 46/46 en
+    5,3 min, job completo en 7 min 17 s (cabe en los 30); `*.localhost`, `make up` y las credenciales
+    deducidas funcionaron. Fallaron dos jobs:
+    - **1 · spec-drift**: `traceability_test.py` importa el script y en Linux deja
+      `scripts/__pycache__/`, que ensucia el árbol (en macOS no aparece: el Python de Apple guarda el
+      bytecode en `~/Library/Caches`). Reproducido en un clon limpio con `python:3.12-slim`; corregido
+      en `bf209a1` (`sys.dont_write_bytecode` + `__pycache__/` en `.gitignore`), verificado igual.
+      Sin subir todavía.
+    - **3 · Secretos en el historial**: 28 hallazgos de la regla propia `contrasena-en-variable-de-
+      entorno` en `e2e/` (commits e435d09, 7b45057, 840a954, e28d3cf): 25 son referencias a
+      variables o tipos (`password: strongPassword`, `password: string`) y 3 son contraseñas
+      incorrectas a propósito de los escenarios (`'una-contraseña-cualquiera'`,
+      `'incorrect-password-value'`). Ninguno es un secreto. Como el job escanea todo el historial ya
+      subido, la única salida es registrar las 28 huellas exactas en `.gitleaksignore`, que por la
+      decisión Q20 requiere aprobación explícita del usuario. **Pendiente de decisión del usuario.**
 
 ### T15 — DAST con OWASP ZAP en CI
 - [ ] Estado · Ejecutor: `Claude`
