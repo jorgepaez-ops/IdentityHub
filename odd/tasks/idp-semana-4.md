@@ -197,6 +197,12 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
     prueba nueva comprueba el modo final, la ventana en sí no es observable de forma determinista),
     aviso de que `--force` exige `make clean` por las contraseñas guardadas en los volúmenes, y el
     `\s` inválido de la plantilla de prueba (`python3 -W error` limpio, 12/12).
+  - Revisión nativa de `0773fb5` (alto, 25 líneas, 4 lentes): **aprobada** y acusada
+    (`review-6d25da34448098d1`). Sus dos advertencias eran correctas: `fchmod` tras `O_TRUNC`
+    dejaba el `.env` vacío si fallaba (Windows con Python < 3.13, archivo de otro dueño). Corregido
+    con escritura atómica: archivo temporal nuevo `O_EXCL` 0600 en el mismo directorio y
+    `os.replace`; el `.env` existente nunca se trunca. RED (falla
+    `test_failed_replace_keeps_the_existing_file_and_leaves_no_temp`) y GREEN 13/13.
 
 ## Fase 2 — IaC de referencia (producción en la nube, como ejemplo)
 

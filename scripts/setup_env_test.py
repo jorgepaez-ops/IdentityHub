@@ -133,6 +133,18 @@ class SetupEnvTests(unittest.TestCase):
         self.run_setup("--force")
         self.assertEqual(stat.S_IMODE(self.output.stat().st_mode), 0o600)
 
+    def test_failed_replace_keeps_the_existing_file_and_leaves_no_temp(self) -> None:
+        self.output.write_text("KEEP=me\n")
+        original = setup_env.os.replace
+        def broken_replace(*_args: object) -> None:
+            raise OSError("simulated failure")
+        setup_env.os.replace = broken_replace
+        self.addCleanup(setattr, setup_env.os, "replace", original)
+        with self.assertRaises(OSError):
+            self.run_setup("--force")
+        self.assertEqual(self.output.read_text(), "KEEP=me\n")
+        self.assertEqual(sorted(p.name for p in self.root.iterdir()), [".env", ".env.example"])
+
     def test_output_mode_is_0600(self) -> None:
         self.run_setup()
         self.assertEqual(stat.S_IMODE(self.output.stat().st_mode), 0o600)

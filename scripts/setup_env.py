@@ -69,11 +69,17 @@ def render(lines: list[str], new_values: dict[str, str]) -> list[str]:
 
 
 def write_private(path: pathlib.Path, content: str) -> None:
-    # The mode argument only applies on creation: tighten an existing file before writing.
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    os.fchmod(fd, 0o600)
-    with os.fdopen(fd, "w", encoding="utf-8") as handle:
-        handle.write(content)
+    # Write a fresh 0600 file next to the target and swap it in atomically: an existing .env is
+    # never truncated, and the secrets never sit in a file with looser permissions.
+    tmp = path.with_name(f".{path.name}.{secrets.token_hex(4)}.tmp")
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(content)
+        os.replace(tmp, path)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
 
 
 def main(argv: list[str] | None = None) -> int:
