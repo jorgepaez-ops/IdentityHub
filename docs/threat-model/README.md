@@ -21,7 +21,7 @@ Las fronteras señalan dónde cambia la confianza: del navegador a Nginx, de Ngi
 
 ## Registro STRIDE
 
-`Mitigated` indica que la contramedida descrita en el modelo fuente está implementada en el repositorio. `Open` marca las cinco amenazas cuya contramedida falta o está incompleta (AM-008, AM-009, AM-014, AM-019 y AM-022); cada fila dice qué falta y qué tarea de la semana 4 lo cierra.
+`Mitigated` indica que la contramedida descrita en el modelo fuente está implementada en el repositorio. `Open` marca las cuatro amenazas cuya contramedida falta o está incompleta (AM-008, AM-009, AM-019 y AM-022); cada fila dice qué falta y qué tarea de la semana 4 lo cierra.
 
 | Amenaza | Elemento del DFD | Categoría | Estado | Contramedida | Evidencia/especificación |
 |---|---|---|---|---|---|
@@ -39,7 +39,7 @@ Las fronteras señalan dónde cambia la confianza: del navegador a Nginx, de Ngi
 | AM-011 | Logs estructurados | Repudiation | Mitigated | Rol de aplicación sin borrado y envío de logs a Loki. | [`threat-model.md`](../../specs/05-security/threat-model.md) — RF-011, RNF-007 |
 | AM-012 | Imagen firmada por digest | Information disclosure | Mitigated | Secretos por entorno, sin valores por defecto y `.env` fuera de Git. | [`threat-model.md`](../../specs/05-security/threat-model.md) — RNF-003 |
 | AM-013 | HTTP interno: `/api` | Information disclosure | Mitigated | `Secret.String()` redactado e identificadores truncados a 8 caracteres. | [`threat-model.md`](../../specs/05-security/threat-model.md) — RNF-012 |
-| AM-014 | Artefacto de despliegue | Information disclosure | Open | En producción no se exponen puertos de base de datos ni broker. Pendiente (T9): no existe todavía el compose de producción; el compose de desarrollo publica el puerto 5432 de db al host. | [`threat-model.md`](../../specs/05-security/threat-model.md) — RNF-001 |
+| AM-014 | Artefacto de despliegue | Information disclosure | Mitigated | En producción no se publica ningún puerto de base de datos ni broker. Implementado (T9): `deploy/docker-compose.prod.yml` elimina las publicaciones de puertos; solo `web` expone 8080. | [`threat-model.md`](../../specs/05-security/threat-model.md) — RNF-001 |
 | AM-015 | Solicitud y sesión de autenticación | Information disclosure | Mitigated | CSP estricta, cookie `HttpOnly` y escape predeterminado de React. | [`threat-model.md`](../../specs/05-security/threat-model.md) — RNF-009 |
 | AM-016 | Evento de notificación | Information disclosure | Mitigated | Token de 24 h y un uso; broker interno y worker sin registrar cuerpo. | [`threat-model.md`](../../specs/05-security/threat-model.md) — RF-002 |
 | AM-017 (DoS) | Solicitud y sesión de autenticación | Denial of service | Mitigated | `limit_req` antes de API y Argon2id calibrado a ~250 ms. | [`threat-model.md`](../../specs/05-security/threat-model.md) — RNF-010 |
@@ -48,3 +48,7 @@ Las fronteras señalan dónde cambia la confianza: del navegador a Nginx, de Ngi
 | AM-020 | Artefacto de despliegue | Elevation of privilege | Mitigated | Usuario no-root, capacidades eliminadas, raíz de solo lectura y base distroless. | [`threat-model.md`](../../specs/05-security/threat-model.md) — RNF-008 |
 | AM-021 | HTTP interno: `/api` | Elevation of privilege | Mitigated | Autorización por ruta comprobada del lado del servidor. | [`threat-model.md`](../../specs/05-security/threat-model.md) — RF-009 |
 | AM-022 | Imagen firmada por digest | Elevation of privilege | Open | Permisos mínimos por job y OIDC keyless. Parcial: permisos mínimos por job en ci.yml; la publicación con OIDC keyless en el registry llega con T17. | [`threat-model.md`](../../specs/05-security/threat-model.md) — RNF-006 |
+
+## Nota sobre la evidencia de AM-014
+
+La especificación cita como compuerta de AM-014 "Trivy config sobre el compose de producción". El Trivy local (`trivy config --help`) lista como escáneres de misconfiguración azure-arm, cloudformation, dockerfile, helm, kubernetes, terraform, terraformplan-json, terraformplan-snapshot y ansible; ninguno es Docker Compose. Por eso la evidencia real de AM-014 es la comprobación `docker compose config` de T9 (ningún servicio salvo `web` publica puertos), no Trivy config.

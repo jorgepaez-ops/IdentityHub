@@ -80,4 +80,32 @@ No hay un comando administrativo de desbloqueo documentado. D13 establece que co
 
 ## Producción
 
-No despliegue este Compose de desarrollo como producción. La arquitectura de referencia en nube, IaC y `docker-compose.prod.yml` son entregables pendientes de T7, T8 y T9; Checkov se incorpora en T10.
+No despliegue el Compose de desarrollo como producción. La arquitectura de referencia en nube e IaC son entregables de T7 y T8; Checkov se incorpora en T10. Para ensayar localmente una configuración parecida a producción existe la **producción simulada** (T9): `deploy/docker-compose.prod.yml`, un override del Compose base.
+
+### Producción simulada
+
+```bash
+make up-prod     # docker compose --env-file .env -f deploy/docker-compose.yml -f deploy/docker-compose.prod.yml up -d --no-build
+make down-prod   # detiene el stack conservando los volúmenes
+```
+
+Variables obligatorias en `.env`, además de las del desarrollo (el comando falla con un mensaje en español si falta alguna):
+
+| Variable | Contenido |
+|---|---|
+| `IDENTITY_HUB_API_IMAGE`, `IDENTITY_HUB_WORKER_IMAGE`, `IDENTITY_HUB_WEB_IMAGE` | Digest de cada imagen publicada en Docker Hub (`nombre@sha256:...`). Las publica T17; hasta entonces no hay imágenes que referenciar. |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM` | Relay SMTP y remitente de producción. |
+
+Qué cambia frente a desarrollo:
+
+- Solo `web` publica un puerto (8080). `db`, `broker`, `api`, `worker` y, con el perfil `observability`, Prometheus, Loki y Grafana quedan solo en la red interna de Compose (AM-014).
+- `api`, `worker` y `web` usan las imágenes por digest, sin `build`; `LOG_LEVEL` pasa a `info`.
+- Mailpit no arranca (perfil `correo-local`); el worker ya no depende de él.
+- `restart: unless-stopped`, rotación de logs (`json-file`, 10 MB x 3) y límites de memoria y CPU.
+- Se conserva el endurecimiento del base: `read_only`, `cap_drop: ALL`, `no-new-privileges` y `tmpfs`.
+
+Límites conocidos:
+
+- Los secretos siguen llegando como variables de entorno desde `.env`: la API no soporta variables `*_FILE`, así que no hay secretos por archivo.
+- El worker envía SMTP sin autenticación ni TLS (`backend/cmd/worker/main.go:198-199`); un relay real exige un cambio de código (misma brecha que el ADR 0012).
+- Hasta T17 no hay imágenes publicadas, de modo que la validación sin arrancar se limita a `docker compose ... config`.

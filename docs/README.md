@@ -11,7 +11,7 @@ Este índice conecta los requisitos de `ENUNCIADO-TRABAJO-FINAL.md` con los arte
 | `docker-compose.yml` | [`../deploy/docker-compose.yml`](../deploy/docker-compose.yml) | El compose actual vive en `deploy/`; T6 creará la entrada portátil desde la raíz. |
 | `.github/workflows/` | [`../.github/workflows/`](../.github/workflows/) y [`../e2e/`](../e2e/) | Los workflows automatizan CI/CD y ejecutan la suite E2E versionada. |
 | `infraestructura/` | No existe todavía | T8 creará los módulos de Terraform para la arquitectura de referencia. |
-| `orquestacion/` | [`../deploy/`](../deploy/) y [`../deploy/docker-compose.yml`](../deploy/docker-compose.yml) | `deploy/` concentra Docker Compose y observabilidad; T9 definirá la variante de producción. |
+| `orquestacion/` | [`../deploy/`](../deploy/) y [`../deploy/docker-compose.yml`](../deploy/docker-compose.yml) | `deploy/` concentra Docker Compose y observabilidad; `deploy/docker-compose.prod.yml` es la producción simulada (T9). |
 | `servicios/` | [`../backend/`](../backend/), [`../frontend/`](../frontend/), [`../contabilidad/`](../contabilidad/) y [`../e2e/`](../e2e/) | Los servicios se separan por responsabilidad; `e2e/` contiene sus pruebas de extremo a extremo. |
 | `docs/` | [`docs/`](./), [`../specs/`](../specs/), [`../security/`](../security/) y [`../scripts/`](../scripts/) | `docs/` reúne la entrega; las especificaciones, evidencia de seguridad y trazabilidad versionada la respaldan. |
 
@@ -73,4 +73,4 @@ No los exige el enunciado, pero responden a la demo en vivo con el profesor:
 
 ## Próximos artefactos
 
-T2 incorpora los diagramas UML versionables y T3 el modelo de Threat Dragon; T4 completó los manuales. T8 añade IaC, T9 el compose de producción y T19 produce el informe PDF. Este índice debe actualizarse cuando cada artefacto quede verificado.
+T2 incorpora los diagramas UML versionables y T3 el modelo de Threat Dragon; T4 completó los manuales. T8 añade IaC, T9 el compose de producción simulado y T19 produce el informe PDF. Este índice debe actualizarse cuando cada artefacto quede verificado.

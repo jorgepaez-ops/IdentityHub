@@ -6,11 +6,12 @@
 
 COMPOSE     := docker compose --env-file .env -f deploy/docker-compose.yml
 COMPOSE_OBS := $(COMPOSE) --profile observability
+COMPOSE_PROD := docker compose --env-file .env -f deploy/docker-compose.yml -f deploy/docker-compose.prod.yml
 SQLC_VERSION := v1.31.1
 SQLC         ?= sqlc
 
 .DEFAULT_GOAL := help
-.PHONY: help setup up down logs ps restart build test test-go test-integration test-front e2e _e2e-run scan-dast _scan-dast-run spec-drift lint fmt gen scan scan-secrets scan-deps scan-image scan-config migrate psql rabbit mail clean
+.PHONY: help setup up down logs ps restart build test test-go test-integration test-front e2e _e2e-run scan-dast _scan-dast-run spec-drift lint fmt gen scan scan-secrets scan-deps scan-image scan-config migrate psql rabbit mail clean up-prod down-prod
 
 help: ## Muestra esta ayuda
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -30,6 +31,13 @@ up: ## Levanta el stack de desarrollo
 	@echo "  Mailpit         http://localhost:8025"
 	@echo ""
 	@echo "  Observabilidad: make up-obs  →  Grafana en http://localhost:3000"
+
+up-prod: ## Levanta la producción simulada (imágenes por digest, sin build ni puertos de desarrollo)
+	$(COMPOSE_PROD) up -d --no-build
+	@echo "  Hub             http://identityhub.localhost:8080  (único puerto publicado)"
+
+down-prod: ## Detiene la producción simulada conservando los volúmenes
+	$(COMPOSE_PROD) down
 
 up-obs: ## Levanta el stack incluida la observabilidad
 	$(COMPOSE_OBS) up -d --build

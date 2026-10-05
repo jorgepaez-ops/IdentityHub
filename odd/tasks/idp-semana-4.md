@@ -267,8 +267,16 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
     (flowchart) y despliegue de una versión (secuencia), con datos tomados del Terraform; ambos
     renderizan con mermaid-cli 11.17.0. Gitleaks del historial completo (v8.24.3, como CI): 0
     hallazgos con las huellas sin commit.
-- [ ] **T9 — Producción simulada local.** `docker-compose.prod.yml` (imágenes por digest, sin
+- [x] **T9 — Producción simulada local.** `docker-compose.prod.yml` (imágenes por digest, sin
   puertos de desarrollo, secretos por archivo).
+  Ruta: delegada (Sonnet), revisión de Claude. Evidencia (2026-10-05): `deploy/docker-compose.prod.yml` + `make up-prod`/`down-prod`; `docker compose config` OK, solo `web` publica puerto (también con perfil observability), api/worker/web sin build; AM-014 pasa a Mitigated (4 Open). Secretos siguen por env (sin `*_FILE`); falta correr el stack real.
+  Prueba real de Claude: proyecto aislado `idhprod` con las imágenes locales y el override:
+  servicios `healthy`, Hub y JWKS 200 a través de `web`; desde el host 5432, 5672, 15672, 8081,
+  9091, 1025 y 8025 cerrados (solo `web` publica 8080); Mailpit no arranca. Luego `down -v` y el
+  stack del usuario restaurado (`/readyz` 200). AM-014 pasa a `Mitigated` en el modelo de amenazas.
+  Confirmado con el binario local de Trivy que `trivy config` no analiza Compose, así que la
+  evidencia de AM-014 que cita el spec ("Trivy config sobre el compose de producción") no existe;
+  la evidencia real es esta prueba (anotado en `docs/threat-model/README.md`, el spec queda sin tocar).
 - [ ] **T10 — Checkov en CI.** Job nuevo sobre Terraform, Dockerfiles y workflows; falla ante
   hallazgos de severidad alta.
 
@@ -301,14 +309,14 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
 | Fase | Tareas | Hechas |
 |---|---|---|
 | 1 — Documentación, UML e integración | T1 a T6 (6) | 5 (T1 a T4 y T6; T5 parcial) |
-| 2 — IaC de referencia | T7 a T10 (4) | 2 (T7 y T8) |
+| 2 — IaC de referencia | T7 a T10 (4) | 3 (T7 a T9) |
 | 3 — Grilla de roles configurable | T11 a T15 (5) | 0 |
 | 4 — Publicación y entrega | T16 a T21 (6) | 0 |
 | **Total** | **21** | **6** |
 
 ## Siguiente paso
 
-T9 (producción simulada local, `docker-compose.prod.yml`). T5 queda abierta hasta T15 (permisos).
+T10 (Checkov en CI). T5 queda abierta hasta T15 (permisos).
 
 ## Cambios de spec propuestos
 
