@@ -99,6 +99,12 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
 - **D5 · Integración de terceros:** se documenta (API compartida más ajustes en el frontend del
   tercero); no se construye una segunda aplicación cliente.
 
+- **D6 · LocalStack (2026-10-05):** el usuario tiene licencia de LocalStack de un año por el
+  GitHub Student Pack, así que la IaC de referencia puede validarse contra servicios de pago de
+  LocalStack (por ejemplo ECS o RDS). Q2 pasa a verificar qué cubre esa licencia en T7. El token
+  de licencia es un secreto: va en el entorno local, nunca en el repo ni en CI sin decisión del
+  usuario.
+
 ## Preguntas abiertas
 
 - **Q1 · Docker Hub:** cuenta y namespace, repositorios (`api`, `worker`, `web` y ¿`contabilidad`?),
