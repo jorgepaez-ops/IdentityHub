@@ -144,9 +144,18 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
     DoS). El modelo de Threat Dragon las distingue como "AM-017 (MFA)" y "AM-017". Decidir en T4 o
     con el usuario si se renumera.
   - AM-019 no tiene tarea asignada en este plan (alerta de Grafana y runbook de la DLQ).
-- [ ] **T4 — Manuales.** Arquitectura (consolida `specs/00-vision.md` y los ADR), despliegue y
+- [x] **T4 — Manuales.** Arquitectura (consolida `specs/00-vision.md` y los ADR), despliegue y
   operación, seguridad (cómo leer los reportes de Trivy, ZAP, Gitleaks, Semgrep) y desarrollo
   (convención de ramas, commits y revisión, sobre `docs/guia-desarrollo.md`).
+  Evidencia (2026-10-05): ruta delegada a Codex; `docs/manuales/arquitectura.md`,
+  `docs/manuales/despliegue-y-operacion.md` y `docs/manuales/seguridad.md` documentan solo
+  evidencia versionada; `docs/guia-desarrollo.md` incorpora contribución y `docs/README.md` enlaza
+  los manuales. Comprobaciones estructurales: enlaces relativos, objetivos Make y variables de
+  entorno verificadas contra sus fuentes (18 objetivos Make, 41 variables, 0 enlaces rotos).
+  Correcciones de la revisión de Claude: el manual de seguridad decía que `osv-scanner.toml` no
+  existía (está en `backend/osv-scanner.toml`, riesgo aceptado de VULN-028 hasta 2026-12-25), y la
+  causa del 502 de Nginx era incorrecta (es la IP vieja de `api` tras recrearlo; se arregla con
+  `docker restart identity-hub-web-1`, no esperando a la API).
 - [ ] **T5 — Guía de integración de terceros.** Registro como cliente OAuth (`redirect_uri`, PKCE,
   CORS), endpoints y JWKS, declaración de permisos de la aplicación (se completa tras la fase 3),
   cambios en el frontend del tercero y checklist de seguridad.
@@ -192,15 +201,15 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
 
 | Fase | Tareas | Hechas |
 |---|---|---|
-| 1 — Documentación, UML e integración | T1 a T6 (6) | 3 (T1 a T3) |
+| 1 — Documentación, UML e integración | T1 a T6 (6) | 4 (T1 a T4) |
 | 2 — IaC de referencia | T7 a T10 (4) | 0 |
 | 3 — Grilla de roles configurable | T11 a T15 (5) | 0 |
 | 4 — Publicación y entrega | T16 a T21 (6) | 0 |
-| **Total** | **21** | **3** |
+| **Total** | **21** | **4** |
 
 ## Siguiente paso
 
-T4 (manuales: arquitectura, despliegue y operación, seguridad, desarrollo).
+T5 (guía de integración de terceros).
 
 ## Cambios de spec propuestos
 

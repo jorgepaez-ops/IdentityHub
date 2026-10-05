@@ -299,3 +299,15 @@ pre-commit install
   el commit no se crea. Después, sacar el archivo del stage y borrarlo.
 - Ejecutar todos los hooks sobre el repo sin commitear: `pre-commit run --all-files`
   (`trailing-whitespace`, `end-of-file-fixer` y gofmt **modifican** archivos).
+
+## 7. Contribución
+
+Trabaje en una rama de funcionalidad; `main` está protegida. Cada unidad de trabajo debe usar un commit Conventional Commit con código, pruebas y documentación que expliquen el mismo cambio. No agregue atribución de IA ni líneas `Co-Authored-By`.
+
+1. Cree una rama para el cambio y mantenga una unidad revisable por commit.
+2. Ejecute las comprobaciones aplicables antes de solicitar revisión. Los gates de CI incluyen deriva de specs, lint/tipos, secretos, SAST, dependencias, pruebas, E2E, Trivy, DAST y SonarCloud; SonarCloud es requerido para los cambios que analiza.
+3. Instale los hooks una vez con `pre-commit install`; un clon nuevo no los hereda. El hook puede modificar formato o rechazar secretos y cambios sin stage.
+4. Abra un PR por corte de fase. La política registrada exige PR, checks requeridos y **merge commit**; squash, rebase, force push y bypass no están permitidos.
+5. Antes de integrar, pase la revisión nativa configurada para el repositorio cuando aplique; su resultado no sustituye los checks obligatorios de CI.
+
+Los commits de unidad de trabajo mantienen pruebas y documentación junto al comportamiento y permiten revisar o revertir un cambio sin arrastrar trabajo no relacionado.

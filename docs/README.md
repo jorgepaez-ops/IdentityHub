@@ -22,15 +22,15 @@ La columna **Ubicación actual** solo enlaza rutas que existen en este checkout.
 | Requisito | Línea(s) | Ubicación actual | Estado |
 |---|---:|---|---|
 | README principal: propósito, tecnologías, licencia, badges e inicio rápido | 112–118 | [`../README.md`](../README.md) | hecho |
-| Manual de arquitectura: microservicios, decisiones y patrones | 119–121 | [`../specs/00-vision.md`](../specs/00-vision.md) y [`../specs/adr/`](../specs/adr/) | parcial (T4) |
+| Manual de arquitectura: microservicios, decisiones y patrones | 119–121 | [`manuales/arquitectura.md`](manuales/arquitectura.md) | hecho (T4) |
 | Diagrama de componentes | 123–131 | [`diagramas/uml/componentes.md`](diagramas/uml/componentes.md) y [`diagramas/01-arquitectura.html`](diagramas/01-arquitectura.html) como apoyo | hecho |
 | Diagrama de despliegue | 123–131 | [`diagramas/uml/despliegue.md`](diagramas/uml/despliegue.md) y [`../deploy/docker-compose.yml`](../deploy/docker-compose.yml) | hecho |
 | Diagrama de secuencia de un flujo crítico | 123–131 | [`diagramas/uml/secuencia-login-mfa.md`](diagramas/uml/secuencia-login-mfa.md) y [`diagramas/02-flujo-sso.html`](diagramas/02-flujo-sso.html) como apoyo | hecho |
 | Diagrama de casos de uso | 123–131 | [`diagramas/uml/casos-de-uso.md`](diagramas/uml/casos-de-uso.md) | hecho |
 | DFD nivel 0 y nivel 1 con OWASP Threat Dragon | 123–131 | [`threat-model/`](threat-model/) | hecho |
-| Manual de desarrollo: entorno, servicios, pruebas y contribución | 132–139 | [`guia-desarrollo.md`](guia-desarrollo.md) | parcial (T4) |
-| Manual de despliegue y operación | 140–149 | [`../deploy/docker-compose.yml`](../deploy/docker-compose.yml) | parcial (T4) |
-| Manual de seguridad: amenazas, herramientas, reportes y vulnerabilidades | 151–156 | [`../specs/05-security/threat-model.md`](../specs/05-security/threat-model.md), [`security-report.html`](security-report.html) y [`../security/findings/`](../security/findings/) | parcial (T4) |
+| Manual de desarrollo: entorno, servicios, pruebas y contribución | 132–139 | [`guia-desarrollo.md`](guia-desarrollo.md) | hecho (T4) |
+| Manual de despliegue y operación | 140–149 | [`manuales/despliegue-y-operacion.md`](manuales/despliegue-y-operacion.md) | parcial: operación local hecha (T4); producción pendiente (T7–T9) |
+| Manual de seguridad: amenazas, herramientas, reportes y vulnerabilidades | 151–156 | [`manuales/seguridad.md`](manuales/seguridad.md) | hecho (T4) |
 | Manual de usuario con capturas | 157–159 | No existe todavía | pendiente (T18) |
 | Fase 1: Threat Dragon, DFD y STRIDE | 75–79 | [`threat-model/`](threat-model/) | hecho |
 | Fase 2: hooks, SAST y SCA | 80–84 | [`../.pre-commit-config.yaml`](../.pre-commit-config.yaml) y [`../.github/workflows/ci.yml`](../.github/workflows/ci.yml) | hecho |
@@ -64,12 +64,13 @@ No los exige el enunciado, pero responden a la demo en vivo con el profesor:
 
 1. Empiece por el [`README principal`](../README.md) para ejecutar y ubicar el proyecto.
 2. Consulte [`../specs/`](../specs/) para requisitos, contratos, ADR y trazabilidad.
-3. Use la [`guía de desarrollo`](guia-desarrollo.md) para el entorno local, generación y pruebas.
-4. Revise el [`informe de seguridad`](security-report.html) junto con las evidencias de seguridad.
-5. Lea la [`bitácora`](BITACORA.md) para avances, decisiones y estado histórico.
-6. Prepare la demostración con el [`guion`](guion-demo.md).
-7. Siga el avance de la entrega en [`../odd/tasks/`](../odd/tasks/).
+3. Use la [`guía de desarrollo`](guia-desarrollo.md) para el entorno local, generación, pruebas y contribución.
+4. Consulte los manuales de [`arquitectura`](manuales/arquitectura.md), [`despliegue y operación`](manuales/despliegue-y-operacion.md) y [`seguridad`](manuales/seguridad.md).
+5. Revise el [`informe de seguridad`](security-report.html) junto con las evidencias de seguridad.
+6. Lea la [`bitácora`](BITACORA.md) para avances, decisiones y estado histórico.
+7. Prepare la demostración con el [`guion`](guion-demo.md).
+8. Siga el avance de la entrega en [`../odd/tasks/`](../odd/tasks/).
 
 ## Próximos artefactos
 
-T2 incorpora los diagramas UML versionables, T3 el modelo de Threat Dragon, T4 completa los manuales, T8 añade IaC y T19 produce el informe PDF. Este índice debe actualizarse cuando cada artefacto quede verificado.
+T2 incorpora los diagramas UML versionables y T3 el modelo de Threat Dragon; T4 completó los manuales. T8 añade IaC, T9 el compose de producción y T19 produce el informe PDF. Este índice debe actualizarse cuando cada artefacto quede verificado.
