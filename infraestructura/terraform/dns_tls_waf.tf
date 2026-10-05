@@ -3,6 +3,8 @@
 
 # No se aplica en LocalStack: solo CRUD (ADR 0012)
 resource "aws_route53_zone" "main" {
+  #checkov:skip=CKV2_AWS_38:DNSSEC exige una clave KMS asimetrica y registros DS en el registrador; trabajo futuro, la referencia nunca se aplica
+  #checkov:skip=CKV2_AWS_39:El registro de consultas DNS exige un grupo de logs en us-east-1 y su politica; trabajo futuro, la referencia nunca se aplica
   name = var.zone_domain
 }
 
@@ -111,6 +113,27 @@ resource "aws_wafv2_web_acl" "alb" {
     }
   }
 
+  # Lista de IP anonimas (VPN, proxies, hosting). Solo cuenta (count) y no bloquea,
+  # para no cortar a usuarios legitimos; Checkov (CKV2_AWS_76) exige que este el grupo.
+  rule {
+    name     = "ips-anonimas"
+    priority = 25
+    override_action {
+      count {}
+    }
+    statement {
+      managed_rule_group_statement {
+        name        = "AWSManagedRulesAnonymousIpList"
+        vendor_name = "AWS"
+      }
+    }
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "ips-anonimas"
+      sampled_requests_enabled   = true
+    }
+  }
+
   # Complementa el limit_req de Nginx sobre /api/v1/auth/ (T29).
   rule {
     name     = "limite-por-ip"
@@ -142,6 +165,19 @@ resource "aws_wafv2_web_acl" "alb" {
 resource "aws_wafv2_web_acl_association" "alb" {
   resource_arn = aws_lb.main.arn
   web_acl_arn  = aws_wafv2_web_acl.alb.arn
+}
+
+# Los logs del WAF exigen un grupo cuyo nombre empiece por aws-waf-logs-.
+resource "aws_cloudwatch_log_group" "waf" {
+  name              = "aws-waf-logs-${var.project}-${var.environment}"
+  retention_in_days = var.log_retention_days
+  kms_key_id        = aws_kms_key.main.arn
+}
+
+# No se aplica en LocalStack: solo CRUD (ADR 0012)
+resource "aws_wafv2_web_acl_logging_configuration" "alb" {
+  resource_arn            = aws_wafv2_web_acl.alb.arn
+  log_destination_configs = [aws_cloudwatch_log_group.waf.arn]
 }
 
 # ── SES (solo produccion) ───────────────────────────────────────────────────

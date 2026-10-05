@@ -187,6 +187,7 @@ resource "aws_ecs_task_definition" "web" {
 # EFS/EBS. No se endurece con read-only ni cap_drop porque el entrypoint de la
 # imagen arranca como root y cambia de usuario (igual que el compose).
 resource "aws_ecs_task_definition" "broker" {
+  #checkov:skip=CKV_AWS_336:RabbitMQ escribe en su directorio de datos y su entrypoint arranca como root (D7, igual que el compose)
   family                   = "${var.project}-broker"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"

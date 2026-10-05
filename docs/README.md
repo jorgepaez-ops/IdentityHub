@@ -36,7 +36,7 @@ La columna **Ubicación actual** solo enlaza rutas que existen en este checkout.
 | Fase 2: hooks, SAST y SCA | 80–84 | [`../.pre-commit-config.yaml`](../.pre-commit-config.yaml) y [`../.github/workflows/ci.yml`](../.github/workflows/ci.yml) | hecho |
 | Fase 3: build de imágenes, escaneo y gate de CVE | 85–89 | [`../.github/workflows/ci.yml`](../.github/workflows/ci.yml), [`../backend/Dockerfile`](../backend/Dockerfile) y [`../frontend/Dockerfile`](../frontend/Dockerfile) | hecho |
 | Fase 4: pruebas unitarias y DAST | 90–93 | [`../.github/workflows/ci.yml`](../.github/workflows/ci.yml), [`../e2e/`](../e2e/) y [`../security/zap-reports/`](../security/zap-reports/) | hecho |
-| Fase 5: IaC, Checkov/tfsec y orquestación simulada | 94–98 | [`../deploy/docker-compose.yml`](../deploy/docker-compose.yml) | parcial (T8, T9 y T10) |
+| Fase 5: IaC, Checkov/tfsec y orquestación simulada | 94–98 | [`../deploy/docker-compose.yml`](../deploy/docker-compose.yml) | hecho (T8, T9 y T10) |
 | Fase 6: métricas, logs y detección en ejecución | 99–103 | [`../deploy/docker-compose.yml`](../deploy/docker-compose.yml) y [`../deploy/observability/`](../deploy/observability/) | parcial: Prometheus, Grafana y Loki (vía Grafana Alloy) hechos; Falco fuera salvo que sobre tiempo |
 | Repositorio GitHub público con código, pipeline, IaC y documentación | 163–166 | [`../README.md`](../README.md) y [`../.github/workflows/`](../.github/workflows/) | parcial (T21) |
 | Imágenes publicadas y versionadas en Docker Hub | 163–167 | [`../specs/adr/0011-docker-hub-como-registry.md`](../specs/adr/0011-docker-hub-como-registry.md) | pendiente (T17) |

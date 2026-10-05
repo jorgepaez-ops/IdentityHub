@@ -11,7 +11,7 @@ SQLC_VERSION := v1.31.1
 SQLC         ?= sqlc
 
 .DEFAULT_GOAL := help
-.PHONY: help setup up down logs ps restart build test test-go test-integration test-front e2e _e2e-run scan-dast _scan-dast-run spec-drift lint fmt gen scan scan-secrets scan-deps scan-image scan-config migrate psql rabbit mail clean up-prod down-prod
+.PHONY: help setup up down logs ps restart build test test-go test-integration test-front e2e _e2e-run scan-dast _scan-dast-run spec-drift lint fmt gen scan scan-secrets scan-deps scan-image scan-config scan-iac migrate psql rabbit mail clean up-prod down-prod
 
 help: ## Muestra esta ayuda
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -161,7 +161,7 @@ mail: ## Abre Mailpit
 	open http://localhost:8025 || xdg-open http://localhost:8025
 
 # ── Seguridad: los mismos gates que en CI ────────────────────────────────
-scan: scan-secrets scan-deps scan-config scan-image ## Todos los gates de seguridad en local
+scan: scan-secrets scan-deps scan-config scan-iac scan-image ## Todos los gates de seguridad en local
 
 scan-secrets: ## Gitleaks sobre el historial completo (RNF-003)
 	@echo "── Gitleaks ──────────────────────────────────────────────"
@@ -184,6 +184,11 @@ scan-config: ## Trivy config y Hadolint (RNF-008)
 		echo "  $$f"; \
 		docker run --rm -i hadolint/hadolint:v2.12.0 hadolint - < $$f || true; \
 	done
+
+scan-iac: ## Checkov sobre Terraform, Dockerfiles y workflows
+	@echo "── Checkov ───────────────────────────────────────────────"
+	docker run --rm -v "$(PWD):/src" -w /src bridgecrew/checkov:3.3.23 \
+		-d . --framework terraform dockerfile github_actions --compact --quiet || true
 
 scan-image: build ## Trivy sobre las imágenes construidas (RNF-004)
 	@echo "── Trivy sobre las imágenes ──────────────────────────────"

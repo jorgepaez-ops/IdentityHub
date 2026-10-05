@@ -10,6 +10,7 @@ locals {
 
 # No se aplica en LocalStack: solo CRUD (ADR 0012)
 resource "aws_security_group" "svc" {
+  #checkov:skip=CKV2_AWS_5:El grupo migrate lo usa la tarea de un solo uso lanzada con aws ecs run-task, no un servicio ECS
   for_each = toset(local.sg_names)
 
   name        = "${var.project}-${var.environment}-${each.key}"
@@ -32,6 +33,7 @@ resource "aws_vpc_security_group_ingress_rule" "alb_https" {
 
 # No se aplica en LocalStack: solo CRUD (ADR 0012)
 resource "aws_vpc_security_group_ingress_rule" "alb_http" {
+  #checkov:skip=CKV_AWS_260:El puerto 80 del ALB solo redirige a HTTPS (301) y no sirve contenido
   security_group_id = aws_security_group.svc["alb"].id
   description       = "HTTP publico, el listener solo redirige a HTTPS"
   ip_protocol       = "tcp"

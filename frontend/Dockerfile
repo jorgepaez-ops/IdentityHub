@@ -59,4 +59,9 @@ EXPOSE 8080
 # una base referenciada solo por digest (mismo caso que backend/Dockerfile, T27).
 USER 101
 
+# nginx-unprivileged es Alpine: wget (BusyBox) sondea el server del Hub, que sirve
+# la SPA estatica sin depender de la API.
+HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=5 \
+  CMD ["wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/"]
+
 CMD ["nginx", "-g", "daemon off;"]

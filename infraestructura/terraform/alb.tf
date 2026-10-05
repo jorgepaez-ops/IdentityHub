@@ -9,11 +9,12 @@ resource "aws_lb" "main" {
   security_groups            = [aws_security_group.svc["alb"].id]
   drop_invalid_header_fields = true
   enable_deletion_protection = true
-  # Sin access_logs a proposito (exige un bucket S3); Checkov lo senala y se
-  # documenta como excepcion en T10.
+  # Sin access_logs a proposito (exige un bucket S3 con su politica): trabajo futuro.
+  #checkov:skip=CKV_AWS_91:Los access logs exigen un bucket S3 con politica propia; la referencia nunca se aplica y queda como trabajo futuro
 }
 
 resource "aws_lb_target_group" "web" {
+  #checkov:skip=CKV_AWS_378:TLS termina en el ALB y el trafico hacia web viaja por subredes privadas; TLS extremo a extremo es trabajo futuro
   name        = "${var.project}-${var.environment}-web"
   port        = 8080
   protocol    = "HTTP"
@@ -44,6 +45,7 @@ resource "aws_lb_listener" "https" {
   }
 }
 
+# El puerto 80 solo redirige a HTTPS (301); no sirve contenido.
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.main.arn
   port              = 80

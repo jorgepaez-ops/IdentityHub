@@ -15,18 +15,19 @@ La fuente de amenazas es [`specs/05-security/threat-model.md`](../../specs/05-se
 | 5 · Dependencias vulnerables | `npm audit` | Dependencias de frontend y Contabilidad | `--audit-level=high`. |
 | 5 · Dependencias vulnerables | osv-scanner | Vulnerabilidades de dependencias recursivas, incluidas no invocadas | `--recursive --all-vulns`; no hay un umbral de severidad configurado. |
 | 8 · Configuración de contenedores | Trivy config | Misconfiguraciones de configuración e infraestructura | Gate en `HIGH,CRITICAL`; primero publica SARIF y luego falla si las encuentra. |
+| 12 · IaC (Checkov) | Checkov 3.3.23 | Misconfiguraciones en Terraform (`infraestructura/terraform/`), Dockerfiles y workflows de GitHub Actions | Falla ante cualquier hallazgo (sin `soft_fail` ni lista global de omisión); las excepciones aceptadas son `#checkov:skip=ID:motivo` en línea sobre el recurso. Publica SARIF (categoría `checkov`) aunque falle. |
 | 9-10 · Construir y escanear imágenes | Trivy image | CVE en `api`, `worker` y `web` | Gate en `HIGH,CRITICAL` corregibles con `ignore-unfixed: true`. |
 | 11 · DAST | OWASP ZAP | Baseline del Hub y Contabilidad y API basada en OpenAPI | `scripts/zap-gate.py` falla ante riesgo medio o alto, salvo `IGNORE` justificado. |
 | 7 · E2E | Playwright | Flujos de navegador contra el stack levantado | Cualquier prueba fallida falla el job; informe y trazas se suben al fallar o cancelar. |
 | **Externo — no es job de `ci.yml`** | SonarCloud | Análisis de calidad y seguridad del código nuevo; la evidencia registrada incluye reglas S6505/S8543 y S2068. | Revise el resultado de SonarCloud asociado al PR y sus hallazgos. El archivo `ci.yml` no configura este análisis ni declara un umbral general; el historial solo registra que el PR #9 fue bloqueado por una calificación de seguridad del código nuevo de 3 > 1. |
 
-Los SARIF de Semgrep y Trivy se cargan a Code Scanning. Los artefactos de Playwright y ZAP se conservan cuando sus jobs los generan; su retención está definida en el workflow. SonarCloud es un gate externo documentado por el historial del repositorio: interprete su Quality Gate junto con los hallazgos del PR, pero no lo confunda con una definición dentro de `.github/workflows/ci.yml`.
+Los SARIF de Semgrep, Trivy y Checkov se cargan a Code Scanning. Los artefactos de Playwright y ZAP se conservan cuando sus jobs los generan; su retención está definida en el workflow. SonarCloud es un gate externo documentado por el historial del repositorio: interprete su Quality Gate junto con los hallazgos del PR, pero no lo confunda con una definición dentro de `.github/workflows/ci.yml`.
 
 ## Lectura local y en CI
 
 - `make scan-secrets` ejecuta Gitleaks sobre el historial.
 - `make scan-deps` ejecuta `govulncheck` y `npm audit`; sus salidas locales terminan con `|| true`, por lo que debe leerse la salida y no solo el código de salida.
-- `make scan-config` ejecuta Trivy config y Hadolint; `make scan-image` construye y escanea las imágenes; `make scan` agrupa los cuatro objetivos.
+- `make scan-config` ejecuta Trivy config y Hadolint; `make scan-image` construye y escanea las imágenes; `make scan-iac` ejecuta Checkov sobre Terraform, Dockerfiles y workflows (imagen `bridgecrew/checkov:3.3.23`; como los demás objetivos locales termina con `|| true`, lea la salida); `make scan` agrupa los cinco objetivos.
 - `make scan-dast` ejecuta ZAP contra un stack ya levantado y deja informes JSON/HTML en `security/zap-reports/`, directorio ignorado por Git.
 - En CI, consulte los SARIF en Code Scanning y descargue los artefactos `playwright-<run>` o `zap-reports-<run>` cuando el workflow los publique.
 

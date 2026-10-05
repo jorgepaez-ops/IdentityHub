@@ -277,8 +277,16 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   Confirmado con el binario local de Trivy que `trivy config` no analiza Compose, así que la
   evidencia de AM-014 que cita el spec ("Trivy config sobre el compose de producción") no existe;
   la evidencia real es esta prueba (anotado en `docs/threat-model/README.md`, el spec queda sin tocar).
-- [ ] **T10 — Checkov en CI.** Job nuevo sobre Terraform, Dockerfiles y workflows; falla ante
+- [x] **T10 — Checkov en CI.** Job nuevo sobre Terraform, Dockerfiles y workflows; falla ante
   hallazgos de severidad alta.
+  Ruta: delegada (Sonnet), revisión de Claude. Evidencia (2026-10-05): job `12 · IaC (Checkov)` en `ci.yml` (Checkov 3.3.23 por pip, no `checkov-action`: su release v12.1347.0 trae Checkov 2.0.930; `soft_fail` no existe, SARIF categoría `checkov`, `if: always()`); `make scan-iac` en `scan`. Corregidos: flow logs de la VPC, RDS (Performance Insights, monitoreo extendido, parameter group con `log_statement`, `log_min_duration_statement` y `rds.force_ssl`), logging del WAF, regla `AWSManagedRulesAnonymousIpList` en modo count (CKV2_AWS_76 exige ese grupo además de KnownBadInputs), AZ fijadas con filtro `zone-name`, HEALTHCHECK en `api` y `web`. Omisiones en línea: CKV_AWS_260, CKV_AWS_378, CKV_AWS_111/356/109, CKV_AWS_336, CKV2_AWS_57, CKV2_AWS_5, CKV2_AWS_38, CKV2_AWS_39, CKV_AWS_91 y CKV_GHA_7 (baseline-scan, ADR 0007). Resultado local: terraform 327 pasan/0 fallan/23 omitidas, dockerfile 139/0, github_actions 471/0/1 omitida.
+
+  Verificación de Claude: Checkov 3.3.23 en los tres frameworks, 0 fallos (terraform 327/0/23
+  omitidos, dockerfile 139/0, github_actions 471/0/1); Hadolint OK en los dos Dockerfiles;
+  `terraform validate` OK; imágenes reconstruidas con `make up`: `api` y `web` quedan `healthy` con
+  los HEALTHCHECK nuevos (el worker no tiene, justificado en el Dockerfile). Desviación aceptada:
+  el job instala `checkov==3.3.23` con pip porque `bridgecrewio/checkov-action` corre una imagen
+  2.0.930 sin los chequeos de AWS actuales.
 
 ## Fase 3 — Grilla de roles configurable
 
@@ -309,14 +317,14 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
 | Fase | Tareas | Hechas |
 |---|---|---|
 | 1 — Documentación, UML e integración | T1 a T6 (6) | 5 (T1 a T4 y T6; T5 parcial) |
-| 2 — IaC de referencia | T7 a T10 (4) | 3 (T7 a T9) |
+| 2 — IaC de referencia | T7 a T10 (4) | 4 (T7 a T10) — fase cerrada |
 | 3 — Grilla de roles configurable | T11 a T15 (5) | 0 |
 | 4 — Publicación y entrega | T16 a T21 (6) | 0 |
 | **Total** | **21** | **6** |
 
 ## Siguiente paso
 
-T10 (Checkov en CI). T5 queda abierta hasta T15 (permisos).
+Fase 3: T11 (spec de la grilla de roles configurable). T5 queda abierta hasta T15 (permisos).
 
 ## Cambios de spec propuestos
 

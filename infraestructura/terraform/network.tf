@@ -1,5 +1,12 @@
+# Se fija la identidad de las zonas con un filtro por nombre (Checkov CKV_AWS_394):
+# si AWS agrega una zona nueva, el conjunto no crece solo.
 data "aws_availability_zones" "available" {
   state = "available"
+
+  filter {
+    name   = "zone-name"
+    values = ["${var.region}a", "${var.region}b"]
+  }
 }
 
 locals {

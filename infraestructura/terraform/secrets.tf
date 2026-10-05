@@ -46,6 +46,7 @@ resource "aws_secretsmanager_secret" "app" {
   kms_key_id              = aws_kms_key.main.arn
   recovery_window_in_days = 7
   # Sin rotacion automatica: la semilla JWT rota con un despliegue coordinado.
+  #checkov:skip=CKV2_AWS_57:La referencia no incluye una Lambda de rotacion; la rotacion es manual y esta documentada en el README
 }
 
 resource "aws_secretsmanager_secret_version" "app" {
