@@ -114,9 +114,14 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
 
 ## Fase 1 — Documentación, UML e integración
 
-- [ ] **T1 — Mapa de la entrega.** Índice de documentación en `docs/README.md` con la tabla de
+- [x] **T1 — Mapa de la entrega.** Índice de documentación en `docs/README.md` con la tabla de
   equivalencias layout del enunciado → repo (`infraestructura/`, `orquestacion/`, `servicios/`) y
   cada entregable del enunciado con su ubicación. Ruta: por definir.
+  Ruta: delegada (Codex), revisión de Claude. Evidencia (2026-10-05): `docs/README.md` con el
+  mapeo de estructura, entregables y requisitos del enunciado; 50 enlaces relativos, 0 rotos.
+  Correcciones de la revisión: líneas exactas de las secciones del PDF (174-181), el diagrama de
+  despliegue ya no enlaza el compose como si fuera el diagrama, Falco anotado en la fase 6 y tabla
+  de entregables propios (grilla de roles, guía de integración).
 - [ ] **T2 — Diagramas UML como código.** Casos de uso, componentes, despliegue y secuencia de
   autenticación en Mermaid o PlantUML versionados (los HTML de Archify actuales quedan como apoyo).
 - [ ] **T3 — Threat Dragon.** Modelo `.json` versionado con DFD nivel 0 y 1, alineado con el STRIDE
@@ -169,15 +174,15 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
 
 | Fase | Tareas | Hechas |
 |---|---|---|
-| 1 — Documentación, UML e integración | T1 a T6 (6) | 0 |
+| 1 — Documentación, UML e integración | T1 a T6 (6) | 1 (T1) |
 | 2 — IaC de referencia | T7 a T10 (4) | 0 |
 | 3 — Grilla de roles configurable | T11 a T15 (5) | 0 |
 | 4 — Publicación y entrega | T16 a T21 (6) | 0 |
-| **Total** | **21** | **0** |
+| **Total** | **21** | **1** |
 
 ## Siguiente paso
 
-T1 (mapa de la entrega), que fija dónde va cada documento antes de escribirlos.
+T2 (diagramas UML como código).
 
 ## Cambios de spec propuestos
 
