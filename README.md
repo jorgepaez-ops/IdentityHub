@@ -41,10 +41,16 @@ La visión y los contratos del sistema están en [`specs/00-vision.md`](specs/00
 ## 6. Inicio rápido
 
 1. Clone el repositorio y entre en su directorio.
-2. Copie [`.env.example`](.env.example) como `.env` y complete los valores requeridos localmente. El archivo `.env` no se versiona.
-3. Ejecute `make up`.
+2. Ejecute `make setup`: genera un `.env` local con secretos aleatorios a partir de [`.env.example`](.env.example). El archivo `.env` no se versiona y un `.env` existente no se sobrescribe.
+3. Ejecute `docker compose up -d` (equivalente: `make up`, que además construye las imágenes).
 
-El objetivo usa `docker compose --env-file .env -f deploy/docker-compose.yml` y construye el stack. Al terminar informa estas direcciones:
+```bash
+git clone <url-del-repositorio> && cd <directorio>
+make setup
+docker compose up -d
+```
+
+El `docker-compose.yml` de la raíz incluye `deploy/docker-compose.yml`; `make up` usa `docker compose --env-file .env -f deploy/docker-compose.yml`. Al terminar se exponen estas direcciones:
 
 | Servicio | Dirección |
 |---|---|
@@ -56,7 +62,7 @@ El objetivo usa `docker compose --env-file .env -f deploy/docker-compose.yml` y 
 
 Use `make up-obs` para incluir Grafana en <http://localhost:3000> y Prometheus en <http://localhost:9090>. [`Makefile`](Makefile) y `make help` enumeran los demás comandos disponibles.
 
-Actualmente el compose vive en `deploy/` y el entorno necesita un `.env` local. Un `docker-compose.yml` en la raíz y un arranque sin preparación adicional están planificados para la semana 4 como parte del requisito de portabilidad.
+El compose real vive en `deploy/` y el de la raíz lo incluye, de modo que un clon nuevo arranca con `make setup && docker compose up -d`. Los secretos se generan localmente y nunca se versionan.
 
 ## 7. Seguridad y evidencia DevSecOps
 

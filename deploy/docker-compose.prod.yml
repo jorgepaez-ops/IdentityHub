@@ -1,0 +1,115 @@
+# ╔══════════════════════════════════════════════════════════════════════════╗
+# ║  PRODUCCIÓN SIMULADA (local) — override de deploy/docker-compose.yml.     ║
+# ║                                                                          ║
+# ║  Uso (o `make up-prod`):                                                 ║
+# ║    docker compose --env-file .env \                                      ║
+# ║      -f deploy/docker-compose.yml -f deploy/docker-compose.prod.yml \    ║
+# ║      up -d                                                               ║
+# ║                                                                          ║
+# ║  Qué cambia frente a desarrollo: solo `web` publica un puerto (8080);    ║
+# ║  db, broker, api, worker y observabilidad quedan solo en la red interna; ║
+# ║  api, worker y web usan imágenes ya publicadas (sin build); mailpit      ║
+# ║  queda fuera por defecto; reinicio automático, rotación de logs y        ║
+# ║  límites de recursos. El endurecimiento del compose base (read_only,     ║
+# ║  cap_drop, no-new-privileges, tmpfs) se conserva intacto.                ║
+# ║                                                                          ║
+# ║  Límites conocidos: es una simulación local, no un despliegue real.      ║
+# ║  Los secretos siguen llegando por variables de entorno desde .env        ║
+# ║  (el backend no soporta *_FILE). El worker envía SMTP sin autenticación  ║
+# ║  ni TLS (backend/cmd/worker/main.go:198-199), así que un relay real      ║
+# ║  exige un cambio de código (misma brecha que el ADR 0012).               ║
+# ╚══════════════════════════════════════════════════════════════════════════╝
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  # ── Datos: sin puertos al host ──────────────────────────────────────────
+  db:
+    ports: !reset []
+    restart: unless-stopped
+    logging: *logging
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+
+  broker:
+    ports: !reset []
+    restart: unless-stopped
+    logging: *logging
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+
+  # El correo de captura es solo de desarrollo: no arranca sin su perfil.
+  mailpit:
+    profiles: ["correo-local"]
+    ports: !reset []
+
+  # ── Aplicación: imágenes publicadas, sin build ──────────────────────────
+  api:
+    image: "${IDENTITY_HUB_API_IMAGE:?IDENTITY_HUB_API_IMAGE debe ser el digest de la imagen api publicada en Docker Hub por T17 (nombre@sha256:...)}"
+    build: !reset null
+    pull_policy: missing
+    ports: !reset []
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      LOG_LEVEL: info
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+
+  worker:
+    image: "${IDENTITY_HUB_WORKER_IMAGE:?IDENTITY_HUB_WORKER_IMAGE debe ser el digest de la imagen worker publicada en Docker Hub por T17 (nombre@sha256:...)}"
+    build: !reset null
+    pull_policy: missing
+    ports: !reset []
+    restart: unless-stopped
+    logging: *logging
+    # El base espera a mailpit; aquí no existe, así que se redefine la lista.
+    depends_on: !override
+      broker:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      LOG_LEVEL: info
+      # SMTP real obligatorio. Ojo: el worker no autentica ni usa TLS.
+      SMTP_HOST: "${SMTP_HOST:?SMTP_HOST debe apuntar al relay SMTP de producción (el worker no usa autenticación ni TLS)}"
+      SMTP_PORT: "${SMTP_PORT:?SMTP_PORT debe indicar el puerto del relay SMTP de producción}"
+      SMTP_FROM: "${SMTP_FROM:?SMTP_FROM debe ser el remitente de producción (por ejemplo no-reply@su-dominio)}"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+
+  web:
+    image: "${IDENTITY_HUB_WEB_IMAGE:?IDENTITY_HUB_WEB_IMAGE debe ser el digest de la imagen web publicada en Docker Hub por T17 (nombre@sha256:...)}"
+    build: !reset null
+    pull_policy: missing
+    restart: unless-stopped
+    logging: *logging
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.5"
+
+  # ── Observabilidad (perfil aparte): tampoco se publica al host ──────────
+  prometheus:
+    ports: !reset []
+  loki:
+    ports: !reset []
+  grafana:
+    ports: !reset []

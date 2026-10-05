@@ -145,3 +145,27 @@ e435d0910dc0c97d132b382811b3ee2a0331a40d:e2e/tests/registro-y-verificacion.spec.
 # ed0d2fd, citaba el campo de contraseña de las pruebas de Go y disparó la misma regla. El comentario
 # ya se reescribió; esta huella cubre solo esa línea del historial.
 ed0d2fd375b1e96f853c4f08c6fa8e165a0a1180:.gitleaksignore:contrasena-en-variable-de-entorno:132
+
+# T8a (2026-10-05, aprobado por el usuario): falsos positivos en el Terraform de la arquitectura
+# de referencia (ADR 0012). Son referencias a recursos de Terraform (random_password.*.result) y
+# URLs armadas con ellas: Terraform genera el secreto al aplicar y lo guarda en Secrets Manager;
+# ningún valor está escrito en el código. Huellas sin commit (archivo:regla:línea) para que también
+# las respete el hook de pre-commit (T16), que escanea antes de que exista el commit.
+# Fijadas por numero de linea: si se mueven las lineas de rds.tf o secrets.tf, hay que actualizarlas
+# (correccion de la revision nativa: rds.tf 21 a 22; secrets.tf 32-37 a 33-38).
+infraestructura/terraform/rds.tf:contrasena-en-variable-de-entorno:22
+infraestructura/terraform/secrets.tf:contrasena-en-variable-de-entorno:33
+infraestructura/terraform/secrets.tf:contrasena-en-variable-de-entorno:34
+infraestructura/terraform/secrets.tf:contrasena-en-variable-de-entorno:35
+infraestructura/terraform/secrets.tf:url-de-conexion-con-credenciales:36
+infraestructura/terraform/secrets.tf:url-de-conexion-con-credenciales:37
+infraestructura/terraform/secrets.tf:url-de-conexion-con-credenciales:38
+# Las mismas siete referencias en el commit original de T8a, antes de que las correcciones de la
+# revisión movieran las líneas: huellas con commit, solo para el escaneo del historial (job 3).
+64330d56b24cf1cd5dd94bfc552baef9ab67acef:infraestructura/terraform/rds.tf:contrasena-en-variable-de-entorno:21
+64330d56b24cf1cd5dd94bfc552baef9ab67acef:infraestructura/terraform/secrets.tf:contrasena-en-variable-de-entorno:32
+64330d56b24cf1cd5dd94bfc552baef9ab67acef:infraestructura/terraform/secrets.tf:contrasena-en-variable-de-entorno:33
+64330d56b24cf1cd5dd94bfc552baef9ab67acef:infraestructura/terraform/secrets.tf:contrasena-en-variable-de-entorno:34
+64330d56b24cf1cd5dd94bfc552baef9ab67acef:infraestructura/terraform/secrets.tf:url-de-conexion-con-credenciales:35
+64330d56b24cf1cd5dd94bfc552baef9ab67acef:infraestructura/terraform/secrets.tf:url-de-conexion-con-credenciales:36
+64330d56b24cf1cd5dd94bfc552baef9ab67acef:infraestructura/terraform/secrets.tf:url-de-conexion-con-credenciales:37

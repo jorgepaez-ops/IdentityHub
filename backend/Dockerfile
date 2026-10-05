@@ -40,6 +40,11 @@ EXPOSE 8081
 # una base referenciada solo por digest.
 USER 65532:65532
 
+# La imagen distroless no tiene shell ni curl: el binario se autosondea con su
+# propio subcomando "healthcheck" (mismo comando que usa el compose).
+HEALTHCHECK --interval=10s --timeout=3s --start-period=15s --retries=5 \
+  CMD ["/usr/local/bin/api", "healthcheck"]
+
 ENTRYPOINT ["/usr/local/bin/api"]
 
 # ── Imagen final del worker ───────────────────────────────────────────────
@@ -48,6 +53,11 @@ FROM gcr.io/distroless/static-debian12@sha256:afa5c872c891853ca7fcf1f12c3edb23f7
 COPY --from=builder /out/worker /usr/local/bin/worker
 
 EXPOSE 9091
+
+# Sin HEALTHCHECK a proposito: el worker no tiene un subcomando de sondeo y la
+# imagen distroless no trae shell, wget ni curl. Checkov (CKV_DOCKER_2) se
+# satisface a nivel de archivo con el de la API; la salud del worker la vigila el
+# orquestador (compose / ECS) con su propia comprobacion.
 
 USER 65532:65532
 

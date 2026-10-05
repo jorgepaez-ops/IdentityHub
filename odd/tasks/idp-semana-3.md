@@ -1305,6 +1305,15 @@ frágil de Contabilidad (WebCrypto con reloj falso, la que marcó R3 en T13-fix2
 `89d6051` (el helper cede un macrotask real en cada vuelta; 53/53 diez veces y doce bajo carga) y
 mergeada por el PR #8 en `795b30d`; CI de `main` en verde (run 36941918054).
 
+Fase 3 cerrada el 2026-10-05 (T14 a T17). PR de corte: #9, mergeado en `6982301`; CI de `main` en
+verde (run 37347015471, 15/15). Antes del merge, SonarCloud bloqueó el PR (calificación de seguridad
+del código nuevo 3 > 1) por `npx playwright install` en CI (S6505/S8543) y una contraseña fija en
+`e2e/support/accounts.ts` (S2068); arreglado en `32b82b3` (binario de Playwright fijado por el
+lockfile y contraseña aleatoria por ejecución; revisión nativa aprobada, `make e2e` 46/46). Una
+prueba frágil del frontend (`TestRF009_MarksTheCurrentRailLinkActive`) se arregló en `5d7ef32`.
+BUG-1/BUG-2 cerrados como no reproducibles (`bec6a37`). Semana 3: 18/18. Pendiente para la semana 4:
+RF-018 y RF-019.
+
 Bugs reportados por el usuario al probar a mano (2026-10-01, `make up`, base local), a resolver
 antes de T14 como **BUG-1** y **BUG-2** (evidencia de los logs de Nginx/API tomada en el momento):
 - **BUG-1 — aceptar invitación falla con "No se pudo conectar con el servicio".** El admin creó la

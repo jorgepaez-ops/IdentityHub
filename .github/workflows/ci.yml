@@ -593,3 +593,36 @@ jobs:
       - name: Derribar el stack
         if: always()
         run: docker compose --env-file .env -f deploy/docker-compose.yml down -v
+
+  # ── 12. IaC: Terraform, Dockerfiles y workflows ─────────────────────────
+  # Checkov se instala con pip y versión fija (3.3.23) en vez de usar
+  # bridgecrewio/checkov-action: el release v12.1347.0 de la acción trae una
+  # imagen de Checkov 2.0.930 (action.yml), sin los checks actuales de AWS.
+  # Las excepciones aceptadas viven en línea (#checkov:skip=ID:motivo), nunca
+  # como soft_fail ni como lista global de omisión.
+  iac-checkov:
+    name: 12 · IaC (Checkov)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar Checkov
+        run: |
+          python3 -m pip install --quiet --only-binary :all: 'checkov==3.3.23'
+
+      - name: Checkov (rompe ante cualquier hallazgo)
+        run: |
+          checkov -d . --framework terraform dockerfile github_actions \
+            --compact --quiet \
+            --output cli --output sarif \
+            --output-file-path console,checkov-results.sarif
+
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: checkov-results.sarif
+          category: checkov

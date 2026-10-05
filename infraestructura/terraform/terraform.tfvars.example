@@ -1,0 +1,13 @@
+# Copiar a terraform.tfvars (ignorado por git). Los digests de abajo son
+# marcadores falsos: sustituirlos por los publicados en Docker Hub.
+zone_domain       = "identityhub.example.com"
+hub_host          = "identityhub.example.com"
+contabilidad_host = "contabilidad.identityhub.example.com"
+
+image_api     = "docker.io/EXAMPLE_NAMESPACE/identity-api@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+image_worker  = "docker.io/EXAMPLE_NAMESPACE/identity-worker@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+image_web     = "docker.io/EXAMPLE_NAMESPACE/identity-web@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+image_migrate = "docker.io/EXAMPLE_NAMESPACE/identity-migrate@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+
+# Con LocalStack (tflocal): localstack = true
+localstack = false

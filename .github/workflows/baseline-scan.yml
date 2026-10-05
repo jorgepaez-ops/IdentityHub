@@ -10,6 +10,7 @@
 #  security/findings/ y el informe final docs/security-report.md.
 # ═══════════════════════════════════════════════════════════════════════════
 name: Escaneo de la línea base
+#checkov:skip=CKV_GHA_7:El input "ref" de workflow_dispatch es deliberado (ADR 0007): permite escanear el tag de la línea base vulnerable
 
 on:
   workflow_dispatch:

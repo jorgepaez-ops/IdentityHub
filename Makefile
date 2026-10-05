@@ -6,17 +6,21 @@
 
 COMPOSE     := docker compose --env-file .env -f deploy/docker-compose.yml
 COMPOSE_OBS := $(COMPOSE) --profile observability
+COMPOSE_PROD := docker compose --env-file .env -f deploy/docker-compose.yml -f deploy/docker-compose.prod.yml
 SQLC_VERSION := v1.31.1
 SQLC         ?= sqlc
 
 .DEFAULT_GOAL := help
-.PHONY: help up down logs ps restart build test test-go test-integration test-front e2e _e2e-run scan-dast _scan-dast-run spec-drift lint fmt gen scan scan-secrets scan-deps scan-image scan-config migrate psql rabbit mail clean
+.PHONY: help setup up down logs ps restart build test test-go test-integration test-front e2e _e2e-run scan-dast _scan-dast-run spec-drift lint fmt gen scan scan-secrets scan-deps scan-image scan-config scan-iac migrate psql rabbit mail clean up-prod down-prod
 
 help: ## Muestra esta ayuda
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
 
 # ── Entorno ──────────────────────────────────────────────────────────────
+setup: ## Genera .env con secretos aleatorios (no sobrescribe uno existente)
+	python3 scripts/setup_env.py
+
 up: ## Levanta el stack de desarrollo
 	$(COMPOSE) up -d --build
 	@echo ""
@@ -27,6 +31,13 @@ up: ## Levanta el stack de desarrollo
 	@echo "  Mailpit         http://localhost:8025"
 	@echo ""
 	@echo "  Observabilidad: make up-obs  →  Grafana en http://localhost:3000"
+
+up-prod: ## Levanta la producción simulada (imágenes por digest, sin build ni puertos de desarrollo)
+	$(COMPOSE_PROD) up -d --no-build
+	@echo "  Hub             http://identityhub.localhost:8080  (único puerto publicado)"
+
+down-prod: ## Detiene la producción simulada conservando los volúmenes
+	$(COMPOSE_PROD) down
 
 up-obs: ## Levanta el stack incluida la observabilidad
 	$(COMPOSE_OBS) up -d --build
@@ -134,6 +145,7 @@ _scan-dast-run:
 spec-drift: ## Verifica sin red la matriz y escenarios Gherkin contra E2E
 	python3 scripts/traceability_test.py
 	python3 scripts/zap_gate_test.py
+	python3 scripts/setup_env_test.py
 	python3 scripts/traceability.py --check
 
 migrate: ## Aplica las migraciones pendientes
@@ -149,7 +161,7 @@ mail: ## Abre Mailpit
 	open http://localhost:8025 || xdg-open http://localhost:8025
 
 # ── Seguridad: los mismos gates que en CI ────────────────────────────────
-scan: scan-secrets scan-deps scan-config scan-image ## Todos los gates de seguridad en local
+scan: scan-secrets scan-deps scan-config scan-iac scan-image ## Todos los gates de seguridad en local
 
 scan-secrets: ## Gitleaks sobre el historial completo (RNF-003)
 	@echo "── Gitleaks ──────────────────────────────────────────────"
@@ -172,6 +184,11 @@ scan-config: ## Trivy config y Hadolint (RNF-008)
 		echo "  $$f"; \
 		docker run --rm -i hadolint/hadolint:v2.12.0 hadolint - < $$f || true; \
 	done
+
+scan-iac: ## Checkov sobre Terraform, Dockerfiles y workflows
+	@echo "── Checkov ───────────────────────────────────────────────"
+	docker run --rm -v "$(PWD):/src" -w /src bridgecrew/checkov:3.3.23 \
+		-d . --framework terraform dockerfile github_actions --compact --quiet || true
 
 scan-image: build ## Trivy sobre las imágenes construidas (RNF-004)
 	@echo "── Trivy sobre las imágenes ──────────────────────────────"
