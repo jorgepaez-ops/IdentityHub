@@ -3,7 +3,8 @@ import { api, loginWithMfa } from './api'
 import { assertEmail, assertHex, psql } from './db'
 import { extractLink, mailIds, waitForMail } from './mailpit'
 
-export const strongPassword = 'correcta-horse-battery'
+// Random per run: every test creates its own accounts, so no fixed credential lives in the repo.
+export const strongPassword = `e2e-${randomBytes(18).toString('base64url')}`
 
 export function uniqueEmail(purpose: string): string {
   const slug = purpose.toLowerCase().replace(/[^a-z0-9]+/g, '-')
