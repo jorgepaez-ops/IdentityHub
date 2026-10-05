@@ -40,7 +40,10 @@ Cierra las fases 0 a 3 de la semana 3. El detalle por tarea y la evidencia traza
 ### Hallazgos
 
 - ZAP detectó VULN-030 y VULN-031; ambos quedaron remediados y el gate DAST forma parte del CI.
-- BUG-1 y BUG-2 siguen pendientes de comprobarse en Safari real con `safaridriver`; Safari no resuelve `*.localhost` igual que Chrome y Firefox.
+- BUG-1 y BUG-2 (aceptar invitación y entrar a Contabilidad) no se reproducen: con una sesión por
+  usuario funcionan en Chromium, WebKit, Firefox y Safari (verificación manual del usuario,
+  2026-10-05). La causa probable fue compartir la sesión del Hub entre el admin y el empleado en el
+  mismo navegador, que el SSO reutiliza a propósito.
 
 ### Estado
 
@@ -55,8 +58,7 @@ Cierra las fases 0 a 3 de la semana 3. El detalle por tarea y la evidencia traza
 
 ### Siguiente paso
 
-1. Resolver BUG-1 y BUG-2 en Safari real con `safaridriver`.
-2. Planificar RF-018 y RF-019 para la semana 4.
+1. Planificar RF-018 y RF-019 para la semana 4.
 
 ---
 

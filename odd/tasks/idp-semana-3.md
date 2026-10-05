@@ -1231,7 +1231,7 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 - **Siguiente sesión**: push de los commits pendientes y CI para verificar la acción compuesta
   `stack-up` (requiere autorización del usuario); después T16 (hook de pre-commit real) y T17
   (cierre de fase y PR, que abre el usuario o se abre con su confirmación). Pendiente aparte:
-  BUG-1/BUG-2 en Safari real con `safaridriver`.
+  BUG-1/BUG-2 en Safari real con `safaridriver` (cerrados el 2026-10-05: no reproducibles).
 
 ### T16 — Hook de pre-commit real
 - [x] Estado · Ejecutor: `Claude` · Ruta: inline (cambio mecánico de configuración y docs)
@@ -1335,6 +1335,13 @@ antes de T14 como **BUG-1** y **BUG-2** (evidencia de los logs de Nginx/API toma
   safaridriver --enable` y "Permitir automatización remota"). Datos de prueba que quedan en la base
   local: usuarios `bug-*@example.test` y la contraseña cambiada de `t34a-check3@example.com` (el rol
   `admin` temporal ya se quitó).
+- **Cerrados (2026-10-05): no reproducibles.** El usuario verificó a mano en Firefox y en Safari
+  que, con una sesión por usuario (admin en ventana normal, empleado en incógnito o en otro
+  navegador), aceptar la invitación y entrar a Contabilidad funcionan. Con las dos cuentas en el
+  mismo navegador, el SSO reutiliza la cookie `hub_session` del admin y entra directo: es el
+  comportamiento esperado (criterio 1, "vuelta sin pedir la contraseña si ya había sesión") y el
+  guion ya pide la ventana privada. Causa probable de los reportes originales: sesiones mezcladas
+  durante la prueba manual. No se hizo la prueba con `safaridriver`.
 - Hallazgo aparte (no es un VULN, sin id): WebKit registra en la consola de
   `/invitations/accept` "Refused to apply a stylesheet because its hash, its nonce, or
   'unsafe-inline' does not appear in the style-src directive". La CSP del Hub bloquea un estilo
