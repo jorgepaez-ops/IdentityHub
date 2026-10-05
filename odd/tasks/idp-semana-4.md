@@ -248,7 +248,7 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   `propuesta`, a la espera de que el usuario la acepte). Ruta: inline (decisión de arquitectura del
   orquestador). Hallazgo para el ADR: el worker envía SMTP sin autenticación ni TLS
   (`backend/cmd/worker/main.go:198-199`), así que SES real exigiría cambiar código.
-- [ ] **T8 — Terraform.** Módulos en `infraestructura/` (o la carpeta que fije T1) para la
+- [x] **T8 — Terraform.** Módulos en `infraestructura/` (o la carpeta que fije T1) para la
   arquitectura de referencia; `terraform validate`; `plan`/`apply` contra LocalStack donde se pueda.
   - T8a — Ruta: delegada (Sonnet: necesita red para terraform init), revisión de Claude. Evidencia (2026-10-05): Terraform en `infraestructura/terraform/` (14 archivos .tf, 1379 líneas, sin módulos externos; `README.md` en español, `terraform.tfvars.example`, `.gitignore`, `.terraform.lock.hcl` versionable): red (VPC, 2 públicas y 2 privadas, NAT), security groups de mínimo privilegio, ALB con reglas por Host y HTTP→HTTPS, ECS (api, worker, web, broker, mailpit solo con `localstack`, migrate de un solo uso), RDS cifrado, Secrets Manager con `random`, KMS, CloudWatch Logs, Cloud Map, ACM/Route 53/WAFv2/SES. Verificación: `terraform init -backend=false` OK, `terraform fmt -check -recursive` OK, `terraform validate` Success; grep sin secretos literales ni credenciales AWS. Sin aplicar nada. Pendiente T8b (apply con LocalStack); incertidumbre: DNS de Cloud Map en tareas locales.
   Revisión de Claude: `fmt`/`validate` repetidos en verde; RDS cifrado y sin acceso público,
@@ -257,8 +257,11 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   ALB anula el límite por IP, rol `identity_app` manual en RDS). Gitleaks (hook T16): 7 falsos
   positivos (referencias `random_password.*.result`) registrados como huellas sin commit en
   `.gitleaksignore`, con aprobación del usuario.
-  - [ ] T8b — Diagrama de la configuración y el despliegue en AWS (sustituye el `apply` en
-    LocalStack por D8).
+  - [x] T8b — Diagrama de la configuración y el despliegue en AWS (sustituye el `apply` en
+    LocalStack por D8). Ruta: inline. `docs/diagramas/uml/despliegue-aws.md`: infraestructura
+    (flowchart) y despliegue de una versión (secuencia), con datos tomados del Terraform; ambos
+    renderizan con mermaid-cli 11.17.0. Gitleaks del historial completo (v8.24.3, como CI): 0
+    hallazgos con las huellas sin commit.
 - [ ] **T9 — Producción simulada local.** `docker-compose.prod.yml` (imágenes por digest, sin
   puertos de desarrollo, secretos por archivo).
 - [ ] **T10 — Checkov en CI.** Job nuevo sobre Terraform, Dockerfiles y workflows; falla ante
@@ -293,14 +296,14 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
 | Fase | Tareas | Hechas |
 |---|---|---|
 | 1 — Documentación, UML e integración | T1 a T6 (6) | 5 (T1 a T4 y T6; T5 parcial) |
-| 2 — IaC de referencia | T7 a T10 (4) | 1 (T7) |
+| 2 — IaC de referencia | T7 a T10 (4) | 2 (T7 y T8) |
 | 3 — Grilla de roles configurable | T11 a T15 (5) | 0 |
 | 4 — Publicación y entrega | T16 a T21 (6) | 0 |
 | **Total** | **21** | **6** |
 
 ## Siguiente paso
 
-T8 (Terraform de la arquitectura de referencia), cuando el usuario acepte la ADR 0012. T5 queda abierta hasta T15 (permisos).
+T9 (producción simulada local, `docker-compose.prod.yml`). T5 queda abierta hasta T15 (permisos).
 
 ## Cambios de spec propuestos
 
