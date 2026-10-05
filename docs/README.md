@@ -23,10 +23,10 @@ La columna **Ubicación actual** solo enlaza rutas que existen en este checkout.
 |---|---:|---|---|
 | README principal: propósito, tecnologías, licencia, badges e inicio rápido | 112–118 | [`../README.md`](../README.md) | hecho |
 | Manual de arquitectura: microservicios, decisiones y patrones | 119–121 | [`../specs/00-vision.md`](../specs/00-vision.md) y [`../specs/adr/`](../specs/adr/) | parcial (T4) |
-| Diagrama de componentes | 123–131 | [`diagramas/01-arquitectura.html`](diagramas/01-arquitectura.html) | parcial (T2) |
-| Diagrama de despliegue | 123–131 | No existe todavía (la topología actual está en [`../deploy/docker-compose.yml`](../deploy/docker-compose.yml)) | pendiente (T2) |
-| Diagrama de secuencia de un flujo crítico | 123–131 | [`diagramas/02-flujo-sso.html`](diagramas/02-flujo-sso.html) | parcial (T2) |
-| Diagrama de casos de uso | 123–131 | No existe todavía | pendiente (T2) |
+| Diagrama de componentes | 123–131 | [`diagramas/uml/componentes.md`](diagramas/uml/componentes.md) y [`diagramas/01-arquitectura.html`](diagramas/01-arquitectura.html) como apoyo | hecho |
+| Diagrama de despliegue | 123–131 | [`diagramas/uml/despliegue.md`](diagramas/uml/despliegue.md) y [`../deploy/docker-compose.yml`](../deploy/docker-compose.yml) | hecho |
+| Diagrama de secuencia de un flujo crítico | 123–131 | [`diagramas/uml/secuencia-login-mfa.md`](diagramas/uml/secuencia-login-mfa.md) y [`diagramas/02-flujo-sso.html`](diagramas/02-flujo-sso.html) como apoyo | hecho |
+| Diagrama de casos de uso | 123–131 | [`diagramas/uml/casos-de-uso.md`](diagramas/uml/casos-de-uso.md) | hecho |
 | DFD nivel 0 y nivel 1 con OWASP Threat Dragon | 123–131 | [`../specs/05-security/threat-model.md`](../specs/05-security/threat-model.md) | parcial (T3) |
 | Manual de desarrollo: entorno, servicios, pruebas y contribución | 132–139 | [`guia-desarrollo.md`](guia-desarrollo.md) | parcial (T4) |
 | Manual de despliegue y operación | 140–149 | [`../deploy/docker-compose.yml`](../deploy/docker-compose.yml) | parcial (T4) |

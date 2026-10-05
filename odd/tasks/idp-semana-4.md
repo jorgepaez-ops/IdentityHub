@@ -122,8 +122,13 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   Correcciones de la revisión: líneas exactas de las secciones del PDF (174-181), el diagrama de
   despliegue ya no enlaza el compose como si fuera el diagrama, Falco anotado en la fase 6 y tabla
   de entregables propios (grilla de roles, guía de integración).
-- [ ] **T2 — Diagramas UML como código.** Casos de uso, componentes, despliegue y secuencia de
+- [x] **T2 — Diagramas UML como código.** Casos de uso, componentes, despliegue y secuencia de
   autenticación en Mermaid o PlantUML versionados (los HTML de Archify actuales quedan como apoyo).
+  Ruta: delegada (Codex), revisión de Claude. Evidencia (2026-10-05): diagramas Mermaid versionados en
+  `docs/diagramas/uml/` y enlaces del índice actualizados. Claude renderizó los cuatro con
+  `@mermaid-js/mermaid-cli` 11.17.0 (todos OK tras corregir la secuencia: un `;` cortaba el mensaje,
+  comillas literales, camelCase de la API y el evento `security.mfa_challenge_issued`) y rehízo el
+  de casos de uso con límites de sistema, óvalos e «include»/«extend».
 - [ ] **T3 — Threat Dragon.** Modelo `.json` versionado con DFD nivel 0 y 1, alineado con el STRIDE
   de `specs/05-security/threat-model.md`.
 - [ ] **T4 — Manuales.** Arquitectura (consolida `specs/00-vision.md` y los ADR), despliegue y
@@ -174,15 +179,15 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
 
 | Fase | Tareas | Hechas |
 |---|---|---|
-| 1 — Documentación, UML e integración | T1 a T6 (6) | 1 (T1) |
+| 1 — Documentación, UML e integración | T1 a T6 (6) | 2 (T1 y T2) |
 | 2 — IaC de referencia | T7 a T10 (4) | 0 |
 | 3 — Grilla de roles configurable | T11 a T15 (5) | 0 |
 | 4 — Publicación y entrega | T16 a T21 (6) | 0 |
-| **Total** | **21** | **1** |
+| **Total** | **21** | **2** |
 
 ## Siguiente paso
 
-T2 (diagramas UML como código).
+T3 (modelo de Threat Dragon con DFD nivel 0 y 1).
 
 ## Cambios de spec propuestos
 
