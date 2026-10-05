@@ -23,10 +23,25 @@ type fakeWriter struct {
 	roles      []string
 	grantedBy  []uuid.UUID
 	roleErr    error
+	validRoles map[string]bool
 	tokens     int
 	audits     int
 	auditActor *uuid.UUID
 	auditAct   string
+}
+
+func (w *fakeWriter) ValidateRoleNames(_ context.Context, names []string) ([]string, error) {
+	valid := w.validRoles
+	if valid == nil {
+		valid = map[string]bool{"admin": true, "user": true, "contabilidad.senior": true, "contabilidad.analista": true}
+	}
+	found := make([]string, 0, len(names))
+	for _, name := range names {
+		if valid[name] {
+			found = append(found, name)
+		}
+	}
+	return found, nil
 }
 
 func (r *fakeRepository) WithinEmployeeCreationTransaction(_ context.Context, fn func(store.EmployeeCreationWriter) error) error {

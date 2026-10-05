@@ -449,8 +449,8 @@ export interface components {
         };
         /** @enum {string} */
         UserStatus: "pending_verification" | "active" | "locked" | "disabled";
-        /** @enum {string} */
-        Role: "admin" | "user" | "contabilidad.senior" | "contabilidad.analista";
+        /** @description Rol de directorio (`admin` o `user`) o rol configurable `<aplicacion>.<nombre>`. */
+        Role: string;
         User: {
             /** Format: uuid */
             id: string;

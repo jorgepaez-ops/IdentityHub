@@ -722,7 +722,11 @@ components:
 
     Role:
       type: string
-      enum: [admin, user, contabilidad.senior, contabilidad.analista]
+      minLength: 3
+      maxLength: 127
+      pattern: '^(admin|user|[a-z][a-z0-9_-]{0,62}\.[a-z][a-z0-9_-]{0,62})$'
+      description: Rol de directorio (`admin` o `user`) o rol configurable `<aplicacion>.<nombre>`.
+      "x-requirement": RF-021
 
     User:
       type: object

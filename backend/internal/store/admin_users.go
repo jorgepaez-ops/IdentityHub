@@ -72,6 +72,14 @@ func (s *Store) WithinUserManagementTransaction(ctx context.Context, fn func(adm
 
 type adminWriter struct{ queries *generated.Queries }
 
+func (w *adminWriter) ValidateRoleNames(ctx context.Context, names []string) ([]string, error) {
+	roles, err := w.queries.ValidateRoleNames(ctx, names)
+	if err != nil {
+		return nil, fmt.Errorf("validate role names: %w", err)
+	}
+	return roles, nil
+}
+
 func (w *adminWriter) LockActiveAdmins(ctx context.Context) (int64, error) {
 	ids, err := w.queries.LockActiveAdminUsers(ctx)
 	if err != nil {
@@ -116,8 +124,12 @@ func (w *adminWriter) ReplaceRoles(ctx context.Context, id uuid.UUID, roles []st
 		return fmt.Errorf("delete user roles: %w", err)
 	}
 	for _, role := range roles {
-		if err := w.queries.AddUserRole(ctx, generated.AddUserRoleParams{UserID: id, Name: role, GrantedBy: pgtype.UUID{Bytes: grantedBy, Valid: true}}); err != nil {
+		rows, err := w.queries.AddUserRole(ctx, generated.AddUserRoleParams{UserID: id, Name: role, GrantedBy: pgtype.UUID{Bytes: grantedBy, Valid: true}})
+		if err != nil {
 			return fmt.Errorf("add user role: %w", err)
+		}
+		if rows != 1 {
+			return fmt.Errorf("add user role: role %q is missing", role)
 		}
 	}
 	return nil

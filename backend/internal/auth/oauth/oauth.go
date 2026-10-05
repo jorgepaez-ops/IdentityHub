@@ -47,8 +47,9 @@ type AuthorizeResult struct {
 	ExpiresAt time.Time
 }
 type ExchangeResult struct {
-	UserID uuid.UUID
-	Roles  []string
+	UserID      uuid.UUID
+	Roles       []string
+	Permissions []string
 }
 type CreateCode struct {
 	ID, UserID            uuid.UUID
@@ -77,6 +78,7 @@ type Repository interface {
 type ExchangeWriter interface {
 	ExchangeAuthorizationCode(context.Context, []byte, string, string, string, time.Time) (StoredCode, error)
 	ListRolesForUser(context.Context, uuid.UUID) ([]string, error)
+	ListPermissionKeysForRolesAndApplication(context.Context, []string, string) ([]string, error)
 	InsertAuditEvent(context.Context, AuditEvent) error
 }
 type HubSessionReader interface {
@@ -156,7 +158,12 @@ func (s *Service) Exchange(ctx context.Context, input ExchangeInput) (ExchangeRe
 		if auditErr := writer.InsertAuditEvent(ctx, AuditEvent{ActorUserID: code.UserID, Action: "authorization_code_exchanged"}); auditErr != nil {
 			return fmt.Errorf("audit authorization code exchange: %w", auditErr)
 		}
-		result = ExchangeResult{UserID: code.UserID, Roles: roles.ForApplication(userRoles, s.client.ID)}
+		applicationRoles := roles.ForApplication(userRoles, s.client.ID)
+		permissions, permissionsErr := writer.ListPermissionKeysForRolesAndApplication(ctx, applicationRoles, s.client.ID)
+		if permissionsErr != nil {
+			return fmt.Errorf("list application permissions: %w", permissionsErr)
+		}
+		result = ExchangeResult{UserID: code.UserID, Roles: applicationRoles, Permissions: permissions}
 		return nil
 	})
 	if err != nil {

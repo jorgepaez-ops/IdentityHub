@@ -14,9 +14,10 @@ import (
 )
 
 type repositoryStub struct {
-	users  map[uuid.UUID]User
-	roles  map[uuid.UUID][]string
-	audits []AuditEvent
+	users      map[uuid.UUID]User
+	roles      map[uuid.UUID][]string
+	audits     []AuditEvent
+	validRoles map[string]bool
 }
 
 func (r *repositoryStub) ListUsers(context.Context, ListInput) ([]User, error) { return nil, nil }
@@ -44,6 +45,19 @@ func (r *repositoryStub) GetUserForUpdate(ctx context.Context, id uuid.UUID) (Us
 }
 func (r *repositoryStub) ListRolesForUser(_ context.Context, id uuid.UUID) ([]string, error) {
 	return append([]string(nil), r.roles[id]...), nil
+}
+func (r *repositoryStub) ValidateRoleNames(_ context.Context, names []string) ([]string, error) {
+	valid := r.validRoles
+	if valid == nil {
+		valid = map[string]bool{"admin": true, "user": true, "contabilidad.senior": true, "contabilidad.analista": true}
+	}
+	found := make([]string, 0, len(names))
+	for _, name := range names {
+		if valid[name] {
+			found = append(found, name)
+		}
+	}
+	return found, nil
 }
 func (r *repositoryStub) UpdateUser(_ context.Context, id uuid.UUID, status Status) (User, error) {
 	u := r.users[id]

@@ -1,6 +1,6 @@
 import { FormEvent, KeyboardEvent, useEffect, useId, useRef, useState } from 'react'
 import { type AdminUser, type Role, type UserStatus, createUser, updateUser } from '../../api/client'
-import { ROLES, ROLE_CATALOG, Problems, STATUS_LABEL, adminProblems, isAuthFailure } from './shared'
+import { ROLES, Problems, STATUS_LABEL, adminProblems, isAuthFailure, roleDescription } from './shared'
 
 export type DrawerTarget = { mode: 'create' } | { mode: 'edit'; user: AdminUser }
 
@@ -138,7 +138,7 @@ export function UserDrawer({ target, currentUserId, onClose, onSaved, onSessionE
                 <div className="role-option" key={role}>
                   <input id={`role-${role}`} type="checkbox" value={role} checked={roles.includes(role)} disabled={locked} aria-describedby={`role-${role}-help`} onChange={() => toggleRole(role)} />
                   <label htmlFor={`role-${role}`}>{role}</label>
-                  <p className="hint" id={`role-${role}-help`}>{ROLE_CATALOG[role]}</p>
+                  <p className="hint" id={`role-${role}-help`}>{roleDescription(role)}</p>
                 </div>
               )
             })}

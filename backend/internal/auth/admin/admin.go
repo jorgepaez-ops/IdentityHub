@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jorgepaez/identity-hub/internal/auth/roles"
 )
 
 var (
@@ -69,6 +68,7 @@ type Writer interface {
 	LockActiveAdmins(context.Context) (int64, error)
 	GetUserForUpdate(context.Context, uuid.UUID) (User, error)
 	ListRolesForUser(context.Context, uuid.UUID) ([]string, error)
+	ValidateRoleNames(context.Context, []string) ([]string, error)
 	UpdateUser(context.Context, uuid.UUID, Status) (User, error)
 	ReplaceRoles(context.Context, uuid.UUID, []string, uuid.UUID) error
 	InsertAuditEvent(context.Context, AuditEvent) error
@@ -143,22 +143,27 @@ func (s *Service) UpdateUser(ctx context.Context, input UpdateInput) (User, erro
 	if input.Status != nil && !validStatus(*input.Status) {
 		return User{}, ErrInvalidStatus
 	}
-	if input.Roles != nil && !validRoles(*input.Roles) {
-		return User{}, ErrInvalidRole
-	}
-	// D8 / RF-009: user is the base role of every account. Roles is a full
-	// replacement of the target's role set (not an additive patch), so a
-	// request that omits it would silently strip it; reject that statically,
-	// like ErrInvalidRole, before touching the repository.
-	if input.Roles != nil && !hasRole(*input.Roles, "user") {
-		return User{}, ErrBaseRoleRequired
-	}
 	if input.Status != nil && *input.Status == StatusDisabled && input.ActorUserID == input.UserID {
 		return User{}, ErrSelfDisable
 	}
 
 	var result User
 	err := s.repository.WithinUserManagementTransaction(ctx, func(writer Writer) error {
+		if input.Roles != nil {
+			requested := deduplicate(*input.Roles)
+			found, validateErr := writer.ValidateRoleNames(ctx, requested)
+			if validateErr != nil {
+				return fmt.Errorf("validate requested roles: %w", validateErr)
+			}
+			if len(found) != len(requested) {
+				return ErrInvalidRole
+			}
+			// Roles is a full replacement, so user must remain present after
+			// the database has established that every requested role exists.
+			if !hasRole(requested, "user") {
+				return ErrBaseRoleRequired
+			}
+		}
 		activeAdmins, err := writer.LockActiveAdmins(ctx)
 		if err != nil {
 			return fmt.Errorf("lock active admins: %w", err)
@@ -214,14 +219,6 @@ func (s *Service) UpdateUser(ctx context.Context, input UpdateInput) (User, erro
 
 func validStatus(status Status) bool {
 	return status == StatusPendingVerification || status == StatusActive || status == StatusLocked || status == StatusDisabled
-}
-func validRoles(candidates []string) bool {
-	for _, role := range candidates {
-		if !roles.Valid(role) {
-			return false
-		}
-	}
-	return true
 }
 func hasRole(roles []string, role string) bool {
 	for _, value := range roles {

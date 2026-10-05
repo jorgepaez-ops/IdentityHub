@@ -196,6 +196,13 @@ type MfaChallenge struct {
 	CreatedAt    pgtype.Timestamptz
 }
 
+type Permission struct {
+	ID            uuid.UUID
+	ApplicationID uuid.UUID
+	Key           string
+	Description   string
+}
+
 type RecoveryCode struct {
 	ID        uuid.UUID
 	UserID    uuid.UUID
@@ -222,6 +229,15 @@ type Role struct {
 	ID          uuid.UUID
 	Name        string
 	Description string
+	// NULL identifies a directory role. T12b validates application role names in Go.
+	ApplicationID pgtype.UUID
+	// System directory roles are protected by Go validation and a database trigger.
+	System bool
+}
+
+type RolePermission struct {
+	RoleID       uuid.UUID
+	PermissionID uuid.UUID
 }
 
 type User struct {

@@ -35,7 +35,7 @@ func (q *Queries) AddBootstrapUserRole(ctx context.Context, arg AddBootstrapUser
 	return result.RowsAffected(), nil
 }
 
-const addUserRole = `-- name: AddUserRole :exec
+const addUserRole = `-- name: AddUserRole :execrows
 INSERT INTO user_roles (user_id, role_id, granted_by)
 SELECT $1, id, $3
 FROM roles
@@ -48,9 +48,12 @@ type AddUserRoleParams struct {
 	GrantedBy pgtype.UUID
 }
 
-func (q *Queries) AddUserRole(ctx context.Context, arg AddUserRoleParams) error {
-	_, err := q.db.Exec(ctx, addUserRole, arg.UserID, arg.Name, arg.GrantedBy)
-	return err
+func (q *Queries) AddUserRole(ctx context.Context, arg AddUserRoleParams) (int64, error) {
+	result, err := q.db.Exec(ctx, addUserRole, arg.UserID, arg.Name, arg.GrantedBy)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const consumeInvitationToken = `-- name: ConsumeInvitationToken :one

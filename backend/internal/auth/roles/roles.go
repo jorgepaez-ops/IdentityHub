@@ -1,7 +1,5 @@
-// Package roles is the single source of truth for the role catalog fixed by
-// D8 (odd/tasks/idp-semana-3.md) and RF-009: directory roles govern the
-// Identity Hub itself, application roles govern one client application and
-// share its "<application>." name prefix.
+// Package roles contains the fixed directory-role helpers. Application roles
+// are data owned by the database (RF-009/RF-021), not a static Go catalog.
 package roles
 
 import "strings"
@@ -12,29 +10,6 @@ const (
 	Admin = "admin"
 	User  = "user"
 )
-
-// Contabilidad application roles (D8). ApplicationContabilidad is the shared
-// name prefix before the dot.
-const (
-	ApplicationContabilidad = "contabilidad"
-
-	ContabilidadSenior   = ApplicationContabilidad + ".senior"
-	ContabilidadAnalista = ApplicationContabilidad + ".analista"
-)
-
-// Catalog lists every role name the system recognizes. A role outside this
-// list is rejected wherever roles are validated or assigned (admin.validRoles).
-var Catalog = []string{Admin, User, ContabilidadSenior, ContabilidadAnalista}
-
-// Valid reports whether role belongs to Catalog.
-func Valid(role string) bool {
-	for _, candidate := range Catalog {
-		if candidate == role {
-			return true
-		}
-	}
-	return false
-}
 
 // IsDirectory reports whether role is a Hub directory role (admin/user): the
 // roles with no "<application>." prefix, valid for every account (D8, RF-009).

@@ -45,14 +45,6 @@ const (
 	Ready    ReadinessStatusStatus = "ready"
 )
 
-// Defines values for Role.
-const (
-	RoleAdmin                Role = "admin"
-	RoleContabilidadAnalista Role = "contabilidad.analista"
-	RoleContabilidadSenior   Role = "contabilidad.senior"
-	RoleUser                 Role = "user"
-)
-
 // Defines values for TokenPairTokenType.
 const (
 	TokenPairTokenTypeBearer TokenPairTokenType = "Bearer"
@@ -227,8 +219,8 @@ type ReadinessStatusChecksStatus string
 // ReadinessStatusStatus defines model for ReadinessStatus.Status.
 type ReadinessStatusStatus string
 
-// Role defines model for Role.
-type Role string
+// Role Rol de directorio (`admin` o `user`) o rol configurable `<aplicacion>.<nombre>`.
+type Role = string
 
 // Session defines model for Session.
 type Session struct {

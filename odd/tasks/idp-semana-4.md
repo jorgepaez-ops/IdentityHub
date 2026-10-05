@@ -322,6 +322,23 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
 - [ ] **T12 — Backend.** Migraciones (permisos y roles editables), store, API de roles y permisos,
   auditoría, controles (solo `admin`, sin autoasignación, sin permisos desconocidos) y token con los
   permisos de la aplicación.
+  T12a — Ruta: delegada (Codex), revisión de Claude. Evidencia (2026-10-05): RED observado con
+  `GOCACHE=/private/tmp/identity-hub-gocache go test ./internal/auth/token -run
+  'TestRF020_Token(ParaAplicacionTieneAudienciaYRolesAcotados|DelHubOmitePermisos)'`: la nueva
+  firma y `Claims.Permissions` aún no existían. GREEN: pruebas focalizadas de token, OAuth, admin,
+  employee, roles y API pasan; `go vet -tags=integration ./...` compila las pruebas de PostgreSQL.
+  Corrección de revisión: RED confirmó que un token de aplicación sin permisos omitía el claim;
+  GREEN conserva la omisión en tokens Hub e incluye `permissions: []` para la audiencia de aplicación.
+  T12a — Revisión de Claude: build, vet (también `-tags=integration`), unitarias con `-race` y
+  golangci-lint (0) en verde; frontend typecheck, lint y 148/148. La integración local se había
+  «aprobado» sin base (`TEST_DATABASE_URL` vacío, pruebas omitidas, cobertura 56,9 %); con un
+  Postgres desechable igual al de CI pasa entera con cobertura 78,9 % (`main`: 77,6 %). Bug
+  encontrado y corregido: el trigger de roles del sistema devolvía `OLD` también en `UPDATE`, lo
+  que en PostgreSQL descarta el cambio en silencio, así que ningún rol de aplicación habría sido
+  editable en T12b; además permitía crear roles `system = true` o promover uno. RED
+  (`TestRF021_TriggerSoloProtegeRolesDelSistema`: el UPDATE no persistía) y GREEN tras devolver
+  `NEW` y cubrir `INSERT`. `mfa_test.go` (fuera de las superficies) solo cambió una constante
+  eliminada por un literal, sin tocar aserciones.
 - [ ] **T13 — Consola del Hub.** Grilla roles × permisos por aplicación: crear, editar y borrar
   roles, y asignarlos a usuarios.
 - [ ] **T14 — Contabilidad.** Autoriza por permisos en lugar de por nombre de rol.
