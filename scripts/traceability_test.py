@@ -103,5 +103,41 @@ class GherkinParserTests(unittest.TestCase):
         self.assertEqual(scenarios[0].requirement, "RF-101")
 
 
+class DeferredRequirementTests(unittest.TestCase):
+    def test_rf018_and_rf019_are_rendered_as_deferred_to_week_4(self) -> None:
+        expected = "Backlog de semana 4 por decisión Q14."
+        self.assertEqual(traceability.DEFERRED["RF-018"], expected)
+        self.assertEqual(traceability.DEFERRED["RF-019"], expected)
+
+        requirements = {
+            "RF-018": ("Claves de servicio", "P2"),
+            "RF-019": ("Exportación del audit log", "P2"),
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            previous_root = traceability.ROOT
+            previous_requirements = traceability.load_requirements
+            previous_operations = traceability.load_operations
+            previous_scenarios = traceability.load_scenarios
+            previous_e2e_titles = traceability.load_e2e_test_titles
+            self.addCleanup(setattr, traceability, "ROOT", previous_root)
+            self.addCleanup(setattr, traceability, "load_requirements", previous_requirements)
+            self.addCleanup(setattr, traceability, "load_operations", previous_operations)
+            self.addCleanup(setattr, traceability, "load_scenarios", previous_scenarios)
+            self.addCleanup(setattr, traceability, "load_e2e_test_titles", previous_e2e_titles)
+            traceability.ROOT = root
+            traceability.load_requirements = lambda: requirements
+            traceability.load_operations = lambda: {}
+            traceability.load_scenarios = lambda scenarios: {}
+            traceability.load_e2e_test_titles = lambda: {}
+
+            rendered = traceability.render([])
+
+        self.assertIn("| **RF-018** | Claves de servicio | P2 | — | — | — | — | ⏳ diferido (semana 4) |", rendered)
+        self.assertIn("| **RF-019** | Exportación del audit log | P2 | — | — | — | — | ⏳ diferido (semana 4) |", rendered)
+        self.assertIn("**Resumen:** 2 requisitos · 0 completos · 0 parciales · 0 sin cubrir · 2 diferidos (semana 4).", rendered)
+        self.assertIn("*diferido (semana 4)* = backlog de semana 4 por decisión Q14.", rendered)
+
+
 if __name__ == "__main__":
     unittest.main()

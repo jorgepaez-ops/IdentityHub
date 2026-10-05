@@ -27,8 +27,8 @@ declaración de buenas intenciones.
 | **RF-015** | Restablecimiento de contraseña | P1 | `requestPasswordReset`, `confirmPasswordReset` | 3 | 33 | 3 | ✅ completo |
 | **RF-016** | Sesiones activas | P1 | `listSessions`, `revokeSession` | 1 | 8 | 1 | ✅ completo |
 | **RF-017** | Bloqueo por fuerza bruta | P1 | — | 4 | 23 | 1 | ✅ completo |
-| **RF-018** | Claves de servicio | P2 | — | — | — | — | ⏳ diferido (semana 3) |
-| **RF-019** | Exportación del audit log | P2 | — | — | — | — | ⏳ diferido (semana 3) |
+| **RF-018** | Claves de servicio | P2 | — | — | — | — | ⏳ diferido (semana 4) |
+| **RF-019** | Exportación del audit log | P2 | — | — | — | — | ⏳ diferido (semana 4) |
 | **RF-020** | Autorización de aplicaciones cliente | P1 | `authorizeClient`, `exchangeAuthorizationCode` | 10 | 24 | 8 | ✅ completo |
 | **RNF-001** | Contenerización total | P0 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-002** | Pipeline de ciclo completo | P0 | — | — | — | — | 🔴 sin cubrir |
@@ -43,10 +43,10 @@ declaración de buenas intenciones.
 | **RNF-011** | Los specs son la fuente de verdad | P0 | — | — | 5 | — | 🟡 parcial |
 | **RNF-012** | Logs sin datos sensibles | P0 | — | — | 5 | — | 🟡 parcial |
 
-**Resumen:** 32 requisitos · 17 completos · 7 parciales · 6 sin cubrir · 2 diferidos (semana 3).
+**Resumen:** 32 requisitos · 17 completos · 7 parciales · 6 sin cubrir · 2 diferidos (semana 4).
 
 Leyenda de estado: *completo* = verificado por al menos dos de las tres
-columnas de prueba · *parcial* = una sola · *sin cubrir* = ninguna · *diferido (semana 3)* = backlog de semana 3 por decisión Q14.
+columnas de prueba · *parcial* = una sola · *sin cubrir* = ninguna · *diferido (semana 4)* = backlog de semana 4 por decisión Q14.
 
 ## Escenarios de aceptación por requisito
 

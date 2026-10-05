@@ -32,8 +32,8 @@ E2E_TEST = re.compile(r"\btest\(\s*'((?:RNF|RF)-\d{3}[^']*)'\s*,")
 # Requisitos pendientes de implementación. T3 define sus contratos, pero la matriz los
 # mantiene diferidos hasta que sus tareas de backend/frontend queden cerradas.
 DEFERRED = {
-    "RF-018": "Backlog de semana 3 por decisión Q14.",
-    "RF-019": "Backlog de semana 3 por decisión Q14.",
+    "RF-018": "Backlog de semana 4 por decisión Q14.",
+    "RF-019": "Backlog de semana 4 por decisión Q14.",
 }
 
 
@@ -241,7 +241,7 @@ def render(gherkin: list[Scenario]) -> str:
         e = str(len(e2e_by_req.get(rid, []))) if e2e_by_req.get(rid) else "—"
         covered = sum(x != "—" for x in (s, g, e))
         if rid in DEFERRED:
-            state = "⏳ diferido (semana 3)"
+            state = "⏳ diferido (semana 4)"
             counts["diferido"] += 1
         else:
             state = "✅ completo" if covered >= 2 else ("🟡 parcial" if covered == 1 else "🔴 sin cubrir")
@@ -253,11 +253,11 @@ def render(gherkin: list[Scenario]) -> str:
         "",
         f"**Resumen:** {total} requisitos · "
         f"{counts['completo']} completos · {counts['parcial']} parciales · "
-        f"{counts['sin cubrir']} sin cubrir · {counts['diferido']} diferidos (semana 3).",
+        f"{counts['sin cubrir']} sin cubrir · {counts['diferido']} diferidos (semana 4).",
         "",
         "Leyenda de estado: *completo* = verificado por al menos dos de las tres",
         "columnas de prueba · *parcial* = una sola · *sin cubrir* = ninguna · "
-        "*diferido (semana 3)* = backlog de semana 3 por decisión Q14.",
+        "*diferido (semana 4)* = backlog de semana 4 por decisión Q14.",
         "",
         "## Escenarios de aceptación por requisito",
         "",

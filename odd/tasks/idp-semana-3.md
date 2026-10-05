@@ -1257,10 +1257,22 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
   `stack-up` en E2E, integración y DAST.
 
 ### T17 — Revisión de fase, trazabilidad, bitácora e informe
-- [ ] Estado · Ejecutor: `Claude (revisión)`
+- [x] Estado · Ejecutor: `Claude (revisión)`
 - Matriz de trazabilidad, entrada en `docs/BITACORA.md`, guion de la demo en `docs/`, informe de
   seguridad (tercera versión si hay hallazgos de ZAP).
-- Commit: —
+- Ruta: delegada (Codex, un escritor; 2+ archivos no triviales), revisión de Claude.
+- [x] T17a — Matriz: `scripts/traceability.py` marca RF-018/RF-019 como "diferido (semana 3)",
+  pero el alcance los movió a la semana 4. Corregir la etiqueta (y su prueba), regenerar
+  `specs/07-traceability.md`; `--check` y `traceability_test.py` en verde.
+- [x] T17b — Entrada de la semana 3 en `docs/BITACORA.md`, con el mismo formato que la semana 2.
+- [x] T17c — `docs/guion-demo.md` contrastado con los criterios de aceptación 1 y 2.
+- [x] T17d — `docs/security-report.html` versión 3: VULN-030 y VULN-031 (hallazgos de ZAP y
+  del login), gates nuevos (DAST y E2E) y run verde 37065094942 como "después".
+- Evidencia (2026-10-05): Codex escribió T17a a T17d; revisión de Claude contra fichas, evidencia
+  y `gh run view` (37065094942: 15/15 en verde), con una corrección en la bitácora (estado de
+  fase contradictorio). `traceability.py --check` al día, `traceability_test.py` 4/4,
+  `zap_gate_test.py` 11/11.
+- Commit: ver `docs(phase-3)` de esta tarea
 
 ---
 
@@ -1271,8 +1283,8 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 | 0 — Enmiendas de spec y decisiones | T1 a T3 (3) | 3 (T1 a T3) |
 | 1 — Backend | T4 a T10 (7) | 7 (T4 a T10) |
 | 2 — Dominios locales y frontend | T11 a T13 + T12d (4) | 4 (T11 a T13 y T12d) — fase cerrada |
-| 3 — Verificación, DAST y cierre | T14 a T17 (4) | 3 (T14 a T16) |
-| **Total** | **18** | **17** |
+| 3 — Verificación, DAST y cierre | T14 a T17 (4) | 4 (T14 a T17) — fase cerrada |
+| **Total** | **18** | **18** |
 
 ## Siguiente paso
 

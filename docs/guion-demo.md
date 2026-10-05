@@ -12,6 +12,7 @@ Contabilidad y vistas según el rol. Dura unos 5 minutos.
   - Contabilidad: <http://contabilidad.localhost:8080>
   - Mailpit (buzón de la demo): <http://localhost:8025>
 - Una ventana privada para el empleado, para que no comparta sesión con el admin.
+- La demo se comprueba en Chrome y Firefox: ambos dominios deben responder sin tocar `/etc/hosts` ni instalar certificados. Contabilidad no puede leer la sesión del Hub; recibe el token solo por el flujo de autorización. Safari queda pendiente de BUG-1 y BUG-2 con `safaridriver`.
 - Plan B si Mailpit web falla: leer el correo con `curl http://localhost:8025/api/v1/messages`.
 
 ## Guion
