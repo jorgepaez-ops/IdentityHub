@@ -1,6 +1,7 @@
 # Secretos y entorno local
 .env
 .env.local
+*.local.md
 *.pem
 *.key
 !specs/**/*.key.example
