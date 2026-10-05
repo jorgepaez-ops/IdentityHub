@@ -1243,7 +1243,18 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
   con forma de AWS → `Detect hardcoded secrets ... Failed` (`aws-access-token` y
   `generic-api-key`), HEAD sin cambios; el archivo se sacó del stage y se borró. Nota: el hook
   rechaza el commit si `.pre-commit-config.yaml` tiene cambios sin stage.
-- Commit: ver el commit `chore(hooks)` de esta tarea
+- Commit: `9d6ea30`
+- Revisión nativa (2026-10-05): el candidato de la rama completa (52 archivos, 3702 líneas)
+  excedió el presupuesto (`lens_context_budget_exceeded`); se dividió en dos, con decisión del
+  usuario. (1) `c2effc5..12a31c4` (alto, 1 archivo, 7 líneas, 4 lentes, en un worktree aparte
+  porque Gentle AI solo revisa rangos que terminan en HEAD): **aprobada** y acusada
+  (`review-fcafcf9828762fae`), 6 observaciones informativas sobre
+  `scripts/ip-lockout-warning.sh`; las dos WARNING (aborto por `pipefail`/`errexit`) no aplican
+  porque el script solo usa `set -u`. (2) `12a31c4..9d6ea30` (medio, 9 archivos, 82 líneas, 1
+  lente): **aprobada** y acusada (`review-20058b6264096ad3`), 2 sugerencias informativas (esta
+  referencia de commit, ya corregida, y la paridad de versión de gitleaks documentada en la guía).
+- CI: run 37334970578 sobre `3d5987c`, 15/15 jobs en verde; verifica la acción compuesta
+  `stack-up` en E2E, integración y DAST.
 
 ### T17 — Revisión de fase, trazabilidad, bitácora e informe
 - [ ] Estado · Ejecutor: `Claude (revisión)`
