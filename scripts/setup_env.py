@@ -13,7 +13,6 @@ import base64
 import os
 import pathlib
 import secrets
-import sys
 
 PASSWORD_KEYS = (
     "POSTGRES_PASSWORD",
@@ -25,8 +24,9 @@ JWT_KEY = "JWT_SIGNING_KEY"
 SECRET_KEYS = (*PASSWORD_KEYS, JWT_KEY)
 # Non-secret values the template leaves empty but deploy/docker-compose.yml requires (":?").
 # Same value as the CI stack (.github/actions/stack-up): the compose network, where Nginx
-# reaches the API from.
-CONFIG_DEFAULTS = {"TRUSTED_PROXIES": "172.28.0.0/16"}  # NOSONAR: red Docker de deploy/docker-compose.yml, no un host real
+# reaches the API from. It is the Docker network of deploy/docker-compose.yml, not a host
+# address, hence the Sonar suppression (S1313).
+CONFIG_DEFAULTS = {"TRUSTED_PROXIES": "172.28.0.0/16"}  # NOSONAR
 
 
 def new_secret(key: str) -> str:
@@ -92,7 +92,8 @@ def inside_root(raw: str, root: pathlib.Path, option: str) -> pathlib.Path:
     return path
 
 
-def main(argv: list[str] | None = None, *, root: pathlib.Path | None = None) -> int:
+def main(argv: list[str] | None = None, *, root: pathlib.Path | None = None) -> None:
+    # Los errores salen con SystemExit (código distinto de 0); terminar sin excepción es éxito.
     # root solo se cambia desde las pruebas; por defecto es la raiz del repositorio.
     root = (root or pathlib.Path(__file__).resolve().parent.parent).resolve()
     parser = argparse.ArgumentParser(description=__doc__)
@@ -109,7 +110,7 @@ def main(argv: list[str] | None = None, *, root: pathlib.Path | None = None) -> 
             " Postgres y RabbitMQ conservan las contraseñas de sus volúmenes: tras --force hay que"
             " borrar los volúmenes (make clean, borra los datos) o el stack no podrá autenticarse."
         )
-        return 0
+        return
 
     lines = template.read_text(encoding="utf-8").splitlines()
     check_template(lines)
@@ -119,8 +120,7 @@ def main(argv: list[str] | None = None, *, root: pathlib.Path | None = None) -> 
     print(f"{output} generado (modo 0600) con secretos aleatorios para:")
     for key in SECRET_KEYS:
         print(f"  - {key}")
-    return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

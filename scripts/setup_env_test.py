@@ -63,12 +63,12 @@ class SetupEnvTests(unittest.TestCase):
         self.output = self.root / ".env"
         self.template.write_text(FIXTURE)
 
-    def run_setup(self, *extra: str, template: pathlib.Path | None = None) -> int:
+    def run_setup(self, *extra: str, template: pathlib.Path | None = None) -> None:
         argv = ["--template", str(template or self.template), "--output", str(self.output), *extra]
         return setup_env.main(argv, root=self.root)
 
     def test_secrets_are_filled(self) -> None:
-        self.assertEqual(self.run_setup(), 0)
+        self.run_setup()
         out = parse(self.output)
         for key in ("POSTGRES_PASSWORD", "IDENTITY_APP_PASSWORD", "RABBITMQ_DEFAULT_PASS", "GRAFANA_ADMIN_PASSWORD"):
             self.assertRegex(out[key], r"^[0-9a-f]{48}$")
@@ -110,12 +110,12 @@ class SetupEnvTests(unittest.TestCase):
 
     def test_existing_output_not_overwritten_without_force(self) -> None:
         self.output.write_text("KEEP=me\n")
-        self.assertEqual(self.run_setup(), 0)
+        self.run_setup()
         self.assertEqual(self.output.read_text(), "KEEP=me\n")
 
     def test_force_overwrites(self) -> None:
         self.output.write_text("KEEP=me\n")
-        self.assertEqual(self.run_setup("--force"), 0)
+        self.run_setup("--force")
         self.assertIn("POSTGRES_PASSWORD=", self.output.read_text())
         self.assertNotIn("KEEP=me", self.output.read_text())
 
@@ -171,7 +171,7 @@ class SetupEnvTests(unittest.TestCase):
         previous = os.getcwd()
         os.chdir(elsewhere.name)
         self.addCleanup(os.chdir, previous)
-        self.assertEqual(setup_env.main(["--template", ".env.example", "--output", ".env"], root=self.root), 0)
+        setup_env.main(["--template", ".env.example", "--output", ".env"], root=self.root)
         self.assertTrue(self.output.exists())
 
     def test_dotdot_escaping_root_is_rejected(self) -> None:
