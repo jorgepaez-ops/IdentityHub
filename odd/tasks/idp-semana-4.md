@@ -118,6 +118,9 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
 - **Q4 · Stack Go:** el enunciado sugiere Python/Node; ¿hay validación escrita del profesor? Si la
   hay, queda en un ADR (T4).
 
+- **Q5 · RabbitMQ en la nube de referencia:** Amazon MQ para RabbitMQ no existe en LocalStack.
+  Se decide antes de T8.
+
 ## Fase 1 — Documentación, UML e integración
 
 - [x] **T1 — Mapa de la entrega.** Índice de documentación en `docs/README.md` con la tabla de
@@ -219,6 +222,21 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
 
 - [ ] **T7 — Investigación y diseño.** Arquitectura de referencia en AWS y qué valida LocalStack
   (Q2); ADR con la decisión.
+  Investigación (2026-10-05, fuentes primarias consultadas ese día, la mayoría sin fecha):
+  - Plan Student de LocalStack = cobertura de Ultimate (500 MB de Cloud Pods, soporte básico),
+    "mientras seas estudiante" (no figura "un año"; confirmar en la cuenta del usuario). Permite CI
+    (1.000 créditos mensuales). Token: `LOCALSTACK_AUTH_TOKEN`; desde marzo de 2026 la imagen
+    `latest` lo exige. Fuentes: docs.localstack.cloud/aws/licensing/,
+    localstack.cloud/localstack-for-students, blog.localstack.cloud (2025-10-28 y 2026-03-17).
+  - Ejecución real: ECS Fargate (contenedores en Docker local), RDS PostgreSQL 13-17, ALB
+    (forward/redirect/fixed-response). Emulados: S3, Secrets Manager, SSM, KMS, CloudWatch Logs,
+    IAM (con enforcement opcional), SES v1 (puede reenviar a un SMTP). Solo CRUD o mock: ACM, Route
+    53, WAFv2, security groups. ECR local con push de capas sin confirmar.
+  - **Amazon MQ para RabbitMQ no está soportado** (solo ActiveMQ). Decisión pendiente (Q5).
+  - Terraform: `tflocal` 0.26.0 o `lstk terraform` generan un override de endpoints (el `.tf` de
+    producción queda limpio). AWS provider v6.67.0 (2026-09-30).
+  - Checkov: `bridgecrewio/checkov-action` con `directory` y `framework`; escanea también
+    Dockerfiles y workflows. Versión a fijar al implementar (PyPI y GitHub no coinciden).
 - [ ] **T8 — Terraform.** Módulos en `infraestructura/` (o la carpeta que fije T1) para la
   arquitectura de referencia; `terraform validate`; `plan`/`apply` contra LocalStack donde se pueda.
 - [ ] **T9 — Producción simulada local.** `docker-compose.prod.yml` (imágenes por digest, sin
