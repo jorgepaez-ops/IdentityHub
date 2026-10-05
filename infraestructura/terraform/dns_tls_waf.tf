@@ -178,6 +178,19 @@ resource "aws_cloudwatch_log_group" "waf" {
 resource "aws_wafv2_web_acl_logging_configuration" "alb" {
   resource_arn            = aws_wafv2_web_acl.alb.arn
   log_destination_configs = [aws_cloudwatch_log_group.waf.arn]
+
+  # Los logs del WAF guardan las cabeceras completas: sin esto quedarían en CloudWatch los JWT
+  # (Authorization) y las cookies de sesión (hub_session, refresh_token) de cada petición.
+  redacted_fields {
+    single_header {
+      name = "authorization"
+    }
+  }
+  redacted_fields {
+    single_header {
+      name = "cookie"
+    }
+  }
 }
 
 # ── SES (solo produccion) ───────────────────────────────────────────────────

@@ -320,11 +320,18 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
 | 2 — IaC de referencia | T7 a T10 (4) | 4 (T7 a T10) — fase cerrada |
 | 3 — Grilla de roles configurable | T11 a T15 (5) | 0 |
 | 4 — Publicación y entrega | T16 a T21 (6) | 0 |
-| **Total** | **21** | **6** |
+| **Total** | **21** | **9** (T1 a T4, T6 a T10; T5 parcial) |
 
 ## Siguiente paso
 
-Fase 3: T11 (spec de la grilla de roles configurable). T5 queda abierta hasta T15 (permisos).
+Fase 3: T11 (spec de la grilla de roles configurable).
+
+Revisión nativa de T10 (`review-a4d738df486230e0`, alto, 235 líneas, 4 lentes): **aprobada**.
+Corregido de sus advertencias: el log del WAF ocultaba nada y guardaba `Authorization` y `Cookie`
+(ahora `redacted_fields`); el comentario de RDS decía que registra cambios de datos pero
+`log_statement = ddl` (se deja `ddl` a propósito y se corrige el comentario: `mod` registraría
+hashes de contraseñas y tokens); `depends_on` del rol de monitoreo; familia del parameter group
+derivada de la versión; zonas en una variable validada; total de la tabla de progreso. T5 queda abierta hasta T15 (permisos).
 
 ## Cambios de spec propuestos
 

@@ -4,6 +4,17 @@ variable "region" {
   default     = "us-east-1"
 }
 
+variable "availability_zone_names" {
+  description = "Zonas de disponibilidad (nombres de la cuenta en la region elegida)."
+  type        = list(string)
+  default     = ["us-east-1a", "us-east-1b"]
+
+  validation {
+    condition     = length(var.availability_zone_names) >= 2
+    error_message = "Se necesitan al menos dos zonas de disponibilidad."
+  }
+}
+
 variable "project" {
   description = "Nombre del proyecto, prefijo de los recursos."
   type        = string

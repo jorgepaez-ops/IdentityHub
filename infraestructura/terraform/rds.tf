@@ -8,7 +8,7 @@ resource "aws_db_subnet_group" "main" {
 resource "aws_db_instance" "main" {
   identifier     = "${var.project}-${var.environment}"
   engine         = "postgres"
-  engine_version = "16"
+  engine_version = local.db_major_version
   instance_class = var.db_instance_class
 
   allocated_storage = 20
@@ -46,12 +46,17 @@ resource "aws_db_instance" "main" {
   performance_insights_kms_key_id = aws_kms_key.main.arn
   monitoring_interval             = 60
   monitoring_role_arn             = aws_iam_role.rds_monitoring.arn
+
+  # El ARN del rol no obliga a esperar su política: sin esto el primer apply puede fallar.
+  depends_on = [aws_iam_role_policy_attachment.rds_monitoring]
 }
 
-# Registra las sentencias que modifican datos y las consultas lentas (> 1 s).
+# Registra los cambios de esquema (ddl) y las consultas lentas (> 1 s). No se usa "mod" a
+# propósito: registraría los valores de INSERT/UPDATE, entre ellos hashes de contraseñas y de
+# tokens. El rastro de los cambios de datos es el audit log de la aplicación (RF-011).
 resource "aws_db_parameter_group" "main" {
-  name   = "${var.project}-${var.environment}-postgres16"
-  family = "postgres16"
+  name   = "${var.project}-${var.environment}-postgres${local.db_major_version}"
+  family = "postgres${local.db_major_version}"
 
   parameter {
     name  = "log_statement"
@@ -88,4 +93,9 @@ resource "aws_iam_role" "rds_monitoring" {
 resource "aws_iam_role_policy_attachment" "rds_monitoring" {
   role       = aws_iam_role.rds_monitoring.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole"
+}
+
+locals {
+  # Una sola fuente para la versión del motor y la familia del parameter group.
+  db_major_version = "16"
 }
