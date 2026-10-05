@@ -339,6 +339,11 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   (`TestRF021_TriggerSoloProtegeRolesDelSistema`: el UPDATE no persistía) y GREEN tras devolver
   `NEW` y cubrir `INSERT`. `mfa_test.go` (fuera de las superficies) solo cambió una constante
   eliminada por un literal, sin tocar aserciones.
+  T12a — Revisión nativa (`review-35646284ed805e4a`, alto, 902 líneas, 4 lentes): **aprobada**.
+  Observaciones que pasan a T12b: probar el error de la consulta de permisos en el canje OAuth y
+  los errores del validador en alta de empleado y en admin; quitar la etiqueta engañosa
+  `permissions,omitempty` de `Claims`; corregir los comentarios de columnas de la migración 000009.
+  Y a T13: el cajón de usuario sigue listando roles fijos; debe cargarlos de la API.
 - [ ] **T13 — Consola del Hub.** Grilla roles × permisos por aplicación: crear, editar y borrar
   roles, y asignarlos a usuarios.
 - [ ] **T14 — Contabilidad.** Autoriza por permisos en lugar de por nombre de rol.
