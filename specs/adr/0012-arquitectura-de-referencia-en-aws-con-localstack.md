@@ -1,6 +1,6 @@
 # 0012 — Arquitectura de referencia en AWS, validada con LocalStack
 
-Estado: propuesta · 2026-10-05
+Estado: aceptada · 2026-10-05
 
 ## Contexto
 
