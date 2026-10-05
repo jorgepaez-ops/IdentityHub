@@ -114,6 +114,20 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   `terraform validate` y Checkov, y la configuración y el despliegue se muestran con un diagrama.
   La ADR 0012 queda enmendada.
 
+- **D9 · Diseño de la grilla de roles (2026-10-05, aprobado por el usuario):** cada aplicación
+  declara sus permisos (tabla `permissions` ligada a `applications`, sembrada por migración); los
+  roles de aplicación son datos editables (`roles.application_id`, `role_permissions`), con
+  nombre `<app>.<nombre>`; `contabilidad.senior` y `contabilidad.analista` pasan a filas con
+  permisos (`movimientos.ver_todos`, `movimientos.aprobar`, `cierre.ejecutar`, `reportes.ver`)
+  sin cambiar su comportamiento. El token de la aplicación lleva `permissions` resueltos además de
+  `roles`; Contabilidad decide por permisos. Grilla solo para `admin`. Controles: (1) solo se
+  crean roles de aplicación (`admin`/`user` son del sistema, no editables ni borrables); (2) un
+  admin no edita los permisos de un rol que él tiene; (3) un rol solo lleva permisos de su
+  aplicación, permiso desconocido = 400; (4) no se borra un rol asignado; (5) auditoría
+  `role_created`/`role_updated`/`role_deleted`. Un cambio de permisos rige desde el siguiente
+  token (≤ 15 min). RF-021 nuevo; RF-009 y RF-020 enmendados. Escena de demo:
+  `contabilidad.auditor` con `reportes.ver` y `movimientos.ver_todos`.
+
 ## Preguntas abiertas
 
 - **Q1 · Docker Hub:** cuenta y namespace, repositorios (`api`, `worker`, `web` y ¿`contabilidad`?),
@@ -326,7 +340,7 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
 
 ## Siguiente paso
 
-Fase 3: T11 (spec de la grilla de roles configurable).
+Fase 3: T11 (spec de la grilla de roles configurable), PR #10 mergeado en `a90d96a` (CI de `main` 16/16).
 
 CI del PR #10: falló Trivy config (job 8) sobre el Terraform y SonarCloud (seguridad 3). Corregido en
 `0c25846` con aprobación del usuario: logs de acceso del ALB en S3, `--only-binary` en la instalación
