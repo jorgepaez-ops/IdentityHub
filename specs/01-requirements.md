@@ -83,14 +83,19 @@ El titular consulta y actualiza su nombre para mostrar.
 
 ### RF-009 — Control de acceso por roles · P0
 Los roles de directorio y de aplicación gobiernan ámbitos distintos.
-- `admin` y `user` son roles de directorio; `user` es el rol base de toda cuenta.
-- `contabilidad.senior` y `contabilidad.analista` son roles exclusivos de Contabilidad.
-- Un token dirigido a una aplicación incluye únicamente los roles de esa aplicación en `roles`;
-  los privilegios se verifican **en el servidor**, nunca confiando en el cliente.
+- `admin` y `user` son roles de directorio fijos; `user` es el rol base de toda cuenta.
+- Los roles de aplicación son datos configurables con nombre `<aplicacion>.<nombre>`; solo pertenecen
+  a una aplicación y se asignan junto con el rol base.
+- Un token dirigido a una aplicación incluye únicamente sus roles de aplicación en `roles` y sus
+  permisos resueltos en `permissions`; los privilegios se verifican **en el servidor**, nunca
+  confiando en el cliente.
 - Un `user` que llama a un endpoint de administración recibe `403`.
 - **Aceptación:** las rutas `/admin/*` responden `200` a un admin y `403` a un user.
 
 > **Enmienda T3 · 2026-09-27 · D8:** se separan roles de directorio y roles de aplicación.
+
+> **Enmienda T11 · 2026-10-05 · D9/ADR 0013:** los roles de aplicación dejan de ser un catálogo
+> fijo; `admin` y `user` permanecen roles del sistema no editables.
 
 ### RF-010 — Administración de usuarios · P0
 Un admin lista, busca, habilita, deshabilita y asigna roles a cuentas.
@@ -210,8 +215,8 @@ Una aplicación cliente obtiene un access token mediante authorization code con 
 - Sin sesión SSO, `/oauth/authorize` redirige al login del Hub con un parámetro `continue` que solo
   admite rutas relativas que empiecen por `/oauth/authorize`; cualquier otro valor se ignora (sin
   redirección abierta).
-- El access token tiene `aud` igual al cliente y solo sus roles de aplicación; no se entrega
-  refresh token a la aplicación.
+- El access token tiene `aud` igual al cliente, solo sus roles de aplicación y los permisos
+  resueltos para esa audiencia; no se entrega refresh token a la aplicación.
 - CORS se permite únicamente en `/oauth/token` y `/.well-known/jwks.json`, sin credenciales y solo
   para el origen configurado del cliente.
 - **Aceptación:** el flujo correcto redirige con `code` y el mismo `state`; una segunda entrada usa
@@ -219,6 +224,27 @@ Una aplicación cliente obtiene un access token mediante authorization code con 
   o un `continue` absoluto o externo se rechazan; el JWT contiene solo los roles de Contabilidad.
 
 > **Enmienda T3 · 2026-09-27 · ADR 0009:** se añade el contrato mínimo de SSO entre dominios.
+
+> **Enmienda T11 · 2026-10-05 · D9/ADR 0013:** el token de Contabilidad incorpora `permissions`
+> resueltos para su audiencia además de `roles`; el cliente público único y sus valores fijos se
+> mantienen.
+
+### RF-021 — Roles y permisos configurables por aplicación · P1
+Cada aplicación declara sus permisos y un administrador configura los roles que podrán asignarse
+para esa aplicación.
+- Los permisos se registran por aplicación; un administrador crea, edita o elimina roles de
+  aplicación con el nombre `<aplicacion>.<nombre>` y solo puede marcar permisos de esa aplicación.
+- `admin` y `user` son roles de directorio del sistema: no se crean, editan ni eliminan desde la
+  grilla.
+- Un token emitido para una aplicación lleva los permisos resueltos de sus roles para esa audiencia
+  en el claim `permissions`. Un cambio rige al emitir el siguiente token, con una espera máxima de
+  15 minutos por la vigencia del access token.
+- **Aceptación:** (1) solo se crean roles de aplicación; (2) un administrador no edita los permisos
+  de un rol que posee; (3) un permiso desconocido o de otra aplicación devuelve `400`; (4) no se
+  elimina un rol asignado; (5) crear, actualizar y eliminar un rol deja auditoría.
+
+> **Decisión T11 · 2026-10-05 · D9/ADR 0013:** se define la grilla configurable y el alcance del
+> token por aplicación.
 
 ---
 

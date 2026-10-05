@@ -118,7 +118,9 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   declara sus permisos (tabla `permissions` ligada a `applications`, sembrada por migración); los
   roles de aplicación son datos editables (`roles.application_id`, `role_permissions`), con
   nombre `<app>.<nombre>`; `contabilidad.senior` y `contabilidad.analista` pasan a filas con
-  permisos (`movimientos.ver_todos`, `movimientos.aprobar`, `cierre.ejecutar`, `reportes.ver`)
+  permisos (`movimientos.ver_todos`, `movimientos.aprobar`, `cierre.ejecutar`, `reportes.ver` y,
+  por ajuste de la revisión de T11, `movimientos.registrar`: hoy registrar no depende de ningún
+  permiso y el auditor de la demo debe ser de solo lectura)
   sin cambiar su comportamiento. El token de la aplicación lleva `permissions` resueltos además de
   `roles`; Contabilidad decide por permisos. Grilla solo para `admin`. Controles: (1) solo se
   crean roles de aplicación (`admin`/`user` son del sistema, no editables ni borrables); (2) un
@@ -306,8 +308,17 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
 
 ## Fase 3 — Grilla de roles configurable
 
-- [ ] **T11 — Spec.** RF nuevo, ADR (modelo permisos por aplicación → roles → usuarios; qué viaja en
+- [x] **T11 — Spec.** RF nuevo, ADR (modelo permisos por aplicación → roles → usuarios; qué viaja en
   el token), escenarios Gherkin y enmienda del OpenAPI.
+  Evidencia (2026-10-05): ruta delegada a Codex; `RF-021`, ADR 0013 y los escenarios diferidos
+  documentan D9. La correspondencia Gherkin↔E2E exige pruebas que se crean en T15, por lo que los
+  escenarios quedan en la ADR y la matriz registra RF-021 como diferido.
+  Revisión de Claude: requisitos y ADR coherentes con D9 (rutas por aplicación, códigos
+  400/403/404/409, GRANT mínimos, auditoría, razonamiento de los controles 1 y 2); verificado en el
+  código que el analista ya ve el Resumen (por eso lleva `reportes.ver`). Corrección: «Registrar
+  movimiento» no dependía de ningún permiso, así que el auditor «de solo lectura» habría podido
+  registrar; se agrega `movimientos.registrar` (senior y analista) y se ajusta el escenario.
+  `traceability.py --check` y `traceability_test.py` en verde.
 - [ ] **T12 — Backend.** Migraciones (permisos y roles editables), store, API de roles y permisos,
   auditoría, controles (solo `admin`, sin autoasignación, sin permisos desconocidos) y token con los
   permisos de la aplicación.
@@ -361,7 +372,9 @@ derivada de la versión; zonas en una variable validada; total de la tabla de pr
 
 ## Cambios de spec propuestos
 
-Ninguno todavía (la fase 3 los define en T11).
+La definición aprobada está en `specs/01-requirements.md` (RF-021) y
+`specs/adr/0013-roles-y-permisos-configurables-por-aplicacion.md`; los fragmentos para actualizar
+OpenAPI en T12 están en la sección «Cambios de OpenAPI propuestos» de esa ADR.
 
 ## Notas de handoff Codex
 

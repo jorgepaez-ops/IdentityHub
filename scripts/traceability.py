@@ -34,6 +34,7 @@ E2E_TEST = re.compile(r"\btest\(\s*'((?:RNF|RF)-\d{3}[^']*)'\s*,")
 DEFERRED = {
     "RF-018": "Backlog de semana 4 por decisión Q14.",
     "RF-019": "Backlog de semana 4 por decisión Q14.",
+    "RF-021": "Contrato de la grilla definido en T11; implementación y E2E pendientes en T12 a T15.",
 }
 
 

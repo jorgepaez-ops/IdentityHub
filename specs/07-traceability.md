@@ -30,6 +30,7 @@ declaración de buenas intenciones.
 | **RF-018** | Claves de servicio | P2 | — | — | — | — | ⏳ diferido (semana 4) |
 | **RF-019** | Exportación del audit log | P2 | — | — | — | — | ⏳ diferido (semana 4) |
 | **RF-020** | Autorización de aplicaciones cliente | P1 | `authorizeClient`, `exchangeAuthorizationCode` | 10 | 24 | 8 | ✅ completo |
+| **RF-021** | Roles y permisos configurables por aplicación | P1 | — | — | — | — | ⏳ diferido (semana 4) |
 | **RNF-001** | Contenerización total | P0 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-002** | Pipeline de ciclo completo | P0 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-003** | Cero secretos en el repositorio | P0 | — | — | 4 | — | 🟡 parcial |
@@ -43,7 +44,7 @@ declaración de buenas intenciones.
 | **RNF-011** | Los specs son la fuente de verdad | P0 | — | — | 5 | — | 🟡 parcial |
 | **RNF-012** | Logs sin datos sensibles | P0 | — | — | 5 | — | 🟡 parcial |
 
-**Resumen:** 32 requisitos · 17 completos · 7 parciales · 6 sin cubrir · 2 diferidos (semana 4).
+**Resumen:** 33 requisitos · 17 completos · 7 parciales · 6 sin cubrir · 3 diferidos (semana 4).
 
 Leyenda de estado: *completo* = verificado por al menos dos de las tres
 columnas de prueba · *parcial* = una sola · *sin cubrir* = ninguna · *diferido (semana 4)* = backlog de semana 4 por decisión Q14.
