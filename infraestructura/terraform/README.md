@@ -11,7 +11,7 @@ en lo posible con LocalStack. **No es necesaria para ejecutar el proyecto**: eso
 |---|---|
 | `versions.tf`, `providers.tf` | Terraform >= 1.6, `hashicorp/aws ~> 6.0`, `random ~> 3.6`; backend S3 descrito en comentario |
 | `variables.tf`, `terraform.tfvars.example` | Entradas; las imagenes (por digest) y los dominios son obligatorios |
-| `network.tf` | VPC, 2 subredes publicas (ALB, NAT) y 2 privadas (ECS, RDS), DHCP con el dominio de Cloud Map |
+| `network.tf` | VPC, 2 subredes publicas (ALB, NAT por zona o unica) y 2 privadas (ECS, RDS), DHCP con el dominio de Cloud Map |
 | `security_groups.tf` | Un grupo por servicio y reglas de minimo privilegio (ALB, web 8080, api 8081, db 5432, broker 5672, correo) |
 | `alb.tf` | ALB, listener HTTPS, HTTP que redirige, regla por `Host` hacia `web` |
 | `ecs.tf` | Cluster, roles IAM, task definitions (api, worker, web, broker, mailpit, migrate) y servicios |
@@ -68,17 +68,42 @@ tflocal init && tflocal apply
 `tflocal` genera `localstack_providers_override.tf` con los endpoints locales (ignorado por git),
 por eso el codigo no lleva endpoints.
 
-## Ejecutar la migracion (antes de que `api` este sano)
+## Desplegar una version (procedimiento de dos fases)
+
+Terraform no ordena la migracion respecto a `api`: un solo `apply` registra la task definition
+nueva de `api` y actualiza el servicio a la vez. Por eso el despliegue es un procedimiento manual
+en dos fases; el orden lo garantiza quien lo ejecuta, no el codigo.
+
+**Fase 1: registrar las task definitions y la infraestructura que `migrate` necesita, sin tocar
+los servicios.** `-target` limita el `apply` a esos recursos y sus dependencias; los servicios
+siguen en la revision anterior. En un primer despliegue crea ademas la red, RDS y los secretos.
 
 ```sh
-aws ecs run-task --cluster identity-hub-prod --launch-type FARGATE \
-  --task-definition identity-hub-migrate \
-  --network-configuration "awsvpcConfiguration={subnets=[$(terraform output -raw private_subnet_ids | tr -d '[]\" ')],securityGroups=[$(terraform output -raw migrate_security_group_id)],assignPublicIp=DISABLED}"
+terraform apply \
+  -target=aws_ecs_task_definition.migrate -target=aws_ecs_task_definition.api \
+  -target=aws_ecs_task_definition.worker  -target=aws_ecs_task_definition.web \
+  -target=aws_db_instance.main -target=aws_service_discovery_instance.db \
+  -target=aws_security_group.svc -target=aws_route_table_association.private \
+  -target=aws_vpc_dhcp_options_association.main -target=aws_ecs_cluster.main
 ```
 
-(`private_subnet_ids` es una lista: adapta el formato de las subredes al de tu shell.) Despues,
-una sola vez, da login al rol `identity_app` (la migracion 000002 lo crea `NOLOGIN`; en el compose
-lo hace `deploy/postgres-init/01-identity-app-role.sh`), usando el secreto `identity-app-pass`.
+**Migrar** (cluster, subredes y security group salen de las salidas de Terraform):
+
+```sh
+aws ecs run-task --cluster "$(terraform output -raw ecs_cluster_name)" --launch-type FARGATE \
+  --task-definition identity-hub-migrate \
+  --network-configuration "awsvpcConfiguration={subnets=[$(terraform output -raw private_subnet_ids_csv)],securityGroups=[$(terraform output -raw migrate_security_group_id)],assignPublicIp=DISABLED}"
+```
+
+Espera a que la tarea termine con codigo 0 (`aws ecs describe-tasks`). Solo la primera vez, da
+login al rol `identity_app` (la migracion 000002 lo crea `NOLOGIN`; en el compose lo hace
+`deploy/postgres-init/01-identity-app-role.sh`), usando el secreto `identity-app-pass`.
+
+**Fase 2: `terraform apply` completo.** Crea o actualiza los servicios con las task definitions ya
+registradas. `api` espera a quedar estable (`wait_for_steady_state`) y `web` se redespliega cuando
+cambia la task definition de `api`.
+
+Otras salidas utiles: `private_subnet_ids` (lista, para `-json`) y `migrate_task_definition`.
 
 ## Secretos y estado
 
@@ -107,6 +132,11 @@ quitar `deletion_protection` antes en una cuenta real).
   parametrizarlos antes de que el flujo OAuth funcione de extremo a extremo.
 - **IP de cliente:** Nginx sobrescribe `X-Forwarded-For` con la IP del ALB, asi que detras del ALB
   la API ve la IP del balanceador; ajustar `TRUSTED_PROXIES` y esa cabecera es trabajo futuro.
-- **Nginx resuelve `api` solo al arrancar:** si la tarea de api cambia de IP, hay que reiniciar web.
-- **Checkov** senalara simplificaciones (sin logs de acceso del ALB, una sola NAT, sin flow logs);
+- **Nginx resuelve `api` solo al arrancar:** Terraform fuerza un despliegue de web cuando cambia la
+  task definition de api, pero la solucion real es una directiva `resolver` en Nginx (DNS de Cloud
+  Map), fuera de alcance. Una tarea de api reemplazada sin cambio de task definition sigue
+  requiriendo reiniciar web.
+- **Una sola NAT opcional:** `nat_gateway_per_az = false` deja una NAT (punto unico de fallo); el
+  valor por defecto, `true`, crea una por zona.
+- **Checkov** senalara simplificaciones (sin logs de acceso del ALB, sin flow logs);
   se documentan como excepciones en T10.

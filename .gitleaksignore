@@ -151,10 +151,12 @@ ed0d2fd375b1e96f853c4f08c6fa8e165a0a1180:.gitleaksignore:contrasena-en-variable-
 # URLs armadas con ellas: Terraform genera el secreto al aplicar y lo guarda en Secrets Manager;
 # ningún valor está escrito en el código. Huellas sin commit (archivo:regla:línea) para que también
 # las respete el hook de pre-commit (T16), que escanea antes de que exista el commit.
-infraestructura/terraform/rds.tf:contrasena-en-variable-de-entorno:21
-infraestructura/terraform/secrets.tf:contrasena-en-variable-de-entorno:32
+# Fijadas por numero de linea: si se mueven las lineas de rds.tf o secrets.tf, hay que actualizarlas
+# (correccion de la revision nativa: rds.tf 21 a 22; secrets.tf 32-37 a 33-38).
+infraestructura/terraform/rds.tf:contrasena-en-variable-de-entorno:22
 infraestructura/terraform/secrets.tf:contrasena-en-variable-de-entorno:33
 infraestructura/terraform/secrets.tf:contrasena-en-variable-de-entorno:34
-infraestructura/terraform/secrets.tf:url-de-conexion-con-credenciales:35
+infraestructura/terraform/secrets.tf:contrasena-en-variable-de-entorno:35
 infraestructura/terraform/secrets.tf:url-de-conexion-con-credenciales:36
 infraestructura/terraform/secrets.tf:url-de-conexion-con-credenciales:37
+infraestructura/terraform/secrets.tf:url-de-conexion-con-credenciales:38

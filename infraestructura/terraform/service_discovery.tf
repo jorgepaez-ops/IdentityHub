@@ -1,9 +1,10 @@
 # Cloud Map: DNS privado para que los nombres del compose (api, broker, db,
 # mailpit) resuelvan igual en AWS. La busqueda corta funciona por el dominio de
 # busqueda del DHCP (network.tf).
-# Incertidumbre en LocalStack: Cloud Map ("servicediscovery") se emula, pero no
-# esta confirmado que el DNS de las tareas ECS locales resuelva estos nombres;
-# T8b lo verifica y, si falla, se documenta la alternativa.
+# Sin verificar: la resolucion de estos nombres desde las tareas nunca se
+# comprobo, porque por D8 no se hace apply (ni en LocalStack ni en AWS); solo
+# pasan terraform validate y Checkov. Figura como no verificada en las
+# consecuencias de la ADR 0012.
 
 resource "aws_service_discovery_private_dns_namespace" "main" {
   name        = var.internal_domain

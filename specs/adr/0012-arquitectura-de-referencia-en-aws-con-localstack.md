@@ -72,6 +72,12 @@ Validación:
   - El rol `identity_app` recibe su contraseña en `deploy/postgres-init/` en el primer arranque del
     contenedor; en RDS ese script no corre y el paso queda manual tras migrar (documentado en
     `infraestructura/terraform/README.md`).
+- **Nginx resuelve `api` solo al arrancar** (`frontend/nginx/default.conf`): tras un despliegue de
+  api, web conserva las IP viejas. El Terraform fuerza un despliegue de web cuando cambia la task
+  definition de api; la solucion real es una directiva `resolver` en Nginx apuntando al DNS de
+  Cloud Map, fuera de alcance de esta referencia.
+- **La resolucion de nombres de Cloud Map desde las tareas no esta verificada:** por D8 no se
+  aplica en LocalStack ni en AWS, asi que solo se comprobo la sintaxis (`terraform validate`).
 - **Lo que no se valida en local:** TLS (ACM), DNS público (Route 53), filtrado de tráfico (WAFv2)
   y reglas de security groups. Terraform los aplica sin error en LocalStack, pero no prueban
   nada; el código los marca y el informe lo dice.

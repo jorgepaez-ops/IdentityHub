@@ -230,12 +230,14 @@ resource "aws_ecs_task_definition" "mailpit" {
   execution_role_arn       = aws_iam_role.execution.arn
   task_role_arn            = aws_iam_role.task.arn
 
-  container_definitions = jsonencode([{
-    name                   = "mailpit"
-    image                  = var.image_mailpit
-    essential              = true
-    readonlyRootFilesystem = true
-    linuxParameters        = { capabilities = { drop = ["ALL"] } }
+  volume {
+    name = "tmp"
+  }
+
+  container_definitions = jsonencode([merge(local.hardened, {
+    name      = "mailpit"
+    image     = var.image_mailpit
+    essential = true
     portMappings = [
       { containerPort = 1025, protocol = "tcp" },
       { containerPort = 8025, protocol = "tcp" },
@@ -253,7 +255,7 @@ resource "aws_ecs_task_definition" "mailpit" {
       retries     = 5
       startPeriod = 5
     }
-  }])
+  })])
 }
 
 # Tarea de un solo uso (equivale al servicio migrate): se lanza con
@@ -294,6 +296,15 @@ resource "aws_ecs_service" "broker" {
   desired_count   = 1
   launch_type     = "FARGATE"
 
+  # RabbitMQ no tiene almacenamiento persistente y ambas tareas se registrarian
+  # con el mismo nombre de Cloud Map. Con el reemplazo gradual por defecto
+  # (100 % sanas, 200 % maximo) convivirian dos brokers y los mensajes quedarian
+  # repartidos entre ellos. Se acepta una breve caida del broker durante el
+  # despliegue (se detiene la tarea vieja antes de iniciar la nueva) a cambio de
+  # no partir los mensajes; el worker y la api reintentan la conexion.
+  deployment_minimum_healthy_percent = 0
+  deployment_maximum_percent         = 100
+
   network_configuration {
     subnets          = local.private_subnet_ids
     security_groups  = [aws_security_group.svc["broker"].id]
@@ -330,13 +341,19 @@ resource "aws_ecs_service" "mailpit" {
   }
 }
 
-# Desplegar api solo despues de ejecutar la tarea migrate (ver README).
+# Desplegar api solo despues de ejecutar la tarea migrate: el orden lo impone el
+# procedimiento de dos fases del README (apply de task definitions, migrate,
+# apply completo), no Terraform.
 resource "aws_ecs_service" "api" {
   name            = "api"
   cluster         = aws_ecs_cluster.main.id
   task_definition = aws_ecs_task_definition.api.arn
-  desired_count   = var.api_desired_count
+  desired_count   = var.app_desired_count
   launch_type     = "FARGATE"
+
+  # Espera a que el despliegue de api quede estable; asi web (depends_on) solo se
+  # crea o actualiza cuando api ya tiene tareas sanas.
+  wait_for_steady_state = true
 
   network_configuration {
     subnets          = local.private_subnet_ids
@@ -382,8 +399,17 @@ resource "aws_ecs_service" "web" {
   name            = "web"
   cluster         = aws_ecs_cluster.main.id
   task_definition = aws_ecs_task_definition.web.arn
-  desired_count   = var.api_desired_count
+  desired_count   = var.app_desired_count
   launch_type     = "FARGATE"
+
+  # Nginx resuelve "api" solo al arrancar, asi que tras cada despliegue de api
+  # web conservaria IP viejas. Se fuerza un despliegue de web cuando cambia la
+  # task definition de api. La solucion real es una directiva resolver en Nginx
+  # (DNS de Cloud Map con TTL corto); queda fuera de alcance (ADR 0012).
+  force_new_deployment = true
+  triggers = {
+    api_task_definition = aws_ecs_task_definition.api.arn
+  }
 
   network_configuration {
     subnets          = local.private_subnet_ids

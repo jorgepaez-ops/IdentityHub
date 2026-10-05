@@ -30,6 +30,11 @@ output "private_subnet_ids" {
   value       = aws_subnet.private[*].id
 }
 
+output "private_subnet_ids_csv" {
+  description = "Subredes privadas separadas por comas, para aws ecs run-task (el README las usa con -raw)."
+  value       = join(",", aws_subnet.private[*].id)
+}
+
 output "migrate_security_group_id" {
   description = "Security group de la tarea migrate."
   value       = aws_security_group.svc["migrate"].id

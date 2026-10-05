@@ -71,7 +71,8 @@ flowchart TB
 ## Despliegue de una versión
 
 Cómo llegaría una versión nueva a producción. La publicación de imágenes llega con T17; el resto
-es lo que describe el Terraform.
+es lo que describe el Terraform. El orden migrar antes de actualizar `api` lo garantiza el
+procedimiento de dos fases del [README](../../../infraestructura/terraform/README.md), no Terraform.
 
 ```mermaid
 sequenceDiagram
@@ -86,12 +87,13 @@ sequenceDiagram
     GH->>GH: Gates de CI, Trivy y Checkov
     GH->>DH: Publica api, worker y web con firma Cosign y SBOM (T17)
     DH-->>Dev: Digests sha256 de cada imagen
-    Dev->>TF: terraform apply con los digests en terraform.tfvars
-    TF->>ECS: Task definitions nuevas que apuntan a los digests
+    Dev->>TF: Fase 1, terraform apply con los digests y -target a las task definitions y a RDS
+    TF->>ECS: Registra las task definitions nuevas sin tocar los servicios
     Dev->>ECS: aws ecs run-task migrate
     ECS->>RDS: Aplica las migraciones
-    Note over Dev,RDS: Paso manual tras la primera migración: dar login al rol identity_app
-    TF->>ECS: Actualiza los servicios web, api y worker
+    Note over Dev,RDS: Paso manual tras la primera migración, dar login al rol identity_app
+    Dev->>TF: Fase 2, terraform apply completo
+    TF->>ECS: Actualiza los servicios, api espera a quedar estable y luego web
     ECS->>ECS: Reemplazo gradual de tareas, el ALB solo enruta a tareas sanas
 ```
 

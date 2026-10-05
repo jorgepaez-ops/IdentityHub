@@ -28,6 +28,7 @@ locals {
   # Contra LocalStack el RDS local no negocia TLS igual; en AWS real se exige.
   db_sslmode = var.localstack ? "disable" : "require"
 
+  # Gitleaks fija las lineas senaladas por numero en .gitleaksignore: si las mueves, actualiza las huellas.
   secret_values = {
     "jwt-signing-key"      = random_bytes.jwt_seed.base64
     "rabbitmq-password"    = random_password.rabbitmq.result

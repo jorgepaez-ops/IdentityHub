@@ -257,6 +257,7 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   ALB anula el límite por IP, rol `identity_app` manual en RDS). Gitleaks (hook T16): 7 falsos
   positivos (referencias `random_password.*.result`) registrados como huellas sin commit en
   `.gitleaksignore`, con aprobación del usuario.
+  - Correcciones de la revisión nativa (review-1d206709c8c0146b, aprobada) — Ruta: delegada (Sonnet), revisión de Claude: (1) README usa la salida nueva `private_subnet_ids_csv` con `-raw`; (2) mailpit con volumen y montaje `tmp`; (3) broker con `deployment_minimum_healthy_percent = 0` y máximo 100; (4) web con `force_new_deployment` y `triggers` sobre la task definition de api, y viñeta en la ADR; (5) despliegue en dos fases documentado (apply con `-target` a task definitions y RDS, `run-task` migrate, apply completo) y diagrama de secuencia corregido; (6) api con `wait_for_steady_state`; (7) variable `nat_gateway_per_az` (NAT y tabla de rutas por zona); (8) `api_desired_count` renombrada a `app_desired_count`; (9) comentario de Cloud Map actualizado y viñeta en la ADR; (10) avisos sobre números de línea en rds.tf y secrets.tf y siete huellas de `.gitleaksignore` actualizadas (rds 22; secrets 33 a 38).
   - [x] T8b — Diagrama de la configuración y el despliegue en AWS (sustituye el `apply` en
     LocalStack por D8). Ruta: inline. `docs/diagramas/uml/despliegue-aws.md`: infraestructura
     (flowchart) y despliegue de una versión (secuencia), con datos tomados del Terraform; ambos

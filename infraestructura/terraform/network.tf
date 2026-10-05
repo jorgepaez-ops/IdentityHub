@@ -58,15 +58,26 @@ resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
 }
 
-# Una sola NAT para ahorrar coste (las tareas la usan para bajar imagenes de
-# Docker Hub). En produccion real: una por zona o VPC endpoints.
+# Coste frente a disponibilidad: con nat_gateway_per_az = true hay una NAT (y una
+# tabla de rutas privada) por zona, de modo que la caida de una zona no deja sin
+# salida a Internet a las tareas de la otra. Con false queda una sola NAT, mas
+# barata pero con un punto unico de fallo. Las tareas la usan para bajar
+# imagenes de Docker Hub.
+locals {
+  nat_count = var.nat_gateway_per_az ? length(local.azs) : 1
+}
+
 resource "aws_eip" "nat" {
+  count = local.nat_count
+
   domain = "vpc"
 }
 
 resource "aws_nat_gateway" "main" {
-  allocation_id = aws_eip.nat.id
-  subnet_id     = aws_subnet.public[0].id
+  count = local.nat_count
+
+  allocation_id = aws_eip.nat[count.index].id
+  subnet_id     = aws_subnet.public[count.index].id
 
   depends_on = [aws_internet_gateway.main]
 }
@@ -81,11 +92,13 @@ resource "aws_route_table" "public" {
 }
 
 resource "aws_route_table" "private" {
+  count = local.nat_count
+
   vpc_id = aws_vpc.main.id
 
   route {
     cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.main.id
+    nat_gateway_id = aws_nat_gateway.main[count.index].id
   }
 }
 
@@ -100,5 +113,5 @@ resource "aws_route_table_association" "private" {
   count = length(local.azs)
 
   subnet_id      = aws_subnet.private[count.index].id
-  route_table_id = aws_route_table.private.id
+  route_table_id = aws_route_table.private[var.nat_gateway_per_az ? count.index : 0].id
 }

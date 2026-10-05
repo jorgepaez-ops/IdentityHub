@@ -18,6 +18,7 @@ resource "aws_db_instance" "main" {
 
   db_name  = var.db_name
   username = var.db_admin_username
+  # Gitleaks fija esta linea por numero en .gitleaksignore: si la mueves, actualiza las huellas.
   password = random_password.db_admin.result
   port     = 5432
 

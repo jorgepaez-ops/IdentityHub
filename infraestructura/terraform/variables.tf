@@ -96,13 +96,19 @@ variable "ses_from_address" {
   default     = "no-reply@identityhub.example.com"
 }
 
-variable "api_desired_count" {
+variable "app_desired_count" {
   description = "Numero de tareas de api y web."
   type        = number
   default     = 2
 }
 
 # ── Red y datos ────────────────────────────────────────────────────────────
+variable "nat_gateway_per_az" {
+  description = "true: una NAT y una tabla de rutas privada por zona (referencia de produccion). false: una sola NAT, mas barata pero sin tolerancia a la caida de su zona."
+  type        = bool
+  default     = true
+}
+
 variable "vpc_cidr" {
   description = "CIDR de la VPC."
   type        = string
