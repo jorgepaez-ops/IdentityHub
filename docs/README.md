@@ -27,12 +27,12 @@ La columna **Ubicación actual** solo enlaza rutas que existen en este checkout.
 | Diagrama de despliegue | 123–131 | [`diagramas/uml/despliegue.md`](diagramas/uml/despliegue.md) y [`../deploy/docker-compose.yml`](../deploy/docker-compose.yml) | hecho |
 | Diagrama de secuencia de un flujo crítico | 123–131 | [`diagramas/uml/secuencia-login-mfa.md`](diagramas/uml/secuencia-login-mfa.md) y [`diagramas/02-flujo-sso.html`](diagramas/02-flujo-sso.html) como apoyo | hecho |
 | Diagrama de casos de uso | 123–131 | [`diagramas/uml/casos-de-uso.md`](diagramas/uml/casos-de-uso.md) | hecho |
-| DFD nivel 0 y nivel 1 con OWASP Threat Dragon | 123–131 | [`../specs/05-security/threat-model.md`](../specs/05-security/threat-model.md) | parcial (T3) |
+| DFD nivel 0 y nivel 1 con OWASP Threat Dragon | 123–131 | [`threat-model/`](threat-model/) | hecho |
 | Manual de desarrollo: entorno, servicios, pruebas y contribución | 132–139 | [`guia-desarrollo.md`](guia-desarrollo.md) | parcial (T4) |
 | Manual de despliegue y operación | 140–149 | [`../deploy/docker-compose.yml`](../deploy/docker-compose.yml) | parcial (T4) |
 | Manual de seguridad: amenazas, herramientas, reportes y vulnerabilidades | 151–156 | [`../specs/05-security/threat-model.md`](../specs/05-security/threat-model.md), [`security-report.html`](security-report.html) y [`../security/findings/`](../security/findings/) | parcial (T4) |
 | Manual de usuario con capturas | 157–159 | No existe todavía | pendiente (T18) |
-| Fase 1: Threat Dragon, DFD y STRIDE | 75–79 | [`../specs/05-security/threat-model.md`](../specs/05-security/threat-model.md) | parcial (T3) |
+| Fase 1: Threat Dragon, DFD y STRIDE | 75–79 | [`threat-model/`](threat-model/) | hecho |
 | Fase 2: hooks, SAST y SCA | 80–84 | [`../.pre-commit-config.yaml`](../.pre-commit-config.yaml) y [`../.github/workflows/ci.yml`](../.github/workflows/ci.yml) | hecho |
 | Fase 3: build de imágenes, escaneo y gate de CVE | 85–89 | [`../.github/workflows/ci.yml`](../.github/workflows/ci.yml), [`../backend/Dockerfile`](../backend/Dockerfile) y [`../frontend/Dockerfile`](../frontend/Dockerfile) | hecho |
 | Fase 4: pruebas unitarias y DAST | 90–93 | [`../.github/workflows/ci.yml`](../.github/workflows/ci.yml), [`../e2e/`](../e2e/) y [`../security/zap-reports/`](../security/zap-reports/) | hecho |

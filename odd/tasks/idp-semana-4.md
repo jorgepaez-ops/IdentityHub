@@ -129,8 +129,21 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   `@mermaid-js/mermaid-cli` 11.17.0 (todos OK tras corregir la secuencia: un `;` cortaba el mensaje,
   comillas literales, camelCase de la API y el evento `security.mfa_challenge_issued`) y rehízo el
   de casos de uso con límites de sistema, óvalos e «include»/«extend».
-- [ ] **T3 — Threat Dragon.** Modelo `.json` versionado con DFD nivel 0 y 1, alineado con el STRIDE
+- [x] **T3 — Threat Dragon.** Modelo `.json` versionado con DFD nivel 0 y 1, alineado con el STRIDE
   de `specs/05-security/threat-model.md`.
+  Ruta: delegada (Codex), revisión de Claude. Evidencia (2026-10-05): `docs/threat-model/` con
+  `identity-hub.json` (Threat Dragon v2, DFD nivel 0 y 1, 35 celdas, 23 amenazas STRIDE) y su guía.
+  Formato copiado de los demos oficiales de Threat Dragon v2.6.2; valida contra
+  `threat-dragon-v2.schema.json` oficial sin errores salvo `strokeDasharray: null`, que los demos
+  oficiales también tienen; sin nodos superpuestos. Corrección de la revisión: Codex marcó las 23
+  como `Mitigated`; cinco no lo están y quedan `Open` con lo que falta: AM-008 y AM-022 (Cosign,
+  OIDC y `cd.yml`, T17), AM-009 (SBOM, T17), AM-014 (compose de producción, T9) y AM-019 (no hay
+  regla de alerta ni runbook de la DLQ, solo el panel).
+  - Hallazgo fuera de alcance (sin corregir): `specs/05-security/threat-model.md` repite el id
+    **AM-017** para dos amenazas distintas (códigos MFA en Spoofing y Argon2id como amplificador en
+    DoS). El modelo de Threat Dragon las distingue como "AM-017 (MFA)" y "AM-017". Decidir en T4 o
+    con el usuario si se renumera.
+  - AM-019 no tiene tarea asignada en este plan (alerta de Grafana y runbook de la DLQ).
 - [ ] **T4 — Manuales.** Arquitectura (consolida `specs/00-vision.md` y los ADR), despliegue y
   operación, seguridad (cómo leer los reportes de Trivy, ZAP, Gitleaks, Semgrep) y desarrollo
   (convención de ramas, commits y revisión, sobre `docs/guia-desarrollo.md`).
@@ -179,15 +192,15 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
 
 | Fase | Tareas | Hechas |
 |---|---|---|
-| 1 — Documentación, UML e integración | T1 a T6 (6) | 2 (T1 y T2) |
+| 1 — Documentación, UML e integración | T1 a T6 (6) | 3 (T1 a T3) |
 | 2 — IaC de referencia | T7 a T10 (4) | 0 |
 | 3 — Grilla de roles configurable | T11 a T15 (5) | 0 |
 | 4 — Publicación y entrega | T16 a T21 (6) | 0 |
-| **Total** | **21** | **2** |
+| **Total** | **21** | **3** |
 
 ## Siguiente paso
 
-T3 (modelo de Threat Dragon con DFD nivel 0 y 1).
+T4 (manuales: arquitectura, despliegue y operación, seguridad, desarrollo).
 
 ## Cambios de spec propuestos
 
