@@ -173,8 +173,24 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
     `oauth.Service`, `IssueForAudience`, `oauthCORS` y catálogo de roles). Decidir si se enmienda el
     ADR o si la fase 3 lo resuelve.
   - OpenAPI no declara los `500`/`503` que emiten `/oauth/authorize` y `/oauth/token`.
-- [ ] **T6 — Compose en la raíz.** `docker compose up -d` desde la raíz sin `.env` previo, como
-  promete el README (portabilidad).
+- [x] **T6 — Compose en la raíz.** `docker compose up -d` desde la raíz sin `.env` previo, como
+  promete el README (portabilidad). Decisión del usuario (2026-10-05): opción C, `make setup`
+  genera el `.env` (respeta AM-012: ningún secreto versionado).
+  Ruta: delegada (Sonnet; Codex sin cuota), revisión de Claude. Evidencia (2026-10-05): RED, `python3 scripts/setup_env_test.py` falló por falta de `setup_env.py`; GREEN, 8 pruebas OK tras implementarlo. Creados `scripts/setup_env.py` (+ test), objetivo `make setup` (también en `spec-drift`), `docker-compose.yml` raíz con `include` de `deploy/docker-compose.yml`, y README/manual de despliegue actualizados.
+  Revisión de Claude con la plantilla real (la pasó el usuario; la sesión no puede leer
+  `.env.example`): los secretos vienen vacíos con comentario al final de la línea y las URLs usan
+  `${VAR}`, así que se quitó la lógica de reemplazo dentro de las URLs (nunca hacía nada útil) y se
+  corrigió un bloqueante: `TRUSTED_PROXIES` vacío hacía fallar el `:?` del compose; ahora toma
+  `172.28.0.0/16` como en `.github/actions/stack-up`. RED (falla solo
+  `test_empty_trusted_proxies_gets_the_compose_subnet`) y GREEN 11/11; `traceability_test.py` 4/4.
+  Prueba real de portabilidad: copia limpia del árbol sin `.env`, `make setup` + `docker compose up
+  -d` (proyecto aislado): `/readyz` 200, Hub, Contabilidad y JWKS 200, servicios `healthy`; luego
+  `down -v` y el stack del usuario restaurado (`/readyz` 200).
+  - Hallazgo fuera de alcance (sin corregir): la regla `contrasena-en-variable-de-entorno` de
+    `.gitleaks.toml` usa `\s*` tras el `=`, que también cruza saltos de línea: una clave vacía
+    (`JWT_SIGNING_KEY=`) seguida de otra línea `CLAVE=` se reporta como secreto. El hook de T16 lo
+    detectó en la plantilla de prueba; se evitó con una línea de comentario. Cambiar a `[ \t]*`
+    afinaría la regla (decidir en qué tarea).
 
 ## Fase 2 — IaC de referencia (producción en la nube, como ejemplo)
 
@@ -215,15 +231,15 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
 
 | Fase | Tareas | Hechas |
 |---|---|---|
-| 1 — Documentación, UML e integración | T1 a T6 (6) | 4 (T1 a T4) |
+| 1 — Documentación, UML e integración | T1 a T6 (6) | 5 (T1 a T4 y T6; T5 parcial) |
 | 2 — IaC de referencia | T7 a T10 (4) | 0 |
 | 3 — Grilla de roles configurable | T11 a T15 (5) | 0 |
 | 4 — Publicación y entrega | T16 a T21 (6) | 0 |
-| **Total** | **21** | **4** |
+| **Total** | **21** | **5** |
 
 ## Siguiente paso
 
-T5 (guía de integración de terceros).
+T7 (investigación y diseño de la IaC de referencia). T5 queda abierta hasta T15 (permisos).
 
 ## Cambios de spec propuestos
 

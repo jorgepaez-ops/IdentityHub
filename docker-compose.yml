@@ -1,0 +1,5 @@
+# Punto de entrada portable: permite `docker compose up -d` desde la raíz del repositorio.
+# Los servicios viven en deploy/docker-compose.yml (include conserva sus rutas relativas).
+# Los secretos no se versionan: `make setup` genera un .env local con valores aleatorios.
+include:
+  - deploy/docker-compose.yml

@@ -8,15 +8,15 @@ Este manual describe el entorno local actual con Docker Compose. No afirma sopor
 
 - Docker y Docker Compose para levantar los contenedores.
 - `make` para usar los objetivos del repositorio.
-- Una copia local de `.env.example` llamada `.env`; no se versiona.
+- Un `.env` local; `make setup` lo genera con secretos aleatorios a partir de `.env.example` y no se versiona.
 
 ```bash
-cp .env.example .env
-make up
+make setup
+docker compose up -d   # equivalente: make up (construye las imágenes)
 make ps
 ```
 
-`make up` construye y levanta el perfil ordinario. Use `make down` para detenerlo conservando volúmenes y `make clean` únicamente si desea detenerlo **y borrar los volúmenes**. Para reconstruir un servicio concreto, use `make restart S=api`; para seguir su salida, `make logs S=api`.
+`make setup` no sobrescribe un `.env` existente. `docker compose up -d` (raíz) y `make up` construyen y levantan el perfil ordinario. Use `make down` para detenerlo conservando volúmenes y `make clean` únicamente si desea detenerlo **y borrar los volúmenes**. Para reconstruir un servicio concreto, use `make restart S=api`; para seguir su salida, `make logs S=api`.
 
 ## Configuración por entorno
 

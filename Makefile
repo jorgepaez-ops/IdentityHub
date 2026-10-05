@@ -10,13 +10,16 @@ SQLC_VERSION := v1.31.1
 SQLC         ?= sqlc
 
 .DEFAULT_GOAL := help
-.PHONY: help up down logs ps restart build test test-go test-integration test-front e2e _e2e-run scan-dast _scan-dast-run spec-drift lint fmt gen scan scan-secrets scan-deps scan-image scan-config migrate psql rabbit mail clean
+.PHONY: help setup up down logs ps restart build test test-go test-integration test-front e2e _e2e-run scan-dast _scan-dast-run spec-drift lint fmt gen scan scan-secrets scan-deps scan-image scan-config migrate psql rabbit mail clean
 
 help: ## Muestra esta ayuda
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
 
 # ── Entorno ──────────────────────────────────────────────────────────────
+setup: ## Genera .env con secretos aleatorios (no sobrescribe uno existente)
+	python3 scripts/setup_env.py
+
 up: ## Levanta el stack de desarrollo
 	$(COMPOSE) up -d --build
 	@echo ""
@@ -134,6 +137,7 @@ _scan-dast-run:
 spec-drift: ## Verifica sin red la matriz y escenarios Gherkin contra E2E
 	python3 scripts/traceability_test.py
 	python3 scripts/zap_gate_test.py
+	python3 scripts/setup_env_test.py
 	python3 scripts/traceability.py --check
 
 migrate: ## Aplica las migraciones pendientes
