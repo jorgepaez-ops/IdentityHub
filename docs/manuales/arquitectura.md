@@ -62,6 +62,7 @@ La implementación OAuth es mínima: Contabilidad es el cliente configurado, el 
 | [0009](../../specs/adr/0009-sso-entre-dominios-con-authorization-code-y-pkce.md) | Implementa SSO entre Hub y Contabilidad mediante authorization code con PKCE. |
 | [0010](../../specs/adr/0010-mfa-por-codigo-enviado-por-correo.md) | Sustituye TOTP por MFA obligatorio con código de un solo uso enviado al correo verificado. |
 | [0011](../../specs/adr/0011-docker-hub-como-registry.md) | Sustituye GHCR por Docker Hub para publicar imágenes versionadas, SBOM y firma; la implementación llega en T17. |
+| [0012](../../specs/adr/0012-arquitectura-de-referencia-en-aws-con-localstack.md) | Arquitectura de producción de referencia en AWS (ECS Fargate, ALB, RDS, RabbitMQ en ECS, Secrets Manager) en Terraform, validada con LocalStack; la implementación llega en T8-T10. |
 
 El README documenta la elección técnica de Go y sus razones para el proyecto. Sin embargo, `ANALISIS-REQUISITOS.md` identifica Go como una desviación frente a Python/Node y pide validación escrita del docente; la pregunta Q4 de la semana 4 permanece abierta y prevé registrar esa evidencia en un ADR si existe. El repositorio no identifica un aprobador ni aporta esa validación escrita.
 

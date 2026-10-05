@@ -223,7 +223,7 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
 
 ## Fase 2 — IaC de referencia (producción en la nube, como ejemplo)
 
-- [ ] **T7 — Investigación y diseño.** Arquitectura de referencia en AWS y qué valida LocalStack
+- [x] **T7 — Investigación y diseño.** Arquitectura de referencia en AWS y qué valida LocalStack
   (Q2); ADR con la decisión.
   Investigación (2026-10-05, fuentes primarias consultadas ese día, la mayoría sin fecha):
   - Plan Student de LocalStack = cobertura de Ultimate (500 MB de Cloud Pods, soporte básico),
@@ -240,6 +240,10 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
     producción queda limpio). AWS provider v6.67.0 (2026-09-30).
   - Checkov: `bridgecrewio/checkov-action` con `directory` y `framework`; escanea también
     Dockerfiles y workflows. Versión a fijar al implementar (PyPI y GitHub no coinciden).
+  Diseño: `specs/adr/0012-arquitectura-de-referencia-en-aws-con-localstack.md` (estado
+  `propuesta`, a la espera de que el usuario la acepte). Ruta: inline (decisión de arquitectura del
+  orquestador). Hallazgo para el ADR: el worker envía SMTP sin autenticación ni TLS
+  (`backend/cmd/worker/main.go:198-199`), así que SES real exigiría cambiar código.
 - [ ] **T8 — Terraform.** Módulos en `infraestructura/` (o la carpeta que fije T1) para la
   arquitectura de referencia; `terraform validate`; `plan`/`apply` contra LocalStack donde se pueda.
 - [ ] **T9 — Producción simulada local.** `docker-compose.prod.yml` (imágenes por digest, sin
@@ -276,14 +280,14 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
 | Fase | Tareas | Hechas |
 |---|---|---|
 | 1 — Documentación, UML e integración | T1 a T6 (6) | 5 (T1 a T4 y T6; T5 parcial) |
-| 2 — IaC de referencia | T7 a T10 (4) | 0 |
+| 2 — IaC de referencia | T7 a T10 (4) | 1 (T7) |
 | 3 — Grilla de roles configurable | T11 a T15 (5) | 0 |
 | 4 — Publicación y entrega | T16 a T21 (6) | 0 |
-| **Total** | **21** | **5** |
+| **Total** | **21** | **6** |
 
 ## Siguiente paso
 
-T7 (investigación y diseño de la IaC de referencia). T5 queda abierta hasta T15 (permisos).
+T8 (Terraform de la arquitectura de referencia), cuando el usuario acepte la ADR 0012. T5 queda abierta hasta T15 (permisos).
 
 ## Cambios de spec propuestos
 
