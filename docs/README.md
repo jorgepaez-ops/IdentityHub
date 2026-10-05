@@ -58,7 +58,7 @@ No los exige el enunciado, pero responden a la demo en vivo con el profesor:
 | Entregable | Ubicación actual | Estado |
 |---|---|---|
 | Grilla de roles y permisos configurable desde el Hub | No existe todavía | pendiente (T11 a T15) |
-| Guía de integración de plataformas de terceros | No existe todavía | pendiente (T5) |
+| Guía de integración de plataformas de terceros | [`manuales/integracion-terceros.md`](manuales/integracion-terceros.md) | parcial (permisos pendientes de T15) |
 
 ## Cómo navegar
 

@@ -159,6 +159,20 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
 - [ ] **T5 — Guía de integración de terceros.** Registro como cliente OAuth (`redirect_uri`, PKCE,
   CORS), endpoints y JWKS, declaración de permisos de la aplicación (se completa tras la fase 3),
   cambios en el frontend del tercero y checklist de seguridad.
+  Ruta: delegada (Sonnet; Codex sin cuota hasta las 16:20), revisión de Claude. Evidencia (2026-10-05):
+  `docs/manuales/integracion-terceros.md` con las nueve secciones (qué ofrece el Hub, registro del cliente
+  y cómo agregar un segundo, flujo con diagrama Mermaid, referencia de endpoints, claims y validación,
+  cambios en el frontend del tercero, checklist y limitaciones); `docs/README.md` enlaza la guía como
+  parcial. La sección 7 (declaración de permisos) queda como marcador y se completa tras T15.
+  Revisión de Claude: Mermaid renderiza (mermaid-cli 11.17.0); verificado contra el código que el
+  cliente está fijo en `backend/internal/config/config.go:66-68` y sembrado en la migración
+  000007. Corrección: la guía decía que el logout del Hub solo limpia la cookie; también revoca en
+  el servidor todas las sesiones del Hub del usuario (`RevokeHubSessions`, `logout.go:74`).
+  - Hallazgo fuera de alcance (sin corregir): `specs/adr/0009` dice que un segundo cliente "exige
+    tocar configuración y desplegar", pero el código exige cambios de código (cliente único en
+    `oauth.Service`, `IssueForAudience`, `oauthCORS` y catálogo de roles). Decidir si se enmienda el
+    ADR o si la fase 3 lo resuelve.
+  - OpenAPI no declara los `500`/`503` que emiten `/oauth/authorize` y `/oauth/token`.
 - [ ] **T6 — Compose en la raíz.** `docker compose up -d` desde la raíz sin `.env` previo, como
   promete el README (portabilidad).
 
