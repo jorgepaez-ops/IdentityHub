@@ -272,3 +272,30 @@ la API no arranca.
 `Load()` acumula **todos** los errores de configuración antes de fallar
 (ver el comentario en `config.go`): un solo arranque fallido lista todo lo
 que falta, en vez de una variable a la vez.
+
+## 6. Hooks de pre-commit (RNF-003)
+
+`.pre-commit-config.yaml` declara los controles locales que corren antes de cada commit:
+gitleaks, `detect-private-key`, gofmt, `go build`, la matriz de trazabilidad y los chequeos
+básicos de `pre-commit-hooks`. **No corren solos**: hay que instalarlos una vez por clon.
+
+```bash
+# instalar la herramienta (cualquiera de las dos)
+uv tool install pre-commit      # o: brew install pre-commit / pipx install pre-commit
+
+# instalar el hook en este clon
+pre-commit install
+```
+
+- Si ya existe un `.git/hooks/pre-commit` (por ejemplo el de Gentleman Guardian Angel),
+  `pre-commit install` lo conserva como `pre-commit.legacy` y lo ejecuta primero (modo
+  migración). No usar `-f`, que lo descarta.
+- La versión de gitleaks del hook es la misma que usa `make scan-secrets` (v8.24.3), con la misma
+  configuración (`.gitleaks.toml`, `.gitleaksignore`).
+- Si `.pre-commit-config.yaml` tiene cambios sin agregar al stage, pre-commit rechaza el commit
+  hasta que se agreguen.
+- Comprobar que funciona: poner en stage un archivo con una clave falsa con forma de AWS
+  (`AKIA` + 16 caracteres) e intentar commitear. El hook `Detect hardcoded secrets` debe fallar y
+  el commit no se crea. Después, sacar el archivo del stage y borrarlo.
+- Ejecutar todos los hooks sobre el repo sin commitear: `pre-commit run --all-files`
+  (`trailing-whitespace`, `end-of-file-fixer` y gofmt **modifican** archivos).

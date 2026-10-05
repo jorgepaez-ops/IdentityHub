@@ -1234,10 +1234,16 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
   BUG-1/BUG-2 en Safari real con `safaridriver`.
 
 ### T16 — Hook de pre-commit real
-- [ ] Estado · Ejecutor: `Claude`
+- [x] Estado · Ejecutor: `Claude` · Ruta: inline (cambio mecánico de configuración y docs)
 - `pre-commit install` documentado en `docs/guia-desarrollo.md` y verificado con un secreto de
   prueba que el hook bloquea (sin llegar a commitearse).
-- Commit: —
+- Evidencia (2026-10-05): `pre-commit` 4.x instalado con `uv tool install`; `pre-commit install`
+  en modo migración (GGA queda como `pre-commit.legacy` y corre primero). gitleaks del hook subido
+  de v8.18.4 a v8.24.3 para igualar `make scan-secrets`. Prueba: archivo en stage con clave falsa
+  con forma de AWS → `Detect hardcoded secrets ... Failed` (`aws-access-token` y
+  `generic-api-key`), HEAD sin cambios; el archivo se sacó del stage y se borró. Nota: el hook
+  rechaza el commit si `.pre-commit-config.yaml` tiene cambios sin stage.
+- Commit: ver el commit `chore(hooks)` de esta tarea
 
 ### T17 — Revisión de fase, trazabilidad, bitácora e informe
 - [ ] Estado · Ejecutor: `Claude (revisión)`
@@ -1254,8 +1260,8 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 | 0 — Enmiendas de spec y decisiones | T1 a T3 (3) | 3 (T1 a T3) |
 | 1 — Backend | T4 a T10 (7) | 7 (T4 a T10) |
 | 2 — Dominios locales y frontend | T11 a T13 + T12d (4) | 4 (T11 a T13 y T12d) — fase cerrada |
-| 3 — Verificación, DAST y cierre | T14 a T17 (4) | 0 |
-| **Total** | **18** | **14** |
+| 3 — Verificación, DAST y cierre | T14 a T17 (4) | 3 (T14 a T16) |
+| **Total** | **18** | **17** |
 
 ## Siguiente paso
 
