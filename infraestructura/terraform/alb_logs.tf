@@ -70,7 +70,13 @@ data "aws_iam_policy_document" "alb_logs" {
   statement {
     sid       = "EntregaDeLogsDelALB"
     actions   = ["s3:PutObject"]
-    resources = ["${aws_s3_bucket.alb_logs.arn}/alb/AWSLogs/${data.aws_caller_identity.current.account_id}/*"]
+    resources = ["${aws_s3_bucket.alb_logs.arn}/${local.alb_log_prefix}/AWSLogs/${data.aws_caller_identity.current.account_id}/*"]
+    # Regiones anteriores a agosto de 2022 (us-east-1 entre ellas) entregan con la cuenta de ELB
+    # de la región; las más nuevas, con el principal de servicio. Se autorizan ambos.
+    principals {
+      type        = "AWS"
+      identifiers = [data.aws_elb_service_account.main.arn]
+    }
     principals {
       type        = "Service"
       identifiers = ["logdelivery.elasticloadbalancing.amazonaws.com"]
@@ -99,4 +105,11 @@ resource "aws_s3_bucket_policy" "alb_logs" {
   policy = data.aws_iam_policy_document.alb_logs.json
 
   depends_on = [aws_s3_bucket_public_access_block.alb_logs]
+}
+
+data "aws_elb_service_account" "main" {}
+
+locals {
+  # Un solo valor para el prefijo del ALB (alb.tf) y la ruta que autoriza la política.
+  alb_log_prefix = "alb"
 }

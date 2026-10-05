@@ -328,6 +328,16 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
 
 Fase 3: T11 (spec de la grilla de roles configurable).
 
+CI del PR #10: falló Trivy config (job 8) sobre el Terraform y SonarCloud (seguridad 3). Corregido en
+`0c25846` con aprobación del usuario: logs de acceso del ALB en S3, `--only-binary` en la instalación
+de Checkov, rutas de `setup_env.py` limitadas a la raíz y tres excepciones de Trivy aprobadas
+(AWS-0053 ALB público, AWS-0104 salida 443 y SMTP a SES, AWS-0132 SSE-S3 obligatorio para logs del
+ALB). Revisión nativa (`review-5abdd5a5b69abbb7`) aprobada; de sus advertencias se corrigió un bug
+real: en us-east-1 los logs del ALB los entrega la cuenta de ELB de la región, no el principal de
+servicio (ahora se autorizan ambos); además prefijo único, rutas relativas desde la raíz (RED con el
+código anterior y GREEN 17/17), validación de `log_retention_days`. Verificado con Trivy 0.70.0 (la
+versión del CI), Checkov y gitleaks del historial.
+
 Revisión nativa de T10 (`review-a4d738df486230e0`, alto, 235 líneas, 4 lentes): **aprobada**.
 Corregido de sus advertencias: el log del WAF ocultaba nada y guardaba `Authorization` y `Cookie`
 (ahora `redacted_fields`); el comentario de RDS decía que registra cambios de datos pero

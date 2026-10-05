@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import importlib.util
+import os
 import pathlib
 import stat
 import sys
@@ -163,6 +164,19 @@ class SetupEnvTests(unittest.TestCase):
             self.run_setup("--force")
         self.assertEqual(self.output.read_text(), "KEEP=me\n")
         self.assertEqual(sorted(p.name for p in self.root.iterdir()), [".env", ".env.example"])
+
+    def test_relative_paths_resolve_from_root_not_cwd(self) -> None:
+        elsewhere = tempfile.TemporaryDirectory()
+        self.addCleanup(elsewhere.cleanup)
+        previous = os.getcwd()
+        os.chdir(elsewhere.name)
+        self.addCleanup(os.chdir, previous)
+        self.assertEqual(setup_env.main(["--template", ".env.example", "--output", ".env"], root=self.root), 0)
+        self.assertTrue(self.output.exists())
+
+    def test_dotdot_escaping_root_is_rejected(self) -> None:
+        with self.assertRaises(SystemExit):
+            setup_env.main(["--output", "../escape.env"], root=self.root)
 
     def test_output_mode_is_0600(self) -> None:
         self.run_setup()

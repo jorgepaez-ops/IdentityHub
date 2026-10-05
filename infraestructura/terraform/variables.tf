@@ -157,7 +157,12 @@ variable "db_backup_retention_days" {
 }
 
 variable "log_retention_days" {
-  description = "Retencion de los grupos de CloudWatch Logs."
+  description = "Retencion de los grupos de CloudWatch Logs y de los logs del ALB en S3."
   type        = number
   default     = 365
+
+  validation {
+    condition     = var.log_retention_days > 0
+    error_message = "La retencion debe ser positiva: S3 no acepta 0 como expiracion."
+  }
 }

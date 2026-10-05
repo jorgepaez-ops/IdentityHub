@@ -83,8 +83,10 @@ def write_private(path: pathlib.Path, content: str) -> None:
 
 
 def inside_root(raw: str, root: pathlib.Path, option: str) -> pathlib.Path:
-    # Resuelve la ruta (symlinks y "..") y rechaza cualquiera fuera del directorio raiz.
-    path = pathlib.Path(raw).resolve()
+    # Las rutas relativas se toman desde la raiz (no desde el directorio de trabajo), se
+    # resuelven (symlinks y "..") y se rechaza cualquiera fuera de ella.
+    path = pathlib.Path(raw)
+    path = (path if path.is_absolute() else root / path).resolve()
     if not path.is_relative_to(root):
         raise SystemExit(f"error: {option} debe estar dentro de {root}; se rechaza {path}")
     return path
