@@ -69,10 +69,11 @@ def render(lines: list[str], new_values: dict[str, str]) -> list[str]:
 
 
 def write_private(path: pathlib.Path, content: str) -> None:
+    # The mode argument only applies on creation: tighten an existing file before writing.
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    os.fchmod(fd, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as handle:
         handle.write(content)
-    os.chmod(path, 0o600)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -85,7 +86,11 @@ def main(argv: list[str] | None = None) -> int:
     template = pathlib.Path(args.template)
     output = pathlib.Path(args.output)
     if output.exists() and not args.force:
-        print(f"{output} ya existe: no se modifica (use --force para regenerarlo).")
+        print(
+            f"{output} ya existe: no se modifica. --force lo regenera con secretos nuevos, pero"
+            " Postgres y RabbitMQ conservan las contraseñas de sus volúmenes: tras --force hay que"
+            " borrar los volúmenes (make clean, borra los datos) o el stack no podrá autenticarse."
+        )
         return 0
 
     lines = template.read_text(encoding="utf-8").splitlines()

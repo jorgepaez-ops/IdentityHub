@@ -16,7 +16,7 @@ docker compose up -d   # equivalente: make up (construye las imágenes)
 make ps
 ```
 
-`make setup` no sobrescribe un `.env` existente. `docker compose up -d` (raíz) y `make up` construyen y levantan el perfil ordinario. Use `make down` para detenerlo conservando volúmenes y `make clean` únicamente si desea detenerlo **y borrar los volúmenes**. Para reconstruir un servicio concreto, use `make restart S=api`; para seguir su salida, `make logs S=api`.
+`make setup` no sobrescribe un `.env` existente. Regenerarlo (`python3 scripts/setup_env.py --force`) cambia las contraseñas, pero Postgres y RabbitMQ conservan las de sus volúmenes: después hay que ejecutar `make clean`, que **borra los datos**, o el stack no podrá autenticarse. `docker compose up -d` (raíz) y `make up` construyen y levantan el perfil ordinario. Use `make down` para detenerlo conservando volúmenes y `make clean` únicamente si desea detenerlo **y borrar los volúmenes**. Para reconstruir un servicio concreto, use `make restart S=api`; para seguir su salida, `make logs S=api`.
 
 ## Configuración por entorno
 

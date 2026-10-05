@@ -191,6 +191,12 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
     (`JWT_SIGNING_KEY=`) seguida de otra línea `CLAVE=` se reporta como secreto. El hook de T16 lo
     detectó en la plantilla de prueba; se evitó con una línea de comentario. Cambiar a `[ \t]*`
     afinaría la regla (decidir en qué tarea).
+  - Revisión nativa (alto, 7 archivos, 306 líneas, 4 lentes): **aprobada** y acusada
+    (`review-e11c51b694747de8`), 9 observaciones informativas. Aplicadas tres: `os.fchmod` antes de
+    escribir (con `--force` sobre un `.env` 0644 los secretos quedaban legibles un instante; la
+    prueba nueva comprueba el modo final, la ventana en sí no es observable de forma determinista),
+    aviso de que `--force` exige `make clean` por las contraseñas guardadas en los volúmenes, y el
+    `\s` inválido de la plantilla de prueba (`python3 -W error` limpio, 12/12).
 
 ## Fase 2 — IaC de referencia (producción en la nube, como ejemplo)
 

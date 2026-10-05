@@ -36,7 +36,7 @@ RABBITMQ_DEFAULT_USER=identity
 RABBITMQ_DEFAULT_PASS=      # obligatorio
 RABBITMQ_URL=amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@broker:5672/
 JWT_SIGNING_KEY=
-# proxies (a comment here also keeps gitleaks' \s* from reading the next line as a value)
+# proxies (a comment here also keeps the gitleaks rule from reading the next line as a value)
 TRUSTED_PROXIES=
 LOG_LEVEL=info
 GRAFANA_ADMIN_USER=admin
@@ -126,6 +126,12 @@ class SetupEnvTests(unittest.TestCase):
         self.assertIn("GRAFANA_ADMIN_PASSWORD", str(ctx.exception))
         self.assertNotEqual(ctx.exception.code, 0)
         self.assertFalse(self.output.exists())
+
+    def test_force_tightens_a_permissive_existing_file_before_writing(self) -> None:
+        self.output.write_text("OLD=1\n")
+        self.output.chmod(0o644)
+        self.run_setup("--force")
+        self.assertEqual(stat.S_IMODE(self.output.stat().st_mode), 0o600)
 
     def test_output_mode_is_0600(self) -> None:
         self.run_setup()
