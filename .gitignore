@@ -1,6 +1,7 @@
 # Secretos y entorno local
 .env
 .env.local
+*.local.md
 *.pem
 *.key
 !specs/**/*.key.example
@@ -28,8 +29,13 @@ e2e/.auth/
 *.sarif
 trivy-report.json
 gitleaks-report.json
+security/zap-reports/
 
 # SO / editores
 .DS_Store
 .idea/
 .vscode/
+
+# Python bytecode (scripts/traceability_test.py imports the script on CI runners).
+__pycache__/
+*.pyc

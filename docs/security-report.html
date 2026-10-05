@@ -532,7 +532,7 @@ footer p { margin-bottom: 0.5rem; }
 <div class="doc">
 
   <header class="masthead">
-    <p class="eyebrow">Identity Hub · Proyecto final de materia · Versión 2</p>
+    <p class="eyebrow">Identity Hub · Proyecto final de materia · Versión 3</p>
     <h1>Informe de seguridad de la línea base</h1>
     <p class="standfirst">
       Qué encontró el pipeline cuando se le dio, a propósito, algo real que
@@ -544,7 +544,7 @@ footer p { margin-bottom: 0.5rem; }
       <div><dt>Medida</dt><dd>2026-09-05 · 053e15f</dd></div>
       <div><dt>Remediado</dt><dd>v0.1.0-hardened</dd></div>
       <div><dt>Medido</dt><dd>2026-09-27 · 2ee59e2</dd></div>
-      <div><dt>Fichas</dt><dd>29 · 27 remediadas</dd></div>
+      <div><dt>Fichas</dt><dd>31 · 29 remediadas</dd></div>
     </dl>
   </header>
 
@@ -554,8 +554,8 @@ footer p { margin-bottom: 0.5rem; }
       El tag <code>v0.0.0-vuln-baseline</code> nunca se despliega. Existe para
       demostrar que cada control del pipeline detecta lo que dice detectar; la
       rama <code>main</code> es la versión remediada, congelada en el tag
-      <code>v0.1.0-hardened</code>. Esta segunda versión del informe conserva las
-      cifras de la línea base y añade la medición del estado corregido.
+      <code>v0.1.0-hardened</code>. Esta tercera versión conserva las
+      cifras de la línea base, la medición del estado corregido y los hallazgos nuevos de DAST.
     </p>
   </div>
 
@@ -785,8 +785,8 @@ footer p { margin-bottom: 0.5rem; }
           <tr>
             <td class="id">dast</td>
             <td class="mono">owasp zap</td>
-            <td>Cabeceras ausentes y <code>server_tokens on</code> confirmados a mano contra el stack; el gate se cablea en la semana 3</td>
-            <td><span class="pill pend">parcial</span></td>
+            <td>ZAP baseline y API scan detectaron 10055 (CSP sin <code>form-action</code>) y 30002 (login con contraseña larga); ambos quedan en PASS tras la remediación</td>
+            <td><span class="pill ok">sí</span></td>
           </tr>
         </tbody>
       </table>
@@ -807,10 +807,10 @@ footer p { margin-bottom: 0.5rem; }
   </section>
 
   <section>
-    <h2>Los tres hallazgos que no habíamos sembrado</h2>
+    <h2>Los cinco hallazgos que no habíamos sembrado</h2>
     <p class="section-note">
       Lo sembrado confirma que los gates funcionan, pero no enseña nada nuevo:
-      ya sabíamos que estaba ahí. Estos tres los encontró el pipeline por su
+      ya sabíamos que estaba ahí. Estos cinco los encontró el pipeline por su
       cuenta, y son el argumento entero a favor de tenerlo.
     </p>
 
@@ -897,6 +897,41 @@ footer p { margin-bottom: 0.5rem; }
           falsos positivos. <strong>Sin la línea base deliberada, ese job habría
           estado en verde y lo habríamos leído como «no hay secretos», cuando lo
           que decía era «no hay secretos con formato reconocible».</strong>
+        </p>
+      </article>
+
+      <article class="finding">
+        <div class="finding-head">
+          <span class="finding-id">VULN-030</span>
+          <h3 class="finding-title" style="margin:0">La CSP no restringía <span class="mono">form-action</span></h3>
+          <span class="pill high">medium</span>
+        </div>
+        <p>
+          El baseline de OWASP ZAP informó la alerta 10055 en el Hub y en Contabilidad: la
+          directiva <code>form-action</code> no hereda de <code>default-src</code>. Ante una XSS,
+          un formulario podía intentar enviar datos a otro origen.
+        </p>
+        <p>
+          La remediación añade <code>form-action 'self'</code> a las dos CSP. El run 37065094942
+          dejó 10055 en PASS en ambos baselines y el gate DAST sin alertas Medium o High.
+        </p>
+      </article>
+
+      <article class="finding">
+        <div class="finding-head">
+          <span class="finding-id">VULN-031</span>
+          <h3 class="finding-title" style="margin:0">El login devolvía 500 con una contraseña demasiado larga</h3>
+          <span class="pill high">medium</span>
+        </div>
+        <p>
+          El API scan de OWASP ZAP informó 30002. La reproducción local confirmó que 128 caracteres
+          devolvían 401, mientras que 129 devolvían 500 sin registrar el intento; así se evitaban los
+          controles de fallo de credenciales.
+        </p>
+        <p>
+          El login ahora trata el límite de longitud como credenciales inválidas, lo registra y lo
+          cuenta para el bloqueo. El run 37065094942 dejó 30002 en PASS; el antes de este hallazgo
+          queda documentado como evidencia local porque no hubo run de CI previo.
         </p>
       </article>
 
@@ -1010,7 +1045,7 @@ trivy image --severity HIGH,CRITICAL identity-hub-api:latest
     <ul class="plain">
       <li>GitHub Actions sí se ejecutó: runs de línea base 35476102444 y 35534898422; runs finales en verde 36283211113, 36284740966 y, sobre el tag corregido, 36329751647.</li>
       <li>El CI ejecuta CodeQL con <code>security-extended</code> para Go y JavaScript/TypeScript, y Semgrep con las reglas OWASP; este último rompe la build ante hallazgos de severidad <code>ERROR</code>. El informe no sustituye la revisión de las alertas SARIF publicadas.</li>
-      <li>El escaneo DAST con OWASP ZAP no está cableado; queda para la semana 3.</li>
+      <li>Los gates DAST de OWASP ZAP y E2E de Playwright ya están cableados. El run 37065094942 terminó con 15/15 jobs en verde; ZAP dejó en PASS 10055, 30002 y 40018.</li>
       <li>VULN-019 es parcial: Mailpit, migrate y cuatro imágenes de observabilidad no se actualizaron. VULN-028 es un riesgo aceptado mientras GO-2026-5932 siga no alcanzable y filtrada hasta 2026-12-25.</li>
       <li>No se ha hecho modelado de amenazas de la cadena de suministro del propio pipeline más allá de restringir los permisos por job.</li>
     </ul>
@@ -1022,7 +1057,7 @@ trivy image --severity HIGH,CRITICAL identity-hub-api:latest
       Cifras medidas el 2026-09-05 sobre <span class="mono">v0.0.0-vuln-baseline</span>
       (<span class="mono">053e15f</span>). Versión 2: remediación medida el 2026-09-27 sobre
       <span class="mono">c6fa5d6</span>, mismo código que <span class="mono">v0.1.0-hardened</span>
-      (<span class="mono">2ee59e2</span>).
+      (<span class="mono">2ee59e2</span>). Versión 3 (2026-10-05): incorpora VULN-030 y VULN-031, y los gates DAST y E2E verificados en el run 37065094942.
     </p>
     <p>
       Documentos relacionados: <span class="mono">specs/05-security/threat-model.md</span> ·

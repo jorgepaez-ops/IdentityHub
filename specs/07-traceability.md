@@ -10,26 +10,26 @@ declaración de buenas intenciones.
 
 | Requisito | Título | Pri | Operaciones de la API | Escenarios | Pruebas Go | E2E | Estado |
 |---|---|---|---|---|---|---|---|
-| **RF-001** | Alta de empleados por administración | P0 | `createEmployee`, `resendInvitation` | 4 | 34 | — | ✅ completo |
-| **RF-002** | Aceptación de invitación y verificación de correo | P0 | `acceptInvitation` | 4 | 16 | — | ✅ completo |
-| **RF-003** | Inicio de sesión | P0 | `login` | 2 | 10 | — | ✅ completo |
-| **RF-004** | Emisión y validación de JWT | P0 | `getJwks` | 1 | 8 | — | ✅ completo |
-| **RF-005** | Renovación de sesión | P0 | `refreshSession` | 1 | 7 | — | ✅ completo |
-| **RF-006** | Detección de reuso de refresh token | P0 | — | 1 | 5 | — | ✅ completo |
-| **RF-007** | Cierre de sesión | P0 | `logout` | 1 | 9 | — | ✅ completo |
+| **RF-001** | Alta de empleados por administración | P0 | `createEmployee`, `resendInvitation` | 4 | 34 | 4 | ✅ completo |
+| **RF-002** | Aceptación de invitación y verificación de correo | P0 | `acceptInvitation` | 4 | 16 | 3 | ✅ completo |
+| **RF-003** | Inicio de sesión | P0 | `login` | 2 | 14 | 2 | ✅ completo |
+| **RF-004** | Emisión y validación de JWT | P0 | `getJwks` | 1 | 8 | 1 | ✅ completo |
+| **RF-005** | Renovación de sesión | P0 | `refreshSession` | 1 | 7 | 1 | ✅ completo |
+| **RF-006** | Detección de reuso de refresh token | P0 | — | 1 | 5 | 1 | ✅ completo |
+| **RF-007** | Cierre de sesión | P0 | `logout` | 1 | 9 | 1 | ✅ completo |
 | **RF-008** | Perfil propio | P0 | `getCurrentUser`, `updateCurrentUser` | — | 7 | — | 🟡 parcial |
-| **RF-009** | Control de acceso por roles | P0 | — | 5 | 20 | — | ✅ completo |
-| **RF-010** | Administración de usuarios | P0 | `listUsers`, `getUser`, `updateUser` | 3 | 12 | — | ✅ completo |
-| **RF-011** | Registro de auditoría | P0 | `listAuditLog` | 1 | 9 | — | ✅ completo |
+| **RF-009** | Control de acceso por roles | P0 | — | 5 | 20 | 5 | ✅ completo |
+| **RF-010** | Administración de usuarios | P0 | `listUsers`, `getUser`, `updateUser` | 3 | 12 | 3 | ✅ completo |
+| **RF-011** | Registro de auditoría | P0 | `listAuditLog` | 1 | 9 | 1 | ✅ completo |
 | **RF-012** | Notificaciones asíncronas | P0 | — | 1 | 9 | — | ✅ completo |
 | **RF-013** | Segundo factor obligatorio por correo | P1 | — | 1 | 5 | — | ✅ completo |
-| **RF-014** | Inicio de sesión con segundo factor | P1 | `verifyMfa`, `resendMfaCode` | 5 | 36 | — | ✅ completo |
-| **RF-015** | Restablecimiento de contraseña | P1 | `requestPasswordReset`, `confirmPasswordReset` | 3 | 33 | — | ✅ completo |
-| **RF-016** | Sesiones activas | P1 | `listSessions`, `revokeSession` | 1 | 8 | — | ✅ completo |
-| **RF-017** | Bloqueo por fuerza bruta | P1 | — | 4 | 22 | — | ✅ completo |
-| **RF-018** | Claves de servicio | P2 | — | — | — | — | ⏳ diferido (semana 3) |
-| **RF-019** | Exportación del audit log | P2 | — | — | — | — | ⏳ diferido (semana 3) |
-| **RF-020** | Autorización de aplicaciones cliente | P1 | `authorizeClient`, `exchangeAuthorizationCode` | 10 | 24 | — | ✅ completo |
+| **RF-014** | Inicio de sesión con segundo factor | P1 | `verifyMfa`, `resendMfaCode` | 5 | 36 | 4 | ✅ completo |
+| **RF-015** | Restablecimiento de contraseña | P1 | `requestPasswordReset`, `confirmPasswordReset` | 3 | 33 | 3 | ✅ completo |
+| **RF-016** | Sesiones activas | P1 | `listSessions`, `revokeSession` | 1 | 8 | 1 | ✅ completo |
+| **RF-017** | Bloqueo por fuerza bruta | P1 | — | 4 | 23 | 1 | ✅ completo |
+| **RF-018** | Claves de servicio | P2 | — | — | — | — | ⏳ diferido (semana 4) |
+| **RF-019** | Exportación del audit log | P2 | — | — | — | — | ⏳ diferido (semana 4) |
+| **RF-020** | Autorización de aplicaciones cliente | P1 | `authorizeClient`, `exchangeAuthorizationCode` | 10 | 24 | 8 | ✅ completo |
 | **RNF-001** | Contenerización total | P0 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-002** | Pipeline de ciclo completo | P0 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-003** | Cero secretos en el repositorio | P0 | — | — | 4 | — | 🟡 parcial |
@@ -38,15 +38,15 @@ declaración de buenas intenciones.
 | **RNF-006** | Procedencia verificable | P0 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-007** | Observabilidad | P0 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-008** | Contenedores endurecidos | P0 | — | — | — | — | 🔴 sin cubrir |
-| **RNF-009** | Cabeceras de seguridad | P0 | — | — | — | — | 🔴 sin cubrir |
+| **RNF-009** | Cabeceras de seguridad | P0 | — | — | — | 6 | 🟡 parcial |
 | **RNF-010** | Latencia | P1 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-011** | Los specs son la fuente de verdad | P0 | — | — | 5 | — | 🟡 parcial |
 | **RNF-012** | Logs sin datos sensibles | P0 | — | — | 5 | — | 🟡 parcial |
 
-**Resumen:** 32 requisitos · 17 completos · 6 parciales · 7 sin cubrir · 2 diferidos (semana 3).
+**Resumen:** 32 requisitos · 17 completos · 7 parciales · 6 sin cubrir · 2 diferidos (semana 4).
 
 Leyenda de estado: *completo* = verificado por al menos dos de las tres
-columnas de prueba · *parcial* = una sola · *sin cubrir* = ninguna · *diferido (semana 3)* = backlog de semana 3 por decisión Q14.
+columnas de prueba · *parcial* = una sola · *sin cubrir* = ninguna · *diferido (semana 4)* = backlog de semana 4 por decisión Q14.
 
 ## Escenarios de aceptación por requisito
 

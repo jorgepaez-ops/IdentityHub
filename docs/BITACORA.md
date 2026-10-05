@@ -12,6 +12,56 @@ retomar el trabajo no exija reconstruir el contexto desde cero.
 
 ---
 
+## 2026-10-05 · Semana 3 — OAuth, dominios locales, frontend, E2E y DAST
+
+Cierra las fases 0 a 3 de la semana 3. El detalle por tarea y la evidencia trazable permanecen en
+`odd/tasks/idp-semana-3.md`; esta entrada concentra el estado que necesita quien retome el proyecto.
+
+### Hecho
+
+- Las fases 0 a 3 incorporaron OAuth 2.0 con authorization code y PKCE, los dominios locales separados del Hub y Contabilidad, y sus interfaces de frontend.
+- Playwright cubre la demo y los escenarios de extremo a extremo; OWASP ZAP añade el gate DAST para los baselines web y el escaneo de API.
+- Se crearon y remediaron VULN-030 (CSP sin `form-action`) y VULN-031 (login con contraseña larga que respondía 500).
+- T16 dejó documentado e instalado el hook real de pre-commit para detectar secretos antes del commit.
+
+### Verificado contra el sistema en ejecución
+
+| Comprobación | Resultado |
+|---|---|
+| CI, run 37334970578 | 15/15 jobs en verde |
+| Acción compuesta `stack-up` | verificada por los jobs E2E, integración y DAST |
+
+### Decisiones tomadas sobre la marcha
+
+- D3 y D10 mantienen Hub y Contabilidad en dominios locales distintos para demostrar SSO sin compartir la sesión entre aplicaciones; Chrome y Firefox resuelven `*.localhost` sin preparar el equipo.
+- D4 fija OAuth 2.0 authorization code con PKCE como el SSO mínimo; D5 conserva MFA por código enviado a Mailpit para el alcance de la demo.
+- D8 y D9 separan los roles del directorio de los roles de Contabilidad y mantienen cerrado el autorregistro.
+
+### Hallazgos
+
+- ZAP detectó VULN-030 y VULN-031; ambos quedaron remediados y el gate DAST forma parte del CI.
+- BUG-1 y BUG-2 (aceptar invitación y entrar a Contabilidad) no se reproducen: con una sesión por
+  usuario funcionan en Chromium, WebKit, Firefox y Safari (verificación manual del usuario,
+  2026-10-05). La causa probable fue compartir la sesión del Hub entre el admin y el empleado en el
+  mismo navegador, que el SSO reutiliza a propósito.
+
+### Estado
+
+- Fases 0 a 3 cerradas con T16 (hook de pre-commit) y T17 (cierre de fase). El PR de corte de la
+  fase 3 queda pendiente de la confirmación del usuario.
+- RF-018 y RF-019 siguen diferidos para la semana 4 y visibles en la matriz de trazabilidad.
+
+### Entregables publicados
+
+- OAuth, dominios locales, frontend, pruebas Playwright E2E y gate DAST de OWASP ZAP.
+- Fichas y evidencia versionada de VULN-030 y VULN-031.
+
+### Siguiente paso
+
+1. Planificar RF-018 y RF-019 para la semana 4.
+
+---
+
 ## 2026-09-27 · Semana 2 (cierre) — Núcleo del IdP, remediación y evidencia "después"
 
 Cierra las fases 0 a 3. El detalle por tarea y la evidencia trazable permanecen en

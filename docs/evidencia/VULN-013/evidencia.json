@@ -1,6 +1,8 @@
 {
   "vuln": "VULN-013",
-  "gate": [],
+  "gate": [
+    "OWASP ZAP baseline del Hub (job 11 · DAST)"
+  ],
   "antes": {
     "commit_linea_base": "053e15fb27b1aaf974c7c818108eee64628973e9",
     "commit_main": null,
@@ -29,6 +31,28 @@
     "hallazgos": [
       "curl -sI http://localhost:8080/: las cinco cabeceras de RNF-009 presentes (Content-Security-Policy, Strict-Transport-Security, X-Content-Type-Options, X-Frame-Options, Referrer-Policy)"
     ],
-    "observacion": "Sin gate hoy (ZAP llega en semana 3, misma decisión Q18 que el antes). Ejecución local del 2026-09-26 con el stack completo (make up) sobre PR #2. Sin gate de CI (ZAP llega en semana 3): la evidencia después es la ejecución local documentada; run_url se mantiene en null."
+    "observacion": "Evidencia original: ejecución local con curl del 2026-09-26 (entonces no había gate de CI). Desde T15 hay gate real: ver despues.gate_ci (OWASP ZAP baseline del Hub, job 11 · DAST, run 37055543540).",
+    "gate_ci": {
+      "workflow": "CI",
+      "run_id": "37065094942",
+      "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/37065094942",
+      "commit": "16ab347c941ea174f03899e79a6618b8dac399ac",
+      "job": "11 · DAST (OWASP ZAP) (id 111031306475)",
+      "bloque": "primer baseline del log (hub.json, 6 URLs, sin \"Using override\")",
+      "hallazgos": [
+        "PASS: Anti-clickjacking Header [10020]",
+        "PASS: X-Content-Type-Options Header Missing [10021]",
+        "PASS: Strict-Transport-Security Header [10035]",
+        "PASS: Content Security Policy (CSP) Header Not Set [10038]"
+      ],
+      "captura": "informe §VULN-013 — después (run 37065094942, run verde): 10020, 10021, 10035, 10038",
+      "observacion": "Run con los 15 jobs en verde (job 11 \"Gate passed\"). Las capturas ya tomadas del run 37055543540 quedan en run_rojo_previo: mismas reglas en PASS, pero ese job terminó en rojo por VULN-030.",
+      "run_rojo_previo": {
+        "run_id": "37055543540",
+        "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/37055543540",
+        "commit": "133aa8b384f2ba93142a03f79126e6880460ebc3",
+        "captura": "informe §VULN-013 — run previo (job 11 en rojo por VULN-030)"
+      }
+    }
   }
 }

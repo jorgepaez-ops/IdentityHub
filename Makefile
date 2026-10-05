@@ -10,7 +10,7 @@ SQLC_VERSION := v1.31.1
 SQLC         ?= sqlc
 
 .DEFAULT_GOAL := help
-.PHONY: help up down logs ps restart build test test-go test-integration test-front e2e lint fmt gen scan scan-secrets scan-deps scan-image scan-config migrate psql rabbit mail clean
+.PHONY: help up down logs ps restart build test test-go test-integration test-front e2e _e2e-run scan-dast _scan-dast-run spec-drift lint fmt gen scan scan-secrets scan-deps scan-image scan-config migrate psql rabbit mail clean
 
 help: ## Muestra esta ayuda
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -83,8 +83,58 @@ test-front: ## Pruebas del frontend (consola del Hub y Contabilidad)
 	cd frontend && npm run test
 	cd contabilidad && npm run test
 
+# Límite por IP mientras corren las suites locales (e2e, scan-dast). E2E_LOGIN_IP_MAX_FAILURES
+# sigue funcionando como alias retrocompatible.
+LOCAL_TEST_LOGIN_IP_MAX_FAILURES ?= $(or $(E2E_LOGIN_IP_MAX_FAILURES),1000)
+
+# Envuelve un objetivo interno: sube solo el límite por IP (RF-017), lo restaura con trap en
+# EXIT/INT/TERM y avisa si alguna IP quedó bloqueada. Ver scripts/with-raised-login-limit.sh.
+WITH_RAISED_LIMIT = COMPOSE='$(COMPOSE)' LOCAL_TEST_LOGIN_IP_MAX_FAILURES=$(LOCAL_TEST_LOGIN_IP_MAX_FAILURES) \
+    scripts/with-raised-login-limit.sh $(MAKE) --no-print-directory
+
 e2e: ## Pruebas de extremo a extremo contra el stack levantado
-	@echo "Pendiente para la semana 3: Playwright."
+	@# Todas las peticiones salen de la misma IP: se sube solo el límite por IP
+	@# (RF-017) mientras corre la suite y se restaura al terminar, pase o falle.
+	@$(WITH_RAISED_LIMIT) _e2e-run
+
+_e2e-run:
+	cd e2e && npm ci --ignore-scripts && npx playwright test
+
+ZAP_IMAGE ?= ghcr.io/zaproxy/zaproxy:2.17.0
+ZAP_REPORTS := security/zap-reports
+ZAP_RUN = docker run --rm --add-host identityhub.localhost:host-gateway \
+    --add-host contabilidad.localhost:host-gateway \
+    -v "$(CURDIR)/$(ZAP_REPORTS):/zap/wrk:rw" \
+    -v "$(CURDIR)/.zap/rules.tsv:/zap/wrk/rules.tsv:ro" \
+    -v "$(CURDIR)/specs/03-api/openapi.yaml:/zap/wrk/openapi.yaml:ro" $(ZAP_IMAGE)
+
+scan-dast: ## DAST con OWASP ZAP (baseline Hub y Contabilidad + API) contra el stack levantado; rompe con riesgo medio o más
+	@# ZAP corre con -I: no decide él. scripts/zap-gate.py es el único punto de decisión.
+	@# El escaneo de API golpea /api/v1/auth/ desde una sola IP: se sube el límite por IP
+	@# (RF-017) mientras corre y se restaura al terminar, igual que en make e2e.
+	@# Al API scan NO se le pasa -c: con un archivo de reglas ZAP cambia a la política "Default Policy"
+	@# con todas las reglas activas (DOM XSS lanza navegadores y agota la memoria del contenedor);
+	@# sin él usa API-Minimal. Las reglas WARN/IGNORE las aplica scripts/zap-gate.py sobre el JSON.
+	@# El escaneo de API va directo a la API (:8081), sin Nginx: su limit_req (5r/s en /api/v1/auth/)
+	@# cortaba respuestas a mitad del escaneo (410 → 429) y ZAP lo leía como inyección SQL booleana
+	@# (falso positivo 40018, run 37058826831). Nginx sigue cubierto por los dos baseline y por E2E.
+	@rm -rf $(ZAP_REPORTS) && mkdir -p $(ZAP_REPORTS) && chmod 777 $(ZAP_REPORTS)
+	@$(WITH_RAISED_LIMIT) _scan-dast-run
+
+_scan-dast-run:
+	$(ZAP_RUN) zap-baseline.py -t http://identityhub.localhost:8080 -c rules.tsv -I \
+	    -J hub.json -r hub.html && \
+	  $(ZAP_RUN) zap-baseline.py -t http://contabilidad.localhost:8080 -c rules.tsv -I \
+	    -J contabilidad.json -r contabilidad.html && \
+	  $(ZAP_RUN) zap-api-scan.py -t openapi.yaml -f openapi -O http://identityhub.localhost:8081 \
+	    -I -J api.json -r api.html && \
+	  python3 scripts/zap-gate.py --rules .zap/rules.tsv \
+	    $(ZAP_REPORTS)/hub.json $(ZAP_REPORTS)/contabilidad.json $(ZAP_REPORTS)/api.json
+
+spec-drift: ## Verifica sin red la matriz y escenarios Gherkin contra E2E
+	python3 scripts/traceability_test.py
+	python3 scripts/zap_gate_test.py
+	python3 scripts/traceability.py --check
 
 migrate: ## Aplica las migraciones pendientes
 	$(COMPOSE) run --rm migrate

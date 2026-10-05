@@ -6,8 +6,10 @@
 #  se sembró para ellos. Pasará a verde durante la fase de remediación.
 #  Para ver los hallazgos sin bloquear, está baseline-scan.yml.
 #
-#  Jobs 1–10 de la tabla del plan. Los de release (SBOM, firma, publicación),
-#  E2E y DAST se incorporan en la semana 3.
+#  Jobs 1–10 de la tabla del plan; el 7 (E2E con Playwright contra el stack
+#  completo de docker compose) se agregó en T14e y el 11 (DAST con OWASP ZAP,
+#  rompe con riesgo medio o más) en T15a. Los de release (SBOM, firma,
+#  publicación) se incorporan en la semana 3.
 # ═══════════════════════════════════════════════════════════════════════════
 name: CI
 
@@ -74,6 +76,14 @@ jobs:
         run: |
           npm install --no-package-lock --ignore-scripts
           npm run gen:api
+
+      # T14d — correspondencia 1 a 1 escenario Gherkin ↔ prueba E2E (stdlib, sin red).
+      - name: Pruebas del verificador de trazabilidad
+        run: python3 scripts/traceability_test.py
+
+      # Pruebas del gate de ZAP (stdlib, sin red): el gate decide el job 11.
+      - name: Pruebas del gate de ZAP
+        run: python3 scripts/zap_gate_test.py
 
       - name: Regenerar la matriz de trazabilidad
         run: python3 scripts/traceability.py
@@ -382,6 +392,59 @@ jobs:
           echo "coverage=${COVERAGE}" >> "$GITHUB_OUTPUT"
         id: coverage
 
+  # ── 7. Pruebas de extremo a extremo ─────────────────────────────────────
+  e2e:
+    name: 7 · E2E (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      # .env desechable, hosts *.localhost, make up y espera de salud (acción compuesta local).
+      - name: Levantar el stack
+        uses: ./.github/actions/stack-up
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+
+      # `make e2e` ejecuta `npm ci --ignore-scripts`; los navegadores van antes porque necesitan las
+      # dependencias de sistema (--with-deps usa sudo) y el paquete ya instalado.
+      - name: Instalar Chromium de Playwright
+        working-directory: e2e
+        run: |
+          npm ci --ignore-scripts
+          # The lockfile-pinned binary, never npx: it cannot fetch an unpinned package on demand.
+          ./node_modules/.bin/playwright install --with-deps chromium
+
+      - name: Pruebas E2E (make e2e)
+        run: make e2e
+
+      - name: Subir informe y trazas de Playwright
+        # cancelled(): al vencer timeout-minutes GitHub cancela el job (no lo marca como
+        # fallido); sin esto, justo ese caso se quedaría sin informe ni logs.
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-${{ github.run_id }}
+          path: |
+            e2e/playwright-report
+            e2e/test-results
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Volcar los logs del stack
+        if: failure() || cancelled()
+        run: docker compose --env-file .env -f deploy/docker-compose.yml logs --no-color --tail=300
+
+      - name: Derribar el stack
+        if: always()
+        run: docker compose --env-file .env -f deploy/docker-compose.yml down -v
+
   # ── 8. Configuración e infraestructura ──────────────────────────────────
   iac-scan:
     name: 8 · Configuración de contenedores
@@ -490,3 +553,43 @@ jobs:
           ignore-unfixed: true
           trivyignores: security/.trivyignore
           exit-code: "1"
+
+  # ── 11. DAST con OWASP ZAP ──────────────────────────────────────────────
+  # Mismo arranque del stack que el job 7. `make scan-dast` corre ZAP (baseline del Hub y de
+  # Contabilidad + escaneo de API con el OpenAPI) y scripts/zap-gate.py rompe la build con
+  # hallazgos de severidad media o más (T15; las reglas aceptadas viven en .zap/rules.tsv).
+  # El arranque es el mismo del job 7: acción compuesta .github/actions/stack-up.
+  dast:
+    name: 11 · DAST (OWASP ZAP)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      # .env desechable, hosts *.localhost, make up y espera de salud (acción compuesta local).
+      - name: Levantar el stack
+        uses: ./.github/actions/stack-up
+
+      - name: Escaneo DAST (make scan-dast)
+        run: make scan-dast
+
+      - name: Subir informes de ZAP
+        # always(): los informes se guardan pase, falle o se cancele el job (al vencer
+        # timeout-minutes GitHub lo cancela, no lo marca como fallido).
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-reports-${{ github.run_id }}
+          path: security/zap-reports
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Volcar los logs del stack
+        if: failure() || cancelled()
+        run: docker compose --env-file .env -f deploy/docker-compose.yml logs --no-color --tail=300
+
+      - name: Derribar el stack
+        if: always()
+        run: docker compose --env-file .env -f deploy/docker-compose.yml down -v

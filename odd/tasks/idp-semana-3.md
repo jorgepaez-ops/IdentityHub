@@ -958,24 +958,321 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 - Una prueba por escenario Gherkin, lectura de correos por la API de Mailpit, el guion de la demo
   como prueba; `make e2e` real y job en CI; `spec-drift` comprueba la correspondencia.
 - Commit: —
+- Mapa (explorador, 2026-10-02): 37 escenarios en 6 features (`specs/06-acceptance/`, etiquetas
+  `@RF-NNN`); `scripts/traceability.py` solo cuenta pruebas por RF (no falla si falta una);
+  `make spec-drift` no existe; ningún job de CI levanta el stack; el admin inicial no tiene
+  contraseña (solo invitación por correo); `/api/v1/auth/` limitado a 5r/s burst 5 (429).
+- Decisión del usuario (2026-10-02): los escenarios sin camino E2E puro (auditoría inmutable,
+  invitación vencida, encolado) se cubren con acceso directo controlado (`docker exec … psql`) para
+  que los 37 tengan prueba E2E real, no con exenciones. Las pruebas crean su propio admin
+  (`e2e-admin-*@example.test`, invitación sembrada por SQL y aceptada por la API real), sin tocar
+  las cuentas del usuario.
+- Convención: un `test()` por escenario titulado `RF-NNN <nombre exacto del escenario>` (primera
+  etiqueta RF), en `e2e/tests/<feature>.spec.ts`.
+- Subtareas:
+  - [x] T14a — Andamiaje: `e2e/package.json` + lockfile (`@playwright/test` 1.63.0), config,
+    helpers (Mailpit, API, admin sembrado, correos únicos, ritmo bajo el límite de 5r/s),
+    `make e2e`, smoke test de Nginx con cabecera `Host` (deuda de T11) y el escenario "aceptar
+    invitación" como prueba del arnés. Ruta: delegada (Sonnet: red y Docker).
+    Hecho (2026-10-02): `e2e/` con `@playwright/test` 1.63.0 fijo, helpers (`support/`: Mailpit,
+    API con ritmo de 300 ms, psql por `execFile` con variables `-v`, admin sembrado), 6 pruebas
+    RNF-009 de Nginx por `Host` y RF-002 "Aceptar la invitación…" por la UI. Revisión de Claude:
+    se endureció la prueba de `/oauth/` (exige 400 `application/problem+json` de la API, no solo
+    "no es HTML"). Evidencia: `make e2e` 7/7 tres veces seguidas (idempotente), `tsc --noEmit` ok,
+    gitleaks sobre `e2e/` sin hallazgos, matriz regenerada (`traceability.py --check` al día).
+  - [x] T14b — Escenarios restantes de las 6 features. Ruta: delegada (Codex escribe, Claude corre).
+    - Lote 1 (2026-10-02, Codex escribió, Claude corrió y revisó): autenticación (8), rotación de
+      sesión (4) y restablecimiento (3). Revisión de Claude: "Agotar los intentos" ahora prueba que
+      el `mfaToken` agotado rechaza el código **correcto** y que los 5 rechazos quedan en
+      `audit_log` (antes repetía un código incorrecto, que pasaría igual con el desafío vivo); la URL
+      del Hub sale de `support/config.ts` en vez de 22 literales. Codex endureció `mailpit.ts`
+      (`full.ok`, reintento ante errores de red), advertencias de la revisión de T14a.
+    - Problema hallado: el límite por IP de RF-017 (20 fallos en 15 min, contados en `audit_log`, que
+      no se puede borrar) bloqueaba la segunda corrida con 423. Decisión del usuario (opción a):
+      `make e2e` recrea la API con `LOGIN_IP_MAX_FAILURES=1000` mientras corre y la restaura al
+      terminar (compose pasa la variable con default 20); el límite por cuenta no se toca; chequeo
+      previo (`support/global-setup.ts`) que falla con un mensaje claro si la IP ya está bloqueada.
+    - Deriva spec↔código (sin id, a decidir): `autenticacion.feature` espera el evento de auditoría
+      `mfa_succeeded`; el backend emite `mfa_code_accepted` y `login_succeeded`. La prueba afirma lo
+      real (`login_succeeded`). Hallazgos de la revisión de T14a/rango aún abiertos: timeout en
+      `psql` de `db.ts:32` y la prueba débil de `nginx.spec.ts:63-72`.
+    - Evidencia: `make e2e` 22/22 en tres corridas seguidas (antes del ajuste, la segunda daba 423);
+      tras cada corrida la API vuelve a `LOGIN_IP_MAX_FAILURES=20`; `tsc --noEmit` ok.
+    - Correcciones tras la revisión de 4 lentes de `7b45057` (Codex escribió; Claude corrió y añadió
+      lo último): los correos se esperan excluyendo los ID que ya existían antes de la acción (las
+      carreras de login doble, reenvío y desafíos sucesivos); "Agotar los intentos" deja 1 intento
+      por SQL para aislar el agotamiento del bloqueo de la cuenta (ambos umbrales son 5) y comprueba
+      que la cuenta sigue `active`; `LoginRejectedError` tipado para el chequeo previo; `make e2e`
+      restaura el límite con `trap` en EXIT/INT/TERM; `psql` con timeout de 30 s; tipos desde
+      `@playwright/test` (no de `playwright-core`, que no está declarado). Evidencia: `make e2e` 22/22
+      dos veces seguidas; interrumpido con SIGINT a mitad de la suite, el límite vuelve de 1000 a 20.
+    - Lote 2 (2026-10-02, Codex escribió, Claude corrió y revisó): registro (6 restantes) y control de
+      acceso (8), incluida "sin acceso a Contabilidad" por navegador. Revisión de Claude: la prueba
+      de auditoría inalterable ahora hace `SET ROLE identity_app` (el escenario habla de la
+      aplicación; Codex la corría como dueño de la tabla) y espera `insufficient_privilege` en UPDATE
+      y DELETE; "conserva sus roles anteriores" compara la lista exacta. Codex añadió además lo que
+      pidió la revisión de `e319485` (comentario del atajo SQL, `attempts_left` inicial = 5, reintento
+      del snapshot de Mailpit). Evidencia: `make e2e` 36/36 dos veces; matriz al día.
+    - Advertencias abiertas de la revisión del rango (para la limpieza al cerrar T14): `fetch` sin
+      timeout en `api.ts`/`mailpit.ts`, helpers de login duplicados entre `api.ts` y `auth.ts`, URL
+      base del Hub en dos lugares (`playwright.config.ts` y `support/config.ts`), prueba débil de
+      `nginx.spec.ts:63-72`.
+    - Más advertencias de la revisión del rango con el lote 2 (aprobada): `make e2e` no avisa si falla
+      la restauración del límite; el 429 de "ventana mínima" no distingue RF-014 del limitador de
+      Nginx (afirmar el tipo de problema); falta un timeout por prueba acorde a los flujos con varios
+      correos (hoy, 30 s por defecto).
+    - Lote 3 (2026-10-02, Codex escribió, Claude corrió y revisó): OAuth (9), cuatro por navegador
+      (PKCE completo, segundo acceso por SSO sin contraseña ni correo nuevo, login con `continue`,
+      `continue` externo sin redirección abierta) y cinco de protocolo. Al correrlo, 2 fallaban por
+      exigir `aud` como texto: el backend lo emite como lista de un elemento, que RFC 7519 admite y la
+      spec ("identifica a Contabilidad") también; la prueba ahora exige exactamente `[contabilidad]`.
+      Evidencia: `make e2e` 45/45 (39 escenarios Gherkin + 6 RNF-009 de Nginx); matriz al día.
+    - Cierre de T14b: los 39 escenarios Gherkin tienen exactamente una prueba con su título (el mapa
+      inicial decía 37; recuento real con `grep`/`comm`: 39, sin faltantes ni sobrantes).
+  - [x] T14c — Guion de la demo como prueba (criterio de aceptación 1). Ruta: delegada.
+    Hecho (2026-10-02, Sonnet porque Codex estaba sin cupo; revisó y commiteó Claude):
+    `e2e/tests/demo.spec.ts`, una prueba "DEMO …" (sin prefijo RF, no es escenario Gherkin) con un
+    `test.step` por paso del guion, todo por la UI real con dos navegadores (admin y empleado): alta
+    desde el cajón de Usuarios, invitación en Mailpit, contraseña, login con MFA, Contabilidad por
+    SSO sin contraseña ni correo nuevo, analista con "Cierre contable" bloqueado, cambio a senior en
+    la consola y el siguiente acceso lo refleja. `docs/guion-demo.md` es el guion para presentar en
+    vivo (insumo para T17). Evidencia: la demo pasó 2/2 sola; `make e2e` 46/46; `make spec-drift`
+    ok; la API quedó con `LOGIN_IP_MAX_FAILURES=20`.
+  - [x] T14d — `spec-drift` comprueba la correspondencia escenario↔prueba (falla si falta o sobra)
+    y `make spec-drift`. Ruta: delegada (Codex, sin red).
+    Hecho (2026-10-02): Codex escribió casi todo y se cortó por su límite de uso antes de regenerar
+    la matriz; Claude lo revisó y terminó. `scripts/traceability.py` exige uno a uno escenario↔prueba
+    (falta, sobra o duplicada → error con archivo:línea) y, añadido por Claude, también falla si un
+    título RF/RNF no es literal (antes quedaba invisible). `nginx.spec.ts` con títulos literales: la
+    matriz cuenta 6 en RNF-009 (antes 4). `scripts/traceability_test.py` (stdlib) y `make
+    spec-drift`. Evidencia: RED sobre el repo real (un título pasado a template → exit 1 con el
+    escenario faltante y el título no literal), GREEN tras restaurarlo; `make spec-drift` ok; 6/6
+    de Nginx. El job de CI ya corre `traceability.py`, así que lo exige sin renombrarse; sumar
+    `traceability_test.py` al job queda para T14e.
+  - [x] Limpieza de advertencias de las revisiones de T14 (2026-10-02, Sonnet porque Codex estaba sin
+    cupo; revisó y commiteó Claude): timeouts en los `fetch` de `api.ts`/`mailpit.ts`; un solo flujo
+    de login con MFA (`passwordThenMfa`); `hubUrl` como única fuente de la URL; timeout de 120 s por
+    prueba; `make e2e` avisa y sale con error si falla la restauración del límite (rama escrita pero
+    no ejercitada); el 429 de "ventana mínima" exige el problema `mfa-resend-rate-limited` de la app;
+    "no aceptó la invitación" ya no es vacía (contraseña conocida y cuenta devuelta a pendiente por
+    SQL → 401 `invalid-credentials` sin revelar el estado); el reenvío acepta el token nuevo (204);
+    la espera de la redirección OAuth solo acepta el 302 hacia el `redirect_uri`; Nginx por hosts con
+    nombre y Contabilidad identificada por su `<title>`; un solo parser de Gherkin, etiquetas que no
+    se arrastran entre bloques, escenarios duplicados como error y pruebas de esas ramas; comentario de
+    `advanceUntil` corregido. Evidencia: `make e2e` 45/45 dos veces, límite de vuelta en 20,
+    `make spec-drift` ok (3 pruebas + matriz idéntica), Contabilidad 53/53, `tsc` ok.
+    Revisión de `e28d3cf` aprobada; se quitó la constante muerta `GHERKIN_SCOPE` (el reinicio real
+    de etiquetas es la rama `else` del parser). Decisión consciente: "no aceptó la invitación"
+    fabrica el estado por SQL (contraseña conocida + `pending_verification`), porque un invitado
+    real nunca tiene una contraseña conocida y solo así se prueba que el 401 viene del estado.
+  - [ ] T14e — Job E2E en CI (stack con `.env` generado), sin renombrar los 17 checks
+    obligatorios; verificarlo requiere push (decisión del usuario).
+    Escrito (2026-10-02, Sonnet; revisó y commiteó Claude): job `e2e` "7 · E2E (Playwright)"
+    (`contents: read`, 30 min): `.env` desechable con secretos aleatorios enmascarados (dueño
+    `identity` para migraciones y el helper `psql`; `identity_app` con `IDENTITY_APP_PASSWORD`, como
+    `deploy/postgres-init`), `/etc/hosts` para `*.localhost` como respaldo, `make up`, espera por
+    HTTP, Chromium con `--with-deps`, `make e2e`, artefactos y logs si falla, `down -v` siempre.
+    `spec-drift` corre además `traceability_test.py`. Ningún job renombrado. Verificado en local:
+    `actionlint` sin hallazgos, YAML válido, el paso del `.env` ejecutado en un directorio aparte
+    resuelve todo `docker compose config`. **Sin verificar hasta el push**: que corra en GitHub,
+    resolución de `*.localhost` en el runner, tiempo de build dentro de 30 min. El check nuevo no
+    está en la lista obligatoria del ruleset (decisión del usuario si se agrega).
+    Advertencia de la revisión del rango (aprobada), hoy sin efecto: un escenario etiquetado solo
+    con RNF no entraría en la correspondencia uno a uno; no existe ninguno en las features.
+    Primer run real (2026-10-02, `workflow_dispatch` sobre la rama tras el push autorizado por el
+    usuario; el CI no corre en pushes fuera de `main`): run 37044020903. **Job 7 en verde**: 46/46 en
+    5,3 min, job completo en 7 min 17 s (cabe en los 30); `*.localhost`, `make up` y las credenciales
+    deducidas funcionaron. Fallaron dos jobs:
+    - **1 · spec-drift**: `traceability_test.py` importa el script y en Linux deja
+      `scripts/__pycache__/`, que ensucia el árbol (en macOS no aparece: el Python de Apple guarda el
+      bytecode en `~/Library/Caches`). Reproducido en un clon limpio con `python:3.12-slim`; corregido
+      en `bf209a1` (`sys.dont_write_bytecode` + `__pycache__/` en `.gitignore`), verificado igual.
+      Sin subir todavía.
+    - **3 · Secretos en el historial**: 28 hallazgos de la regla propia `contrasena-en-variable-de-
+      entorno` en `e2e/` (commits e435d09, 7b45057, 840a954, e28d3cf): 25 son referencias a
+      variables o tipos (`password: strongPassword`, `password: string`) y 3 son contraseñas
+      incorrectas a propósito de los escenarios (`'una-contraseña-cualquiera'`,
+      `'incorrect-password-value'`). Ninguno es un secreto. Como el job escanea todo el historial ya
+      subido, la única salida es registrar las 28 huellas exactas en `.gitleaksignore`, que por la
+      decisión Q20 requiere aprobación explícita del usuario. **Aprobado por el usuario
+      (2026-10-02)**: las 28 huellas exactas quedan en `.gitleaksignore` con su justificación;
+      `make scan-secrets` local: 243 commits, sin hallazgos.
+    - Revisión del rango tras el run (aprobada): `npm ci` del job E2E sin `--ignore-scripts`;
+      corregido en `fc466a7` (CI y Makefile), `make e2e` 46/46. Pendiente menor de legibilidad: el
+      login por navegador con MFA está escrito a mano en tres sitios (unificar al volver a tocar E2E).
 
 ### T15 — DAST con OWASP ZAP en CI
-- [ ] Estado · Ejecutor: `Claude`
+- [x] Estado · Ejecutor: `Claude`
 - ZAP contra el stack levantado en CI (baseline y escaneo de API con el OpenAPI); umbral que rompe
   la build; hallazgos a fichas.
 - Commit: —
+- Mapa (explorador, 2026-10-02): no existe nada de ZAP (ni job, ni `.zap/rules.tsv`, ni target en
+  el Makefile); la plantilla del curso usa `fail_action: warn`, que choca con "umbral que rompe".
+  El arranque del stack del job 7 es reutilizable. La API exige bearer salvo 13 operaciones públicas.
+- Escaneo exploratorio local (2026-10-02, `ghcr.io/zaproxy/zaproxy:stable`, solo para conocer el
+  punto de partida; nada commiteado). Hallazgos nuevos, **sin id** (los asigna el usuario o Codex al
+  crear la ficha):
+  - Baseline (`zap-baseline.py`, Hub): **ninguno alto**. Medio: 10055 "CSP: Failure to Define
+    Directive with No Fallback" (Hub, la CSP no define una directiva sin respaldo en `default-src`,
+    probablemente `form-action`; componente `frontend/nginx/default.conf`). Bajos: 90004 COEP, COOP y
+    CORP ausentes; 10063 `Permissions-Policy` ausente (componente Nginx). Informativos: 10027
+    comentario sospechoso en el bundle, 10109, 10049.
+  - API (`zap-api-scan.py` con `specs/03-api/openapi.yaml`, sin token): **ninguno alto ni medio**.
+    Bajo: 90004 CORP en `/.well-known/jwks.json`; 100001 "Unexpected Content-Type" ×41. Comprobado a
+    mano: las rutas desconocidas bajo `/api/v1/` responden 404 `text/plain` (el 404 por defecto del
+    router), no RFC 7807 como el resto de la API (componente `backend/internal/api`); `/api` sin barra
+    da un 301 HTML de Nginx.
+- Decisión del usuario (2026-10-02, opción a): el job de ZAP rompe la build con hallazgos de
+  severidad **media o más**; los bajos quedan como advertencia con justificación en `.zap/rules.tsv`.
+  El job nace en rojo por el medio de la CSP, que se remedia con su propia ficha.
+- Subtareas:
+  - [x] T15a — Job de ZAP en CI (baseline del Hub y de Contabilidad por `Host`, API con el OpenAPI;
+    umbral medio+ verificado sobre el informe JSON), `.zap/rules.tsv`, `make scan-dast`. Ruta:
+    delegada (Sonnet: Docker y red). Su primer run en rojo es la evidencia "antes" (requiere push).
+    Escrito (2026-10-02, Sonnet; revisó y commiteó Claude): `scripts/zap-gate.py` (stdlib) rompe
+    con riskcode >= 2 salvo IGNORE justificado en `.zap/rules.tsv` (hoy WARN para 90004, 10063 y
+    100001; 10055 a propósito fuera); Claude añadió que un informe sin sitios escaneados sea error
+    (antes un ZAP que no llegaba al objetivo daba "verde" sin escanear; RED 0≠2 → GREEN, 9/9).
+    `make scan-dast` con `ghcr.io/zaproxy/zaproxy:2.17.0` fijo: baseline del Hub y de Contabilidad
+    y escaneo de API (sin `-c`: con `-c` la API usa la política completa y el contenedor muere por
+    memoria; el gate aplica `rules.tsv` al JSON), con el límite por IP elevado y restaurado como en
+    `make e2e`. Job "11 · DAST (OWASP ZAP)" (`contents: read`, 30 min, informes siempre como
+    artefacto). Evidencia local: `make scan-dast` falla por 10055 en el **Hub y en Contabilidad**
+    (nuevo: la exploración inicial solo miró el Hub), API sin medios; límite de vuelta en 20;
+    `actionlint` ok; `make spec-drift` ok. Sin verificar hasta CI: `host-gateway`, permisos del
+    directorio de informes y alcance a Nginx desde el contenedor. Candidato a acción compuesta:
+    los pasos de arranque del stack están duplicados entre los jobs 7 y 11.
+    Revisión de `d2db463` aprobada; sus tres advertencias corregidas: un informe malformado es
+    error de entrada (exit 2), nunca "hallazgo" (exit 1), y se acepta `site` como objeto único (RED
+    contra la versión anterior: 2 errores → GREEN 11/11); el encabezado de `rules.tsv` ya no dice
+    que el escaneo de API use `-c`; el comentario del paso de informes explica `always()`.
+    **Run "antes" (2026-10-02, run 37055543540, `workflow_dispatch` sobre `133aa8b`)**: job 11 en
+    rojo, `GATE BROKEN: 2 alert(s)`: 10055 Medium ×3 en el Hub y ×3 en Contabilidad; API sin medios.
+    En el mismo run falló el job 7 en "Esperar a que el stack esté sano" (`curl: (56) Connection
+    reset by peer` mientras Nginx arrancaba; `--retry-connrefused` no reintenta ese caso), no en las
+    pruebas: corregido con `--retry-all-errors` en los jobs 7 y 11.
+    Advertencias de la revisión del rango con T15a (aprobada), pendientes: tras `make e2e` o
+    `make scan-dast`, los fallos que quedan en `audit_log` pueden dejar bloqueada la IP del host en
+    el stack local hasta 15 min al restaurar el límite a 20 (solo local); `scan-dast` duplica el
+    bloque de restauración de `e2e` y reutiliza `E2E_LOGIN_IP_MAX_FAILURES`; `advanceUntil` de
+    `contabilidad/src/App.test.tsx` espera 5 s, igual que el timeout de Vitest.
+    **T15b (2026-10-02, Codex escribió; Claude verificó y commiteó)**: VULN-030 (id asignado por
+    Codex al crear la ficha), `form-action 'self'` en las dos CSP (Codex comprobó que ningún
+    formulario publica a otro origen: las SPA usan `fetch` y OAuth es navegación de nivel superior),
+    aserción en `nginx.spec.ts`, `docs/evidencia/VULN-030/evidencia.json`. Remediación en `61df987`.
+    Verificado en local con la imagen `web` reconstruida: ambas cabeceras traen `form-action 'self'`;
+    `make scan-dast` → 10055 PASS en los tres escaneos, "Gate passed"; `make e2e` 46/46. Falta el run
+    "después" en CI (requiere push).
+  - [x] T15b — Ficha de la CSP sin `form-action` (id lo asigna Codex al crearla; afecta a los dos
+    `server`, Hub y Contabilidad) y remediación en `frontend/nginx/default.conf`; run en verde como evidencia "después" (requiere push).
+    Estado (2026-10-02): VULN-030 creada y remediada en `61df987`, verificada en local y revisión
+    nativa aprobada (sus tres advertencias corregidas: casilla marcada antes de tiempo y dos textos
+    que contradecían el estado). Queda sin marcar hasta el run "después" en verde en CI.
+    **Run "después" 37058826831 (`4d647ca`)**: 10055 resuelto (Hub y Contabilidad sin medios), E2E
+    verde, pero el job 11 rompió con **40018 SQL Injection (High) en `POST
+    /api/v1/auth/password-reset/confirm`, parámetro `token`**. Analizado: **falso positivo**. El token
+    se decodifica en base64 (la carga con comillas ni decodifica) y se hashea con SHA-256 antes de una
+    consulta parametrizada (`PasswordResetTokenIsUsable`, `$1`); directo a la API las cargas `AND`/`OR`
+    dan la misma respuesta (410, idéntica, 3 rondas); a través de Nginx el `limit_req` pasa de 410 a
+    429 al sexto pedido, y ZAP leyó esa diferencia como inyección booleana. Decisión del usuario
+    (opción a): el escaneo de API va directo a la API (`-O http://identityhub.localhost:8081`); Nginx
+    queda cubierto por los dos baseline y por E2E. Con eso 40018 da PASS.
+    **Hallazgo nuevo, real, sin id** (lo asigna el usuario o Codex): yendo directo a la API, ZAP marca
+    30002 "Format String Error" (Medium) en `POST /api/v1/auth/login`, parámetro `password`.
+    Reproducido a mano: no tiene que ver con `%`, es el **largo**: hasta 128 caracteres el login da 401;
+    con 129 o más da **500** "Login could not be completed", porque `password.Verify` devuelve
+    `InvalidPasswordError` ("longer than 128 characters") y el login no lo contempla; además ese 500 no
+    deja ninguna línea en el log de la API. Componentes: `backend/internal/auth/login` y
+    `backend/internal/api` (login). El gate queda en rojo hasta remediarlo.
+    **T15c (2026-10-02, decisión del usuario: remediar ya; Codex escribió, Claude verificó y
+    commiteó)**: VULN-031 (id asignado por Codex; amenaza AM-001 porque las contraseñas largas no
+    contaban para el bloqueo). `login.go` trata `InvalidPasswordError` de `Verify` y `VerifyDecoy`
+    como credenciales inválidas (mismo 401, se audita y cuenta para el bloqueo, igual con correo
+    existente o no) y el handler registra con `slog` los 500 inesperados (error y request id, sin la
+    contraseña). Remediación en `4afd563`. Evidencia: RED reproducido por Claude (las dos pruebas nuevas
+    fallan sin el arreglo) → GREEN; `go test` de login y api ok; `golangci-lint` 0 issues; `go vet` ok;
+    API reconstruida: 128, 129 y 300 caracteres → 401; `make scan-dast` "Gate passed" (10055, 30002 y
+    40018 en PASS); `make e2e` 46/46. No hay run de CI "antes" para VULN-031 (se detectó con el
+    escaneo ya apuntando a `:8081`); su antes es la evidencia local.
+    Revisión nativa de T15c aprobada; corregidos dos textos viejos que decían "pendiente". Solo
+    falta el run "después" en verde en CI (común a VULN-030 y VULN-031).
+    Run 37063807973 (`687fb16`): job 11 **en verde** (10055, 30002 y 40018 PASS; "Gate passed"),
+    pero fallaron spec-drift (la matriz no se regeneró tras las pruebas de Go de T15c; corregido en
+    `b2705d7`) y secretos (8 falsos positivos nuevos: 3 líneas "PASS: …" de
+    `docs/evidencia/VULN-013/evidencia.json` y 5 contraseñas de prueba en los tests de VULN-031;
+    huellas exactas aprobadas por el usuario el 2026-10-02 y registradas; `make scan-secrets` local:
+    256 commits, sin hallazgos). Lección: correr `make spec-drift` y `make scan-secrets` antes de
+    cada push, no solo `make e2e`.
+    El comentario de esas huellas citaba un campo de contraseña y disparó la regla en `ed0d2fd`;
+    reescrito y su huella aprobada por el usuario (`16ab347`); `make scan-secrets` corrido **después**
+    del commit: 258 commits, sin hallazgos.
+    **Run "después" 37065094942 (`16ab347`): los 15 jobs en verde**; job 11: 10055 PASS en Hub y
+    Contabilidad, 30002 y 40018 PASS en la API, "Gate passed". Cierra VULN-030 y VULN-031 y es el
+    "después" con gate real de VULN-013 y VULN-014 (sus capturas del run 37055543540 quedan como
+    `run_rojo_previo`). Las capturas de este run quedan en `null` hasta que Desktop las confirme.
+- Limpieza tras T15 (2026-10-02, Sonnet; revisó y commiteó Claude), las advertencias acumuladas de
+  las revisiones de T14 y T15: (1) `scripts/ip-lockout-warning.sh` avisa al terminar `make e2e` o
+  `make scan-dast` qué IP quedó sobre el límite y hasta qué hora (solo lectura de `audit_log`, que no
+  se puede borrar); (2) `globalTeardown` deshabilita las cuentas `e2e-%@example.test`; (3)
+  `zap_gate_test.py` corre en spec-drift (CI y `make spec-drift`); (4) un solo
+  `scripts/with-raised-login-limit.sh` para `e2e` y `scan-dast`, variable
+  `LOCAL_TEST_LOGIN_IP_MAX_FAILURES` (con alias del nombre viejo); (5) acción compuesta
+  `.github/actions/stack-up` para los jobs 7 y 11; (6) `advanceUntil` con plazo de 3 s frente a los
+  5 s de Vitest; (7) un solo helper `browserLoginWithMfa`. Evidencia local: `actionlint` ok, `tsc`
+  ok, `make spec-drift` ok, `make e2e` 46/46 con 0 cuentas `e2e-%` activas, `make scan-dast` "Gate
+  passed" (el aviso de IP salió para 192.168.65.1), Contabilidad 53/53, interrupción con SIGINT
+  restaura el límite a 20. Sin verificar hasta CI: la acción compuesta.
+  Revisión nativa de `c2effc5` aprobada; su advertencia corregida en `12a31c4` (el aviso lee el
+  límite efectivo del contenedor de la API). **Sin subir**: `c2effc5`, `12a31c4` y este registro.
+- Capturas de Desktop confirmadas (2026-10-02) para el run verde 37065094942: VULN-030 (log 147 y
+  234), VULN-031 (354), VULN-013 (10020, 10021, 10035, 10038) y VULN-014 (10036) "después"; las
+  secciones del run 37055543540 renombradas a "run previo"; el run 37063807973 queda como
+  discrepancia #12 del informe (descartado). Los `captura` de los `evidencia.json` ya apuntan ahí.
+- **Siguiente sesión**: push de los commits pendientes y CI para verificar la acción compuesta
+  `stack-up` (requiere autorización del usuario); después T16 (hook de pre-commit real) y T17
+  (cierre de fase y PR, que abre el usuario o se abre con su confirmación). Pendiente aparte:
+  BUG-1/BUG-2 en Safari real con `safaridriver` (cerrados el 2026-10-05: no reproducibles).
 
 ### T16 — Hook de pre-commit real
-- [ ] Estado · Ejecutor: `Claude`
+- [x] Estado · Ejecutor: `Claude` · Ruta: inline (cambio mecánico de configuración y docs)
 - `pre-commit install` documentado en `docs/guia-desarrollo.md` y verificado con un secreto de
   prueba que el hook bloquea (sin llegar a commitearse).
-- Commit: —
+- Evidencia (2026-10-05): `pre-commit` 4.x instalado con `uv tool install`; `pre-commit install`
+  en modo migración (GGA queda como `pre-commit.legacy` y corre primero). gitleaks del hook subido
+  de v8.18.4 a v8.24.3 para igualar `make scan-secrets`. Prueba: archivo en stage con clave falsa
+  con forma de AWS → `Detect hardcoded secrets ... Failed` (`aws-access-token` y
+  `generic-api-key`), HEAD sin cambios; el archivo se sacó del stage y se borró. Nota: el hook
+  rechaza el commit si `.pre-commit-config.yaml` tiene cambios sin stage.
+- Commit: `9d6ea30`
+- Revisión nativa (2026-10-05): el candidato de la rama completa (52 archivos, 3702 líneas)
+  excedió el presupuesto (`lens_context_budget_exceeded`); se dividió en dos, con decisión del
+  usuario. (1) `c2effc5..12a31c4` (alto, 1 archivo, 7 líneas, 4 lentes, en un worktree aparte
+  porque Gentle AI solo revisa rangos que terminan en HEAD): **aprobada** y acusada
+  (`review-fcafcf9828762fae`), 6 observaciones informativas sobre
+  `scripts/ip-lockout-warning.sh`; las dos WARNING (aborto por `pipefail`/`errexit`) no aplican
+  porque el script solo usa `set -u`. (2) `12a31c4..9d6ea30` (medio, 9 archivos, 82 líneas, 1
+  lente): **aprobada** y acusada (`review-20058b6264096ad3`), 2 sugerencias informativas (esta
+  referencia de commit, ya corregida, y la paridad de versión de gitleaks documentada en la guía).
+- CI: run 37334970578 sobre `3d5987c`, 15/15 jobs en verde; verifica la acción compuesta
+  `stack-up` en E2E, integración y DAST.
 
 ### T17 — Revisión de fase, trazabilidad, bitácora e informe
-- [ ] Estado · Ejecutor: `Claude (revisión)`
+- [x] Estado · Ejecutor: `Claude (revisión)`
 - Matriz de trazabilidad, entrada en `docs/BITACORA.md`, guion de la demo en `docs/`, informe de
   seguridad (tercera versión si hay hallazgos de ZAP).
-- Commit: —
+- Ruta: delegada (Codex, un escritor; 2+ archivos no triviales), revisión de Claude.
+- [x] T17a — Matriz: `scripts/traceability.py` marca RF-018/RF-019 como "diferido (semana 3)",
+  pero el alcance los movió a la semana 4. Corregir la etiqueta (y su prueba), regenerar
+  `specs/07-traceability.md`; `--check` y `traceability_test.py` en verde.
+- [x] T17b — Entrada de la semana 3 en `docs/BITACORA.md`, con el mismo formato que la semana 2.
+- [x] T17c — `docs/guion-demo.md` contrastado con los criterios de aceptación 1 y 2.
+- [x] T17d — `docs/security-report.html` versión 3: VULN-030 y VULN-031 (hallazgos de ZAP y
+  del login), gates nuevos (DAST y E2E) y run verde 37065094942 como "después".
+- Evidencia (2026-10-05): Codex escribió T17a a T17d; revisión de Claude contra fichas, evidencia
+  y `gh run view` (37065094942: 15/15 en verde), con una corrección en la bitácora (estado de
+  fase contradictorio). `traceability.py --check` al día, `traceability_test.py` 4/4,
+  `zap_gate_test.py` 11/11.
+- Commit: ver `docs(phase-3)` de esta tarea
 
 ---
 
@@ -986,8 +1283,8 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 | 0 — Enmiendas de spec y decisiones | T1 a T3 (3) | 3 (T1 a T3) |
 | 1 — Backend | T4 a T10 (7) | 7 (T4 a T10) |
 | 2 — Dominios locales y frontend | T11 a T13 + T12d (4) | 4 (T11 a T13 y T12d) — fase cerrada |
-| 3 — Verificación, DAST y cierre | T14 a T17 (4) | 0 |
-| **Total** | **18** | **14** |
+| 3 — Verificación, DAST y cierre | T14 a T17 (4) | 4 (T14 a T17) — fase cerrada |
+| **Total** | **18** | **18** |
 
 ## Siguiente paso
 
@@ -1003,7 +1300,56 @@ gitleaks a `.gitleaksignore` (`85b8cc0`) y `0cd9cd1` (revisión nativa aprobada,
 nueva de upstream) parcheado con `apk upgrade --no-cache pcre2` en la etapa final (decisión del
 usuario; quitar esa capa cuando el digest lo incluya; Trivy de CI la rechaza si no corrige), `npm ci
 --ignore-scripts` sin fallback (SonarCloud S6505/S8543) y nombre explícito del job de imágenes para
-conservar los checks obligatorios del ruleset. Sigue la fase 3 (T14).
+conservar los checks obligatorios del ruleset. Tras el merge, el CI de `main` falló en una prueba
+frágil de Contabilidad (WebCrypto con reloj falso, la que marcó R3 en T13-fix2); arreglada en
+`89d6051` (el helper cede un macrotask real en cada vuelta; 53/53 diez veces y doce bajo carga) y
+mergeada por el PR #8 en `795b30d`; CI de `main` en verde (run 36941918054).
+
+Bugs reportados por el usuario al probar a mano (2026-10-01, `make up`, base local), a resolver
+antes de T14 como **BUG-1** y **BUG-2** (evidencia de los logs de Nginx/API tomada en el momento):
+- **BUG-1 — aceptar invitación falla con "No se pudo conectar con el servicio".** El admin creó la
+  cuenta (`POST /api/v1/admin/users` 201, 00:23:08 UTC), llegó el correo, el enlace abrió
+  `/invitations/accept?token=…` (00:23:30) y al enviar la contraseña salió ese mensaje. En los logs
+  de Nginx **nunca llega** un `POST /api/v1/auth/invitations/accept`: el fallo ocurre en el
+  navegador antes o al hacer el `fetch` (ese mensaje es el de un error que no es RFC 7807). En
+  cambio, restablecer contraseña sí funciona (`request` 202, `confirm` 204).
+- **BUG-2 — `t12a-user@example.test` (analista) no entra a Contabilidad** tras restablecer la
+  contraseña (el restablecimiento funcionó). El Hub emite el código: hay tres
+  `/oauth/authorize` → `/oauth/callback?code=…` (00:21:19, 00:21:30, 00:28:56), pero **nunca llega**
+  un `POST /oauth/token` (ni un `OPTIONS` previo) a Nginx: Contabilidad falla en el navegador antes
+  de canjear el código. La E2E de T13 pasó en Chromium headless con el mismo flujo, así que puede
+  depender del navegador o del estado (pestañas, `sessionStorage`, extensiones). Dato aparte: esa
+  cuenta se creó a mano por SQL en T12a y no tiene el rol base `user` (solo
+  `contabilidad.analista`); no explica que falte el canje, pero conviene descartarlo.
+- Plan: reproducir con Playwright en Chromium y Firefox mirando consola, red y CSP; preguntar al
+  usuario el navegador y lo que muestra la consola; prueba que falle primero (TDD) y arreglo.
+- Avance (2026-10-02): **no se reproducen** con un script de Playwright desechable (scratchpad)
+  contra el stack del usuario, ni en Chromium ni en WebKit 26.6 headless, ni con el admin logueado en
+  otra pestaña del mismo navegador: `invitations/accept` responde 204 con "Tu cuenta quedó activada";
+  Contabilidad canjea el código (`/oauth/token` 200) y carga el panel del analista. El usuario
+  confirmó que usó **Safari** y que Contabilidad mostró un "error de sesión" (`state` o `exchange` en
+  `contabilidad/src/App.tsx`). En sus logs el Hub emitió códigos, así que Safari sí envió
+  `hub_session`; el fallo ocurre en Contabilidad antes del `fetch`. Hipótesis: Safari pierde
+  `state`/`verifier` de `sessionStorage`, o rechaza el `fetch` cruzado antes de enviarlo. Siguiente
+  paso, aplazado por el usuario: reproducir en Safari real con `safaridriver` (requiere `sudo
+  safaridriver --enable` y "Permitir automatización remota"). Datos de prueba que quedan en la base
+  local: usuarios `bug-*@example.test` y la contraseña cambiada de `t34a-check3@example.com` (el rol
+  `admin` temporal ya se quitó).
+- **Cerrados (2026-10-05): no reproducibles.** El usuario verificó a mano en Firefox y en Safari
+  que, con una sesión por usuario (admin en ventana normal, empleado en incógnito o en otro
+  navegador), aceptar la invitación y entrar a Contabilidad funcionan. Con las dos cuentas en el
+  mismo navegador, el SSO reutiliza la cookie `hub_session` del admin y entra directo: es el
+  comportamiento esperado (criterio 1, "vuelta sin pedir la contraseña si ya había sesión") y el
+  guion ya pide la ventana privada. Causa probable de los reportes originales: sesiones mezcladas
+  durante la prueba manual. No se hizo la prueba con `safaridriver`.
+- Hallazgo aparte (no es un VULN, sin id): WebKit registra en la consola de
+  `/invitations/accept` "Refused to apply a stylesheet because its hash, its nonce, or
+  'unsafe-inline' does not appear in the style-src directive". La CSP del Hub bloquea un estilo
+  inline; falta ver qué lo inyecta y decidir en qué tarea se corrige.
+
+Siguiente: fase 3 empezando por T14 (BUG-1/BUG-2 quedan pendientes de la prueba en Safari real) (E2E con Playwright, incluido el smoke test de Nginx
+con cabecera `Host` pendiente de T11). Para delegar con Gentle AI 4.0, cada tarea a un agente que
+escribe lleva su `## Allowed edit surfaces`.
 
 - `main` protegida desde el 2026-10-01 (ruleset "Protect main", decisión del usuario): PR
   obligatorio sin aprobaciones requeridas, los 17 checks del PR #6 obligatorios, sin force push ni

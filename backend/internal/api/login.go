@@ -40,6 +40,9 @@ func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 	case errors.Is(err, mfa.ErrDeliveryUnavailable):
 		writeProblem(w, http.StatusServiceUnavailable, "mfa-delivery-unavailable", "Service Unavailable", "The verification code could not be sent. Please try again.")
 	default:
+		if s.logger != nil {
+			s.logger.Error("login failed", "error", err, "request_id", TraceIDFrom(r.Context()))
+		}
 		writeProblem(w, http.StatusInternalServerError, "login-failed", "Internal Server Error", "Login could not be completed.")
 	}
 }

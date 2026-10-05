@@ -2,7 +2,7 @@
 #
 # Cada huella listada aquí es un secreto ya conocido y documentado (línea base
 # deliberada, ADR 0007) o un falso positivo ya aprobado explícitamente (Q20).
-# Solo estas 14 huellas exactas están autorizadas: sin comodines, sin rutas,
+# Solo estas huellas exactas están autorizadas: sin comodines, sin rutas,
 # sin patrones. Un secreto nuevo, en cualquier archivo o línea distinta, sigue
 # siendo detectado por el job `secrets`.
 
@@ -93,3 +93,55 @@ ac159e86dc206f84a8f2163ace4f13682f3e2e22:docs/guia-desarrollo.md:url-de-conexion
 # no un secreto en el código; la regla genérica toma cualquier "password: <valor>".
 8291345ac882b2c6a4998b312727a1a6c5ea1052:frontend/src/features/account/PublicPages.tsx:contrasena-en-variable-de-entorno:50
 7c9c3a7d3ee95e3946f4df16f50de26e77f37f67:frontend/src/App.tsx:contrasena-en-variable-de-entorno:38
+
+# T14 (2026-10-02, aprobado por el usuario): falsos positivos de la regla
+# contrasena-en-variable-de-entorno en las pruebas E2E. Son referencias a variables o tipos
+# (password: strongPassword, password: string) y contraseñas incorrectas a propósito que exigen
+# los escenarios Gherkin; ninguna es un secreto. Huellas exactas, sin comodines.
+7b45057b7ab27eee60a5ba90281104fc805c27a8:e2e/support/accounts.ts:contrasena-en-variable-de-entorno:69
+7b45057b7ab27eee60a5ba90281104fc805c27a8:e2e/tests/autenticacion.spec.ts:contrasena-en-variable-de-entorno:104
+7b45057b7ab27eee60a5ba90281104fc805c27a8:e2e/tests/autenticacion.spec.ts:contrasena-en-variable-de-entorno:118
+7b45057b7ab27eee60a5ba90281104fc805c27a8:e2e/tests/autenticacion.spec.ts:contrasena-en-variable-de-entorno:146
+7b45057b7ab27eee60a5ba90281104fc805c27a8:e2e/tests/autenticacion.spec.ts:contrasena-en-variable-de-entorno:148
+7b45057b7ab27eee60a5ba90281104fc805c27a8:e2e/tests/autenticacion.spec.ts:contrasena-en-variable-de-entorno:20
+7b45057b7ab27eee60a5ba90281104fc805c27a8:e2e/tests/autenticacion.spec.ts:contrasena-en-variable-de-entorno:45
+7b45057b7ab27eee60a5ba90281104fc805c27a8:e2e/tests/autenticacion.spec.ts:contrasena-en-variable-de-entorno:61
+7b45057b7ab27eee60a5ba90281104fc805c27a8:e2e/tests/autenticacion.spec.ts:contrasena-en-variable-de-entorno:72
+7b45057b7ab27eee60a5ba90281104fc805c27a8:e2e/tests/autenticacion.spec.ts:contrasena-en-variable-de-entorno:92
+7b45057b7ab27eee60a5ba90281104fc805c27a8:e2e/tests/autenticacion.spec.ts:contrasena-en-variable-de-entorno:98
+7b45057b7ab27eee60a5ba90281104fc805c27a8:e2e/tests/restablecimiento-contrasena.spec.ts:contrasena-en-variable-de-entorno:32
+7b45057b7ab27eee60a5ba90281104fc805c27a8:e2e/tests/restablecimiento-contrasena.spec.ts:contrasena-en-variable-de-entorno:36
+7b45057b7ab27eee60a5ba90281104fc805c27a8:e2e/tests/restablecimiento-contrasena.spec.ts:contrasena-en-variable-de-entorno:56
+7b45057b7ab27eee60a5ba90281104fc805c27a8:e2e/tests/restablecimiento-contrasena.spec.ts:contrasena-en-variable-de-entorno:59
+840a954e84407e57c0f0649a23db5d652c8dd7b8:e2e/tests/control-de-acceso.spec.ts:contrasena-en-variable-de-entorno:13
+840a954e84407e57c0f0649a23db5d652c8dd7b8:e2e/tests/control-de-acceso.spec.ts:contrasena-en-variable-de-entorno:67
+840a954e84407e57c0f0649a23db5d652c8dd7b8:e2e/tests/registro-y-verificacion.spec.ts:contrasena-en-variable-de-entorno:45
+840a954e84407e57c0f0649a23db5d652c8dd7b8:e2e/tests/registro-y-verificacion.spec.ts:contrasena-en-variable-de-entorno:65
+840a954e84407e57c0f0649a23db5d652c8dd7b8:e2e/tests/registro-y-verificacion.spec.ts:contrasena-en-variable-de-entorno:68
+840a954e84407e57c0f0649a23db5d652c8dd7b8:e2e/tests/registro-y-verificacion.spec.ts:contrasena-en-variable-de-entorno:78
+840a954e84407e57c0f0649a23db5d652c8dd7b8:e2e/tests/registro-y-verificacion.spec.ts:contrasena-en-variable-de-entorno:95
+e28d3cfae71b4c0457a3ae66a5ea91466bc9471d:e2e/support/api.ts:contrasena-en-variable-de-entorno:81
+e28d3cfae71b4c0457a3ae66a5ea91466bc9471d:e2e/tests/registro-y-verificacion.spec.ts:contrasena-en-variable-de-entorno:119
+e28d3cfae71b4c0457a3ae66a5ea91466bc9471d:e2e/tests/registro-y-verificacion.spec.ts:contrasena-en-variable-de-entorno:81
+e435d0910dc0c97d132b382811b3ee2a0331a40d:e2e/support/accounts.ts:contrasena-en-variable-de-entorno:45
+e435d0910dc0c97d132b382811b3ee2a0331a40d:e2e/support/api.ts:contrasena-en-variable-de-entorno:46
+e435d0910dc0c97d132b382811b3ee2a0331a40d:e2e/tests/registro-y-verificacion.spec.ts:contrasena-en-variable-de-entorno:21
+
+# T15 (2026-10-02, aprobado por el usuario): falsos positivos de contrasena-en-variable-de-entorno.
+# 3 en docs/evidencia/VULN-013/evidencia.json: líneas de resultado PASS de reglas ZAP (la regla
+# confunde la palabra PASS seguida de dos puntos con una asignación de contraseña). 5 en las pruebas
+# de Go de VULN-031: el campo de contraseña recibe un valor generado con strings.Repeat, una variable
+# o un cuerpo JSON de prueba con una contraseña inventada. Ninguno es un secreto.
+4afd5636f7e4657295ae07a5a5fa58fe81763c65:backend/internal/api/login_test.go:contrasena-en-variable-de-entorno:141
+4afd5636f7e4657295ae07a5a5fa58fe81763c65:backend/internal/api/login_test.go:contrasena-en-variable-de-entorno:155
+4afd5636f7e4657295ae07a5a5fa58fe81763c65:backend/internal/auth/login/login_test.go:contrasena-en-variable-de-entorno:191
+4afd5636f7e4657295ae07a5a5fa58fe81763c65:backend/internal/auth/login/login_test.go:contrasena-en-variable-de-entorno:217
+4afd5636f7e4657295ae07a5a5fa58fe81763c65:backend/internal/auth/login/login_test.go:contrasena-en-variable-de-entorno:236
+7db44a84bafe2db38dcfa61cd383ecd35b49d05b:docs/evidencia/VULN-013/evidencia.json:contrasena-en-variable-de-entorno:43
+7db44a84bafe2db38dcfa61cd383ecd35b49d05b:docs/evidencia/VULN-013/evidencia.json:contrasena-en-variable-de-entorno:44
+7db44a84bafe2db38dcfa61cd383ecd35b49d05b:docs/evidencia/VULN-013/evidencia.json:contrasena-en-variable-de-entorno:45
+
+# T15 (2026-10-02, aprobado por el usuario): el propio comentario anterior, tal como quedó en
+# ed0d2fd, citaba el campo de contraseña de las pruebas de Go y disparó la misma regla. El comentario
+# ya se reescribió; esta huella cubre solo esa línea del historial.
+ed0d2fd375b1e96f853c4f08c6fa8e165a0a1180:.gitleaksignore:contrasena-en-variable-de-entorno:132
