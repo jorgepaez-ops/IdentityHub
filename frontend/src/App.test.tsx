@@ -233,7 +233,8 @@ describe('authentication routes', () => {
 
     render(<App />)
 
-    expect(await screen.findByRole('link', { name: 'Usuarios' })).toHaveClass('active')
+    // The link renders before the redirect to /usuarios settles; wait for the route, not the node.
+    await waitFor(() => expect(screen.getByRole('link', { name: 'Usuarios' })).toHaveClass('active'))
   })
 
   it('TestRF007_LogsOutLocallyWhenRemoteLogoutFails', async () => {
