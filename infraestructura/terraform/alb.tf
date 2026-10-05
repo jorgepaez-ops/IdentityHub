@@ -1,6 +1,9 @@
 # Un ALB publico; reglas por Host que reproducen los dos server{} de Nginx.
 # ELB y reglas ejecutan de verdad en LocalStack.
 
+# Excepcion aceptada de Trivy (AWS-0053): el ALB es publico por diseno, es el unico punto de entrada
+# de la plataforma; lo protegen WAF, TLS 1.3 y la redireccion de HTTP a HTTPS.
+#trivy:ignore:AWS-0053
 resource "aws_lb" "main" {
   name                       = "${var.project}-${var.environment}"
   load_balancer_type         = "application"
@@ -9,8 +12,14 @@ resource "aws_lb" "main" {
   security_groups            = [aws_security_group.svc["alb"].id]
   drop_invalid_header_fields = true
   enable_deletion_protection = true
-  # Sin access_logs a proposito (exige un bucket S3 con su politica): trabajo futuro.
-  #checkov:skip=CKV_AWS_91:Los access logs exigen un bucket S3 con politica propia; la referencia nunca se aplica y queda como trabajo futuro
+
+  access_logs {
+    bucket  = aws_s3_bucket.alb_logs.id
+    prefix  = "alb"
+    enabled = true
+  }
+
+  depends_on = [aws_s3_bucket_policy.alb_logs]
 }
 
 resource "aws_lb_target_group" "web" {

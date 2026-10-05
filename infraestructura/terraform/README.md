@@ -13,7 +13,8 @@ en lo posible con LocalStack. **No es necesaria para ejecutar el proyecto**: eso
 | `variables.tf`, `terraform.tfvars.example` | Entradas; las imagenes (por digest) y los dominios son obligatorios |
 | `network.tf` | VPC, 2 subredes publicas (ALB, NAT por zona o unica) y 2 privadas (ECS, RDS), DHCP con el dominio de Cloud Map |
 | `security_groups.tf` | Un grupo por servicio y reglas de minimo privilegio (ALB, web 8080, api 8081, db 5432, broker 5672, correo) |
-| `alb.tf` | ALB, listener HTTPS, HTTP que redirige, regla por `Host` hacia `web` |
+| `alb.tf` | ALB (con logs de acceso), listener HTTPS, HTTP que redirige, regla por `Host` hacia `web` |
+| `alb_logs.tf` | Bucket S3 de los logs de acceso del ALB (cifrado SSE-S3, versionado, bloqueo publico, solo TLS) |
 | `ecs.tf` | Cluster, roles IAM, task definitions (api, worker, web, broker, mailpit, migrate) y servicios |
 | `rds.tf` | RDS PostgreSQL 16 cifrado con KMS, privado, con backups y proteccion contra borrado |
 | `secrets.tf` | Contrasenas y semilla Ed25519 generadas con `random`, guardadas en Secrets Manager |
@@ -138,5 +139,5 @@ quitar `deletion_protection` antes en una cuenta real).
   requiriendo reiniciar web.
 - **Una sola NAT opcional:** `nat_gateway_per_az = false` deja una NAT (punto unico de fallo); el
   valor por defecto, `true`, crea una por zona.
-- **Checkov** senalara simplificaciones (sin logs de acceso del ALB, sin flow logs);
-  se documentan como excepciones en T10.
+- **Checkov** senalara simplificaciones; se documentan como excepciones en T10. Los logs de acceso
+  del ALB van a un bucket S3 propio (`alb_logs.tf`).

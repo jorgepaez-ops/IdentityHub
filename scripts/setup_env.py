@@ -26,7 +26,7 @@ SECRET_KEYS = (*PASSWORD_KEYS, JWT_KEY)
 # Non-secret values the template leaves empty but deploy/docker-compose.yml requires (":?").
 # Same value as the CI stack (.github/actions/stack-up): the compose network, where Nginx
 # reaches the API from.
-CONFIG_DEFAULTS = {"TRUSTED_PROXIES": "172.28.0.0/16"}
+CONFIG_DEFAULTS = {"TRUSTED_PROXIES": "172.28.0.0/16"}  # NOSONAR: red Docker de deploy/docker-compose.yml, no un host real
 
 
 def new_secret(key: str) -> str:
@@ -82,15 +82,25 @@ def write_private(path: pathlib.Path, content: str) -> None:
         raise
 
 
-def main(argv: list[str] | None = None) -> int:
+def inside_root(raw: str, root: pathlib.Path, option: str) -> pathlib.Path:
+    # Resuelve la ruta (symlinks y "..") y rechaza cualquiera fuera del directorio raiz.
+    path = pathlib.Path(raw).resolve()
+    if not path.is_relative_to(root):
+        raise SystemExit(f"error: {option} debe estar dentro de {root}; se rechaza {path}")
+    return path
+
+
+def main(argv: list[str] | None = None, *, root: pathlib.Path | None = None) -> int:
+    # root solo se cambia desde las pruebas; por defecto es la raiz del repositorio.
+    root = (root or pathlib.Path(__file__).resolve().parent.parent).resolve()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--template", default=".env.example")
     parser.add_argument("--output", default=".env")
     parser.add_argument("--force", action="store_true", help="sobrescribe el archivo de salida")
     args = parser.parse_args(argv)
 
-    template = pathlib.Path(args.template)
-    output = pathlib.Path(args.output)
+    template = inside_root(args.template, root, "--template")
+    output = inside_root(args.output, root, "--output")
     if output.exists() and not args.force:
         print(
             f"{output} ya existe: no se modifica. --force lo regenera con secretos nuevos, pero"

@@ -64,7 +64,7 @@ class SetupEnvTests(unittest.TestCase):
 
     def run_setup(self, *extra: str, template: pathlib.Path | None = None) -> int:
         argv = ["--template", str(template or self.template), "--output", str(self.output), *extra]
-        return setup_env.main(argv)
+        return setup_env.main(argv, root=self.root)
 
     def test_secrets_are_filled(self) -> None:
         self.assertEqual(self.run_setup(), 0)
@@ -126,6 +126,25 @@ class SetupEnvTests(unittest.TestCase):
         self.assertIn("GRAFANA_ADMIN_PASSWORD", str(ctx.exception))
         self.assertNotEqual(ctx.exception.code, 0)
         self.assertFalse(self.output.exists())
+
+    def test_output_outside_the_root_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as other:
+            outside = pathlib.Path(other) / ".env"
+            argv = ["--template", str(self.template), "--output", str(outside)]
+            with self.assertRaises(SystemExit) as ctx:
+                setup_env.main(argv, root=self.root)
+            self.assertNotEqual(ctx.exception.code, 0)
+            self.assertFalse(outside.exists())
+
+    def test_template_outside_the_root_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as other:
+            outside = pathlib.Path(other) / ".env.example"
+            outside.write_text(FIXTURE)
+            argv = ["--template", str(outside), "--output", str(self.output)]
+            with self.assertRaises(SystemExit) as ctx:
+                setup_env.main(argv, root=self.root)
+            self.assertNotEqual(ctx.exception.code, 0)
+            self.assertFalse(self.output.exists())
 
     def test_force_tightens_a_permissive_existing_file_before_writing(self) -> None:
         self.output.write_text("OLD=1\n")

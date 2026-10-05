@@ -159,6 +159,10 @@ resource "aws_vpc_security_group_egress_rule" "worker_to_mail" {
 }
 
 # No se aplica en LocalStack: solo CRUD (ADR 0012)
+# Excepcion aceptada de Trivy (AWS-0104): las tareas necesitan SMTP (587) hacia la interfaz de SES, que
+# solo se alcanza por Internet via NAT; hoy no hay VPC endpoint de SES (Docker Hub, Secrets Manager y CloudWatch usan HTTPS). Los VPC endpoints y un espejo de ECR son
+# trabajo futuro (ADR 0012).
+#trivy:ignore:AWS-0104
 resource "aws_vpc_security_group_egress_rule" "worker_to_ses" {
   security_group_id = aws_security_group.svc["worker"].id
   description       = "SMTP con STARTTLS hacia la interfaz SMTP de SES"
@@ -170,6 +174,10 @@ resource "aws_vpc_security_group_egress_rule" "worker_to_ses" {
 
 # ── Salida HTTPS por la NAT ─────────────────────────────────────────────────
 # No se aplica en LocalStack: solo CRUD (ADR 0012)
+# Excepcion aceptada de Trivy (AWS-0104): las tareas necesitan HTTPS hacia Internet por la NAT
+# (Docker Hub, Secrets Manager y CloudWatch Logs). Los VPC endpoints y un espejo de ECR son
+# trabajo futuro (ADR 0012).
+#trivy:ignore:AWS-0104
 resource "aws_vpc_security_group_egress_rule" "https_out" {
   for_each = toset(local.sg_https_egress)
 

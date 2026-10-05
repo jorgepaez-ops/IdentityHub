@@ -611,7 +611,8 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Instalar Checkov
-        run: python3 -m pip install --quiet 'checkov==3.3.23'
+        run: |
+          python3 -m pip install --quiet --only-binary :all: 'checkov==3.3.23'
 
       - name: Checkov (rompe ante cualquier hallazgo)
         run: |
