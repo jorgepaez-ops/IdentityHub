@@ -160,3 +160,12 @@ infraestructura/terraform/secrets.tf:contrasena-en-variable-de-entorno:35
 infraestructura/terraform/secrets.tf:url-de-conexion-con-credenciales:36
 infraestructura/terraform/secrets.tf:url-de-conexion-con-credenciales:37
 infraestructura/terraform/secrets.tf:url-de-conexion-con-credenciales:38
+# Las mismas siete referencias en el commit original de T8a, antes de que las correcciones de la
+# revisión movieran las líneas: huellas con commit, solo para el escaneo del historial (job 3).
+64330d56b24cf1cd5dd94bfc552baef9ab67acef:infraestructura/terraform/rds.tf:contrasena-en-variable-de-entorno:21
+64330d56b24cf1cd5dd94bfc552baef9ab67acef:infraestructura/terraform/secrets.tf:contrasena-en-variable-de-entorno:32
+64330d56b24cf1cd5dd94bfc552baef9ab67acef:infraestructura/terraform/secrets.tf:contrasena-en-variable-de-entorno:33
+64330d56b24cf1cd5dd94bfc552baef9ab67acef:infraestructura/terraform/secrets.tf:contrasena-en-variable-de-entorno:34
+64330d56b24cf1cd5dd94bfc552baef9ab67acef:infraestructura/terraform/secrets.tf:url-de-conexion-con-credenciales:35
+64330d56b24cf1cd5dd94bfc552baef9ab67acef:infraestructura/terraform/secrets.tf:url-de-conexion-con-credenciales:36
+64330d56b24cf1cd5dd94bfc552baef9ab67acef:infraestructura/terraform/secrets.tf:url-de-conexion-con-credenciales:37
