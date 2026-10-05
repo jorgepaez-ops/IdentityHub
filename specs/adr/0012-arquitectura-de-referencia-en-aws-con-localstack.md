@@ -45,9 +45,10 @@ la alternativa que funcione.
 Validación:
 - `terraform fmt -check` y `terraform validate` en CI.
 - **Checkov** en CI sobre `infraestructura/`, los Dockerfiles y los workflows (T10).
-- `terraform apply` contra LocalStack con `tflocal` (que genera un override de endpoints, así el
-  código de producción no lleva endpoints locales), mediante un objetivo `make` local. El token
-  `LOCALSTACK_AUTH_TOKEN` vive solo en el entorno del usuario.
+- ~~`terraform apply` contra LocalStack con `tflocal`~~ **Enmienda (2026-10-05, D8 del usuario):
+  no se ejecuta.** Probarlo complicaba de más la entrega; en su lugar, la configuración y el
+  despliegue se muestran con un diagrama (`docs/diagramas/uml/despliegue-aws.md`). El
+  `README.md` de `infraestructura/terraform/` conserva cómo se haría con `tflocal`.
 - El estado de Terraform es local y no se versiona; el backend remoto (S3 con bloqueo) queda
   descrito, no configurado.
 
@@ -60,12 +61,21 @@ Validación:
   (`backend/cmd/worker/main.go:198-199`, pensado para Mailpit). La interfaz SMTP de SES exige
   credenciales y STARTTLS. Hasta que el worker los soporte, la referencia usa SES solo como
   destino documentado.
+- **Brechas del código frente a un despliegue real** (encontradas al escribir el Terraform, T8a):
+  - Los hosts `*.localhost` y el `redirect_uri` de OAuth están fijos en
+    `backend/internal/config/config.go:66-68` y en `frontend/nginx/default.conf`; con dominios
+    reales hay que volverlos configurables.
+  - Detrás del ALB, Nginx reemplaza `X-Forwarded-For` con la IP del ALB, así que el límite de
+    fallos por IP (RF-017) contaría a todos los clientes como uno solo: un atacante podría
+    bloquear el login de todos. Antes de producción, Nginx debe confiar en el ALB y propagar la
+    IP del cliente (`set_real_ip_from` con la subred del ALB) y `TRUSTED_PROXIES` debe incluirla.
+  - El rol `identity_app` recibe su contraseña en `deploy/postgres-init/` en el primer arranque del
+    contenedor; en RDS ese script no corre y el paso queda manual tras migrar (documentado en
+    `infraestructura/terraform/README.md`).
 - **Lo que no se valida en local:** TLS (ACM), DNS público (Route 53), filtrado de tráfico (WAFv2)
   y reglas de security groups. Terraform los aplica sin error en LocalStack, pero no prueban
   nada; el código los marca y el informe lo dice.
 - **Checkov va a señalar simplificaciones** (por ejemplo, logs de acceso del ALB o réplicas de RDS).
   Cada excepción se documenta con `skip` y su justificación, nunca con `soft_fail`.
-- **Dependencia de una licencia personal.** El `apply` local requiere el token del plan Student;
-  `validate` y Checkov no. Si la licencia vence, la IaC sigue siendo válida y escaneada.
-- **Ejecutar LocalStack en CI queda pendiente de decisión del usuario** (exige guardar el token
-  como secreto del repositorio).
+- **La arquitectura no se ejecuta de punta a punta** (D8): `validate` y Checkov prueban que el
+  código es correcto y seguro de configurar, no que los servicios arranquen juntos en AWS.

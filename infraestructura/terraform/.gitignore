@@ -1,0 +1,7 @@
+# Estado y variables locales (el estado contiene secretos generados)
+.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfvars
+localstack_providers_override.tf
+# .terraform.lock.hcl SI se versiona

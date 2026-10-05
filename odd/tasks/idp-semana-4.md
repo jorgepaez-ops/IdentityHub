@@ -110,6 +110,10 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   arquitectura se aplica y prueba en local. El informe justifica la desviación respecto de un
   servicio gestionado.
 
+- **D8 · Sin `apply` en LocalStack (2026-10-05):** probarlo complica de más; la IaC se valida con
+  `terraform validate` y Checkov, y la configuración y el despliegue se muestran con un diagrama.
+  La ADR 0012 queda enmendada.
+
 ## Preguntas abiertas
 
 - **Q1 · Docker Hub:** cuenta y namespace, repositorios (`api`, `worker`, `web` y ¿`contabilidad`?),
@@ -246,6 +250,15 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   (`backend/cmd/worker/main.go:198-199`), así que SES real exigiría cambiar código.
 - [ ] **T8 — Terraform.** Módulos en `infraestructura/` (o la carpeta que fije T1) para la
   arquitectura de referencia; `terraform validate`; `plan`/`apply` contra LocalStack donde se pueda.
+  - T8a — Ruta: delegada (Sonnet: necesita red para terraform init), revisión de Claude. Evidencia (2026-10-05): Terraform en `infraestructura/terraform/` (14 archivos .tf, 1379 líneas, sin módulos externos; `README.md` en español, `terraform.tfvars.example`, `.gitignore`, `.terraform.lock.hcl` versionable): red (VPC, 2 públicas y 2 privadas, NAT), security groups de mínimo privilegio, ALB con reglas por Host y HTTP→HTTPS, ECS (api, worker, web, broker, mailpit solo con `localstack`, migrate de un solo uso), RDS cifrado, Secrets Manager con `random`, KMS, CloudWatch Logs, Cloud Map, ACM/Route 53/WAFv2/SES. Verificación: `terraform init -backend=false` OK, `terraform fmt -check -recursive` OK, `terraform validate` Success; grep sin secretos literales ni credenciales AWS. Sin aplicar nada. Pendiente T8b (apply con LocalStack); incertidumbre: DNS de Cloud Map en tareas locales.
+  Revisión de Claude: `fmt`/`validate` repetidos en verde; RDS cifrado y sin acceso público,
+  tareas sin IP pública, ALB con `drop_invalid_header_fields`; `.terraform/` fuera de git. Brechas
+  del código frente a producción añadidas a la ADR 0012 (hosts fijos, `X-Forwarded-For` detrás del
+  ALB anula el límite por IP, rol `identity_app` manual en RDS). Gitleaks (hook T16): 7 falsos
+  positivos (referencias `random_password.*.result`) registrados como huellas sin commit en
+  `.gitleaksignore`, con aprobación del usuario.
+  - [ ] T8b — Diagrama de la configuración y el despliegue en AWS (sustituye el `apply` en
+    LocalStack por D8).
 - [ ] **T9 — Producción simulada local.** `docker-compose.prod.yml` (imágenes por digest, sin
   puertos de desarrollo, secretos por archivo).
 - [ ] **T10 — Checkov en CI.** Job nuevo sobre Terraform, Dockerfiles y workflows; falla ante
