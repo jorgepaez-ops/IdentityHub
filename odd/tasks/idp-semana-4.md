@@ -209,6 +209,11 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
     con escritura atómica: archivo temporal nuevo `O_EXCL` 0600 en el mismo directorio y
     `os.replace`; el `.env` existente nunca se trunca. RED (falla
     `test_failed_replace_keeps_the_existing_file_and_leaves_no_temp`) y GREEN 13/13.
+  - Revisión nativa de `8952c0d` (alto, 40 líneas, 4 lentes): **aprobada** y acusada
+    (`review-b5c230077a2a232a`), solo sugerencias informativas (fsync antes de `os.replace`, un
+    `.env` enlazado simbólicamente se reemplaza por un archivo, parche global de `os.replace` en
+    la prueba, fd sin cerrar si falla `fdopen`). No se aplican: es un generador de desarrollo local
+    de un solo uso; se dejan anotadas.
 
 ## Fase 2 — IaC de referencia (producción en la nube, como ejemplo)
 
