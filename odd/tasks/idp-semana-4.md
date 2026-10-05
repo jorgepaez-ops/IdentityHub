@@ -105,6 +105,11 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   de licencia es un secreto: va en el entorno local, nunca en el repo ni en CI sin decisión del
   usuario.
 
+- **D7 · RabbitMQ en la nube de referencia (2026-10-05):** servicio ECS Fargate autogestionado
+  (como en el compose), no Amazon MQ: LocalStack no soporta Amazon MQ para RabbitMQ y así toda la
+  arquitectura se aplica y prueba en local. El informe justifica la desviación respecto de un
+  servicio gestionado.
+
 ## Preguntas abiertas
 
 - **Q1 · Docker Hub:** cuenta y namespace, repositorios (`api`, `worker`, `web` y ¿`contabilidad`?),
@@ -118,8 +123,6 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
 - **Q4 · Stack Go:** el enunciado sugiere Python/Node; ¿hay validación escrita del profesor? Si la
   hay, queda en un ADR (T4).
 
-- **Q5 · RabbitMQ en la nube de referencia:** Amazon MQ para RabbitMQ no existe en LocalStack.
-  Se decide antes de T8.
 
 ## Fase 1 — Documentación, UML e integración
 
@@ -232,7 +235,7 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
     (forward/redirect/fixed-response). Emulados: S3, Secrets Manager, SSM, KMS, CloudWatch Logs,
     IAM (con enforcement opcional), SES v1 (puede reenviar a un SMTP). Solo CRUD o mock: ACM, Route
     53, WAFv2, security groups. ECR local con push de capas sin confirmar.
-  - **Amazon MQ para RabbitMQ no está soportado** (solo ActiveMQ). Decisión pendiente (Q5).
+  - **Amazon MQ para RabbitMQ no está soportado** (solo ActiveMQ). Resuelto en D7.
   - Terraform: `tflocal` 0.26.0 o `lstk terraform` generan un override de endpoints (el `.tf` de
     producción queda limpio). AWS provider v6.67.0 (2026-09-30).
   - Checkov: `bridgecrewio/checkov-action` con `directory` y `framework`; escanea también
