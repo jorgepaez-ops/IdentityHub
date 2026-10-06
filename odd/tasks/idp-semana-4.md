@@ -591,12 +591,14 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
     sobre `924b581` (8 imágenes: 710 → 108) y los README reflejan T1–T21, T17 pendiente y los enlaces al
     manual, informe y guion. Comprobaciones: `python3 scripts/traceability.py --check`, enlaces relativos,
     búsqueda de «parcial», parseo HTML y `git diff --check` (sin errores).
-  - [ ] **T21c — PR de la fase 4** (con confirmación del usuario). Tag, release y T17 quedan para el final.
+  - [x] **T21c — PR de la fase 4** (con confirmación del usuario). Tag, release y T17 quedan para el final.
     PR #12 abierto (2026-10-06). CI: 20/20 jobs en verde; SonarCloud reprobó el gate por la
     calificación de seguridad (S4036, `execFileSync('docker', …)` resuelto por `PATH` en
     `docs/informe/capturas-grafana.mjs`): el binario se toma de `INFORME_DOCKER`, como en
     `e2e/support/db.ts`. Code smells nuevos (complejidad en `login_test.go`, estilo en `build.mjs` y
     `capturas.ts`) no afectan el gate y quedan anotados.
+    Tras `6c8bc11`: CI 21/21 y quality gate de SonarCloud aprobado; PR #12 listo para merge (decisión
+    del usuario). Pendiente al final, en vivo: T17, tag `vX.Y.Z` y release con el PDF del informe.
 
 ## Progreso
 
