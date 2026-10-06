@@ -1,0 +1,19 @@
+{
+  "name": "identity-hub-informe",
+  "private": true,
+  "type": "module",
+  "description": "Build tooling for the technical report (Markdown to PDF). Not part of the application.",
+  "scripts": {
+    "build": "node build.mjs",
+    "capturas": "node capturas-grafana.mjs"
+  },
+  "dependencies": {
+    "marked": "16.4.1",
+    "mermaid": "11.17.2",
+    "playwright-core": "1.63.0",
+    "pdfjs-dist": "5.4.149"
+  },
+  "overrides": {
+    "katex": "^0.18.2"
+  }
+}

@@ -513,7 +513,30 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   R3-stale-toast-save (el script ahora espera el aviso «guardado», no cualquier aviso); la captura
   vigente ya era correcta. R3-stage-leak-on-failure (carpeta temporal si la corrida falla) queda como
   sugerencia.
-- [ ] **T19 — Informe técnico PDF** con las 8 secciones del enunciado.
+- [x] **T19 — Informe técnico PDF** con las 8 secciones del enunciado.
+  Ruta: delegada (Sonnet: necesita Docker, navegador y red para npm), revisión de Claude. Evidencia
+  (2026-10-06): `docs/informe/informe-tecnico.md` → `informe-tecnico.pdf` (44 páginas, 2,2 MB) con
+  `make informe` (`build.mjs`: Markdown a HTML, Mermaid en Chromium, PDF en dos pasadas para el índice);
+  diagramas y fragmentos de workflow leídos de los archivos reales al compilar; capturas de Grafana,
+  Loki, Prometheus y sus objetivos (`capturas-grafana.mjs`, sin credenciales en pantalla). Secciones en el
+  orden del enunciado, tabla VULN-001 a VULN-031, Anexo A (puesta en marcha: `make setup` antes de
+  `make up`, direcciones, objetivos de make, producción simulada) y Anexo B (índice de artefactos).
+  Portada con la materia y los cinco integrantes que dio el usuario; queda «[completar: docente]».
+  `npm audit` 0 en `docs/informe` (override de `katex`), porque osv-scanner recorre todo el repo.
+  Revisión de Claude: páginas 1, 2, 27 y 37 renderizadas (portada, índice, tabla de hallazgos, anexo A);
+  el encabezado de la portada sale del enunciado (línea 8).
+  Al commitear: el PDF (2,2 MB) supera el límite de 512 KB del hook de archivos grandes; sin subir el
+  límite, el PDF queda en `.gitignore`, se regenera con `make informe` y se adjunta al release en T21.
+  Gitleaks marcó `const password = …` en `capturas-grafana.mjs` (valor leído en ejecución, no escrito):
+  variable renombrada.
+  **Hallazgo nuevo fuera de alcance (T19):** el dashboard «Identity Hub — Seguridad» tiene paneles sin
+  datos: `identity_login_attempts_total`, `identity_events_published_total` e
+  `identity_refresh_reuse_detected_total` están definidas en `backend/internal/observability/metrics.go`
+  pero ningún código las incrementa (Claude contó 0 usos fuera de pruebas); el panel de DLQ consulta una
+  etiqueta `queue` que RabbitMQ no expone. El informe muestra la captura real y lo explica. Afecta al
+  bono de observabilidad (+8 %) y al video; sin id; falta decidir la tarea.
+  iCloud volvió a reemplazar 7 capturas del manual por versiones viejas y a crear copias « N»: se
+  restauraron desde git (`6496a92`) y las copias se movieron fuera del repo, sin borrarlas.
 - [ ] **T20 — Guion del video** de 10-15 minutos (ciclo completo: app, pipeline, despliegue,
   observabilidad) (Q3).
 - [ ] **T21 — Cierre.** Bitácora, matriz, informe de seguridad final, tag de versión y PR.
@@ -525,14 +548,14 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
 | 1 — Documentación, UML e integración | T1 a T6 (6) | 6 (T1 a T6) — fase cerrada |
 | 2 — IaC de referencia | T7 a T10 (4) | 4 (T7 a T10) — fase cerrada |
 | 3 — Grilla de roles configurable | T11 a T15 (5) | 5 (T11 a T15) — fase cerrada |
-| 4 — Publicación y entrega | T16 a T21 (6) | 2 (T16 y T18) |
-| **Total** | **21** | **17** (T1 a T16 y T18) |
+| 4 — Publicación y entrega | T16 a T21 (6) | 3 (T16, T18 y T19) |
+| **Total** | **21** | **18** (T1 a T16, T18 y T19) |
 
 ## Siguiente paso
 
 **2026-10-06.** Fases 1 a 3 cerradas y en main (PR #11, merge `8b4a18a`, CI 21/21). T16 hecha
-(VULN-019 remediado, capturas de Desktop incluidas). T17 pospuesta al final (Q1). T18 hecha. Siguiente: T19
-(informe técnico PDF).
+(VULN-019 remediado, capturas de Desktop incluidas). T17 pospuesta al final (Q1). T18 y T19 hechas. Siguiente: T20
+(guion del video).
 Codex: cuota diaria limitada; Sonnet como respaldo.
 
 ## Cambios de spec propuestos

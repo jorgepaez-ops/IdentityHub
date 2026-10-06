@@ -11,7 +11,7 @@ SQLC_VERSION := v1.31.1
 SQLC         ?= sqlc
 
 .DEFAULT_GOAL := help
-.PHONY: help setup up down logs ps restart build test test-go test-integration test-front e2e _e2e-run capturas _capturas-run scan-dast _scan-dast-run spec-drift lint fmt gen scan scan-secrets scan-deps scan-image scan-config scan-iac migrate psql rabbit mail clean up-prod down-prod
+.PHONY: help setup up down informe logs ps restart build test test-go test-integration test-front e2e _e2e-run capturas _capturas-run scan-dast _scan-dast-run spec-drift lint fmt gen scan scan-secrets scan-deps scan-image scan-config scan-iac migrate psql rabbit mail clean up-prod down-prod
 
 help: ## Muestra esta ayuda
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -153,6 +153,9 @@ spec-drift: ## Verifica sin red la matriz y escenarios Gherkin contra E2E
 	python3 scripts/zap_gate_test.py
 	python3 scripts/setup_env_test.py
 	python3 scripts/traceability.py --check
+
+informe: ## Genera el informe técnico en PDF (docs/informe/informe-tecnico.pdf) con Chromium de Playwright
+	cd docs/informe && npm ci --ignore-scripts && node build.mjs
 
 migrate: ## Aplica las migraciones pendientes
 	$(COMPOSE) run --rm migrate

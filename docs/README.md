@@ -40,16 +40,16 @@ La columna **Ubicación actual** solo enlaza rutas que existen en este checkout.
 | Fase 6: métricas, logs y detección en ejecución | 99–103 | [`../deploy/docker-compose.yml`](../deploy/docker-compose.yml) y [`../deploy/observability/`](../deploy/observability/) | parcial: Prometheus, Grafana y Loki (vía Grafana Alloy) hechos; Falco fuera salvo que sobre tiempo |
 | Repositorio GitHub público con código, pipeline, IaC y documentación | 163–166 | [`../README.md`](../README.md) y [`../.github/workflows/`](../.github/workflows/) | parcial (T21) |
 | Imágenes publicadas y versionadas en Docker Hub | 163–167 | [`../specs/adr/0011-docker-hub-como-registry.md`](../specs/adr/0011-docker-hub-como-registry.md) | pendiente (T17) |
-| Informe técnico en PDF | 163–168 | No existe todavía | pendiente (T19) |
+| Informe técnico en PDF | 163–168 | PDF generado con `make informe` (no se versiona por tamaño; se adjunta al release de GitHub en T21), fuente en [`informe/informe-tecnico.md`](informe/informe-tecnico.md); `make informe` lo regenera | hecho (T19) |
 | Video-demostración de 10–15 minutos | 163–169 | [`guion-demo.md`](guion-demo.md) | parcial (T20) |
-| PDF: portada | 174 | No existe todavía | pendiente (T19) |
-| PDF: introducción | 175 | No existe todavía | pendiente (T19) |
-| PDF: arquitectura y diagramas UML | 176 | No existe todavía | pendiente (T19) |
-| PDF: modelado de amenazas | 177 | No existe todavía | pendiente (T19) |
-| PDF: implementación del pipeline | 178 | No existe todavía | pendiente (T19) |
-| PDF: resultados de seguridad | 179 | No existe todavía | pendiente (T19) |
-| PDF: monitoreo y observabilidad, si aplica | 180 | No existe todavía | pendiente (T19) |
-| PDF: conclusiones | 181 | No existe todavía | pendiente (T19) |
+| PDF: portada | 174 | [`informe/informe-tecnico.md`](informe/informe-tecnico.md) | hecho (T19) |
+| PDF: introducción | 175 | [`informe/informe-tecnico.md`](informe/informe-tecnico.md) | hecho (T19) |
+| PDF: arquitectura y diagramas UML | 176 | [`informe/informe-tecnico.md`](informe/informe-tecnico.md) | hecho (T19) |
+| PDF: modelado de amenazas | 177 | [`informe/informe-tecnico.md`](informe/informe-tecnico.md) | hecho (T19) |
+| PDF: implementación del pipeline | 178 | [`informe/informe-tecnico.md`](informe/informe-tecnico.md) | hecho (T19) |
+| PDF: resultados de seguridad | 179 | [`informe/informe-tecnico.md`](informe/informe-tecnico.md) | hecho (T19) |
+| PDF: monitoreo y observabilidad, si aplica | 180 | [`informe/informe-tecnico.md`](informe/informe-tecnico.md) | hecho (T19) |
+| PDF: conclusiones | 181 | [`informe/informe-tecnico.md`](informe/informe-tecnico.md) | hecho (T19) |
 
 ## Entregables propios de la semana 4
 
