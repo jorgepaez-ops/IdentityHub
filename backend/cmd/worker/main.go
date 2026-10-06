@@ -136,7 +136,7 @@ func (w *worker) handle(ctx context.Context, d amqp.Delivery) {
 	if err := json.Unmarshal(d.Body, &env); err != nil {
 		// Un mensaje ilegible no mejora reintentándolo: va directo a la DLQ.
 		w.logger.Error("evento ilegible, enviado a la DLQ", "error", err)
-		observability.EventsConsumed.WithLabelValues("unknown", "malformed").Inc()
+		observability.EventsConsumed.WithLabelValues("unknown", observability.ResultMalformed).Inc()
 		_ = d.Reject(false)
 		return
 	}
@@ -145,7 +145,7 @@ func (w *worker) handle(ctx context.Context, d amqp.Delivery) {
 
 	if w.alreadyProcessed(env.EventID.String()) {
 		log.Info("evento duplicado, descartado sin reenviar")
-		observability.EventsConsumed.WithLabelValues(env.EventType, "duplicate").Inc()
+		observability.EventsConsumed.WithLabelValues(env.EventType, observability.ResultDuplicate).Inc()
 		_ = d.Ack(false)
 		return
 	}
@@ -154,7 +154,7 @@ func (w *worker) handle(ctx context.Context, d amqp.Delivery) {
 	// password_reset_requested llevan tokens en claro (RNF-012 / AM-016).
 	if err := w.deliver(ctx, env, d.Body); err != nil {
 		log.Error("no se pudo entregar la notificación", "error", err)
-		observability.EventsConsumed.WithLabelValues(env.EventType, "failed").Inc()
+		observability.EventsConsumed.WithLabelValues(env.EventType, observability.ResultFailed).Inc()
 		// Nack con requeue: el broker reintenta hasta x-delivery-limit y
 		// después lo deriva solo a la DLQ.
 		_ = d.Nack(false, true)
@@ -163,7 +163,7 @@ func (w *worker) handle(ctx context.Context, d amqp.Delivery) {
 
 	w.markDelivered(env.EventID.String())
 	log.Info("notificación entregada")
-	observability.EventsConsumed.WithLabelValues(env.EventType, "delivered").Inc()
+	observability.EventsConsumed.WithLabelValues(env.EventType, observability.ResultDelivered).Inc()
 	_ = d.Ack(false)
 }
 

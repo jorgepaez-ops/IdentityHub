@@ -9,6 +9,8 @@ import (
 	"github.com/jorgepaez/identity-hub/internal/auth/rolegrid"
 )
 
+const problemInvalidApplicationRole = "invalid-application-role"
+
 // Handlers of the configurable role grid (RF-021, ADR 0013). They are reached
 // only through the Server methods wrapped with RequireRole("admin").
 
@@ -19,7 +21,7 @@ func (s *Server) listApplications(w http.ResponseWriter, r *http.Request) {
 	applications, err := s.roleGrid.ListApplications(r.Context())
 	if err != nil {
 		s.logRoleGridError(r, "applications load failed", err)
-		writeProblem(w, http.StatusInternalServerError, "applications-load-failed", "Internal Server Error", "Applications could not be loaded.")
+		writeProblem(w, http.StatusInternalServerError, "applications-load-failed", titleInternalServerError, "Applications could not be loaded.")
 		return
 	}
 	result := make([]Application, 0, len(applications))
@@ -120,7 +122,7 @@ func (s *Server) deleteApplicationRole(w http.ResponseWriter, r *http.Request, a
 
 func (s *Server) roleGridReady(w http.ResponseWriter) bool {
 	if s.roleGrid == nil {
-		writeProblem(w, http.StatusServiceUnavailable, "role-grid-unavailable", "Service Unavailable", "Role management is temporarily unavailable.")
+		writeProblem(w, http.StatusServiceUnavailable, "role-grid-unavailable", titleServiceUnavailable, "Role management is temporarily unavailable.")
 		return false
 	}
 	return true
@@ -147,11 +149,11 @@ func (s *Server) logRoleGridError(r *http.Request, message string, err error) {
 func (s *Server) writeRoleGridError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, rolegrid.ErrInvalidRoleName):
-		writeProblem(w, http.StatusBadRequest, "invalid-application-role", "Bad Request", "The role name must be <application>.<name> with lowercase letters, digits, '_' or '-'.")
+		writeProblem(w, http.StatusBadRequest, problemInvalidApplicationRole, titleBadRequest, "The role name must be <application>.<name> with lowercase letters, digits, '_' or '-'.")
 	case errors.Is(err, rolegrid.ErrInvalidPermission):
-		writeProblem(w, http.StatusBadRequest, "invalid-application-role", "Bad Request", "A permission is unknown for this application.")
+		writeProblem(w, http.StatusBadRequest, problemInvalidApplicationRole, titleBadRequest, "A permission is unknown for this application.")
 	case errors.Is(err, rolegrid.ErrInvalidDescription), errors.Is(err, rolegrid.ErrEmptyUpdate):
-		writeProblem(w, http.StatusBadRequest, "invalid-application-role", "Bad Request", "The role description or update is invalid.")
+		writeProblem(w, http.StatusBadRequest, problemInvalidApplicationRole, titleBadRequest, "The role description or update is invalid.")
 	case errors.Is(err, rolegrid.ErrSelfPermissionChange), errors.Is(err, rolegrid.ErrSelfRoleDelete):
 		writeProblem(w, http.StatusForbidden, "role-change-forbidden", "Forbidden", "An administrator cannot change or delete a role they hold.")
 	case errors.Is(err, rolegrid.ErrSystemRole):
@@ -166,7 +168,7 @@ func (s *Server) writeRoleGridError(w http.ResponseWriter, r *http.Request, err 
 		writeProblem(w, http.StatusConflict, "application-role-conflict", "Conflict", "The role is assigned to users and cannot be deleted.")
 	default:
 		s.logRoleGridError(r, "application role operation failed", err)
-		writeProblem(w, http.StatusInternalServerError, "application-role-change-failed", "Internal Server Error", "The role operation could not be completed.")
+		writeProblem(w, http.StatusInternalServerError, "application-role-change-failed", titleInternalServerError, "The role operation could not be completed.")
 	}
 }
 

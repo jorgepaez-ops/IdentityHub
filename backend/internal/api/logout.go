@@ -13,7 +13,7 @@ import (
 // same 401 response as an unknown or already revoked token below.
 func (s *Server) Logout(w http.ResponseWriter, r *http.Request, params LogoutParams) {
 	if s.logout == nil {
-		writeProblem(w, http.StatusServiceUnavailable, "logout-unavailable", "Service Unavailable", "Logout is temporarily unavailable.")
+		writeProblem(w, http.StatusServiceUnavailable, "logout-unavailable", titleServiceUnavailable, "Logout is temporarily unavailable.")
 		return
 	}
 	err := s.logout.Logout(r.Context(), logout.Input{RefreshToken: params.RefreshToken, IP: requestClientIP(r), UserAgent: optionalRequestUserAgent(r)})
@@ -23,7 +23,7 @@ func (s *Server) Logout(w http.ResponseWriter, r *http.Request, params LogoutPar
 			writeUnauthorized(w)
 			return
 		}
-		writeProblem(w, http.StatusInternalServerError, "logout-failed", "Internal Server Error", "Logout could not be completed.")
+		writeProblem(w, http.StatusInternalServerError, "logout-failed", titleInternalServerError, "Logout could not be completed.")
 		return
 	}
 	clearRefreshCookie(w)

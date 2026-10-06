@@ -61,6 +61,13 @@ func writeJSON(w http.ResponseWriter, code int, body any) {
 	_ = json.NewEncoder(w).Encode(body)
 }
 
+// Problem titles shared by every handler (the RFC 7807 "title" mirrors the status text).
+const (
+	titleBadRequest          = "Bad Request"
+	titleServiceUnavailable  = "Service Unavailable"
+	titleInternalServerError = "Internal Server Error"
+)
+
 // writeProblem emite un error en formato RFC 7807, tal y como lo declara el
 // esquema Problem del OpenAPI.
 func writeProblem(w http.ResponseWriter, status int, kind, title, detail string) {

@@ -11,11 +11,16 @@ import (
 	"github.com/jorgepaez/identity-hub/internal/store"
 )
 
+const (
+	problemAdminUsersUnavailable = "admin-users-unavailable"
+	detailAdminUsersUnavailable  = "User management is temporarily unavailable."
+)
+
 const defaultAdminUsersLimit = 25
 
 func (s *Server) listUsers(w http.ResponseWriter, r *http.Request, params ListUsersParams) {
 	if s.adminUsers == nil {
-		writeProblem(w, http.StatusServiceUnavailable, "admin-users-unavailable", "Service Unavailable", "User management is temporarily unavailable.")
+		writeProblem(w, http.StatusServiceUnavailable, problemAdminUsersUnavailable, titleServiceUnavailable, detailAdminUsersUnavailable)
 		return
 	}
 	limit := defaultAdminUsersLimit
@@ -48,7 +53,7 @@ func (s *Server) listUsers(w http.ResponseWriter, r *http.Request, params ListUs
 		return
 	}
 	if err != nil {
-		writeProblem(w, http.StatusInternalServerError, "admin-users-load-failed", "Internal Server Error", "Users could not be loaded.")
+		writeProblem(w, http.StatusInternalServerError, "admin-users-load-failed", titleInternalServerError, "Users could not be loaded.")
 		return
 	}
 	page := UserPage{Items: make([]User, 0, len(users))}
@@ -65,7 +70,7 @@ func (s *Server) listUsers(w http.ResponseWriter, r *http.Request, params ListUs
 
 func (s *Server) getUser(w http.ResponseWriter, r *http.Request, userID UserId) {
 	if s.adminUsers == nil {
-		writeProblem(w, http.StatusServiceUnavailable, "admin-users-unavailable", "Service Unavailable", "User management is temporarily unavailable.")
+		writeProblem(w, http.StatusServiceUnavailable, problemAdminUsersUnavailable, titleServiceUnavailable, detailAdminUsersUnavailable)
 		return
 	}
 	user, err := s.adminUsers.GetUser(r.Context(), uuid.UUID(userID))
@@ -74,7 +79,7 @@ func (s *Server) getUser(w http.ResponseWriter, r *http.Request, userID UserId) 
 		return
 	}
 	if err != nil {
-		writeProblem(w, http.StatusInternalServerError, "admin-user-load-failed", "Internal Server Error", "User could not be loaded.")
+		writeProblem(w, http.StatusInternalServerError, "admin-user-load-failed", titleInternalServerError, "User could not be loaded.")
 		return
 	}
 	writeJSON(w, http.StatusOK, apiAdminUser(user))
@@ -82,7 +87,7 @@ func (s *Server) getUser(w http.ResponseWriter, r *http.Request, userID UserId) 
 
 func (s *Server) updateUser(w http.ResponseWriter, r *http.Request, userID UserId) {
 	if s.adminUsers == nil {
-		writeProblem(w, http.StatusServiceUnavailable, "admin-users-unavailable", "Service Unavailable", "User management is temporarily unavailable.")
+		writeProblem(w, http.StatusServiceUnavailable, problemAdminUsersUnavailable, titleServiceUnavailable, detailAdminUsersUnavailable)
 		return
 	}
 	actorID, ok := currentUserID(r)
@@ -117,11 +122,11 @@ func (s *Server) updateUser(w http.ResponseWriter, r *http.Request, userID UserI
 	user, err := s.adminUsers.UpdateUser(r.Context(), admin.UpdateInput{ActorUserID: actorID, UserID: uuid.UUID(userID), Status: status, Roles: roles})
 	switch {
 	case errors.Is(err, admin.ErrSelfDisable), errors.Is(err, admin.ErrSelfRoleAssignment), errors.Is(err, admin.ErrLastActiveAdmin), errors.Is(err, admin.ErrInvalidStatus), errors.Is(err, admin.ErrInvalidRole), errors.Is(err, admin.ErrBaseRoleRequired):
-		writeProblem(w, http.StatusBadRequest, "invalid-user-update", "Bad Request", "The requested user update is not allowed.")
+		writeProblem(w, http.StatusBadRequest, "invalid-user-update", titleBadRequest, "The requested user update is not allowed.")
 	case errors.Is(err, admin.ErrUserNotFound), errors.Is(err, pgx.ErrNoRows):
 		writeProblem(w, http.StatusNotFound, "user-not-found", "Not Found", "The user was not found.")
 	case err != nil:
-		writeProblem(w, http.StatusInternalServerError, "admin-user-update-failed", "Internal Server Error", "User could not be updated.")
+		writeProblem(w, http.StatusInternalServerError, "admin-user-update-failed", titleInternalServerError, "User could not be updated.")
 	default:
 		writeJSON(w, http.StatusOK, apiAdminUser(user))
 	}

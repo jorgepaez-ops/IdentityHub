@@ -54,7 +54,7 @@ func TestRNF012_TokenRefNoRevelaElToken(t *testing.T) {
 
 func TestNewLogger_InterpretaElNivel(t *testing.T) {
 	for _, nivel := range []string{"debug", "info", "warn", "error", "DEBUG", "basura"} {
-		if l := NewLogger(nivel, "test", "0.0.0"); l == nil {
+		if NewLogger(nivel, "test", "0.0.0") == nil {
 			t.Errorf("NewLogger(%q) devolvió nil; un nivel desconocido debe caer en info, no fallar", nivel)
 		}
 	}

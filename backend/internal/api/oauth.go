@@ -11,16 +11,23 @@ import (
 	"github.com/jorgepaez/identity-hub/internal/auth/token"
 )
 
+const (
+	problemOAuthUnavailable    = "oauth-unavailable"
+	detailOAuthUnavailable     = "OAuth is temporarily unavailable."
+	problemOAuthInvalidRequest = "oauth-invalid-request"
+	detailOAuthInvalidRequest  = "The OAuth request is invalid."
+)
+
 const hubSessionCookieName = "hub_session"
 
 func (s *Server) authorizeClient(w http.ResponseWriter, r *http.Request, params AuthorizeClientParams) {
 	if s.oauth == nil || s.hubSessions == nil {
-		writeProblem(w, http.StatusServiceUnavailable, "oauth-unavailable", "Service Unavailable", "OAuth is temporarily unavailable.")
+		writeProblem(w, http.StatusServiceUnavailable, problemOAuthUnavailable, titleServiceUnavailable, detailOAuthUnavailable)
 		return
 	}
 	input := oauth.AuthorizeInput{ClientID: params.ClientId, RedirectURI: params.RedirectUri, ResponseType: string(params.ResponseType), State: params.State, CodeChallenge: params.CodeChallenge, CodeChallengeMethod: string(params.CodeChallengeMethod)}
 	if hasDuplicateOAuthParameter(r.URL.Query()) {
-		writeProblem(w, http.StatusBadRequest, "oauth-invalid-request", "Bad Request", "The OAuth request is invalid.")
+		writeProblem(w, http.StatusBadRequest, problemOAuthInvalidRequest, titleBadRequest, detailOAuthInvalidRequest)
 		return
 	}
 	if err := s.oauth.ValidateAuthorizeInput(input); err != nil {
@@ -28,7 +35,7 @@ func (s *Server) authorizeClient(w http.ResponseWriter, r *http.Request, params 
 			s.redirectOAuthInvalid(w, r, input.State)
 			return
 		}
-		writeProblem(w, http.StatusBadRequest, "oauth-invalid-request", "Bad Request", "The OAuth request is invalid.")
+		writeProblem(w, http.StatusBadRequest, problemOAuthInvalidRequest, titleBadRequest, detailOAuthInvalidRequest)
 		return
 	}
 	cookie, err := r.Cookie(hubSessionCookieName)
@@ -103,7 +110,7 @@ func (s *Server) redirectToHubLogin(w http.ResponseWriter, r *http.Request) {
 	target := "/oauth/authorize?" + r.URL.Query().Encode()
 	login, err := url.Parse(s.oauthLoginURL)
 	if err != nil || !login.IsAbs() {
-		writeProblem(w, http.StatusServiceUnavailable, "oauth-unavailable", "Service Unavailable", "OAuth is temporarily unavailable.")
+		writeProblem(w, http.StatusServiceUnavailable, problemOAuthUnavailable, titleServiceUnavailable, detailOAuthUnavailable)
 		return
 	}
 	values := login.Query()
@@ -115,16 +122,16 @@ func (s *Server) exchangeAuthorizationCode(w http.ResponseWriter, r *http.Reques
 	// RFC 6749 section 5.1: token endpoint responses must never be cached.
 	w.Header().Set("Cache-Control", "no-store")
 	if s.oauth == nil || s.tokens == nil {
-		writeProblem(w, http.StatusServiceUnavailable, "oauth-unavailable", "Service Unavailable", "OAuth is temporarily unavailable.")
+		writeProblem(w, http.StatusServiceUnavailable, problemOAuthUnavailable, titleServiceUnavailable, detailOAuthUnavailable)
 		return
 	}
 	if err := r.ParseForm(); err != nil || r.PostForm.Get("grant_type") != "authorization_code" || !oauth.ValidPKCEVerifier(r.PostForm.Get("code_verifier")) {
-		writeProblem(w, http.StatusBadRequest, "oauth-invalid-request", "Bad Request", "The OAuth request is invalid.")
+		writeProblem(w, http.StatusBadRequest, problemOAuthInvalidRequest, titleBadRequest, detailOAuthInvalidRequest)
 		return
 	}
 	result, err := s.oauth.Exchange(r.Context(), oauth.ExchangeInput{Code: r.PostForm.Get("code"), ClientID: r.PostForm.Get("client_id"), RedirectURI: r.PostForm.Get("redirect_uri"), CodeVerifier: r.PostForm.Get("code_verifier")})
 	if errors.Is(err, oauth.ErrAuthorizationCodeInvalid) {
-		writeProblem(w, http.StatusBadRequest, "oauth-invalid-grant", "Bad Request", "The authorization code is invalid.")
+		writeProblem(w, http.StatusBadRequest, "oauth-invalid-grant", titleBadRequest, "The authorization code is invalid.")
 		return
 	}
 	if err != nil {
@@ -145,7 +152,7 @@ func (s *Server) writeOAuthServerError(w http.ResponseWriter, operation, problem
 	if s.logger != nil {
 		s.logger.Error("oauth request failed", "operation", operation, "error", err)
 	}
-	writeProblem(w, http.StatusInternalServerError, problemType, "Internal Server Error", detail)
+	writeProblem(w, http.StatusInternalServerError, problemType, titleInternalServerError, detail)
 }
 
 func hubSessionCookie(value string, maxAge int) *http.Cookie {

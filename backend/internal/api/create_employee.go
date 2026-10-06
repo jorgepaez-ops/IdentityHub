@@ -14,7 +14,7 @@ import (
 // wrapper; the admin never sets or learns the new account's password.
 func (s *Server) createEmployee(w http.ResponseWriter, r *http.Request) {
 	if s.employeeCreation == nil {
-		writeProblem(w, http.StatusServiceUnavailable, "employee-creation-unavailable", "Service Unavailable", "Employee creation is temporarily unavailable.")
+		writeProblem(w, http.StatusServiceUnavailable, "employee-creation-unavailable", titleServiceUnavailable, "Employee creation is temporarily unavailable.")
 		return
 	}
 	actorID, ok := currentUserID(r)
@@ -51,9 +51,9 @@ func (s *Server) createEmployee(w http.ResponseWriter, r *http.Request) {
 			// response used to be: it must not reveal that the account exists.
 			writeProblem(w, http.StatusConflict, "employee-conflict", "Conflict", "An employee account cannot be created.")
 		case errors.Is(err, employee.ErrPublish):
-			writeProblem(w, http.StatusServiceUnavailable, "event-unavailable", "Service Unavailable", "Employee creation is temporarily unavailable.")
+			writeProblem(w, http.StatusServiceUnavailable, "event-unavailable", titleServiceUnavailable, "Employee creation is temporarily unavailable.")
 		default:
-			writeProblem(w, http.StatusInternalServerError, "employee-creation-failed", "Internal Server Error", "The employee account could not be created.")
+			writeProblem(w, http.StatusInternalServerError, "employee-creation-failed", titleInternalServerError, "The employee account could not be created.")
 		}
 		return
 	}

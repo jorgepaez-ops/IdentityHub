@@ -260,7 +260,7 @@ func (p loginSecurityEventPublisher) PublishSecurityEvent(ctx context.Context, e
 	if !ok {
 		return nil
 	}
-	message := accountLockedNotification{Envelope: events.NewEnvelope(events.TypeAccountLocked, api.TraceIDFrom(ctx))}
+	message := events.AccountLocked{Envelope: events.NewEnvelope(events.TypeAccountLocked, api.TraceIDFrom(ctx))}
 	message.Data.UserID = event.UserID
 	message.Data.Email = user.Email
 	message.Data.DisplayName = user.DisplayName
@@ -307,16 +307,11 @@ func (p refreshSecurityEventPublisher) PublishSecurityEvent(ctx context.Context,
 	return p.publisher.Publish(ctx, events.TypeRefreshReuseDetected, message)
 }
 
-type accountLockedNotification struct {
-	events.Envelope
-	Data struct {
-		UserID         uuid.UUID `json:"userId"`
-		Email          string    `json:"email"`
-		DisplayName    string    `json:"displayName"`
-		LockedUntil    time.Time `json:"lockedUntil"`
-		FailedAttempts int       `json:"failedAttempts"`
-		IP             string    `json:"ip"`
-	} `json:"data"`
+func addressString(address *netip.Addr) string {
+	if address == nil {
+		return ""
+	}
+	return address.String()
 }
 
 type refreshReuseNotification struct {
@@ -329,11 +324,4 @@ type refreshReuseNotification struct {
 		RevokedCount int       `json:"revokedCount"`
 		IP           string    `json:"ip"`
 	} `json:"data"`
-}
-
-func addressString(address *netip.Addr) string {
-	if address == nil {
-		return ""
-	}
-	return address.String()
 }

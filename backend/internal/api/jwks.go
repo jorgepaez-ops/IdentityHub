@@ -20,7 +20,7 @@ type jwk struct {
 
 func (s *Server) GetJwks(w http.ResponseWriter, _ *http.Request) {
 	if s.tokens == nil {
-		writeProblem(w, http.StatusServiceUnavailable, "service-unavailable", "Service Unavailable", "The service is not ready.")
+		writeProblem(w, http.StatusServiceUnavailable, "service-unavailable", titleServiceUnavailable, "The service is not ready.")
 		return
 	}
 	writeJSON(w, http.StatusOK, jwksDocument{Keys: []jwk{{

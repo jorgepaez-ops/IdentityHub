@@ -23,12 +23,12 @@ func (s *Server) ListSessions(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) listSessions(w http.ResponseWriter, r *http.Request, userID uuid.UUID) {
 	if s.sessions == nil {
-		writeProblem(w, http.StatusServiceUnavailable, "sessions-unavailable", "Service Unavailable", "Sessions are temporarily unavailable.")
+		writeProblem(w, http.StatusServiceUnavailable, "sessions-unavailable", titleServiceUnavailable, "Sessions are temporarily unavailable.")
 		return
 	}
 	items, err := s.sessions.List(r.Context(), userID)
 	if err != nil {
-		writeProblem(w, http.StatusInternalServerError, "sessions-load-failed", "Internal Server Error", "Sessions could not be loaded.")
+		writeProblem(w, http.StatusInternalServerError, "sessions-load-failed", titleInternalServerError, "Sessions could not be loaded.")
 		return
 	}
 	claims, _ := ClaimsFrom(r.Context())
@@ -49,7 +49,7 @@ func (s *Server) listSessions(w http.ResponseWriter, r *http.Request, userID uui
 func (s *Server) RevokeSession(w http.ResponseWriter, r *http.Request, sessionID SessionId) {
 	s.withSessionSubject(func(w http.ResponseWriter, r *http.Request, userID uuid.UUID) {
 		if s.sessions == nil {
-			writeProblem(w, http.StatusServiceUnavailable, "sessions-unavailable", "Service Unavailable", "Sessions are temporarily unavailable.")
+			writeProblem(w, http.StatusServiceUnavailable, "sessions-unavailable", titleServiceUnavailable, "Sessions are temporarily unavailable.")
 			return
 		}
 		if err := s.sessions.Revoke(r.Context(), userID, uuid.UUID(sessionID)); err != nil {
@@ -57,7 +57,7 @@ func (s *Server) RevokeSession(w http.ResponseWriter, r *http.Request, sessionID
 				writeProblem(w, http.StatusNotFound, "session-not-found", "Not Found", "The session was not found.")
 				return
 			}
-			writeProblem(w, http.StatusInternalServerError, "session-revoke-failed", "Internal Server Error", "The session could not be revoked.")
+			writeProblem(w, http.StatusInternalServerError, "session-revoke-failed", titleInternalServerError, "The session could not be revoked.")
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
