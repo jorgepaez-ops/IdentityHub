@@ -122,7 +122,7 @@ tbody tr:last-child td { border-bottom: 0; }
 .movement-filters input, .movement-filters select { width: 100%; }
 .result-count { grid-column: 1 / -1; margin: 0; font-size: .85rem; }
 .movements-table { min-width: 44rem; }
-.movements-table .date { white-space: nowrap; }
+.movements-table .mono { white-space: nowrap; }
 .sort-button { display: inline-flex; align-items: center; gap: .3rem; padding: 0; background: transparent; border: 0; color: inherit; font: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer; }
 .sort-button:hover { color: var(--ink); }
 .sort-arrow { font-size: .85rem; opacity: .7; }

@@ -131,7 +131,7 @@ nav a.active { background: var(--accent-soft); color: var(--accent); font-weight
 .filter-button { padding: .4rem .9rem; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); color: var(--muted); font: inherit; font-size: .85rem; font-weight: 600; cursor: pointer; }
 .filter-button:hover { border-color: var(--accent); color: var(--ink); }
 .filter-button[aria-pressed='true'] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-.table-scroll { overflow-x: auto; }
+.table-scroll { position: relative; overflow-x: auto; }
 .data-table { width: 100%; border-collapse: collapse; font-size: .875rem; }
 .data-table th { padding: .5rem .75rem; color: var(--muted); font-size: .72rem; font-weight: 600; text-align: left; text-transform: uppercase; letter-spacing: .04em; border-bottom: 1px solid var(--line); }
 .data-table td { padding: .75rem; vertical-align: middle; border-bottom: 1px solid var(--line); }
@@ -170,7 +170,8 @@ select { width: 100%; padding: .7rem .75rem; color: var(--ink); background: var(
 .filter-form label { margin-top: .5rem; }
 .filter-actions { display: flex; gap: .65rem; }
 .filter-actions .primary-button, .filter-actions .secondary-button { margin-top: .5rem; }
-.metadata-list { display: grid; grid-template-columns: max-content 1fr; gap: .2rem .75rem; max-width: 26rem; margin: .35rem 0 0; font-size: .75rem; }
+.metadata-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: .2rem; max-width: 26rem; margin: .35rem 0 0; font-size: .75rem; }
+.metadata-pair { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: .75rem; }
 .metadata-list dt { color: var(--muted); font-family: var(--mono); }
 .metadata-list dd { margin: 0; font-family: var(--mono); overflow-wrap: anywhere; }
 .link-button { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-size: .75rem; font-weight: 600; cursor: pointer; }
