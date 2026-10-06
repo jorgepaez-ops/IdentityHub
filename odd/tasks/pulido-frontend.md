@@ -79,6 +79,11 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
   typecheck y lint limpios, build con 4 woff2, `make e2e` 52/52. Revisión de Claude: capturas de resumen
   y transacciones revisadas; un «+ +» en el botón de registrar era de una versión intermedia (el código
   final no tiene ícono ahí). Sin verificar a ojo: modo oscuro y móvil (P10).
+  Commit `3cc9604`. Revisión nativa (medio, 432 líneas, P1 y P2, 1 lente): **aprobada** con avisos de
+  cobertura; cerrados con pruebas (Sonnet): mismo texto dos veces reinicia el aviso en Contabilidad,
+  usuarios y roles; un error y «Nuevo rol» retiran el aviso de éxito; almacenamiento bloqueado usa el
+  tema del sistema y el botón sigue alternando. Cada prueba falla al revertir su comportamiento. vitest
+  Hub 176/176 y Contabilidad 72/72, lint y typecheck limpios.
 - [ ] **P3 — Inicio de la consola.** Ruta `/inicio` con indicadores (usuarios por estado, inicios
   fallidos en 24 h, actividad reciente) y accesos directos; los administradores aterrizan ahí.
 - [ ] **P4 — Usuarios.** Filtro por estado con el parámetro `status` existente y tarjetas clicables.

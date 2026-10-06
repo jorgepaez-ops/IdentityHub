@@ -435,6 +435,29 @@ describe('resend invitation', () => {
     expect(api.calls.some((c) => c.key === 'POST /api/v1/admin/users/beto-id/invitation')).toBe(true)
   })
 
+  it('TestRF001_ResendingTwiceShowsTheSameToastAndRestartsItsTimer', async () => {
+    await openUsers({ 'POST /api/v1/admin/users/beto-id/invitation': () => json(204) })
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      const message = 'Invitación reenviada a beto@example.test.'
+      // Testing Library's waitFor/findBy drain with setTimeout, which would hang under fake timers.
+      const flush = () => act(async () => { await vi.advanceTimersByTimeAsync(0) })
+      resend('Beto Ruiz')
+      await flush()
+      expect(screen.getByRole('status')).toHaveTextContent(message)
+      act(() => { vi.advanceTimersByTime(3000) })
+      expect(screen.getByRole('button', { name: 'Reenviar invitación a Beto Ruiz' })).toBeEnabled()
+      resend('Beto Ruiz')
+      await flush()
+      act(() => { vi.advanceTimersByTime(3000) })
+      expect(screen.getByRole('status')).toHaveTextContent(message)
+      act(() => { vi.advanceTimersByTime(2000) })
+      expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('TestRF001_KeepsResendCompletionAfterReloadingTheDirectory', async () => {
     const invitation = deferred<Response>()
     const api = await openUsers({ 'POST /api/v1/admin/users/beto-id/invitation': () => invitation.promise })

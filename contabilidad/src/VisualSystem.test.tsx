@@ -18,6 +18,7 @@ const senior = accessFor(['movimientos.registrar', 'movimientos.ver_todos', 'mov
 describe('visual system of Contabilidad', () => {
   afterEach(() => {
     vi.useRealTimers()
+    vi.unstubAllGlobals()
     window.localStorage.clear()
     document.documentElement.removeAttribute('data-theme')
   })
@@ -39,10 +40,15 @@ describe('visual system of Contabilidad', () => {
   it('TestRF021_ElTemaSobreviveAlAlmacenamientoBloqueado', () => {
     const getItem = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new DOMException('blocked', 'SecurityError') })
     const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new DOMException('blocked', 'SecurityError') })
+    vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: true }))
     try {
       expect(() => initializeTheme()).not.toThrow()
+      expect(document.documentElement.dataset.theme).toBe('dark')
       render(<ThemeToggle />)
-      expect(() => fireEvent.click(screen.getByRole('button', { name: /Cambiar a tema/ }))).not.toThrow()
+      expect(() => fireEvent.click(screen.getByRole('button', { name: 'Cambiar a tema claro' }))).not.toThrow()
+      expect(document.documentElement.dataset.theme).toBe('light')
+      fireEvent.click(screen.getByRole('button', { name: 'Cambiar a tema oscuro' }))
+      expect(document.documentElement.dataset.theme).toBe('dark')
     } finally {
       getItem.mockRestore()
       setItem.mockRestore()
@@ -79,6 +85,28 @@ describe('visual system of Contabilidad', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Aprobar M-2044' }))
     act(() => { vi.advanceTimersByTime(3000) })
     expect(screen.getByRole('status')).toHaveTextContent('Movimiento M-2044 aprobado.')
+    act(() => { vi.advanceTimersByTime(2000) })
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+
+  it('TestRF021_UnMismoTextoRepetidoReiniciaElTemporizadorDelShell', () => {
+    vi.useFakeTimers()
+    render(<Shell access={senior} subject="3f2c1a9e-0000" onLogout={() => undefined} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Transacciones' }))
+    const register = (description: string) => {
+      fireEvent.click(screen.getByRole('button', { name: '+ Registrar movimiento' }))
+      fireEvent.change(screen.getByLabelText('Descripción'), { target: { value: description } })
+      fireEvent.change(screen.getByLabelText('Monto'), { target: { value: '100' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Registrar' }))
+    }
+    const notice = 'Movimiento registrado, queda pendiente de aprobación.'
+    register('Primero')
+    expect(screen.getByRole('status')).toHaveTextContent(notice)
+    act(() => { vi.advanceTimersByTime(3000) })
+    register('Segundo')
+    expect(screen.getByRole('status')).toHaveTextContent(notice)
+    act(() => { vi.advanceTimersByTime(3000) })
+    expect(screen.getByRole('status')).toHaveTextContent(notice)
     act(() => { vi.advanceTimersByTime(2000) })
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })

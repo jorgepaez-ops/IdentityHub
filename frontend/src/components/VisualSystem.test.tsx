@@ -46,10 +46,15 @@ describe('visual system feedback', () => {
   it('TestRF010_ElTemaUsaElDelSistemaSiElAlmacenamientoFalla', () => {
     const getItem = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new DOMException('blocked', 'SecurityError') })
     const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new DOMException('blocked', 'SecurityError') })
+    vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: true }))
     try {
       expect(() => initializeTheme()).not.toThrow()
+      expect(document.documentElement.dataset.theme).toBe('dark')
       render(<ThemeToggle />)
-      expect(() => fireEvent.click(screen.getByRole('button', { name: /Cambiar a tema/ }))).not.toThrow()
+      expect(() => fireEvent.click(screen.getByRole('button', { name: 'Cambiar a tema claro' }))).not.toThrow()
+      expect(document.documentElement.dataset.theme).toBe('light')
+      fireEvent.click(screen.getByRole('button', { name: 'Cambiar a tema oscuro' }))
+      expect(document.documentElement.dataset.theme).toBe('dark')
     } finally {
       getItem.mockRestore()
       setItem.mockRestore()
