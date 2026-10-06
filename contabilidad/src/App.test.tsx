@@ -5,7 +5,7 @@ import { beginLogin } from './auth/flow'
 import { CLOCK_LEEWAY_SECONDS } from './auth/jwt'
 import * as navigation from './navigation'
 import { AUDIENCE, HUB_ORIGIN, ISSUER } from './config'
-import { makeKey, signToken, validClaims, type TestKey } from './testing'
+import { SEEDED_PERMISSIONS, makeKey, signToken, validClaims, type TestKey } from './testing'
 
 const HUB = HUB_ORIGIN
 let key: TestKey
@@ -40,10 +40,12 @@ function stubHub(claims: Record<string, unknown>) {
 }
 
 /** Plays the whole round trip: start the flow, then land on the callback with the stored state. */
-async function signInAs(roles: string[] | null, landing: 'shell' | 'denied' = 'shell') {
+async function signInAs(roles: string[] | null, landing: 'shell' | 'denied' = 'shell', permissions: string[] | null | undefined = undefined) {
   await beginLogin()
   const state = sessionStorage.getItem('contabilidad.oauth_state')
-  stubHub({ roles })
+  // Seeded roles carry their seeded permissions unless the test says otherwise.
+  const seeded = permissions === undefined ? [...new Set((roles ?? []).flatMap((role) => SEEDED_PERMISSIONS[role] ?? []))] : permissions
+  stubHub({ roles, permissions: seeded })
   window.history.replaceState({}, '', `/oauth/callback?code=the-code&state=${state}`)
   render(<App />)
   if (landing === 'shell') await screen.findByRole('navigation', { name: 'Secciones' })
@@ -273,6 +275,61 @@ describe('senior role', () => {
   })
 })
 
+describe('permission driven access', () => {
+  const AUDITOR = ['movimientos.ver_todos', 'reportes.ver']
+
+  it('TestRF021_AuditorSeesEveryMovementAndTheSummaryButCannotActOnThem', async () => {
+    await signInAs(['contabilidad.auditor'], 'shell', AUDITOR)
+    expect(screen.getByText('Aprobado del mes')).toBeInTheDocument()
+    expect(screen.getByText('Usuarios con acceso')).toBeInTheDocument()
+    expect(screen.getAllByText('contabilidad.auditor').length).toBeGreaterThan(0)
+    goTo('Transacciones')
+    for (const folio of ['M-2041', 'M-2042', 'M-2043', 'M-2044', 'M-2045', 'M-2046']) expect(screen.getByText(folio)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '+ Registrar movimiento' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Aprobar/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Rechazar/ })).not.toBeInTheDocument()
+    expect(within(rowOf('M-2043')).getByText('esperando aprobación')).toBeInTheDocument()
+  })
+
+  it('TestRF021_AuditorHasTheClosingLockedWithThePermissionNamed', async () => {
+    await signInAs(['contabilidad.auditor'], 'shell', AUDITOR)
+    expect(within(rail()).getByRole('button', { name: /Cierre contable/ })).toBeDisabled()
+    expect(screen.getByText(/ver todos los movimientos/)).toBeInTheDocument()
+  })
+
+  it('TestRF021_ApplicationRoleWithoutPermissionsSeesOnlyOwnRowsAndNothingElse', async () => {
+    await signInAs(['contabilidad.visitante'], 'shell', [])
+    expect(within(rail()).getByRole('button', { name: /Resumen/ })).toBeDisabled()
+    expect(within(rail()).getByRole('button', { name: /Cierre contable/ })).toBeDisabled()
+    // Lands on the transactions view because the summary is locked.
+    for (const folio of ['M-2043', 'M-2044', 'M-2046']) expect(screen.getByText(folio)).toBeInTheDocument()
+    for (const folio of ['M-2041', 'M-2042', 'M-2045']) expect(screen.queryByText(folio)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '+ Registrar movimiento' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Aprobar/ })).not.toBeInTheDocument()
+    expect(screen.queryByText('Aprobado del mes')).not.toBeInTheDocument()
+  })
+
+  it('TestRF021_MissingPermissionsClaimIsTreatedAsEmpty', async () => {
+    await beginLogin()
+    const state = sessionStorage.getItem('contabilidad.oauth_state')
+    stubHub({ roles: ['contabilidad.senior'], permissions: undefined })
+    window.history.replaceState({}, '', `/oauth/callback?code=the-code&state=${state}`)
+    render(<App />)
+    await screen.findByRole('navigation', { name: 'Secciones' })
+    expect(within(rail()).getByRole('button', { name: /Cierre contable/ })).toBeDisabled()
+    goTo('Transacciones')
+    expect(screen.queryByRole('button', { name: '+ Registrar movimiento' })).not.toBeInTheDocument()
+    expect(screen.queryByText('M-2041')).not.toBeInTheDocument()
+  })
+
+  it('TestRF021_PermissionsNotRolesDecideWhatASeniorNamedRoleCanDo', async () => {
+    await signInAs(['contabilidad.senior'], 'shell', ['movimientos.registrar'])
+    goTo('Transacciones')
+    expect(screen.getByRole('button', { name: '+ Registrar movimiento' })).toBeInTheDocument()
+    expect(screen.queryByText('M-2041')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Aprobar/ })).not.toBeInTheDocument()
+  })
+})
 
 describe('logout', () => {
   it('TestRF020_LogoutClearsMemoryAndReturnsToLogin', async () => {

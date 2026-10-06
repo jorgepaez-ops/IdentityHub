@@ -28,9 +28,9 @@ export function TransactionsView({ access, movements, onDecide, onRegister }: Pr
     <section aria-labelledby="view-title">
       <div className="view-head">
         <h1 id="view-title">Transacciones</h1>
-        <button className="primary-button" type="button" onClick={() => setAdding((open) => !open)}>+ Registrar movimiento</button>
+        {access.canRegister && <button className="primary-button" type="button" onClick={() => setAdding((open) => !open)}>+ Registrar movimiento</button>}
       </div>
-      {adding && (
+      {adding && access.canRegister && (
         <form className="card movement-form" onSubmit={submit}>
           <label htmlFor="movement-description">Descripción</label>
           <input id="movement-description" name="description" required maxLength={80} />

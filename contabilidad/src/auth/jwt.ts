@@ -25,6 +25,7 @@ export interface ExpectedToken {
 export interface VerifiedToken {
   subject: string
   roles: string[]
+  permissions: string[]
   expiresAt: number
 }
 
@@ -81,5 +82,8 @@ export async function verifyAccessToken(token: string, jwks: Jwks, expected: Exp
   // The Hub serializes an empty role set as null.
   const rawRoles = claims.roles ?? []
   if (!Array.isArray(rawRoles) || !rawRoles.every((role) => typeof role === 'string')) throw new TokenVerificationError('invalid roles claim')
-  return { subject: claims.sub, roles: rawRoles as string[], expiresAt: claims.exp }
+  // Same for permissions; a token issued before permissions existed has no claim at all.
+  const rawPermissions = claims.permissions ?? []
+  if (!Array.isArray(rawPermissions) || !rawPermissions.every((permission) => typeof permission === 'string')) throw new TokenVerificationError('invalid permissions claim')
+  return { subject: claims.sub, roles: rawRoles as string[], permissions: rawPermissions as string[], expiresAt: claims.exp }
 }

@@ -14,7 +14,7 @@ interface Props {
 }
 
 export function Shell({ access, subject, onLogout }: Props) {
-  const [view, setView] = useState<View>('summary')
+  const [view, setView] = useState<View>(access.canSeeReports ? 'summary' : 'transactions')
   const [movements, setMovements] = useState<Movement[]>(INITIAL_MOVEMENTS)
   const [closed, setClosed] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
@@ -33,7 +33,7 @@ export function Shell({ access, subject, onLogout }: Props) {
   }
 
   const items: { id: View; label: string; locked?: boolean }[] = [
-    { id: 'summary', label: 'Resumen' },
+    { id: 'summary', label: 'Resumen', locked: !access.canSeeReports },
     { id: 'transactions', label: 'Transacciones' },
     { id: 'closing', label: 'Cierre contable', locked: !access.canClose },
   ]
