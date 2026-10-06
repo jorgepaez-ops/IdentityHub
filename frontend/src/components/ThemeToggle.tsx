@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { MoonIcon, SunIcon } from './icons'
-import { applyTheme, resolveTheme, saveTheme } from './theme'
+import { applyTheme, resolveTheme, saveTheme, subscribeToSystemTheme } from './theme'
 
 export function ThemeToggle() {
   const [theme, setTheme] = useState(resolveTheme)
@@ -8,6 +8,8 @@ export function ThemeToggle() {
   useEffect(() => {
     applyTheme(theme)
   }, [theme])
+
+  useEffect(() => subscribeToSystemTheme(setTheme), [])
 
   const next = theme === 'dark' ? 'light' : 'dark'
   const change = () => {

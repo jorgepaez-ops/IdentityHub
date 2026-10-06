@@ -105,8 +105,13 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
   Revisión nativa de la rama completa (desde `6c8bc11`, 45 archivos, 1421 líneas, 1 lente): **aprobada**
   y acusada. Aviso nuevo para P9: `initializeTheme` escribe `data-theme` al arrancar aunque el usuario no
   haya elegido tema, así que el Hub y Contabilidad ya no siguen en vivo el cambio de modo oscuro del
-  sistema (solo al recargar). Corregir: sin elección guardada, no fijar `data-theme` o escuchar
-  `matchMedia`.
+  sistema (solo al recargar). **Corregido** (con el usuario, antes de P4; delegado a Sonnet, revisado por
+  Claude): `subscribeToSystemTheme` escucha `matchMedia` mientras no haya elección guardada ni clic en la
+  página; `initializeTheme` y `ThemeToggle` se suscriben. RED: 2 de 4 pruebas nuevas por app fallaban;
+  GREEN: vitest Hub 194/194 y Contabilidad 76/76, typecheck y lint limpios. Tercera revisión nativa de
+  la rama (aprobada y acusada) dejó otra sugerencia para P9: en login, páginas públicas y pantalla de
+  restauración, `main#main-content` no tiene `tabIndex=-1`, así que el enlace para saltar puede no mover
+  el foco.
 - [ ] **P4 — Usuarios.** Filtro por estado con el parámetro `status` existente y tarjetas clicables.
 - [ ] **P5 — Auditoría.** Atajos de filtro, actor resuelto a correo (`getUser`), metadatos legibles y
   «filtrar por este actor».

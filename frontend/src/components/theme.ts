@@ -14,7 +14,35 @@ export function resolveTheme(): Theme {
   return saved === 'light' || saved === 'dark' ? saved : preferredTheme()
 }
 
+// Set once the user clicks the toggle in this page, so a failing write still stops following the system.
+let chosenInPage = false
+
+function hasSavedTheme(): boolean {
+  try {
+    const saved = window.localStorage.getItem(themeStorageKey)
+    return saved === 'light' || saved === 'dark'
+  } catch {
+    return false
+  }
+}
+
+export function followsSystemTheme(): boolean {
+  return !chosenInPage && !hasSavedTheme()
+}
+
+// Calls back with the new system theme, but only while the user has not chosen one.
+export function subscribeToSystemTheme(callback: (theme: Theme) => void): () => void {
+  const query = window.matchMedia?.('(prefers-color-scheme: dark)')
+  if (!query?.addEventListener) return () => {}
+  const listener = (event: { matches: boolean }) => {
+    if (followsSystemTheme()) callback(event.matches ? 'dark' : 'light')
+  }
+  query.addEventListener('change', listener)
+  return () => query.removeEventListener('change', listener)
+}
+
 export function saveTheme(theme: Theme) {
+  chosenInPage = true
   try { window.localStorage.setItem(themeStorageKey, theme) } catch { /* the choice lasts for this page */ }
 }
 
@@ -22,6 +50,11 @@ export function applyTheme(theme: Theme) {
   document.documentElement.dataset.theme = theme
 }
 
+let stopFollowingSystem = () => {}
+
 export function initializeTheme() {
+  chosenInPage = false
   applyTheme(resolveTheme())
+  stopFollowingSystem()
+  stopFollowingSystem = subscribeToSystemTheme(applyTheme)
 }

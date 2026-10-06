@@ -19,6 +19,79 @@ describe('visual system feedback', () => {
     document.documentElement.removeAttribute('data-theme')
   })
 
+  describe('system theme changes', () => {
+    function fakeSystemTheme(dark: boolean) {
+      let matches = dark
+      const listeners = new Set<(event: { matches: boolean }) => void>()
+      vi.stubGlobal('matchMedia', vi.fn(() => ({
+        get matches() { return matches },
+        addEventListener: (_: string, listener: (event: { matches: boolean }) => void) => listeners.add(listener),
+        removeEventListener: (_: string, listener: (event: { matches: boolean }) => void) => listeners.delete(listener),
+      })))
+      return (next: boolean) => {
+        matches = next
+        act(() => listeners.forEach((listener) => listener({ matches: next })))
+      }
+    }
+
+    it('TestRF010_ElTemaSigueAlSistemaEnVivoSinEleccionGuardada', () => {
+      const setSystemDark = fakeSystemTheme(false)
+      initializeTheme()
+      render(<ThemeToggle />)
+      expect(document.documentElement).toHaveAttribute('data-theme', 'light')
+
+      setSystemDark(true)
+      expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+      expect(screen.getByRole('button', { name: 'Cambiar a tema claro' })).toBeInTheDocument()
+    })
+
+    it('TestRF010_TrasUnClicElCambioDelSistemaSeIgnora', () => {
+      const setSystemDark = fakeSystemTheme(false)
+      initializeTheme()
+      render(<ThemeToggle />)
+      fireEvent.click(screen.getByRole('button', { name: 'Cambiar a tema oscuro' }))
+
+      setSystemDark(false)
+      setSystemDark(true)
+      expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+      setSystemDark(false)
+      expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+      expect(screen.getByRole('button', { name: 'Cambiar a tema claro' })).toBeInTheDocument()
+    })
+
+    it('TestRF010_UnTemaGuardadoAlArrancarIgnoraAlSistema', () => {
+      window.localStorage.setItem('identityhub.theme', 'light')
+      const setSystemDark = fakeSystemTheme(false)
+      initializeTheme()
+      render(<ThemeToggle />)
+
+      setSystemDark(true)
+      expect(document.documentElement).toHaveAttribute('data-theme', 'light')
+      expect(screen.getByRole('button', { name: 'Cambiar a tema oscuro' })).toBeInTheDocument()
+    })
+
+    it('TestRF010_SiGuardarFallaElClicDejaDeSeguirAlSistema', () => {
+      const getItem = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new DOMException('blocked', 'SecurityError') })
+      const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new DOMException('blocked', 'SecurityError') })
+      try {
+        const setSystemDark = fakeSystemTheme(false)
+        initializeTheme()
+        render(<ThemeToggle />)
+        setSystemDark(true)
+        expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+
+        fireEvent.click(screen.getByRole('button', { name: 'Cambiar a tema claro' }))
+        setSystemDark(false)
+        setSystemDark(true)
+        expect(document.documentElement).toHaveAttribute('data-theme', 'light')
+        expect(screen.getByRole('button', { name: 'Cambiar a tema oscuro' })).toBeInTheDocument()
+      } finally {
+        getItem.mockRestore()
+        setItem.mockRestore()
+      }
+    })
+  })
+
   it('TestRF010_CierraElAvisoManualSinDejarUnTemporizadorActivo', () => {
     vi.useFakeTimers()
     const onClose = vi.fn()
