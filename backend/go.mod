@@ -27,6 +27,8 @@ require (
 
 require github.com/golang-jwt/jwt/v5 v5.3.1
 
+require github.com/davecgh/go-spew v1.1.1 // indirect
+
 require (
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect

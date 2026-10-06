@@ -25,6 +25,15 @@ scrape_configs:
       - targets: ["broker:15692"]
         labels: { service: broker }
 
+  - job_name: rabbitmq_detailed
+    metrics_path: /metrics/detailed
+    params:
+      family: [queue_coarse_metrics]
+      vhost: ["/"]
+    static_configs:
+      - targets: ["broker:15692"]
+        labels: { service: broker }
+
   - job_name: prometheus
     static_configs:
       - targets: ["localhost:9090"]

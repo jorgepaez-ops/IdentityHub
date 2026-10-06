@@ -37,14 +37,14 @@ declaración de buenas intenciones.
 | **RNF-004** | Imágenes sin vulnerabilidades corregibles | P0 | — | — | 3 | — | 🟡 parcial |
 | **RNF-005** | Cobertura de pruebas ≥ 70 % | P0 | — | — | 25 | — | 🟡 parcial |
 | **RNF-006** | Procedencia verificable | P0 | — | — | — | — | 🔴 sin cubrir |
-| **RNF-007** | Observabilidad | P0 | — | — | — | — | 🔴 sin cubrir |
+| **RNF-007** | Observabilidad | P0 | — | — | 4 | — | 🟡 parcial |
 | **RNF-008** | Contenedores endurecidos | P0 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-009** | Cabeceras de seguridad | P0 | — | — | — | 6 | 🟡 parcial |
 | **RNF-010** | Latencia | P1 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-011** | Los specs son la fuente de verdad | P0 | — | — | 5 | — | 🟡 parcial |
 | **RNF-012** | Logs sin datos sensibles | P0 | — | — | 5 | — | 🟡 parcial |
 
-**Resumen:** 33 requisitos · 18 completos · 7 parciales · 6 sin cubrir · 2 diferidos (semana 4).
+**Resumen:** 33 requisitos · 18 completos · 8 parciales · 5 sin cubrir · 2 diferidos (semana 4).
 
 Leyenda de estado: *completo* = verificado por al menos dos de las tres
 columnas de prueba · *parcial* = una sola · *sin cubrir* = ninguna · *diferido (semana 4)* = backlog de semana 4 por decisión Q14.

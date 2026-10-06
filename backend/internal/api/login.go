@@ -7,6 +7,7 @@ import (
 
 	"github.com/jorgepaez/identity-hub/internal/auth/login"
 	"github.com/jorgepaez/identity-hub/internal/auth/mfa"
+	"github.com/jorgepaez/identity-hub/internal/observability"
 )
 
 // Login verifies the password and starts the mandatory email MFA challenge
@@ -31,10 +32,15 @@ func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case err == nil:
 		writeJSON(w, http.StatusAccepted, MfaChallenge{MfaToken: result.MfaToken, ExpiresIn: result.ExpiresIn})
-	case errors.Is(err, login.ErrAccountLocked), errors.Is(err, login.ErrIPRateLimited):
+		observability.LoginAttempts.WithLabelValues("mfa_required").Inc()
+	case errors.Is(err, login.ErrAccountLocked):
+		writeProblem(w, http.StatusLocked, "login-locked", "Locked", "Login is temporarily unavailable. Please try again later.")
+		observability.LoginAttempts.WithLabelValues("locked").Inc()
+	case errors.Is(err, login.ErrIPRateLimited):
 		writeProblem(w, http.StatusLocked, "login-locked", "Locked", "Login is temporarily unavailable. Please try again later.")
 	case errors.Is(err, login.ErrInvalidCredentials):
 		writeProblem(w, http.StatusUnauthorized, "invalid-credentials", "Unauthorized", "Invalid email or password.")
+		observability.LoginAttempts.WithLabelValues("failed").Inc()
 	case errors.Is(err, mfa.ErrIssuanceLimited):
 		writeProblem(w, http.StatusTooManyRequests, "mfa-challenge-rate-limited", "Too Many Requests", "Too many verification codes were requested. Please try again later.")
 	case errors.Is(err, mfa.ErrDeliveryUnavailable):

@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jorgepaez/identity-hub/internal/auth/roles"
 	"github.com/jorgepaez/identity-hub/internal/auth/token"
+	"github.com/jorgepaez/identity-hub/internal/observability"
 )
 
 var (
@@ -167,6 +168,7 @@ func (s *Service) Refresh(ctx context.Context, input Input) (Result, error) {
 				return fmt.Errorf("record refresh reuse audit: %w", err)
 			}
 			event = &SecurityEvent{Type: "security.refresh_reuse_detected", UserID: rotation.UserID, FamilyID: rotation.FamilyID, RevokedCount: revokedCount, IP: input.IP}
+			observability.RefreshReuseDetected.Inc()
 			// Returning an error here would roll back the revocation and audit.
 			refreshErr = ErrRefreshReuse
 			return nil

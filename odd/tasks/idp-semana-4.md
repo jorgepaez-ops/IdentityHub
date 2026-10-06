@@ -540,8 +540,22 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   pero ningún código las incrementa (Claude contó 0 usos fuera de pruebas); el panel de DLQ consulta una
   etiqueta `queue` que RabbitMQ no expone. El informe muestra la captura real y lo explica. Afecta al
   bono de observabilidad (+8 %) y al video; sin id; falta decidir la tarea.
+  **Corregido (2026-10-06, por decisión del usuario)** — Ruta: delegada (Codex), revisión de Claude.
+  `Broker.Publish` cuenta `identity_events_published_total` (`published`/`failed`, un incremento por
+  intento); el reuso de refresh incrementa `identity_refresh_reuse_detected_total`; los handlers de
+  login y verificación MFA cuentan `mfa_required`, `failed`, `locked` y `succeeded` (no cuentan los
+  rechazos por límite de IP); Prometheus raspa `/metrics/detailed` de RabbitMQ (`queue_coarse_metrics`)
+  y el panel de DLQ usa `rabbitmq_detailed_queue_messages`. RED observado por Claude (3 pruebas
+  TestRNF007_ fallan contra el código previo; `go.mod` necesitó `go-spew` indirecto para `testutil`,
+  resuelto por Claude con red). GREEN (Codex): build, vet, `go test ./...`, golangci-lint 0, trazabilidad
+  al día. Verificación de Claude con el stack real tras `make e2e` 52/52: login 76 `mfa_required`,
+  69 `succeeded`, 3 `failed`; 204 eventos `published`; 2 reusos; serie de `notifications.dlq` presente.
+  Limitación aceptada: el intento que provoca el bloqueo se cuenta como `failed` (el dominio devuelve
+  credenciales inválidas); los siguientes, como `locked`.
   iCloud volvió a reemplazar 7 capturas del manual por versiones viejas y a crear copias « N»: se
-  restauraron desde git (`6496a92`) y las copias se movieron fuera del repo, sin borrarlas.
+  restauraron desde git (`6496a92`) y las copias se movieron fuera del repo, sin borrarlas. Causa
+  (aclarada por el usuario): la sincronización continua del Mac con iCloud al reescribir archivos
+  generados, no ediciones simultáneas desde otro equipo.
 - [ ] **T20 — Guion del video** de 10-15 minutos (ciclo completo: app, pipeline, despliegue,
   observabilidad) (Q3).
 - [ ] **T21 — Cierre.** Bitácora, matriz, informe de seguridad final, tag de versión y PR.
