@@ -1240,7 +1240,7 @@ func (q *Queries) UnlockLoginUser(ctx context.Context, id uuid.UUID) error {
 
 const updateAdminUserStatus = `-- name: UpdateAdminUserStatus :one
 UPDATE users
-SET status = $2
+SET status = $2, locked_until = NULL
 WHERE id = $1
 RETURNING id, email, password_hash, display_name, status, mfa_enabled, mfa_secret_enc, failed_login_count, locked_until, last_login_at, created_at, updated_at
 `
@@ -1250,6 +1250,8 @@ type UpdateAdminUserStatusParams struct {
 	Status UserStatus
 }
 
+// Every admin status change clears locked_until: a manual lock has no expiry
+// and must never inherit the one left by an earlier automatic lockout.
 func (q *Queries) UpdateAdminUserStatus(ctx context.Context, arg UpdateAdminUserStatusParams) (User, error) {
 	row := q.db.QueryRow(ctx, updateAdminUserStatus, arg.ID, arg.Status)
 	var i User

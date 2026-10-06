@@ -7,10 +7,12 @@ import (
 	"errors"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jorgepaez/identity-hub/internal/auth/admin"
 	"github.com/jorgepaez/identity-hub/internal/auth/auditlog"
+	"github.com/jorgepaez/identity-hub/internal/auth/login"
 	"github.com/jorgepaez/identity-hub/internal/store"
 	"github.com/jorgepaez/identity-hub/internal/testdb"
 )
@@ -349,5 +351,73 @@ func TestRF010_TransaccionDeAdministracionSeRevierteSiElEscritorFalla(t *testing
 	}
 	if auditCount != 0 {
 		t.Fatalf("audit rows after rollback = %d, want 0 (InsertAuditEvent must have been rolled back too)", auditCount)
+	}
+}
+
+// An admin lock is manual: it has no locked_until and never expires. A stale
+// locked_until left by an earlier automatic lockout must not turn it into a
+// timed lock, otherwise the account would unlock itself later.
+func TestRF010_BloqueoManualNoHeredaLockedUntilDeUnBloqueoAutomatico(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test requires a PostgreSQL server")
+	}
+	ctx := context.Background()
+	pool := testdb.New(t)
+	repository, err := store.NewWithPool(pool)
+	if err != nil {
+		t.Fatalf("NewWithPool: %v", err)
+	}
+	target := createAdminTestUser(t, ctx, repository, "manual-lock-target@example.test", "Manual Lock", "active")
+
+	setStatus := func(status admin.Status) {
+		t.Helper()
+		err := repository.WithinUserManagementTransaction(ctx, func(writer admin.Writer) error {
+			_, err := writer.UpdateUser(ctx, target.ID, status)
+			return err
+		})
+		if err != nil {
+			t.Fatalf("UpdateUser(%s): %v", status, err)
+		}
+	}
+	lockedUntil := func() *time.Time {
+		t.Helper()
+		var until *time.Time
+		if err := pool.QueryRow(ctx, `SELECT locked_until FROM users WHERE id = $1`, target.ID).Scan(&until); err != nil {
+			t.Fatalf("read locked_until: %v", err)
+		}
+		return until
+	}
+
+	// 1. Automatic lockout with a future expiry.
+	err = repository.WithinLoginTransaction(ctx, func(writer login.Writer) error {
+		return writer.LockLoginUser(ctx, target.ID, time.Now().Add(15*time.Minute))
+	})
+	if err != nil {
+		t.Fatalf("LockLoginUser: %v", err)
+	}
+	// 2. Admin reactivates before it expires; 3. admin locks manually.
+	setStatus(admin.StatusActive)
+	if until := lockedUntil(); until != nil {
+		t.Errorf("locked_until after admin active = %v, want NULL", until)
+	}
+	setStatus(admin.StatusLocked)
+	if until := lockedUntil(); until != nil {
+		t.Fatalf("locked_until after admin locked = %v, want NULL (a manual lock never expires)", until)
+	}
+	// 4. Even if an old expiry were in the past, the account stays locked.
+	if _, err := pool.Exec(ctx, `UPDATE users SET locked_until = now() - interval '1 hour' WHERE id = $1 AND locked_until IS NOT NULL`, target.ID); err != nil {
+		t.Fatalf("age locked_until: %v", err)
+	}
+	var state login.User
+	err = repository.WithinLoginTransaction(ctx, func(writer login.Writer) error {
+		var getErr error
+		state, getErr = writer.GetLoginUserByEmail(ctx, target.Email)
+		return getErr
+	})
+	if err != nil {
+		t.Fatalf("GetLoginUserByEmail: %v", err)
+	}
+	if state.Status != login.StatusLocked || state.LockedUntil != nil {
+		t.Fatalf("login state = %s / %v, want locked / nil", state.Status, state.LockedUntil)
 	}
 }

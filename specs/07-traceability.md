@@ -19,7 +19,7 @@ declaración de buenas intenciones.
 | **RF-007** | Cierre de sesión | P0 | `logout` | 1 | 9 | 1 | ✅ completo |
 | **RF-008** | Perfil propio | P0 | `getCurrentUser`, `updateCurrentUser` | — | 7 | — | 🟡 parcial |
 | **RF-009** | Control de acceso por roles | P0 | — | 5 | 17 | 5 | ✅ completo |
-| **RF-010** | Administración de usuarios | P0 | `listUsers`, `getUser`, `updateUser` | 3 | 12 | 3 | ✅ completo |
+| **RF-010** | Administración de usuarios | P0 | `listUsers`, `getUser`, `updateUser` | 3 | 13 | 3 | ✅ completo |
 | **RF-011** | Registro de auditoría | P0 | `listAuditLog` | 1 | 9 | 1 | ✅ completo |
 | **RF-012** | Notificaciones asíncronas | P0 | — | 1 | 12 | — | ✅ completo |
 | **RF-013** | Segundo factor obligatorio por correo | P1 | — | 1 | 5 | — | ✅ completo |
