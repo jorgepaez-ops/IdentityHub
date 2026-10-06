@@ -64,7 +64,8 @@ services:
   mailpit:
     # Servidor SMTP de captura: recoge todo el correo saliente y lo muestra en
     # una interfaz web. No es un broker — esa función la cumple RabbitMQ.
-    image: axllent/mailpit:v1.20
+    # axllent/mailpit v1.31.4, con soporte, fijado por digest real.
+    image: axllent/mailpit@sha256:b68349e3a014b90c5610bfb26b2ae36f3892d7b8cf25ee140c6c71c98d2fcf48
     ports:
       - "1025:1025"  # SMTP
       - "8025:8025"  # interfaz web y API HTTP que consultan las pruebas E2E
@@ -80,7 +81,8 @@ services:
 
   # ── Migraciones ─────────────────────────────────────────────────────────
   migrate:
-    image: migrate/migrate:v4.17.0
+    # migrate/migrate v4.20.1, con soporte, fijado por digest real.
+    image: migrate/migrate@sha256:76cc2074cb6642631f34a898ced71e6aeaa6b1a4d78c4daa743275a22e0c5be7
     depends_on:
       db:
         condition: service_healthy
@@ -200,7 +202,8 @@ services:
   # Fuera del perfil por defecto para no cargar cuatro contenedores más en cada
   # ciclo de desarrollo.
   prometheus:
-    image: prom/prometheus:v2.51.0
+    # prom/prometheus v3.15.0, con soporte, fijado por digest real.
+    image: prom/prometheus@sha256:efd719c99d83b060d9daefdcf00360461adf279f45ef5391f8d111892118753e
     profiles: ["observability"]
     volumes:
       - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
@@ -208,7 +211,8 @@ services:
       - "9090:9090"
 
   loki:
-    image: grafana/loki:2.9.4
+    # grafana/loki 3.7.8, con soporte, fijado por digest real.
+    image: grafana/loki@sha256:1107dd5274e0ada47e42472b7a7e71f3b2a2fe878878108f3e2f9e51528f0193
     profiles: ["observability"]
     command: ["-config.file=/etc/loki/local-config.yaml"]
     ports:
@@ -216,7 +220,8 @@ services:
 
   alloy:
     # Grafana Alloy sustituye a Promtail, que está descontinuado.
-    image: grafana/alloy:v1.0.0
+    # grafana/alloy v1.20.1, con soporte, fijado por digest real.
+    image: grafana/alloy@sha256:2aa2099af76c0098d4af7a4d6e48f86cb66dc1a000222ad927a1c67c6542d13f
     profiles: ["observability"]
     depends_on: [loki]
     volumes:
@@ -228,7 +233,8 @@ services:
       - "/etc/alloy/config.river"
 
   grafana:
-    image: grafana/grafana:10.4.0
+    # grafana/grafana 13.2.3, con soporte, fijado por digest real.
+    image: grafana/grafana@sha256:b28bae15e219c998fb0e0424ed724930cc61b1f61fb404d47c862f9a23f9e572
     profiles: ["observability"]
     depends_on: [prometheus, loki]
     environment:

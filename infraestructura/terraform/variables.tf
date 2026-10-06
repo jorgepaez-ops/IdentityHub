@@ -83,9 +83,9 @@ variable "image_broker" {
 }
 
 variable "image_mailpit" {
-  description = "Imagen de Mailpit; solo se usa con localstack = true."
+  description = "Imagen de Mailpit (v1.31.4), fijada por digest; solo se usa con localstack = true."
   type        = string
-  default     = "docker.io/axllent/mailpit:v1.20"
+  default     = "docker.io/axllent/mailpit@sha256:b68349e3a014b90c5610bfb26b2ae36f3892d7b8cf25ee140c6c71c98d2fcf48"
 }
 
 # ── Aplicacion ─────────────────────────────────────────────────────────────
