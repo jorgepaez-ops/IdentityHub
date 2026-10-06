@@ -67,6 +67,18 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
 - [ ] **P9 — Deudas menores.** Avisos de SonarCloud de las fases 3 y 4, sugerencias pendientes de las
   revisiones nativas (correos, refresh, informe, capturas) y alerta de Grafana más runbook para la DLQ
   (AM-019).
+  Ampliada (2026-10-06, con el usuario) con las 120 alertas abiertas de code scanning en `main`:
+  - 50 de Semgrep (`github-actions-mutable-action-tag`): fijar las acciones por SHA con el tag como
+    comentario.
+  - 33 de CodeQL (`js/remote-property-injection`), todas en los HTML de `docs/diagramas/` (biblioteca
+    minificada embebida): agregar UML de secuencia del SSO con PKCE y de estados del ciclo de vida del
+    usuario en `docs/diagramas/uml/`, borrar los tres HTML (el de arquitectura ya lo cubren los UML de
+    componentes y despliegue) y actualizar `README.md`, `docs/README.md` y `ANALISIS-REQUISITOS.md`.
+  - 6 de Trivy (libpng y nghttp2 en `web`, tzdata en `api`/`worker`, x/crypto en `api` ligado a
+    VULN-028, AWS-0089 en Terraform): actualizar imágenes base si hay versión corregida.
+  - 27 de Checkov (omisiones ya justificadas en el código) y 4 de Semgrep (`request-host-used` en nginx).
+  - Lo que no se pueda corregir se documenta en `README.md`, sección «Alertas abiertas conocidas», con
+    motivo y justificación, para la exposición.
 - [ ] **P10 — Documentación y evidencia.** Ajustes de E2E si hacen falta, capturas regeneradas,
   manual de usuario e informe técnico actualizados.
 
