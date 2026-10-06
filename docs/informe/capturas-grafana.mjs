@@ -23,9 +23,11 @@ const OUT = outIdx >= 0 ? path.resolve(args[outIdx + 1]) : path.join(os.tmpdir()
 const GRAFANA = process.env.GRAFANA_URL ?? 'http://localhost:3000'
 const PROMETHEUS = process.env.PROMETHEUS_URL ?? 'http://localhost:9090'
 const CONTAINER = process.env.GRAFANA_CONTAINER ?? 'identity-hub-grafana-1'
+// Same convention as e2e/support/db.ts: the Docker CLI can be pinned to an absolute path.
+const DOCKER = process.env.INFORME_DOCKER ?? 'docker'
 
 function fromContainer(name) {
-  return execFileSync('docker', ['exec', CONTAINER, 'printenv', name], { encoding: 'utf8' }).trim()
+  return execFileSync(DOCKER, ['exec', CONTAINER, 'printenv', name], { encoding: 'utf8' }).trim()
 }
 const user = process.env.GRAFANA_ADMIN_USER ?? fromContainer('GF_SECURITY_ADMIN_USER')
 // Read at run time from the environment or the container, never stored in this file.
