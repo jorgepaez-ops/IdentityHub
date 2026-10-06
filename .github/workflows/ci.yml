@@ -621,6 +621,17 @@ jobs:
             --output cli --output sarif \
             --output-file-path console,checkov-results.sarif
 
+      # P9d — Checkov mete en el SARIF también los hallazgos omitidos en línea (llevan
+      # "suppressions" con la justificación) y GitHub los muestra como alertas abiertas. Se
+      # quitan solo del SARIF que se sube; el gate de arriba ya no los cuenta y la excepción
+      # sigue visible en el código (#checkov:skip=ID:motivo).
+      - name: Quitar del SARIF los hallazgos ya justificados en línea
+        if: always()
+        run: |
+          jq '.runs[].results |= map(select((.suppressions // []) | length == 0))' \
+            checkov-results.sarif > checkov-results.filtered.sarif
+          mv checkov-results.filtered.sarif checkov-results.sarif
+
       - uses: github/codeql-action/upload-sarif@1190a975f95ce23525efb6a3fc21ea29567c1b52 # v3.38.2
         if: always()
         with:

@@ -269,8 +269,24 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
     los HTML de archify); sin registro creado. La herramienta revisa hasta HEAD, así que no se pudo
     aislar el arreglo de Inicio: queda **sin revisión nativa**, cubierto por su prueba (RED observado) y
     la revisión visual de Claude. El siguiente tramo parte de `f56b9a9`.
-  - [ ] **P9d — Imágenes base y alertas de infraestructura:** Trivy (6), Checkov (27), Semgrep de nginx
+  - [x] **P9d — Imágenes base y alertas de infraestructura:** Trivy (6), Checkov (27), Semgrep de nginx
     (4) y sección «Alertas abiertas conocidas» en `README.md`.
+    Evidencia (2026-10-06, Sonnet, revisión de Claude): 120 alertas abiertas en `main` al
+    empezar (50 Semgrep acciones y 33 CodeQL, ya cubiertas por P9b/P9c); las de P9d: Trivy 6, Checkov 27,
+    Semgrep nginx 4. `web`: nuevo digest de `stable-alpine` (nginx 1.30.5) corrige libpng, nghttp2 y
+    pcre2, así que se retiró la capa `apk upgrade pcre2`; Trivy sobre la imagen 3 → 0. tzdata (`api`,
+    `worker`): sin digest de distroless con 2026c todavía, queda. x/crypto GO-2026-5932: sin versión
+    corregida, ya es riesgo aceptado de VULN-028 (osv-scanner.toml), no se tocó Go. Nginx: la cabecera
+    Host hacia la API usa el nombre del bloque `server` y no la cabecera Host del cliente (la API no la
+    lee); Semgrep local 0 hallazgos. Terraform: `#trivy:ignore:AWS-0089` con motivo (bucket destino de
+    logs, igual que CKV_AWS_18); `terraform fmt`/`validate` bien. Checkov: las 27 llevaban `suppressions`
+    en el SARIF; GitHub las muestra igual, así que `ci.yml` las filtra con `jq` antes de subir (el gate
+    no cambia). README: sección «Alertas abiertas conocidas». `make e2e` 52/52. Claude verificó que el backend
+    no lee la cabecera Host de la petición (único `.Host` en `notify.go`, sobre una URL de configuración).
+    Pendiente de CI: el filtro `jq` de Checkov solo se probó localmente; se ve en el próximo push.
+    Hallazgo fuera de alcance (sin id): `make scan-image` y `make scan-config` fijan Trivy 0.56.2 mientras
+    CI usa una versión mucho más nueva, así que el escaneo local puede no coincidir con CI; decidir en qué
+    tarea se alinea.
   - [ ] **P9e — Deudas de fases 3 y 4:** avisos de SonarCloud, sugerencias de las revisiones nativas
     (correos, refresh, informe, capturas) y alerta de Grafana con runbook para la DLQ (AM-019).
 - [ ] **P10 — Documentación y evidencia.** Ajustes de E2E si hacen falta, capturas regeneradas,

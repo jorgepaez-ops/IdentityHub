@@ -1,6 +1,9 @@
 # Logs de acceso del ALB. No se aplica en LocalStack: solo CRUD (ADR 0012)
 # Los logs del ALB solo admiten cifrado SSE-S3 (AES256); SSE-KMS no esta soportado por ELB.
 
+# Excepcion aceptada de Trivy (AWS-0089), la misma de CKV_AWS_18 en Checkov: este es el bucket de
+# destino de los logs de acceso; activar el logging sobre si mismo crearia un ciclo sin valor.
+#trivy:ignore:AWS-0089
 resource "aws_s3_bucket" "alb_logs" {
   #checkov:skip=CKV_AWS_144:La replicacion entre regiones de los logs queda fuera del alcance de una referencia que nunca se aplica
   #checkov:skip=CKV2_AWS_62:Las notificaciones de eventos sobre el bucket de logs no aportan a la referencia
