@@ -19,8 +19,8 @@ Contabilidad y vistas según el rol. Dura unos 5 minutos.
 
 | # | Qué se hace | Qué mostrar en pantalla |
 |---|-------------|-------------------------|
-| 1 | El admin inicia sesión en el Hub y escribe el código MFA que llega a Mailpit. | Formulario de acceso, correo "sign-in code" en Mailpit, página Usuarios. |
-| 2 | En Usuarios, pulsar "Nuevo usuario", completar nombre y correo, marcar el rol `contabilidad.analista` y "Crear y enviar invitación". | El aviso "Invitación enviada" y el correo de invitación en Mailpit. |
+| 1 | El admin inicia sesión en el Hub y escribe el código MFA que llega a Mailpit. | Formulario de acceso, correo "sign-in code" en Mailpit, página Inicio de la consola. |
+| 2 | Desde Inicio, abrir Usuarios, pulsar "Nuevo usuario", completar nombre y correo, marcar el rol `contabilidad.analista` y "Crear y enviar invitación". | El aviso "Invitación enviada" y el correo de invitación en Mailpit. |
 | 3 | En la ventana del empleado, abrir el enlace del correo y definir la contraseña ("Definir contraseña"). | "Tu cuenta quedó activada". El admin nunca conoce la contraseña. |
 | 4 | El empleado inicia sesión en el Hub y escribe el código MFA de Mailpit. | Su página "Mi cuenta" y el segundo correo de código. |
 | 5 | El empleado abre Contabilidad y pulsa "Continuar con Identity Hub". | Redirección al Hub y regreso a Contabilidad sin formulario de contraseña ni nuevo correo: ya había sesión. |

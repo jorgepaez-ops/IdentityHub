@@ -317,7 +317,7 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
     métricas vuelve a documentar su bloque `var`. Aviso descartado con evidencia: `events.AccountLocked`
     tiene la misma forma JSON que el struct que reemplazó. Queda como sugerencia: sin verificación
     automática de que la regla y el uid de la fuente resuelven (solo la prueba manual).
-- [ ] **P10 — Documentación y evidencia.** Ajustes de E2E si hacen falta, capturas regeneradas,
+- [x] **P10 — Documentación y evidencia.** Ajustes de E2E si hacen falta, capturas regeneradas,
   manual de usuario e informe técnico actualizados.
   Pendientes detectados (2026-10-06): en `docs/manuales/integracion-terceros.md` §2.3, la fila «Roles»
   dice que el catálogo está fijo en `roles.go` con los roles de Contabilidad; desde ADR 0013 solo `admin`
@@ -337,12 +337,20 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
     Chromium: BOM, CRLF, encabezados y montos numéricos correctos. Verificación: `make capturas` limpio
     (sin roles de prueba restantes), `make e2e` 52/52, vitest Hub 255/255 y Contabilidad 144/144. Los
     conteos de Inicio en las capturas reflejan cuentas de E2E en la base local (100+ deshabilitados).
+  - P10b (Sonnet, 2026-10-06, pendiente de revisión de Claude): documentación técnica alineada.
+    `integracion-terceros.md` §2.3 (fila Roles: solo `admin`/`user` en código; una segunda aplicación
+    exige una migración que siembre aplicación y permisos); `arquitectura.md` lista los dos UML nuevos y
+    las tres vistas HTML (SVG estático); AM-019 `Mitigated` en `identity-hub.json` (JSON válido), informe
+    y `guion.md`, con regla `dlq.yml` y runbook; informe con secciones «Pulido del frontend»,
+    «Endurecimiento adicional de la rama de pulido» y «Diferencias conocidas entre especificación y
+    código» (tres, como trabajo futuro); Inicio en lugar de Usuarios en informe, `guion-demo.md` y
+    `video/guion.md`; PDF regenerado con `make informe` (47 páginas; está ignorado por git).
 
 ## Progreso
 
 | Tareas | Hechas |
 |---|---|
-| P1 a P10 (10) | 9 (P1 a P9) |
+| P1 a P10 (10) | 10 (P1 a P10) |
 
 ## Entrega
 
@@ -352,4 +360,4 @@ notas). Commits por unidad de trabajo; un PR al final con confirmación del usua
 
 ## Siguiente paso
 
-P10 (documentación y evidencia).
+Feature completo. Siguiente: PR de `feat/pulido-frontend` a `main`, con confirmación del usuario (estrategia `ask-on-risk`, un PR al final).
