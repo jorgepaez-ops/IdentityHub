@@ -450,6 +450,14 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   de directorio mira `admin` y `user`; el escenario dice «un rol auditor» en vez del nombre fijo; se
   quita el clic inútil de la prueba de App. Verificación: 6/6 E2E de RF-021, typecheck de e2e y de
   Contabilidad, lint, vitest 63/63, `make spec-drift` al día, sin roles de prueba en la base.
+  **Hallazgo nuevo fuera de alcance (CI del PR #11, 2026-10-06):** el job «5 · Dependencias
+  vulnerables» (`npm audit --audit-level=high`) falla por GHSA-68fv-2mgg-jv7q (alta, DoS del event
+  loop) en `source-map-js` 1.2.1 de `frontend` (solo desarrollo: `@vitest/coverage-v8` → `magicast` y
+  `jsdom` → `css-tree`); Contabilidad ya tiene 1.2.2. Aviso publicado después de abrir la fase, no lo
+  introduce este PR. Sin id VULN asignado; falta decidir en qué tarea se remedia. SonarCloud: quality
+  gate aprobado con 12 code smells nuevos (props de solo lectura y `role="status"` en `RolesPage.tsx`,
+  literales repetidos en `admin_roles.go`, complejidad en `rolegrid_integration_test.go`, `ASC` en
+  `roles.sql`).
 
 ## Fase 4 — Publicación y entrega
 
