@@ -11,7 +11,7 @@ SQLC_VERSION := v1.31.1
 SQLC         ?= sqlc
 
 .DEFAULT_GOAL := help
-.PHONY: help setup up down logs ps restart build test test-go test-integration test-front e2e _e2e-run scan-dast _scan-dast-run spec-drift lint fmt gen scan scan-secrets scan-deps scan-image scan-config scan-iac migrate psql rabbit mail clean up-prod down-prod
+.PHONY: help setup up down logs ps restart build test test-go test-integration test-front e2e _e2e-run capturas _capturas-run scan-dast _scan-dast-run spec-drift lint fmt gen scan scan-secrets scan-deps scan-image scan-config scan-iac migrate psql rabbit mail clean up-prod down-prod
 
 help: ## Muestra esta ayuda
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -110,6 +110,12 @@ e2e: ## Pruebas de extremo a extremo contra el stack levantado
 
 _e2e-run:
 	cd e2e && npm ci --ignore-scripts && npx playwright test
+
+capturas: ## Regenera las capturas del manual de usuario (docs/manuales/img/usuario) contra el stack levantado
+	@$(WITH_RAISED_LIMIT) _capturas-run
+
+_capturas-run:
+	cd e2e && npm ci --ignore-scripts && npm run capturas
 
 ZAP_IMAGE ?= ghcr.io/zaproxy/zaproxy:2.17.0
 ZAP_REPORTS := security/zap-reports

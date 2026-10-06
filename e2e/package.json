@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "test": "playwright test",
+    "capturas": "playwright test -c manual/playwright.config.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

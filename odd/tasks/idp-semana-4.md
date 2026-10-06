@@ -491,7 +491,21 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   Pospuesta al final de la fase 4 por decisión del usuario (2026-10-06), a la espera de Q1 (namespace
   y token de Docker Hub). Propuesta de Claude: repositorios `api`, `worker` y `web` (`web` ya sirve el
   Hub y Contabilidad), environment protegido `dockerhub`, tag de prueba `v0.9.0` y `v1.0.0` en T21.
-- [ ] **T18 — Manual de usuario con capturas** (incluye la grilla de roles).
+- [x] **T18 — Manual de usuario con capturas** (incluye la grilla de roles).
+  Ruta: delegada (Sonnet: necesita el stack y un navegador), revisión de Claude. Evidencia (2026-10-06):
+  `docs/manuales/usuario.md` por tipo de usuario (empleado, administrador, Contabilidad por rol), con la
+  historia del auditor para la sustentación (enunciado 4.6) y problemas frecuentes; 48 capturas en
+  `docs/manuales/img/usuario/` (3,5 MB, la mayor 188 KB) generadas por `e2e/manual/capturas.ts`
+  (`make capturas`, fuera de `make e2e` y de la matriz); vista previa de Mailpit enmascarada (lleva el
+  código y el enlace). `docs/README.md` marca el manual como hecho. Verificación (Sonnet): `make capturas`
+  1/1 (48 PNG), typecheck de e2e, `make e2e` 52/52, `make spec-drift` al día, 48 imágenes referenciadas
+  y existentes, sin roles del script en la base. Revisión de Claude: tres capturas abiertas (grilla,
+  Mailpit, resumen del auditor) sin datos sensibles; enlaces relativos del manual existen. Nota: la grilla
+  muestra «Asignado a 97/37 usuarios» por las cuentas que dejan las corridas E2E en la base local.
+  **Hallazgo nuevo fuera de alcance (T18):** los correos del Hub no declaran codificación:
+  `buildRawMessage` (`backend/cmd/worker/main.go`) no envía `MIME-Version` ni
+  `Content-Type: text/plain; charset=utf-8` (ni codifica el asunto según RFC 2047), así que Mailpit
+  muestra «GÃ³mez» en vez de «Gómez». Error funcional, no de seguridad; sin id; falta decidir la tarea.
 - [ ] **T19 — Informe técnico PDF** con las 8 secciones del enunciado.
 - [ ] **T20 — Guion del video** de 10-15 minutos (ciclo completo: app, pipeline, despliegue,
   observabilidad) (Q3).
@@ -504,14 +518,14 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
 | 1 — Documentación, UML e integración | T1 a T6 (6) | 6 (T1 a T6) — fase cerrada |
 | 2 — IaC de referencia | T7 a T10 (4) | 4 (T7 a T10) — fase cerrada |
 | 3 — Grilla de roles configurable | T11 a T15 (5) | 5 (T11 a T15) — fase cerrada |
-| 4 — Publicación y entrega | T16 a T21 (6) | 1 (T16) |
-| **Total** | **21** | **16** (T1 a T16) |
+| 4 — Publicación y entrega | T16 a T21 (6) | 2 (T16 y T18) |
+| **Total** | **21** | **17** (T1 a T16 y T18) |
 
 ## Siguiente paso
 
 **2026-10-06.** Fases 1 a 3 cerradas y en main (PR #11, merge `8b4a18a`, CI 21/21). T16 hecha
-(VULN-019 remediado, capturas de Desktop incluidas). T17 pospuesta al final (Q1). Siguiente: T18
-(manual de usuario con capturas).
+(VULN-019 remediado, capturas de Desktop incluidas). T17 pospuesta al final (Q1). T18 hecha. Siguiente: T19
+(informe técnico PDF).
 Codex: cuota diaria limitada; Sonnet como respaldo.
 
 ## Cambios de spec propuestos
