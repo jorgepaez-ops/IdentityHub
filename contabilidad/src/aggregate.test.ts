@@ -37,6 +37,12 @@ describe('ledger aggregation', () => {
     ])
   })
 
+  it('TestRF021_TotalsByMonthIgnoresMalformedDatesInsteadOfLooping', () => {
+    const months = totalsByMonth([row('X', '', 'Ventas', 5, 'pending'), row('Y', 'not-a-date', 'Ventas', 6, 'pending'), row('Z', '2026-13-01', 'Ventas', 7, 'pending'), row('A', '2026-02-10', 'Ventas', 9, 'approved')])
+    expect(months.map((month) => [month.month, month.total])).toEqual([['2026-02', 9]])
+    expect(totalsByMonth([row('X', '', 'Ventas', 5, 'pending')])).toEqual([])
+  })
+
   it('TestRF021_AggregateMonthsCrossYearBoundaries', () => {
     const months = totalsByMonth([row('P', '2025-11-30', 'Ventas', 1, 'approved'), row('Q', '2026-02-01', 'Ventas', 2, 'approved')])
     expect(months.map((entry) => entry.month)).toEqual(['2025-11', '2025-12', '2026-01', '2026-02'])

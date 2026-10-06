@@ -169,6 +169,12 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
   5); ahora usa `inOpenPeriod` (prueba `TestRF021_ClosingCountsOnlyTheOpenPeriod`, RED observado). vitest
   96/96, typecheck, lint y build limpios, `make e2e` 52/52 (corrido por Sonnet antes de la corrección del
   cierre, que ninguna E2E afirma). Sin verificar a ojo: modo oscuro y móvil (P10).
+  Commit `d5f7b19`. Revisión nativa de P6 (medio, 14 archivos, 571 líneas, 1 lente): **aprobada** y
+  acusada. Aviso corregido por Claude: `totalsByMonth` entraba en un ciclo infinito con una fecha mal
+  formada (RED observado: el proceso de pruebas murió por memoria agotada); ahora solo recorre claves
+  `YYYY-MM` válidas. Sugerencia aceptada como límite de la demo: el periodo abierto es una constante
+  (`2026-09-01`) sin límite superior, así que un movimiento nuevo (fechado con el reloj real, octubre)
+  cuenta en el cierre de septiembre y no cambia tras cerrar. vitest 97/97, typecheck y lint limpios.
 - [ ] **P7 — Contabilidad: movimientos.** Búsqueda, filtros, orden, categoría al registrar,
   confirmación antes de aprobar o rechazar, estado vacío, tabla accesible.
 - [ ] **P8 — Exportar CSV** en usuarios, auditoría y movimientos.

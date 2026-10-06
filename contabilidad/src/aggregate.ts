@@ -38,9 +38,12 @@ const nextMonth = (month: string): string => {
 }
 
 /** Chronological totals; months without movements between the first and last one appear with zero. */
+// Only real YYYY-MM keys walk the month range; a malformed date would otherwise never reach the last month.
+const MONTH_KEY = /^\d{4}-(0[1-9]|1[0-2])$/
+
 export function totalsByMonth(movements: Movement[]): MonthTotal[] {
-  if (movements.length === 0) return []
-  const keys = movements.map((movement) => movement.date.slice(0, 7)).sort()
+  const keys = movements.map((movement) => movement.date.slice(0, 7)).filter((key) => MONTH_KEY.test(key)).sort()
+  if (keys.length === 0) return []
   const first = keys[0] as string
   const last = keys[keys.length - 1] as string
   const result: MonthTotal[] = []
