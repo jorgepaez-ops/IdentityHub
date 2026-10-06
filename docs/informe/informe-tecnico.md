@@ -3,7 +3,7 @@ proyecto: Identity Hub
 subtitulo: Informe técnico del pipeline DevSecOps de ciclo completo para un proveedor de identidad con SSO
 institucion: Especialización en Ciberseguridad — Énfasis DevSecOps · Trabajo final de curso
 curso: Seguridad en Entornos Cloud y DevOps
-docente: «[completar: docente]»
+docente: Jaider Ospina Navas
 equipo: Miguel Ángel Díaz Díaz · María Fernanda Giraldo Osorio · William Ricardo Niño Pico · Jorge Iván Páez Rincón · Milena Rocío Ramírez Espinosa
 repositorio: https://github.com/jorgepaez-ops/IdentityHub
 licencia: Apache License 2.0 (archivo LICENSE del repositorio)

@@ -40,6 +40,9 @@ func Render(eventType, publicBaseURL string, body []byte) (Message, error) {
 	if event.Data.Email == "" {
 		return Message{}, fmt.Errorf("event %s has no recipient", eventType)
 	}
+	if strings.ContainsAny(event.Data.Email, "\r\n") {
+		return Message{}, fmt.Errorf("event %s has an invalid recipient", eventType)
+	}
 
 	message := Message{To: event.Data.Email}
 	switch eventType {

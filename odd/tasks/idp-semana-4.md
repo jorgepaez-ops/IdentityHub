@@ -571,6 +571,22 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   existen, tiempos 13:00. Revisión de Claude: escenas 1 a 5 leídas; `docs/README.md` conserva el guion
   de la demo en vivo (`guion-demo.md`, ~5 min) junto al del video. Pendiente: grabar (Q3).
 - [ ] **T21 — Cierre.** Bitácora, matriz, informe de seguridad final, tag de versión y PR.
+  Decisión del usuario (2026-10-06): dejar todo terminado y verificado antes de Docker Hub; T17, el tag
+  `vX.Y.Z` y el release (con el PDF del informe adjunto) se hacen al final, en vivo frente al equipo.
+  - [x] **T21a — Codificación de los correos.** `buildRawMessage` declara `MIME-Version`,
+    `Content-Type: text/plain; charset=utf-8` y codifica el asunto (RFC 2047); prueba primero.
+    Ruta: delegada (Codex), revisión de Claude. Evidencia (2026-10-06): RED con tres TestRF012_ (faltaba
+    `MIME-Version` y un CR/LF en el asunto inyectaba una cabecera `Bcc`); GREEN con `MIME-Version`,
+    `charset=utf-8`, `Content-Transfer-Encoding: 8bit` (quoted-printable cambiaba LF por CRLF en el
+    cuerpo), asunto con `mime.QEncoding`, CR/LF eliminados de las cabeceras y destinatario con CR/LF
+    rechazado en `notify.Render`. Build, vet, `go test ./...`, golangci-lint 0 y matriz al día (Codex).
+    Claude: worker reconstruido y correo real en Mailpit con las tres cabeceras. La inyección no era
+    explotable desde fuera (el correo del destinatario se valida al crear la cuenta y los asuntos son
+    fijos), así que no se abre un VULN; queda como defensa en profundidad.
+  - [ ] **T21b — Documentación de cierre.** Entrada de la semana 4 en `docs/BITACORA.md`, versión final
+    de `docs/security-report.html` (VULN-019 remediado), coherencia de `docs/README.md`, README raíz y
+    matriz; informe técnico regenerado con el docente (Jaider Ospina Navas).
+  - [ ] **T21c — PR de la fase 4** (con confirmación del usuario). Tag, release y T17 quedan para el final.
 
 ## Progreso
 
@@ -586,7 +602,7 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
 
 **2026-10-06.** Fases 1 a 3 cerradas y en main (PR #11, merge `8b4a18a`, CI 21/21). T16 hecha
 (VULN-019 remediado, capturas de Desktop incluidas). T17 pospuesta al final (Q1). T18 a T20 hechas, más la corrección de
-las métricas del dashboard. Siguiente: T21 (cierre) y T17 (Docker Hub, pendiente de Q1).
+las métricas del dashboard. Siguiente: T21a a T21c; al final, en vivo, T17 con tag y release.
 Codex: cuota diaria limitada; Sonnet como respaldo.
 
 ## Cambios de spec propuestos

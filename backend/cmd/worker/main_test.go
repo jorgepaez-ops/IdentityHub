@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"mime"
 	"net/smtp"
 	"reflect"
 	"strings"
@@ -100,8 +101,93 @@ func TestRF012_ConstruyeElMensajeSMTPConAsuntoYCuerpoRenderizados(t *testing.T) 
 	if !strings.Contains(raw, "Subject: [Identity Hub] Verify your Identity Hub email") {
 		t.Errorf("raw message missing prefixed Subject header: %s", raw)
 	}
-	if !strings.Contains(raw, message.Body) {
-		t.Errorf("raw message missing rendered body: %s", raw)
+	_, encodedBody, found := strings.Cut(raw, "\r\n\r\n")
+	if !found {
+		t.Fatalf("raw message has no header/body separator: %s", raw)
+	}
+	if encodedBody != message.Body {
+		t.Errorf("body = %q, want %q", encodedBody, message.Body)
+	}
+}
+
+func TestRF012_MensajeSMTPDeclaraMIMEYCodificaContenidoUTF8(t *testing.T) {
+	message, err := notify.Render(events.TypeUserRegistered, "https://id.example", []byte(`{
+		"data": {
+			"email": "ana@example.com",
+			"displayName": "Jos\u00e9 \u674e",
+			"verificationToken": "abc"
+		}
+	}`))
+	if err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	message.Subject = "Bienvenida para Zo\u00eb"
+
+	raw := string(buildRawMessage("no-reply@identity.local", message))
+	headers, encodedBody, found := strings.Cut(raw, "\r\n\r\n")
+	if !found {
+		t.Fatal("raw message has no header/body separator")
+	}
+	if !strings.Contains(headers, "MIME-Version: 1.0\r\n") {
+		t.Fatalf("raw message is missing MIME-Version: %s", raw)
+	}
+	if !strings.Contains(headers, "Content-Type: text/plain; charset=utf-8\r\n") {
+		t.Fatalf("raw message is missing UTF-8 content type: %s", raw)
+	}
+	if !strings.Contains(headers, "Content-Transfer-Encoding: 8bit\r\n") {
+		t.Fatalf("raw message is missing 8bit transfer encoding: %s", raw)
+	}
+
+	var encodedSubject string
+	for _, header := range strings.Split(headers, "\r\n") {
+		if strings.HasPrefix(header, "Subject: ") {
+			encodedSubject = strings.TrimPrefix(header, "Subject: ")
+			break
+		}
+	}
+	if encodedSubject == "" {
+		t.Fatal("raw message is missing Subject header")
+	}
+	decodedSubject, err := new(mime.WordDecoder).DecodeHeader(encodedSubject)
+	if err != nil {
+		t.Fatalf("DecodeHeader(%q): %v", encodedSubject, err)
+	}
+	if want := "[Identity Hub] " + message.Subject; decodedSubject != want {
+		t.Errorf("decoded subject = %q, want %q", decodedSubject, want)
+	}
+
+	if encodedBody != message.Body {
+		t.Errorf("body = %q, want %q", encodedBody, message.Body)
+	}
+}
+
+func TestRF012_MensajeSMTPMantieneAsuntoASCIIVisible(t *testing.T) {
+	message := notify.Message{To: "ana@example.com", Subject: "Verify your Identity Hub email", Body: "Hello Ana."}
+	raw := string(buildRawMessage("no-reply@identity.local", message))
+
+	if !strings.Contains(raw, "Subject: [Identity Hub] Verify your Identity Hub email\r\n") {
+		t.Errorf("ASCII subject was unexpectedly encoded: %s", raw)
+	}
+}
+
+func TestRF012_MensajeSMTPNoPermiteInyeccionDeCabeceras(t *testing.T) {
+	raw := string(buildRawMessage("no-reply@identity.local", notify.Message{
+		To:      "ana@example.com\r\nBcc: attacker@example.com",
+		Subject: "Welcome\r\nBcc: attacker@example.com",
+		Body:    "Hello.",
+	}))
+	if strings.Contains(raw, "\r\nBcc:") {
+		t.Fatalf("raw message contains injected Bcc header: %q", raw)
+	}
+
+	_, err := notify.Render(events.TypeUserRegistered, "https://id.example", []byte(`{
+		"data": {
+			"email": "ana@example.com\r\nBcc: attacker@example.com",
+			"verificationToken": "abc"
+		}
+	}`))
+	if err == nil {
+		t.Fatal("Render accepted a recipient with CR/LF")
 	}
 }
 

@@ -7,11 +7,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"mime"
 	"net"
 	"net/http"
 	"net/smtp"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -206,8 +208,14 @@ func (w *worker) deliver(ctx context.Context, env events.Envelope, body []byte) 
 
 // buildRawMessage arma las cabeceras RFC 5322 y el cuerpo que espera smtp.SendMail.
 func buildRawMessage(from string, message notify.Message) []byte {
-	return []byte(fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: [Identity Hub] %s\r\n\r\n%s",
-		from, message.To, message.Subject, message.Body))
+	subject := mime.QEncoding.Encode("utf-8", "[Identity Hub] "+sanitizeHeaderValue(message.Subject))
+	// quoted-printable canonicalizes LF as CRLF; 8bit preserves rendered body text exactly.
+	return []byte(fmt.Sprintf("From: %s\r\nTo: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8bit\r\nSubject: %s\r\n\r\n%s",
+		sanitizeHeaderValue(from), sanitizeHeaderValue(message.To), subject, message.Body))
+}
+
+func sanitizeHeaderValue(value string) string {
+	return strings.NewReplacer("\r", "", "\n", "").Replace(value)
 }
 
 func startMetricsServer(logger *slog.Logger, version string) *http.Server {
