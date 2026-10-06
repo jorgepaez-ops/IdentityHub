@@ -232,3 +232,6 @@ nav a { display: flex; align-items: center; gap: .65rem; padding: .65rem .7rem; 
   .app-content { padding: 1.5rem 1rem; }
   .panel { padding: 1rem; }
 }
+.export-row { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.export-row .secondary-button { margin-top: 0; }
+.export-row .hint { margin: 0; }

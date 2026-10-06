@@ -2,11 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { LoadingSkeleton } from '../../components/LoadingSkeleton'
 import { Toast } from '../../components/Toast'
-import { SearchIcon, UsersIcon } from '../../components/icons'
+import { DownloadIcon, SearchIcon, UsersIcon } from '../../components/icons'
 import { type AdminUser, listUsers, resendInvitation } from '../../api/client'
+import { csvFileName, downloadCsv, toCsv } from '../csv'
 import { formatDate } from '../format'
 import { type DrawerTarget, UserDrawer } from './UserDrawer'
-import { Problems, RoleChips, StatusPill, adminProblems, initialsOf, isAuthFailure, parseStatusFilter, STATUS_FILTERS, STATUS_FILTER_LABEL, STATUS_PARAM } from './shared'
+import { Problems, RoleChips, StatusPill, adminProblems, initialsOf, isAuthFailure, parseStatusFilter, STATUS_FILTERS, STATUS_FILTER_LABEL, STATUS_LABEL, STATUS_PARAM } from './shared'
 
 const PAGE_SIZE = 100
 const SEARCH_DELAY_MS = 250
@@ -147,6 +148,13 @@ export function UsersPage({ currentUserId, onSessionEnded }: { currentUserId: st
   }
 
   const list = users ?? []
+  // Exports what is loaded (the filtered pages the table shows): fetching every page would contradict D3.
+  const exportUsers = () => {
+    const header = ['Correo', 'Nombre', 'Estado', 'Roles', 'MFA', 'Último acceso', 'Creado']
+    const rows = list.map((user) => [user.email, user.displayName, STATUS_LABEL[user.status], user.roles.join('; '), user.mfaEnabled ? 'Sí' : 'No', user.lastLoginAt, user.createdAt])
+    downloadCsv(csvFileName('usuarios'), toCsv(header, rows))
+    showToast(`Exportados ${rows.length} registros`)
+  }
   const count = (status: AdminUser['status']) => list.filter((user) => user.status === status).length
 
   return (
@@ -181,6 +189,10 @@ export function UsersPage({ currentUserId, onSessionEnded }: { currentUserId: st
           {STATUS_FILTERS.map((option) => (
             <button key={option ?? 'all'} className="filter-button" type="button" aria-pressed={status === option} onClick={() => chooseStatus(option)}>{STATUS_FILTER_LABEL[option ?? 'all']}</button>
           ))}
+        </div>
+        <div className="export-row">
+          <button className="secondary-button fit" type="button" disabled={list.length === 0} onClick={exportUsers}><DownloadIcon />Exportar CSV</button>
+          {nextCursor && list.length > 0 && <p className="hint">Exporta los {list.length} cargados; carga más para incluir el resto.</p>}
         </div>
         {loadError && <Problems messages={[loadError]} />}
         {users === null && !loadError && <LoadingSkeleton label="Cargando usuarios…" />}

@@ -1,7 +1,8 @@
 import { FormEvent, useRef, useState } from 'react'
 import type { Access } from '../access'
 import { categoriesOf, filterMovements, sortMovements, type SortDirection, type SortKey, type StatusFilter } from '../aggregate'
-import { CheckIcon, CloseIcon } from '../icons'
+import { csvFileName, downloadCsv, toCsv } from '../csv'
+import { CheckIcon, CloseIcon, DownloadIcon } from '../icons'
 import { KNOWN_CATEGORIES, STATUS_LABEL, formatCop, visibleMovements, type Movement } from '../ledger'
 import { ConfirmDialog } from './ConfirmDialog'
 
@@ -51,6 +52,12 @@ export function TransactionsView({ access, movements, onDecide, onRegister }: Pr
     </th>
   )
 
+  // Exports exactly the rows on screen (search, filters and sort applied); amounts stay plain numbers.
+  const exportRows = () => {
+    const header = ['Folio', 'Fecha', 'Descripción', 'Categoría', 'Monto', 'Estado']
+    downloadCsv(csvFileName('movimientos'), toCsv(header, rows.map((movement) => [movement.id, movement.date, movement.description, movement.category, movement.amount, STATUS_LABEL[movement.status]])))
+  }
+
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const data = new FormData(event.currentTarget)
@@ -74,7 +81,10 @@ export function TransactionsView({ access, movements, onDecide, onRegister }: Pr
     <section aria-labelledby="view-title">
       <div className="view-head">
         <h1 id="view-title">Transacciones</h1>
-        {access.canRegister && <button className="primary-button" type="button" onClick={() => setAdding((open) => !open)}>+ Registrar movimiento</button>}
+        <div className="view-actions">
+          <button className="secondary-button" type="button" disabled={rows.length === 0} onClick={exportRows}><DownloadIcon />Exportar CSV</button>
+          {access.canRegister && <button className="primary-button" type="button" onClick={() => setAdding((open) => !open)}>+ Registrar movimiento</button>}
+        </div>
       </div>
       {adding && access.canRegister && (
         <form className="card movement-form" onSubmit={submit}>

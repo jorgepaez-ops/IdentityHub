@@ -193,7 +193,19 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
   movimiento que dejó de estar pendiente mientras el diálogo estaba abierto. El cierre por clic en el
   fondo ya funcionaba y ahora tiene prueba. Queda como sugerencia menor: la prueba de orden por monto
   solo verifica el primer folio. vitest 126/126, typecheck, lint y build limpios.
-- [ ] **P8 — Exportar CSV** en usuarios, auditoría y movimientos.
+- [x] **P8 — Exportar CSV** en usuarios, auditoría y movimientos.
+  Ruta: delegada (Sonnet; Codex sin cuota), revisión de Claude. Evidencia (2026-10-06): `csv.ts` puro e
+  idéntico en ambas apps (RFC 4180, CRLF, BOM UTF-8 para Excel, comilla simple delante de celdas de texto
+  que empiezan con `= + - @` tab o CR según OWASP; los números se escriben tal cual, así que los montos
+  negativos siguen siendo numéricos); descarga por `Blob` + `<a download>` con URL revocada, sin `data:`
+  ni cambios de CSP; botón «Exportar CSV» con ícono, deshabilitado sin filas. Usuarios (7 columnas) y
+  Auditoría (7 columnas; actor como correo resuelto, id o «Sistema»; metadatos `k=v; …`) exportan lo
+  cargado bajo los filtros actuales, con la nota «Exporta los N cargados; carga más para incluir el resto»
+  cuando hay más páginas (D3: no se piden todas). Contabilidad exporta las filas visibles tras búsqueda,
+  filtros y orden. RED: 9 pruebas de interfaz del Hub y 3 de Contabilidad fallaban. Revisión de Claude:
+  BOM como `\uFEFF` y sin ternario anidado. vitest Hub 248/248 y Contabilidad 143/143, typecheck y lint
+  limpios, build de Contabilidad, `make e2e` 52/52 (Sonnet). Sin probar la descarga en un navegador
+  real (P10).
 - [ ] **P9 — Deudas menores.** Avisos de SonarCloud de las fases 3 y 4, sugerencias pendientes de las
   revisiones nativas (correos, refresh, informe, capturas) y alerta de Grafana más runbook para la DLQ
   (AM-019).
@@ -213,12 +225,18 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
     motivo y justificación, para la exposición.
 - [ ] **P10 — Documentación y evidencia.** Ajustes de E2E si hacen falta, capturas regeneradas,
   manual de usuario e informe técnico actualizados.
+  Pendientes detectados (2026-10-06): en `docs/manuales/integracion-terceros.md` §2.3, la fila «Roles»
+  dice que el catálogo está fijo en `roles.go` con los roles de Contabilidad; desde ADR 0013 solo `admin`
+  y `user` viven en código y los roles de aplicación son datos que se crean en la grilla. En
+  `docs/manuales/usuario.md`, aclarar al inicio que hay dos roles de sistema (`admin`, `user`) y roles de
+  aplicación ilimitados creados en **Roles** (la tabla de la sección 1 lista perfiles, no roles, y se
+  presta a leer «solo dos roles»); actualizar también el aterrizaje en **Inicio** (§3, dice «Usuarios»).
 
 ## Progreso
 
 | Tareas | Hechas |
 |---|---|
-| P1 a P10 (10) | 7 (P1 a P7) |
+| P1 a P10 (10) | 8 (P1 a P8) |
 
 ## Entrega
 
@@ -228,4 +246,4 @@ notas). Commits por unidad de trabajo; un PR al final con confirmación del usua
 
 ## Siguiente paso
 
-P8 (exportar CSV en usuarios, auditoría y movimientos).
+P9 (deudas menores y alertas de code scanning).

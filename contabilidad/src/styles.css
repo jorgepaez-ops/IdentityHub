@@ -203,3 +203,4 @@ th[aria-sort] .sort-arrow { opacity: 1; color: var(--accent); }
   .recent-list li { grid-template-columns: minmax(0, 1fr) auto; }
   .recent-list .pill { justify-self: start; grid-column: 1 / -1; }
 }
+.view-actions { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }

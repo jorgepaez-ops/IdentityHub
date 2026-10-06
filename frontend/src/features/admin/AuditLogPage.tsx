@@ -1,7 +1,10 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { LoadingSkeleton } from '../../components/LoadingSkeleton'
+import { Toast } from '../../components/Toast'
+import { DownloadIcon } from '../../components/icons'
 import { type AuditEvent, type AuditLogQuery, getUser, listAuditLog } from '../../api/client'
+import { csvFileName, downloadCsv, toCsv } from '../csv'
 import { formatDate } from '../format'
 import { AUDIT_PARAM, FAILED_SIGN_IN_ACTION, LAST_24H, Problems, isAuthFailure } from './shared'
 
@@ -128,6 +131,7 @@ export function AuditLogPage({ onSessionEnded }: { onSessionEnded: () => void })
   // The query sent for the first page is reused for "Cargar más", so a relative window never shifts mid-pagination.
   const query = useRef<AuditLogQuery>({})
   const actorEmails = useActorEmails(events)
+  const [toast, setToast] = useState<{ text: string; id: number } | null>(null)
 
   useEffect(() => () => {
     generation.current += 1
@@ -200,6 +204,22 @@ export function AuditLogPage({ onSessionEnded }: { onSessionEnded: () => void })
     }
   }
 
+  // Exports what is loaded under the current filters: fetching every page would contradict D3.
+  const exportEvents = () => {
+    const header = ['Fecha', 'Acción', 'Actor', 'Tipo de recurso', 'ID de recurso', 'IP', 'Metadatos']
+    const rows = (events ?? []).map((item) => [
+      item.createdAt,
+      item.action,
+      item.actorUserId ? actorEmails[item.actorUserId] ?? item.actorUserId : 'Sistema',
+      item.resourceType,
+      item.resourceId,
+      item.ip,
+      Object.keys(item.metadata ?? {}).length === 0 ? '' : metadataEntries(item.metadata).map(([key, text]) => `${key}=${text}`).join('; '),
+    ])
+    downloadCsv(csvFileName('auditoria'), toCsv(header, rows))
+    setToast((current) => ({ text: `Exportados ${rows.length} registros`, id: (current?.id ?? 0) + 1 }))
+  }
+
   const set = (key: keyof Filters) => (event: React.ChangeEvent<HTMLInputElement>) => setDraft((current) => ({ ...current, [key]: event.target.value }))
 
   return (
@@ -222,6 +242,10 @@ export function AuditLogPage({ onSessionEnded }: { onSessionEnded: () => void })
             <button key={item.action} className="filter-button" type="button" aria-pressed={applied.action === item.action} onClick={() => toggleAction(item.action)}>{item.label}</button>
           ))}
           <button className="filter-button" type="button" aria-pressed={applied.since === LAST_24H} onClick={toggleLast24h}>Últimas 24 h</button>
+        </div>
+        <div className="export-row">
+          <button className="secondary-button fit" type="button" disabled={!events?.length} onClick={exportEvents}><DownloadIcon />Exportar CSV</button>
+          {nextCursor && events && events.length > 0 && <p className="hint">Exporta los {events.length} cargados; carga más para incluir el resto.</p>}
         </div>
         {filterError && <Problems messages={[filterError]} />}
         {error && <Problems messages={[error]} />}
@@ -265,6 +289,7 @@ export function AuditLogPage({ onSessionEnded }: { onSessionEnded: () => void })
         )}
         {nextCursor && <button className="secondary-button fit" disabled={loadingMore} onClick={() => void loadMore()} type="button">{loadingMore ? 'Cargando…' : 'Cargar más'}</button>}
       </section>
+      {toast && <Toast key={toast.id} message={toast.text} onClose={() => setToast(null)} />}
     </section>
   )
 }
