@@ -383,6 +383,15 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   `DEFERRED` actualizado (API en T12; faltan interfaz y E2E, T13 a T15).
 - [ ] **T13 — Consola del Hub.** Grilla roles × permisos por aplicación: crear, editar y borrar
   roles, y asignarlos a usuarios.
+  Ruta: delegada (Sonnet; Codex sin cuota), revisión de Claude. Evidencia (2026-10-06): RED con
+  `RolesPage` vacío: 11 de 12 pruebas nuevas de `roles.test.tsx` fallan (la del no admin ya pasaba) y
+  8 de `admin.test.tsx` fallan al exigir roles de aplicación desde la API; GREEN tras implementar
+  `RolesPage` (grilla roles × permisos, guardar con PATCH solo de lo cambiado, crear con nombre
+  validado, borrar con confirmación, solo lectura del rol propio, detalle RFC 7807) y el cajón de
+  usuario con los roles de `GET /admin/applications` agrupados por aplicación con sus permisos.
+  `npm run typecheck` y `npm run lint` limpios, `vitest run` 6 archivos / 162 pruebas en verde,
+  `npm run build` correcto, trazabilidad al día (matriz sin cambios). Pendiente: probarlo en el
+  stack real.
 - [ ] **T14 — Contabilidad.** Autoriza por permisos en lugar de por nombre de rol.
 - [ ] **T15 — E2E y trazabilidad.** Escena de la demo (crear `contabilidad.auditor` y verlo en
   Contabilidad), matriz al día.

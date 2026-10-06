@@ -1,17 +1,13 @@
-import { ApiProblemError, type AdminUser, type Role } from '../../api/client'
+import { ApiProblemError, type AdminUser } from '../../api/client'
 import { connectionMessage } from '../account/PublicPages'
 
-// Directory roles and seeded application roles are described locally; application
-// roles created later receive the generic description until the T13 grid owns them.
-export const ROLE_CATALOG: Record<string, string> = {
+// Only the two directory roles are described locally; application roles and their permissions
+// come from GET /admin/applications (RF-021).
+export const DIRECTORY_ROLES = ['admin', 'user'] as const
+export const DIRECTORY_ROLE_DESCRIPTION: Record<string, string> = {
   admin: 'Control total del Hub y de todas las aplicaciones conectadas.',
   user: 'Rol base de toda cuenta: acceso a Mi cuenta.',
-  'contabilidad.senior': 'En Contabilidad: acceso completo, incluido el cierre contable.',
-  'contabilidad.analista': 'En Contabilidad: registra movimientos propios, sin cierre ni reportes consolidados.',
 }
-export const ROLES = Object.keys(ROLE_CATALOG) as Role[]
-
-export const roleDescription = (role: string) => ROLE_CATALOG[role] ?? 'Rol configurable de una aplicación conectada.'
 
 const chipTone = (role: string) => (role === 'admin' ? 'accent' : role === 'contabilidad.senior' ? 'warn' : 'neutral')
 

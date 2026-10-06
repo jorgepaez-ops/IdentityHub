@@ -35,3 +35,26 @@ export const signedIn = (user = profile()) => ({
 })
 export const type = (label: string, value: string) => fireEvent.change(screen.getByLabelText(label), { target: { value } })
 export const goTo = (path: string) => window.history.replaceState({}, '', path)
+
+const appId = '11111111-1111-4111-8111-111111111111'
+const role = (id: string, name: string, permissionKeys: string[], assignedCount: number, description = '') =>
+  ({ id, name, description, applicationId: appId, permissionKeys, system: false, assignedCount })
+// RF-021: one application with its permission catalog and three configurable roles.
+export const applicationsFixture = () => [{
+  id: appId,
+  clientId: 'contabilidad',
+  name: 'Contabilidad',
+  permissions: [
+    { key: 'movimientos.ver_todos', description: 'Ver todos los movimientos contables' },
+    { key: 'movimientos.aprobar', description: 'Aprobar movimientos' },
+    { key: 'cierre.ejecutar', description: 'Ejecutar el cierre contable' },
+    { key: 'reportes.ver', description: 'Ver reportes consolidados' },
+    { key: 'movimientos.registrar', description: 'Registrar movimientos' },
+  ],
+  roles: [
+    role('22222222-2222-4222-8222-222222222221', 'contabilidad.senior', ['movimientos.ver_todos', 'movimientos.aprobar', 'cierre.ejecutar', 'reportes.ver', 'movimientos.registrar'], 1, 'Acceso completo'),
+    role('22222222-2222-4222-8222-222222222222', 'contabilidad.analista', ['movimientos.registrar'], 2, 'Registra movimientos propios'),
+    role('22222222-2222-4222-8222-222222222223', 'contabilidad.auditor', ['movimientos.ver_todos', 'reportes.ver'], 0, 'Solo lectura'),
+  ],
+}]
+export const applicationsRoute = { 'GET /api/v1/admin/applications': () => json(200, applicationsFixture()) }

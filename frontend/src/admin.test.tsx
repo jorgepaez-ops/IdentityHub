@@ -4,7 +4,7 @@ import { App } from './App'
 import { UsersPage } from './features/admin/UsersPage'
 import { AuditLogPage } from './features/admin/AuditLogPage'
 import { resetSessionForTests } from './api/client'
-import { type Handler, goTo, json, problem, profile, signedIn, stubApi, type } from './test-utils'
+import { type Handler, applicationsRoute, goTo, json, problem, profile, signedIn, stubApi, type } from './test-utils'
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -29,6 +29,7 @@ const listUsers: Handler = (_body, url) => {
 
 const adminApi = (extra: Record<string, Handler> = {}) => ({
   ...signedIn(adminUser),
+  ...applicationsRoute,
   'GET /api/v1/admin/users': listUsers,
   ...extra,
 })
@@ -231,6 +232,7 @@ describe('create user drawer', () => {
     const api = await openUsers(extra)
     fireEvent.click(screen.getByRole('button', { name: 'Nuevo usuario' }))
     await screen.findByRole('dialog', { name: 'Nuevo usuario' })
+    await within(drawer()).findByLabelText('contabilidad.auditor')
     return api
   }
   const created = person({ id: 'eva-id', email: 'eva@example.test', displayName: 'Eva Mora', status: 'pending_verification', roles: ['user', 'contabilidad.senior'], lastLoginAt: null })
@@ -238,7 +240,7 @@ describe('create user drawer', () => {
   it('TestRF001_CreatesAUserWithTheCatalogRolesAndShowsAToast', async () => {
     const api = await openCreate({ 'POST /api/v1/admin/users': () => json(201, created) })
     const roles = within(drawer()).getByRole('group', { name: 'Roles' })
-    expect(within(roles).getAllByRole('checkbox').map((box) => (box as HTMLInputElement).value)).toEqual(['admin', 'user', 'contabilidad.senior', 'contabilidad.analista'])
+    expect(within(roles).getAllByRole('checkbox').map((box) => (box as HTMLInputElement).value)).toEqual(['admin', 'user', 'contabilidad.senior', 'contabilidad.analista', 'contabilidad.auditor'])
     expect(within(roles).getByLabelText('user')).toBeChecked()
     expect(within(roles).getByLabelText('user')).toBeDisabled()
     expect(within(roles).getByText('Control total del Hub y de todas las aplicaciones conectadas.')).toBeInTheDocument()
@@ -250,6 +252,23 @@ describe('create user drawer', () => {
     expect(body(api, 'POST /api/v1/admin/users')).toEqual({ email: 'eva@example.test', displayName: 'Eva Mora', roles: ['user', 'contabilidad.senior'] })
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(within(rowOf('Eva Mora')).getByText('Pendiente')).toBeInTheDocument()
+  })
+
+  it('TestRF021_CajonListaRolesDeAplicacionDeLaApiAgrupadosConSusPermisos', async () => {
+    await openCreate()
+    const group = within(drawer()).getByRole('group', { name: 'Contabilidad' })
+    expect(within(group).getAllByRole('checkbox').map((item) => (item as HTMLInputElement).value)).toEqual(['contabilidad.senior', 'contabilidad.analista', 'contabilidad.auditor'])
+    expect(within(group).getByText('Permisos: movimientos.ver_todos, reportes.ver')).toBeInTheDocument()
+    expect(within(group).getByText('Permisos: movimientos.registrar')).toBeInTheDocument()
+  })
+
+  it('TestRF021_CajonMuestraElErrorSiNoCargaElCatalogoDeRoles', async () => {
+    goTo('/usuarios')
+    stubApi({ ...adminApi(), 'GET /api/v1/admin/applications': () => problem(500) })
+    render(<App />)
+    await screen.findByText('Ana Pérez')
+    fireEvent.click(screen.getByRole('button', { name: 'Nuevo usuario' }))
+    expect(await within(await screen.findByRole('dialog')).findByText('No fue posible cargar los roles de las aplicaciones. Los roles del Hub siguen disponibles.')).toBeInTheDocument()
   })
 
   it('TestRF001_ShowsFieldErrorsFromTheApiAndKeepsTheDrawerOpen', async () => {
@@ -326,6 +345,7 @@ describe('edit user drawer', () => {
     const api = await openUsers(extra)
     fireEvent.click(within(rowOf(name)).getByRole('button', { name: `Editar a ${name}` }))
     await screen.findByRole('dialog', { name: 'Editar usuario' })
+    await within(drawer()).findByLabelText('contabilidad.auditor')
     return api
   }
 
