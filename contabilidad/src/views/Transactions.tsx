@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react'
+import { FormEvent, useRef, useState } from 'react'
 import type { Access } from '../access'
 import { categoriesOf, filterMovements, sortMovements, type SortDirection, type SortKey, type StatusFilter } from '../aggregate'
 import { CheckIcon, CloseIcon } from '../icons'
@@ -31,6 +31,7 @@ export function TransactionsView({ access, movements, onDecide, onRegister }: Pr
   const [category, setCategory] = useState('')
   const [sort, setSort] = useState<{ key: SortKey; direction: SortDirection }>({ key: 'date', direction: 'descending' })
   const [deciding, setDeciding] = useState<{ movement: Movement; decision: Decision } | null>(null)
+  const table = useRef<HTMLTableElement>(null)
   if (access.level === 'none') return null
   const visible = visibleMovements(movements, access.level)
   const rows = sortMovements(filterMovements(visible, { text, status, category }), sort.key, sort.direction)
@@ -61,9 +62,11 @@ export function TransactionsView({ access, movements, onDecide, onRegister }: Pr
     setAdding(false)
   }
 
+  // The dialog holds a snapshot; decide only if the live row is still pending.
   const confirm = () => {
     if (!deciding) return
-    onDecide(deciding.movement.id, deciding.decision)
+    const live = movements.find((movement) => movement.id === deciding.movement.id)
+    if (live?.status === 'pending') onDecide(deciding.movement.id, deciding.decision)
     setDeciding(null)
   }
 
@@ -108,7 +111,7 @@ export function TransactionsView({ access, movements, onDecide, onRegister }: Pr
         <p className="result-count muted" aria-live="polite" aria-atomic="true">{count}</p>
       </div>
       <div className="card table-card">
-        <table className="movements-table" aria-label="Movimientos del periodo">
+        <table className="movements-table" aria-label="Movimientos del periodo" ref={table} tabIndex={-1}>
           <thead>
             <tr>
               {sortHeader('date', 'Fecha')}
@@ -158,6 +161,7 @@ export function TransactionsView({ access, movements, onDecide, onRegister }: Pr
           tone={deciding.decision === 'approved' ? 'ok' : 'danger'}
           onConfirm={confirm}
           onCancel={() => setDeciding(null)}
+          fallbackFocus={() => table.current?.focus()}
         >
           {`Vas a ${deciding.decision === 'approved' ? 'aprobar' : 'rechazar'} el movimiento ${deciding.movement.id} por ${formatCop(deciding.movement.amount)}. Esta decisión queda registrada.`}
         </ConfirmDialog>

@@ -7,22 +7,32 @@ interface Props {
   tone: 'ok' | 'danger'
   onConfirm: () => void
   onCancel: () => void
+  /** Where focus goes when the trigger no longer exists (a decided row loses its buttons). */
+  fallbackFocus?: () => void
 }
 
 const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
 /** Small modal confirmation: focus moves in on open, Tab stays inside, Escape cancels and focus returns to the trigger. */
-export function ConfirmDialog({ title, children, confirmLabel, tone, onConfirm, onCancel }: Props) {
+export function ConfirmDialog({ title, children, confirmLabel, tone, onConfirm, onCancel, fallbackFocus }: Props) {
   const titleId = useId()
   const bodyId = useId()
   const dialog = useRef<HTMLDivElement>(null)
   const cancel = useRef<HTMLButtonElement>(null)
 
+  const fallback = useRef(fallbackFocus)
+  fallback.current = fallbackFocus
+
   useEffect(() => {
-    const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    // Safari does not focus a clicked button, so the active element can be the body: treat that as no trigger.
+    const active = document.activeElement
+    const trigger = active instanceof HTMLElement && active !== document.body ? active : null
     // Cancel is the safe default focus: pressing Enter right away never decides a movement.
     cancel.current?.focus()
-    return () => trigger?.focus()
+    return () => {
+      if (trigger?.isConnected) trigger.focus()
+      else fallback.current?.()
+    }
   }, [])
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {

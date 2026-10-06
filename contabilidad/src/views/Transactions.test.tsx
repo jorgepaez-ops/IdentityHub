@@ -237,6 +237,48 @@ describe('confirmation before deciding', () => {
     expect(onDecide).toHaveBeenCalledWith('M-2044', 'rejected')
   })
 
+  function DecidingHarness({ onDecide = () => undefined }: { onDecide?: (id: string, status: 'approved' | 'rejected') => void }) {
+    const [rows, setRows] = useState<Movement[]>(INITIAL_MOVEMENTS)
+    const decide = (id: string, status: 'approved' | 'rejected') => {
+      onDecide(id, status)
+      setRows((current) => current.map((row) => (row.id === id ? { ...row, status } : row)))
+    }
+    return (
+      <>
+        <button type="button" onClick={() => setRows((current) => current.map((row) => (row.id === 'M-2043' ? { ...row, status: 'approved' } : row)))}>Decidir por fuera</button>
+        <TransactionsView access={senior} movements={rows} onDecide={decide} onRegister={() => undefined} />
+      </>
+    )
+  }
+
+  it('TestRF021_ConfirmingMovesFocusToTheTableInsteadOfTheBody', () => {
+    render(<DecidingHarness />)
+    ask('M-2043', /Aprobar/)
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar aprobación' }))
+    expect(document.activeElement).toBe(screen.getByRole('table', { name: 'Movimientos del periodo' }))
+  })
+
+  it('TestRF021_ConfirmDoesNotDecideAMovementThatIsNoLongerPending', () => {
+    const onDecide = vi.fn()
+    render(<DecidingHarness onDecide={onDecide} />)
+    ask('M-2043', /Aprobar/)
+    fireEvent.click(screen.getByRole('button', { name: 'Decidir por fuera' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar aprobación' }))
+    expect(onDecide).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('TestRF021_BackdropClickCancelsButAClickInsideTheDialogDoesNot', () => {
+    const { onDecide } = renderView()
+    ask('M-2043', /Aprobar/)
+    const dialog = screen.getByRole('dialog')
+    fireEvent.mouseDown(dialog)
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    fireEvent.mouseDown(dialog.parentElement as HTMLElement)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(onDecide).not.toHaveBeenCalled()
+  })
+
   it('TestRF021_CancelChangesNothingAndRestoresFocusToTheTrigger', () => {
     const { onDecide } = renderView()
     const trigger = within(rowOf('M-2043')).getByRole('button', { name: /Aprobar/ })

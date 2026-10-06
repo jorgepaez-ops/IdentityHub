@@ -185,8 +185,14 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
   que nombra folio y monto; estado vacío con «Limpiar filtros»; columna «Fecha» propia; conteo de
   resultados en `aria-live` sin crear otra región `role="status"`. RED: 24 de 25 pruebas nuevas
   fallaban. vitest 123/123, typecheck, lint y build limpios, `make e2e` 52/52 (ninguna E2E pulsa
-  Aprobar/Rechazar, así que no hubo que tocarlas). Para P9: tras confirmar, el botón que abrió el diálogo
-  desaparece (la fila deja de estar pendiente) y el foco cae al `body`; devolverlo a la tabla o al aviso.
+  Aprobar/Rechazar, así que no hubo que tocarlas).
+  Commit `59061d0`. Revisión nativa de P7 (medio, 10 archivos, 576 líneas, 1 lente): **aprobada** y
+  acusada. Corregido por Claude con pruebas (RED observado en las dos primeras): tras confirmar, el botón
+  que abrió el diálogo desaparece y el foco caía al `body`; ahora va a la tabla (`tabIndex=-1`), también
+  cuando el disparador era el `body` (Safari no enfoca botones al hacer clic). Confirmar ya no decide un
+  movimiento que dejó de estar pendiente mientras el diálogo estaba abierto. El cierre por clic en el
+  fondo ya funcionaba y ahora tiene prueba. Queda como sugerencia menor: la prueba de orden por monto
+  solo verifica el primer folio. vitest 126/126, typecheck, lint y build limpios.
 - [ ] **P8 — Exportar CSV** en usuarios, auditoría y movimientos.
 - [ ] **P9 — Deudas menores.** Avisos de SonarCloud de las fases 3 y 4, sugerencias pendientes de las
   revisiones nativas (correos, refresh, informe, capturas) y alerta de Grafana más runbook para la DLQ
