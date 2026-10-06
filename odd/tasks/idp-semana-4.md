@@ -454,7 +454,9 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   vulnerables» (`npm audit --audit-level=high`) falla por GHSA-68fv-2mgg-jv7q (alta, DoS del event
   loop) en `source-map-js` 1.2.1 de `frontend` (solo desarrollo: `@vitest/coverage-v8` → `magicast` y
   `jsdom` → `css-tree`); Contabilidad ya tiene 1.2.2. Aviso publicado después de abrir la fase, no lo
-  introduce este PR. Sin id VULN asignado; falta decidir en qué tarea se remedia. SonarCloud: quality
+  introduce este PR. Sin id VULN asignado. Remediado en el mismo PR por decisión del usuario (inline,
+  Claude, necesita red): `source-map-js` 1.2.2 en `frontend/package-lock.json`; `npm audit` 0, vitest
+  con cobertura 162/162, build y lint en verde. SonarCloud: quality
   gate aprobado con 12 code smells nuevos (props de solo lectura y `role="status"` en `RolesPage.tsx`,
   literales repetidos en `admin_roles.go`, complejidad en `rolegrid_integration_test.go`, `ASC` en
   `roles.sql`).
