@@ -7,7 +7,7 @@ Característica: Roles y permisos configurables por aplicación
   @RF-021 @p1
   Escenario: Admin crea auditor de Contabilidad con capacidades acotadas
     Dado un administrador autenticado y la aplicación "contabilidad"
-    Cuando crea el rol "contabilidad.auditor" con "reportes.ver" y "movimientos.ver_todos"
+    Cuando crea un rol auditor de "contabilidad" con "reportes.ver" y "movimientos.ver_todos"
     Y asigna ese rol a un empleado
     Entonces el empleado ve todos los movimientos y el Resumen
     Pero no puede registrar, aprobar movimientos ni ejecutar el cierre

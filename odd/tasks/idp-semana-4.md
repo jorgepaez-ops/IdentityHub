@@ -429,7 +429,7 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   analista). Re-corrida: los 6 E2E de RF-021 pasan. Desviación aceptada: el E2E no decodifica el token;
   verifica el texto «Tu rol permite…», que `access.ts` deriva de sus permisos (el contenido exacto del
   claim lo cubren las pruebas de integración de T12a). Ojo: el E2E borra `contabilidad.auditor` al
-  empezar y al terminar, así que no conviene correrlo con un auditor creado a mano para la demo.
+  empezar y al terminar (corregido después: ahora usa un nombre único, ver abajo).
   Commit `ac3922f`. Revisión nativa (`review-c9e878db05b47f89`, alto, 451 líneas, 4 lentes): **aprobada**,
   sin bloqueantes. Avisos informativos que coinciden en dos puntos: (1) el nombre fijo
   `contabilidad.auditor` que el E2E purga directo en la base (R1-001, R4-001, R2-002, R3-003): borra un
@@ -437,6 +437,13 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   solo…» y el E2E no lo verifica (R1-002, R2-001, R3-001). Menores: R3-002 (la prueba del rol de
   directorio solo mira `admin`, no `user`), R2-003, R2-004/R3-004 (el clic sobre un botón deshabilitado
   no prueba nada nuevo).
+  Correcciones de los avisos (2026-10-06) — Ruta: inline (Claude): el E2E del auditor usa un nombre
+  único (`contabilidad.e2e-auditor-<hex>`) y ya no purga `contabilidad.auditor`; lee la respuesta de
+  `/oauth/token` y comprueba que el token trae el rol y exactamente `movimientos.ver_todos` y
+  `reportes.ver` (mutación: esperar también `cierre.ejecutar` hace fallar la prueba); la prueba del rol
+  de directorio mira `admin` y `user`; el escenario dice «un rol auditor» en vez del nombre fijo; se
+  quita el clic inútil de la prueba de App. Verificación: 6/6 E2E de RF-021, typecheck de e2e y de
+  Contabilidad, lint, vitest 63/63, `make spec-drift` al día, sin roles de prueba en la base.
 
 ## Fase 4 — Publicación y entrega
 

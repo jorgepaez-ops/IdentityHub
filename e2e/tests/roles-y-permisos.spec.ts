@@ -14,8 +14,9 @@ const rolePath = (applicationId: string, roleId: string) => `${adminApi}/applica
 
 test('RF-021 Admin crea auditor de Contabilidad con capacidades acotadas', async ({ browser }) => {
   test.setTimeout(180_000)
-  const roleName = 'contabilidad.auditor'
-  purgeRole(roleName) // a previous aborted run must not leave the demo role behind
+  // A unique name: a fixed contabilidad.auditor would delete one created by hand for the demo and
+  // collide between concurrent runs.
+  const roleName = uniqueRoleName('auditor')
   const admin = await seedAdmin()
   const employee = await createActiveUser(admin)
   const adminContext = await browser.newContext()
@@ -54,9 +55,20 @@ test('RF-021 Admin crea auditor de Contabilidad con capacidades acotadas', async
     })
 
     await test.step('El empleado ve todo y el Resumen, pero no puede actuar', async () => {
+      const tokenResponse = employeePage.waitForResponse(
+        (response) => response.url() === `${hubUrl}/oauth/token` && response.request().method() === 'POST',
+      )
       await employeePage.goto(contabilidadUrl)
       await employeePage.getByRole('button', { name: 'Continuar con Identity Hub' }).click()
       await browserLoginWithMfa(employeePage, employee, strongPassword)
+      // The Contabilidad token carries exactly the two permissions granted in the grid.
+      const { access_token: accessToken } = (await (await tokenResponse).json()) as { access_token: string }
+      const claims = JSON.parse(Buffer.from(accessToken.split('.')[1], 'base64url').toString()) as {
+        roles?: string[]
+        permissions?: string[]
+      }
+      expect(claims.roles).toContain(roleName)
+      expect([...(claims.permissions ?? [])].sort()).toEqual(['movimientos.ver_todos', 'reportes.ver'])
       // Lands on the summary because the role carries reportes.ver.
       await expect(employeePage.getByRole('heading', { name: 'Resumen' })).toBeVisible()
       await expect(employeePage.getByText('Aprobado del mes')).toBeVisible()
@@ -84,7 +96,10 @@ test('RF-021 Admin crea auditor de Contabilidad con capacidades acotadas', async
 test('RF-021 Se rechaza crear un rol de directorio desde la grilla', async () => {
   const admin = await seedAdmin()
   const application = await contabilidadApplication(admin)
-  const before = psql(`SELECT count(*) || ':' || coalesce(bool_and(application_id IS NULL)::text, '') FROM roles WHERE name = 'admin';`)
+  // Each directory role exists exactly once and belongs to no application.
+  const directoryRoles = () => psql(`SELECT string_agg(name || ':' || (application_id IS NULL)::text, ',' ORDER BY name)
+                                     FROM roles WHERE name IN ('admin', 'user');`)
+  const before = directoryRoles()
 
   for (const name of ['admin', 'user']) {
     const created = await api('POST', `${adminApi}/applications/${application.id}/roles`, {
@@ -93,8 +108,8 @@ test('RF-021 Se rechaza crear un rol de directorio desde la grilla', async () =>
     })
     expect([400, 403]).toContain(created.status)
   }
-  expect(psql(`SELECT count(*) || ':' || coalesce(bool_and(application_id IS NULL)::text, '') FROM roles WHERE name = 'admin';`)).toBe(before)
-  expect(before).toBe('1:true')
+  expect(directoryRoles()).toBe(before)
+  expect(before).toBe('admin:true,user:true')
 })
 
 test('RF-021 Un administrador no edita permisos de un rol que posee', async () => {
