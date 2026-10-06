@@ -250,8 +250,20 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
   muestra al resolverse (prueba con una respuesta que nunca llega, RED observado) y los grupos aún en
   carga muestran texto, no otra región `role="status"`. Queda como menor: la prueba del enlace para
   saltar enfoca el destino a mano (jsdom no mueve el foco al navegar a un fragmento). vitest Hub 254/254.
-  - [ ] **P9c — Diagramas regenerados** sin bibliotecas JavaScript (33 alertas de CodeQL) y UML de
+  - [x] **P9c — Diagramas regenerados** sin bibliotecas JavaScript (33 alertas de CodeQL) y UML de
     secuencia del SSO con PKCE y de estados del usuario en `docs/diagramas/uml/`.
+    Evidencia (2026-10-06, Sonnet, revisión visual de Claude en claro y oscuro): los tres HTML de
+    `docs/diagramas/` pasan de ~800 KB a 12–16 KB, con SVG en línea, sin `<script>`, sin atributos `on*`
+    y sin fuentes externas; el tema sigue `prefers-color-scheme`. Arquitectura con Contabilidad como SPA
+    cliente SSO, observabilidad real (Prometheus, Alloy, Loki, Grafana), `migrate`, Mailpit y tabla
+    desarrollo / producción simulada / AWS; flujo SSO completo (PKCE S256, rama sin `hub_session` con MFA,
+    canje con CORS, claims del JWT, JWKS); ciclo de vida con las transiciones reales y los roles como
+    anotación. Nuevos `uml/secuencia-sso-pkce.md` y `uml/estados-usuario.md` (Mermaid validado con
+    `mermaid-cli`), enlazados en `docs/README.md`. Diferencias con la especificación halladas (fuera de
+    alcance, backend): la purga de cuentas sin verificar a las 24 h de `specs/02-domain-model.md` no
+    existe en el código; un bloqueo puesto a mano por un admin no vence (`locked_until` vacío); el worker
+    no usa la base aunque recibe `DATABASE_URL` (y `despliegue-aws.md` dibuja Worker→RDS). Para P10:
+    añadir los dos UML nuevos a la lista de `docs/manuales/arquitectura.md` (líneas 71–74).
   - [ ] **P9d — Imágenes base y alertas de infraestructura:** Trivy (6), Checkov (27), Semgrep de nginx
     (4) y sección «Alertas abiertas conocidas» en `README.md`.
   - [ ] **P9e — Deudas de fases 3 y 4:** avisos de SonarCloud, sugerencias de las revisiones nativas

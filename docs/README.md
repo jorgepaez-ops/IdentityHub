@@ -25,7 +25,8 @@ La columna **Ubicación actual** solo enlaza rutas que existen en este checkout.
 | Manual de arquitectura: microservicios, decisiones y patrones | 119–121 | [`manuales/arquitectura.md`](manuales/arquitectura.md) | hecho (T4) |
 | Diagrama de componentes | 123–131 | [`diagramas/uml/componentes.md`](diagramas/uml/componentes.md) y [`diagramas/01-arquitectura.html`](diagramas/01-arquitectura.html) como apoyo | hecho |
 | Diagrama de despliegue | 123–131 | [`diagramas/uml/despliegue.md`](diagramas/uml/despliegue.md) (local), [`diagramas/uml/despliegue-aws.md`](diagramas/uml/despliegue-aws.md) (referencia en AWS) y [`../deploy/docker-compose.yml`](../deploy/docker-compose.yml) | hecho |
-| Diagrama de secuencia de un flujo crítico | 123–131 | [`diagramas/uml/secuencia-login-mfa.md`](diagramas/uml/secuencia-login-mfa.md) y [`diagramas/02-flujo-sso.html`](diagramas/02-flujo-sso.html) como apoyo | hecho |
+| Diagrama de secuencia de un flujo crítico | 123–131 | [`diagramas/uml/secuencia-login-mfa.md`](diagramas/uml/secuencia-login-mfa.md), [`diagramas/uml/secuencia-sso-pkce.md`](diagramas/uml/secuencia-sso-pkce.md) y [`diagramas/02-flujo-sso.html`](diagramas/02-flujo-sso.html) como apoyo | hecho |
+| Diagrama de estados del ciclo de vida de la cuenta | 123–131 | [`diagramas/uml/estados-usuario.md`](diagramas/uml/estados-usuario.md) y [`diagramas/03-ciclo-de-vida-usuario.html`](diagramas/03-ciclo-de-vida-usuario.html) como apoyo | hecho |
 | Diagrama de casos de uso | 123–131 | [`diagramas/uml/casos-de-uso.md`](diagramas/uml/casos-de-uso.md) | hecho |
 | DFD nivel 0 y nivel 1 con OWASP Threat Dragon | 123–131 | [`threat-model/`](threat-model/) | hecho |
 | Manual de desarrollo: entorno, servicios, pruebas y contribución | 132–139 | [`guia-desarrollo.md`](guia-desarrollo.md) | hecho (T4) |
