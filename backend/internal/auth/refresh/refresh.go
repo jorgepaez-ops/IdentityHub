@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jorgepaez/identity-hub/internal/auth/roles"
 	"github.com/jorgepaez/identity-hub/internal/auth/token"
+	"github.com/jorgepaez/identity-hub/internal/observability"
 )
 
 var (
@@ -176,6 +177,11 @@ func (s *Service) Refresh(ctx context.Context, input Input) (Result, error) {
 	})
 	if err != nil {
 		return Result{}, err
+	}
+	if event != nil {
+		// Counted only after the revocation committed, so a rolled-back or retried
+		// transaction never inflates the dashboard.
+		observability.RefreshReuseDetected.Inc()
 	}
 	if event != nil && s.publisher != nil {
 		if err := s.publisher.PublishSecurityEvent(ctx, *event); err != nil {

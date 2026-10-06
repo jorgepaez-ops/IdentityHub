@@ -3,9 +3,14 @@ package events
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/jorgepaez/identity-hub/internal/observability"
+	"github.com/prometheus/client_golang/prometheus/testutil"
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 // RF-012 — Cada evento necesita un identificador único: es lo que permite al
@@ -142,6 +147,68 @@ func TestRNF005_PublishFallaAlSerializarSinNecesitarBroker(t *testing.T) {
 	err := b.Publish(context.Background(), TypeUserRegistered, make(chan int))
 	if err == nil {
 		t.Fatal("Publish() = nil error; se esperaba un fallo de serialización")
+	}
+}
+
+func TestRNF007_PublishCuentaFalloDeSerializacion(t *testing.T) {
+	metric := observability.EventsPublished.WithLabelValues(TypeUserRegistered, "failed")
+	before := testutil.ToFloat64(metric)
+
+	err := (&Broker{}).Publish(context.Background(), TypeUserRegistered, make(chan int))
+	if err == nil {
+		t.Fatal("Publish() = nil error; se esperaba un fallo de serialización")
+	}
+
+	if got := testutil.ToFloat64(metric); got != before+1 {
+		t.Fatalf("contador failed = %v; se esperaba %v", got, before+1)
+	}
+}
+
+type publisherStub struct {
+	confirmation deferredConfirmation
+	err          error
+}
+
+func (p publisherStub) PublishWithDeferredConfirmWithContext(context.Context, string, string, bool, bool, amqp.Publishing) (deferredConfirmation, error) {
+	return p.confirmation, p.err
+}
+
+type confirmationStub struct {
+	confirmed bool
+	err       error
+}
+
+func (c confirmationStub) WaitContext(context.Context) (bool, error) { return c.confirmed, c.err }
+
+func TestRNF007_PublishCuentaResultadosConfirmadosYFallidos(t *testing.T) {
+	const routingKey = TypeAccountLocked
+	for _, testCase := range []struct {
+		name    string
+		event   any
+		publish eventPublisher
+		result  string
+	}{
+		{name: "serialización", event: make(chan int), result: "failed"},
+		{name: "publicación", event: NewEnvelope(routingKey, ""), publish: publisherStub{err: errors.New("broker unavailable")}, result: "failed"},
+		{name: "espera de confirmación", event: NewEnvelope(routingKey, ""), publish: publisherStub{confirmation: confirmationStub{err: errors.New("confirmation timeout")}}, result: "failed"},
+		{name: "nack", event: NewEnvelope(routingKey, ""), publish: publisherStub{confirmation: confirmationStub{}}, result: "failed"},
+		{name: "confirmación", event: NewEnvelope(routingKey, ""), publish: publisherStub{confirmation: confirmationStub{confirmed: true}}, result: "published"},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			metric := observability.EventsPublished.WithLabelValues(routingKey, testCase.result)
+			before := testutil.ToFloat64(metric)
+
+			err := (&Broker{publisher: testCase.publish}).Publish(context.Background(), routingKey, testCase.event)
+			if testCase.result == "published" && err != nil {
+				t.Fatalf("Publish() error = %v", err)
+			}
+			if testCase.result == "failed" && err == nil {
+				t.Fatal("Publish() = nil error; se esperaba un fallo")
+			}
+			if got := testutil.ToFloat64(metric); got != before+1 {
+				t.Fatalf("contador %s = %v; se esperaba %v", testCase.result, got, before+1)
+			}
+		})
 	}
 }
 

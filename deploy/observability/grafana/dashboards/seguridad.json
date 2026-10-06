@@ -33,7 +33,7 @@
       "description": "Notificaciones que fallaron tres entregas. Alerta por encima de 10 (AM-019).",
       "gridPos": { "h": 8, "w": 6, "x": 18, "y": 0 },
       "targets": [
-        { "expr": "rabbitmq_queue_messages{queue=\"notifications.dlq\"}" }
+        { "expr": "rabbitmq_detailed_queue_messages{queue=\"notifications.dlq\"}" }
       ]
     },
     {

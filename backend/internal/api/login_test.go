@@ -19,6 +19,8 @@ import (
 	"github.com/jorgepaez/identity-hub/internal/auth/login"
 	"github.com/jorgepaez/identity-hub/internal/auth/mfa"
 	"github.com/jorgepaez/identity-hub/internal/auth/password"
+	"github.com/jorgepaez/identity-hub/internal/observability"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 
 type loginStub struct {
@@ -214,9 +216,13 @@ func TestRF003_AM004EmailInexistenteYPasswordIncorrectoDevuelvenElMismoMensaje(t
 			server.SetLoginService(login.New(testCase.repo).WithMFA(mfaIssuerStub{}))
 			response := httptest.NewRecorder()
 			request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", strings.NewReader(`{"email":"ada@example.com","password":"wrong password"}`))
+			failedBefore := testutil.ToFloat64(observability.LoginAttempts.WithLabelValues("failed"))
 			server.Login(response, request)
 			if response.Code != http.StatusUnauthorized {
 				t.Fatalf("status = %d, want 401: %s", response.Code, response.Body.String())
+			}
+			if got := testutil.ToFloat64(observability.LoginAttempts.WithLabelValues("failed")); got != failedBefore+1 {
+				t.Fatalf("contador failed = %v; se esperaba %v", got, failedBefore+1)
 			}
 			responseBodies = append(responseBodies, response.Body.String())
 		})
@@ -417,5 +423,85 @@ func TestRF003_LoginConObjetoVacioDevuelveProblem400(t *testing.T) {
 	}
 	if contentType := response.Header().Get("Content-Type"); !strings.HasPrefix(contentType, "application/problem+json") {
 		t.Fatalf("Content-Type=%q, want application/problem+json", contentType)
+	}
+}
+
+func TestRNF007_LoginAttemptsCuentaResultadosDeAutenticacion(t *testing.T) {
+	loginRequest := func() *http.Request {
+		return httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", strings.NewReader(`{"email":"ada@example.com","password":"correct horse battery"}`))
+	}
+	results := []string{"mfa_required", "failed", "locked", "succeeded"}
+
+	for _, testCase := range []struct {
+		name   string
+		result string
+		call   func()
+	}{
+		{
+			name:   "mfa required after challenge issuance",
+			result: "mfa_required",
+			call: func() {
+				server := NewServer(nil, "test", nil)
+				server.SetLoginService(loginStub{result: login.Result{MfaToken: "challenge", ExpiresIn: 300}})
+				server.Login(httptest.NewRecorder(), loginRequest())
+			},
+		},
+		{
+			name:   "failed invalid credentials",
+			result: "failed",
+			call: func() {
+				server := NewServer(nil, "test", nil)
+				server.SetLoginService(loginStub{err: login.ErrInvalidCredentials})
+				server.Login(httptest.NewRecorder(), loginRequest())
+			},
+		},
+		{
+			name:   "locked account",
+			result: "locked",
+			call: func() {
+				server := NewServer(nil, "test", nil)
+				server.SetLoginService(loginStub{err: login.ErrAccountLocked})
+				server.Login(httptest.NewRecorder(), loginRequest())
+			},
+		},
+		{
+			name:   "succeeded after MFA session creation",
+			result: "succeeded",
+			call: func() {
+				server := NewServer(nil, "test", nil)
+				server.SetMFAService(&mfaStub{result: mfa.Result{AccessToken: "access", RefreshToken: "refresh", TokenType: "Bearer", ExpiresIn: 900}}, time.Hour)
+				server.VerifyMfa(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/api/v1/auth/mfa/verify", strings.NewReader(`{"mfaToken":"challenge","code":"123456"}`)))
+			},
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			before := make(map[string]float64, len(results))
+			for _, result := range results {
+				before[result] = testutil.ToFloat64(observability.LoginAttempts.WithLabelValues(result))
+			}
+			testCase.call()
+			for _, result := range results {
+				want := before[result]
+				if result == testCase.result {
+					want++
+				}
+				if got := testutil.ToFloat64(observability.LoginAttempts.WithLabelValues(result)); got != want {
+					t.Fatalf("contador %s = %v; se esperaba %v", result, got, want)
+				}
+			}
+		})
+	}
+
+	server := NewServer(nil, "test", nil)
+	server.SetLoginService(loginStub{err: login.ErrIPRateLimited})
+	before := make(map[string]float64, len(results))
+	for _, result := range results {
+		before[result] = testutil.ToFloat64(observability.LoginAttempts.WithLabelValues(result))
+	}
+	server.Login(httptest.NewRecorder(), loginRequest())
+	for _, result := range results {
+		if got := testutil.ToFloat64(observability.LoginAttempts.WithLabelValues(result)); got != before[result] {
+			t.Fatalf("contador %s = %v; se esperaba que un límite previo no lo cambiara desde %v", result, got, before[result])
+		}
 	}
 }

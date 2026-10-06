@@ -39,3 +39,7 @@ security/zap-reports/
 # Python bytecode (scripts/traceability_test.py imports the script on CI runners).
 __pycache__/
 *.pyc
+
+# Informe técnico: el PDF se genera con `make informe` y se publica como asset del release (excede el
+# límite de 512 KB del hook de archivos grandes).
+docs/informe/informe-tecnico.pdf

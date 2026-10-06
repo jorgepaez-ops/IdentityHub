@@ -6,13 +6,29 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jorgepaez/identity-hub/internal/observability"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
+type deferredConfirmation interface {
+	WaitContext(context.Context) (bool, error)
+}
+
+type eventPublisher interface {
+	PublishWithDeferredConfirmWithContext(context.Context, string, string, bool, bool, amqp.Publishing) (deferredConfirmation, error)
+}
+
+type amqpEventPublisher struct{ channel *amqp.Channel }
+
+func (p amqpEventPublisher) PublishWithDeferredConfirmWithContext(ctx context.Context, exchange, key string, mandatory, immediate bool, message amqp.Publishing) (deferredConfirmation, error) {
+	return p.channel.PublishWithDeferredConfirmWithContext(ctx, exchange, key, mandatory, immediate, message)
+}
+
 // Broker mantiene la conexión y el canal con RabbitMQ y declara la topología.
 type Broker struct {
-	conn    *amqp.Connection
-	channel *amqp.Channel
+	conn      *amqp.Connection
+	channel   *amqp.Channel
+	publisher eventPublisher
 }
 
 // Connect abre la conexión y declara exchanges y colas de forma idempotente.
@@ -38,7 +54,7 @@ func Connect(url string) (*Broker, error) {
 		return nil, fmt.Errorf("no se pudo activar publisher confirms: %w", err)
 	}
 
-	b := &Broker{conn: conn, channel: ch}
+	b := &Broker{conn: conn, channel: ch, publisher: amqpEventPublisher{channel: ch}}
 	if err := b.declareTopology(); err != nil {
 		b.Close()
 		return nil, err
@@ -83,6 +99,11 @@ func (b *Broker) declareTopology() error {
 // Publish serializa el evento y espera la confirmación del broker antes de
 // devolver. Si el broker no confirma, el llamante debe revertir su transacción.
 func (b *Broker) Publish(ctx context.Context, routingKey string, event any) error {
+	result := "failed"
+	defer func() {
+		observability.EventsPublished.WithLabelValues(routingKey, result).Inc()
+	}()
+
 	body, err := json.Marshal(event)
 	if err != nil {
 		return fmt.Errorf("serializando el evento: %w", err)
@@ -91,7 +112,11 @@ func (b *Broker) Publish(ctx context.Context, routingKey string, event any) erro
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	confirm, err := b.channel.PublishWithDeferredConfirmWithContext(ctx,
+	publisher := b.publisher
+	if publisher == nil {
+		publisher = amqpEventPublisher{channel: b.channel}
+	}
+	confirm, err := publisher.PublishWithDeferredConfirmWithContext(ctx,
 		ExchangeEvents, routingKey, true, false,
 		amqp.Publishing{
 			ContentType:  "application/json",
@@ -110,6 +135,7 @@ func (b *Broker) Publish(ctx context.Context, routingKey string, event any) erro
 	if !ok {
 		return fmt.Errorf("el broker rechazó el evento %s", routingKey)
 	}
+	result = "published"
 	return nil
 }
 

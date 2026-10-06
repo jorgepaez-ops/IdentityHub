@@ -13,6 +13,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jorgepaez/identity-hub/internal/auth/token"
+	"github.com/jorgepaez/identity-hub/internal/observability"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 
 type repositoryStub struct {
@@ -135,6 +137,53 @@ func TestRF006_ReusoConFalloDePublicacionSigueRevocandoYDevuelveReuso(t *testing
 	}
 	if len(repo.revoked) != 1 || repo.revoked[0] != familyID {
 		t.Fatalf("revoked=%v, family must stay revoked despite the publish failure", repo.revoked)
+	}
+}
+
+func TestRNF007_ReusoRefreshSeCuentaAunqueFalleLaPublicacion(t *testing.T) {
+	signer, err := token.New(make([]byte, 32), "https://issuer.test", "identity-hub", time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo := &repositoryStub{rotation: Rotation{Status: RotationReused, UserID: uuid.New(), FamilyID: uuid.New()}}
+	service := New(repo, signer, time.Hour).WithEventPublisher(&failingPublisher{err: errors.New("broker unavailable")})
+	before := testutil.ToFloat64(observability.RefreshReuseDetected)
+
+	_, err = service.Refresh(context.Background(), Input{RefreshToken: "reused"})
+	if !errors.Is(err, ErrRefreshReuse) {
+		t.Fatalf("Refresh error=%v, want ErrRefreshReuse", err)
+	}
+
+	if got := testutil.ToFloat64(observability.RefreshReuseDetected); got != before+1 {
+		t.Fatalf("contador de reusos = %v; se esperaba %v", got, before+1)
+	}
+}
+
+// commitFailingRepository runs the callback like a real transaction and then
+// reports a commit failure, so the revocation never persists.
+type commitFailingRepository struct{ repositoryStub }
+
+func (r *commitFailingRepository) WithinRefreshTransaction(ctx context.Context, fn func(Writer) error) error {
+	if err := fn(&r.repositoryStub); err != nil {
+		return err
+	}
+	return errors.New("commit failed")
+}
+
+func TestRNF007_ReusoRefreshNoSeCuentaSiElCommitFalla(t *testing.T) {
+	signer, err := token.New(make([]byte, 32), "https://issuer.test", "identity-hub", time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo := &commitFailingRepository{repositoryStub{rotation: Rotation{Status: RotationReused, UserID: uuid.New(), FamilyID: uuid.New()}}}
+	before := testutil.ToFloat64(observability.RefreshReuseDetected)
+
+	if _, err := New(repo, signer, time.Hour).Refresh(context.Background(), Input{RefreshToken: "reused"}); err == nil {
+		t.Fatal("Refresh succeeded; want the commit error")
+	}
+
+	if got := testutil.ToFloat64(observability.RefreshReuseDetected); got != before {
+		t.Fatalf("contador de reusos = %v; se esperaba %v (la revocación no se confirmó)", got, before)
 	}
 }
 

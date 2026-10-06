@@ -463,14 +463,140 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
 
 ## Fase 4 — Publicación y entrega
 
-- [ ] **T16 — VULN-019.** Actualizar las imágenes restantes del compose.
+- [x] **T16 — VULN-019.** Actualizar las imágenes restantes del compose.
+  Ruta: delegada (Sonnet: necesita red y Docker), revisión de Claude. Evidencia (2026-10-06): commit
+  `14047c7`, `mailpit` v1.31.4, `migrate` v4.20.1, `prometheus` v3.15.0, `loki` 3.7.8, `alloy` v1.20.1 y
+  `grafana` 13.2.3, cada una por digest de su índice multiarquitectura (Claude comprobó los 6 digests
+  contra sus tags con `docker buildx imagetools`); también la imagen de mailpit en Terraform.
+  `deploy/observability/*` sin cambios. Verificación (Sonnet): `docker compose config` con y sin
+  observabilidad, `make up-obs` sano, migrate con salida 0, `/readyz` 200, Prometheus con api, worker,
+  rabbitmq y prometheus `up` (Claude lo repitió), Grafana 13.2.3 con sus dos fuentes de datos y el
+  dashboard, Loki con logs del api vía Alloy, `make e2e` 52/52, `terraform fmt -check` y `validate`.
+  RED no aplica (cambio de imágenes): la prueba es el escaneo antes/después.
+  Evidencia «después»: run `baseline-scan` 37473616659 (`workflow_dispatch`, `ref=924b581`), total de
+  las 8 imágenes 710 → 108 (`mailpit` y `loki` 0); residual detallado en
+  `security/evidence/actions-37473616659/README.md`; ficha, `evidencia.json` y README raíz al día
+  (28 fichas remediadas). Capturas de Claude Desktop confirmadas (informe, capturas 93 a 95).
+  Revisión nativa (`review-dad3dc9c349c9821`, medio, 26 líneas, 1 lente): **aprobada**; avisos
+  informativos R3-001 a R3-005 (cambios de versión mayor sin prueba en el candidato, E2E con el nuevo
+  mailpit, digests multiarquitectura), todos cubiertos por la verificación anterior.
+  Revisión nativa de la evidencia (`review-0acc883077aedd36`, alto, 191 líneas, 4 lentes): **aprobada**.
+  R1-001, R2-001 y R3-001 coincidían en que 51 de los 117 hallazgos de `postgres` tenían parche: se
+  vuelve a fijar `postgres:16-bookworm` en su digest reconstruido (misma 16.15) en el compose y en el
+  servicio de CI (`924b581`, Trivy local 117 → 88, con parche 51 → 22; base sana, `/readyz` 200,
+  `make e2e` 52/52) y se relanza el run (37473616659 reemplaza a 37471823657). R2-002: el párrafo de T30
+  queda marcado como histórico. R3-002 (forma de `captura` en null): sigue el protocolo de evidencia.
 - [ ] **T17 — Docker Hub.** Workflow de release en tag `vX.Y.Z`: imágenes con `vX.Y.Z` y `latest`,
   SBOM con Syft y firma con Cosign (ADR 0011, Q1).
-- [ ] **T18 — Manual de usuario con capturas** (incluye la grilla de roles).
-- [ ] **T19 — Informe técnico PDF** con las 8 secciones del enunciado.
-- [ ] **T20 — Guion del video** de 10-15 minutos (ciclo completo: app, pipeline, despliegue,
+  Pospuesta al final de la fase 4 por decisión del usuario (2026-10-06), a la espera de Q1 (namespace
+  y token de Docker Hub). Propuesta de Claude: repositorios `api`, `worker` y `web` (`web` ya sirve el
+  Hub y Contabilidad), environment protegido `dockerhub`, tag de prueba `v0.9.0` y `v1.0.0` en T21.
+- [x] **T18 — Manual de usuario con capturas** (incluye la grilla de roles).
+  Ruta: delegada (Sonnet: necesita el stack y un navegador), revisión de Claude. Evidencia (2026-10-06):
+  `docs/manuales/usuario.md` por tipo de usuario (empleado, administrador, Contabilidad por rol), con la
+  historia del auditor para la sustentación (enunciado 4.6) y problemas frecuentes; 48 capturas en
+  `docs/manuales/img/usuario/` (3,5 MB, la mayor 188 KB) generadas por `e2e/manual/capturas.ts`
+  (`make capturas`, fuera de `make e2e` y de la matriz); vista previa de Mailpit enmascarada (lleva el
+  código y el enlace). `docs/README.md` marca el manual como hecho. Verificación (Sonnet): `make capturas`
+  1/1 (48 PNG), typecheck de e2e, `make e2e` 52/52, `make spec-drift` al día, 48 imágenes referenciadas
+  y existentes, sin roles del script en la base. Revisión de Claude: tres capturas abiertas (grilla,
+  Mailpit, resumen del auditor) sin datos sensibles; enlaces relativos del manual existen. Nota: la grilla
+  muestra «Asignado a 97/37 usuarios» por las cuentas que dejan las corridas E2E en la base local.
+  **Hallazgo nuevo fuera de alcance (T18):** los correos del Hub no declaran codificación:
+  `buildRawMessage` (`backend/cmd/worker/main.go`) no envía `MIME-Version` ni
+  `Content-Type: text/plain; charset=utf-8` (ni codifica el asunto según RFC 2047), así que Mailpit
+  muestra «GÃ³mez» en vez de «Gómez». Error funcional, no de seguridad; sin id; falta decidir la tarea.
+  Al commitear: gitleaks marcó tres líneas del script (`password: <identificador>` y un literal de prueba);
+  se reescribieron con alias cortos, sin tocar `.gitleaks.toml` ni `.gitleaksignore`. iCloud había
+  renombrado o borrado 15 capturas: se regeneraron en una carpeta limpia (48/48, nombres exactos).
+  Commit `6496a92`. Revisión nativa (`review` de T18, medio, 882 líneas, 1 lente): **aprobada**; corregido
+  R3-stale-toast-save (el script ahora espera el aviso «guardado», no cualquier aviso); la captura
+  vigente ya era correcta. R3-stage-leak-on-failure (carpeta temporal si la corrida falla) queda como
+  sugerencia.
+- [x] **T19 — Informe técnico PDF** con las 8 secciones del enunciado.
+  Ruta: delegada (Sonnet: necesita Docker, navegador y red para npm), revisión de Claude. Evidencia
+  (2026-10-06): `docs/informe/informe-tecnico.md` → `informe-tecnico.pdf` (44 páginas, 2,2 MB) con
+  `make informe` (`build.mjs`: Markdown a HTML, Mermaid en Chromium, PDF en dos pasadas para el índice);
+  diagramas y fragmentos de workflow leídos de los archivos reales al compilar; capturas de Grafana,
+  Loki, Prometheus y sus objetivos (`capturas-grafana.mjs`, sin credenciales en pantalla). Secciones en el
+  orden del enunciado, tabla VULN-001 a VULN-031, Anexo A (puesta en marcha: `make setup` antes de
+  `make up`, direcciones, objetivos de make, producción simulada) y Anexo B (índice de artefactos).
+  Portada con la materia y los cinco integrantes que dio el usuario; queda «[completar: docente]».
+  `npm audit` 0 en `docs/informe` (override de `katex`), porque osv-scanner recorre todo el repo.
+  Revisión de Claude: páginas 1, 2, 27 y 37 renderizadas (portada, índice, tabla de hallazgos, anexo A);
+  el encabezado de la portada sale del enunciado (línea 8).
+  Al commitear: el PDF (2,2 MB) supera el límite de 512 KB del hook de archivos grandes; sin subir el
+  límite, el PDF queda en `.gitignore`, se regenera con `make informe` y se adjunta al release en T21.
+  Gitleaks marcó `const password = …` en `capturas-grafana.mjs` (valor leído en ejecución, no escrito):
+  variable renombrada.
+  Commit `2315f09`. Revisión nativa (medio, 2681 líneas, 1 lente): **aprobada**. Corregido después:
+  el PDF final se escribe en un temporal y solo se copia si la paginación de las dos pasadas coincide;
+  los rangos de líneas citados de los workflows fallan el build si quedan fuera del archivo o vacíos; el
+  enmascarado de gitleaks cubre también `Line`; el anexo dice que `make informe` reinstala con `npm ci`.
+  Sugerencias no aplicadas: limpieza con try/finally, índice por subcadena, espera fija en las capturas.
+  **Hallazgo nuevo fuera de alcance (T19):** el dashboard «Identity Hub — Seguridad» tiene paneles sin
+  datos: `identity_login_attempts_total`, `identity_events_published_total` e
+  `identity_refresh_reuse_detected_total` están definidas en `backend/internal/observability/metrics.go`
+  pero ningún código las incrementa (Claude contó 0 usos fuera de pruebas); el panel de DLQ consulta una
+  etiqueta `queue` que RabbitMQ no expone. El informe muestra la captura real y lo explica. Afecta al
+  bono de observabilidad (+8 %) y al video; sin id; falta decidir la tarea.
+  **Corregido (2026-10-06, por decisión del usuario)** — Ruta: delegada (Codex), revisión de Claude.
+  `Broker.Publish` cuenta `identity_events_published_total` (`published`/`failed`, un incremento por
+  intento); el reuso de refresh incrementa `identity_refresh_reuse_detected_total`; los handlers de
+  login y verificación MFA cuentan `mfa_required`, `failed`, `locked` y `succeeded` (no cuentan los
+  rechazos por límite de IP); Prometheus raspa `/metrics/detailed` de RabbitMQ (`queue_coarse_metrics`)
+  y el panel de DLQ usa `rabbitmq_detailed_queue_messages`. RED observado por Claude (3 pruebas
+  TestRNF007_ fallan contra el código previo; `go.mod` necesitó `go-spew` indirecto para `testutil`,
+  resuelto por Claude con red). GREEN (Codex): build, vet, `go test ./...`, golangci-lint 0, trazabilidad
+  al día. Verificación de Claude con el stack real tras `make e2e` 52/52: login 76 `mfa_required`,
+  69 `succeeded`, 3 `failed`; 204 eventos `published`; 2 reusos; serie de `notifications.dlq` presente.
+  Limitación aceptada: el intento que provoca el bloqueo se cuenta como `failed` (el dominio devuelve
+  credenciales inválidas); los siguientes, como `locked`.
+  Commit `fa6d307`. Revisión nativa (alto, 286 líneas, 4 lentes): **aprobada**. Corregido después:
+  el contador de reuso sube solo tras el commit de la revocación (R3-001/R4), comentarios en el handler
+  de login sobre el límite de IP y el intento que bloquea (R2), y `Publish` sin retorno con nombre.
+  Sugerencias no aplicadas: constantes para las etiquetas, prueba de serialización duplicada.
+  iCloud volvió a reemplazar 7 capturas del manual por versiones viejas y a crear copias « N»: se
+  restauraron desde git (`6496a92`) y las copias se movieron fuera del repo, sin borrarlas. Causa
+  (aclarada por el usuario): la sincronización continua del Mac con iCloud al reescribir archivos
+  generados, no ediciones simultáneas desde otro equipo.
+- [x] **T20 — Guion del video** de 10-15 minutos (ciclo completo: app, pipeline, despliegue,
   observabilidad) (Q3).
+  Ruta: delegada (Codex), revisión de Claude. Evidencia (2026-10-06): `docs/video/guion.md`, 10 escenas
+  en 13:00 (apertura, arquitectura, flujo del empleado, historia RF-021 del auditor, pipeline con
+  VULN-019 de 710 a 108 y el hook de gitleaks en clip pregrabado, despliegue local, producción simulada
+  con T17 condicional, Terraform sin apply, observabilidad y cierre), reparto sugerido entre los cinco
+  integrantes, checklist de preparación (`make setup` antes de `make up-obs`, sin mostrar `.env`) y plan
+  de contingencia. Verificación (Codex): 22 enlaces relativos existen, los objetivos de make citados
+  existen, tiempos 13:00. Revisión de Claude: escenas 1 a 5 leídas; `docs/README.md` conserva el guion
+  de la demo en vivo (`guion-demo.md`, ~5 min) junto al del video. Pendiente: grabar (Q3).
 - [ ] **T21 — Cierre.** Bitácora, matriz, informe de seguridad final, tag de versión y PR.
+  Decisión del usuario (2026-10-06): dejar todo terminado y verificado antes de Docker Hub; T17, el tag
+  `vX.Y.Z` y el release (con el PDF del informe adjunto) se hacen al final, en vivo frente al equipo.
+  - [x] **T21a — Codificación de los correos.** `buildRawMessage` declara `MIME-Version`,
+    `Content-Type: text/plain; charset=utf-8` y codifica el asunto (RFC 2047); prueba primero.
+    Ruta: delegada (Codex), revisión de Claude. Evidencia (2026-10-06): RED con tres TestRF012_ (faltaba
+    `MIME-Version` y un CR/LF en el asunto inyectaba una cabecera `Bcc`); GREEN con `MIME-Version`,
+    `charset=utf-8`, `Content-Transfer-Encoding: 8bit` (quoted-printable cambiaba LF por CRLF en el
+    cuerpo), asunto con `mime.QEncoding`, CR/LF eliminados de las cabeceras y destinatario con CR/LF
+    rechazado en `notify.Render`. Build, vet, `go test ./...`, golangci-lint 0 y matriz al día (Codex).
+    Claude: worker reconstruido y correo real en Mailpit con las tres cabeceras. La inyección no era
+    explotable desde fuera (el correo del destinatario se valida al crear la cuenta y los asuntos son
+    fijos), así que no se abre un VULN; queda como defensa en profundidad.
+  - [x] **T21b — Documentación de cierre.** Entrada de la semana 4 en `docs/BITACORA.md`, versión final
+    de `docs/security-report.html` (VULN-019 remediado), coherencia de `docs/README.md`, README raíz y
+    matriz; informe técnico regenerado con el docente (Jaider Ospina Navas).
+    Ruta: delegada (Codex), revisión por Claude pendiente. Evidencia (2026-10-06): se añadió la entrada
+    de semana 4 sin reescribir los estados históricos; el informe finaliza VULN-019 con el run 37473616659
+    sobre `924b581` (8 imágenes: 710 → 108) y los README reflejan T1–T21, T17 pendiente y los enlaces al
+    manual, informe y guion. Comprobaciones: `python3 scripts/traceability.py --check`, enlaces relativos,
+    búsqueda de «parcial», parseo HTML y `git diff --check` (sin errores).
+  - [ ] **T21c — PR de la fase 4** (con confirmación del usuario). Tag, release y T17 quedan para el final.
+    PR #12 abierto (2026-10-06). CI: 20/20 jobs en verde; SonarCloud reprobó el gate por la
+    calificación de seguridad (S4036, `execFileSync('docker', …)` resuelto por `PATH` en
+    `docs/informe/capturas-grafana.mjs`): el binario se toma de `INFORME_DOCKER`, como en
+    `e2e/support/db.ts`. Code smells nuevos (complejidad en `login_test.go`, estilo en `build.mjs` y
+    `capturas.ts`) no afectan el gate y quedan anotados.
 
 ## Progreso
 
@@ -479,13 +605,14 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
 | 1 — Documentación, UML e integración | T1 a T6 (6) | 6 (T1 a T6) — fase cerrada |
 | 2 — IaC de referencia | T7 a T10 (4) | 4 (T7 a T10) — fase cerrada |
 | 3 — Grilla de roles configurable | T11 a T15 (5) | 5 (T11 a T15) — fase cerrada |
-| 4 — Publicación y entrega | T16 a T21 (6) | 0 |
-| **Total** | **21** | **15** (T1 a T15) |
+| 4 — Publicación y entrega | T16 a T21 (6) | 4 (T16, T18, T19 y T20) |
+| **Total** | **21** | **19** (T1 a T16 y T18 a T20) |
 
 ## Siguiente paso
 
-**2026-10-06.** Fases 1 a 3 cerradas (T5 completa). PR de la fase 3 abierto con confirmación del
-usuario; siguiente: fase 4 desde T16.
+**2026-10-06.** Fases 1 a 3 cerradas y en main (PR #11, merge `8b4a18a`, CI 21/21). T16 hecha
+(VULN-019 remediado, capturas de Desktop incluidas). T17 pospuesta al final (Q1). T18 a T20 hechas, más la corrección de
+las métricas del dashboard. Siguiente: T21a a T21c; al final, en vivo, T17 con tag y release.
 Codex: cuota diaria limitada; Sonnet como respaldo.
 
 ## Cambios de spec propuestos

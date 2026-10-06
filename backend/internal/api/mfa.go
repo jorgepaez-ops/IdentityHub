@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/jorgepaez/identity-hub/internal/auth/mfa"
+	"github.com/jorgepaez/identity-hub/internal/observability"
 )
 
 func (s *Server) verifyMfa(w http.ResponseWriter, r *http.Request) {
@@ -41,6 +42,7 @@ func (s *Server) verifyMfa(w http.ResponseWriter, r *http.Request) {
 			http.SetCookie(w, hubSessionCookie(result.HubSessionToken, int(s.hubSessionTTL.Seconds())))
 		}
 		writeJSON(w, http.StatusOK, TokenPair{AccessToken: result.AccessToken, TokenType: TokenPairTokenType(result.TokenType), ExpiresIn: result.ExpiresIn})
+		observability.LoginAttempts.WithLabelValues("succeeded").Inc()
 		return
 	}
 	if errors.Is(err, mfa.ErrChallengeInvalid) || errors.Is(err, mfa.ErrCodeInvalid) {

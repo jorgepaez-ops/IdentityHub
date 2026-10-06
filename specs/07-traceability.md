@@ -21,7 +21,7 @@ declaración de buenas intenciones.
 | **RF-009** | Control de acceso por roles | P0 | — | 5 | 17 | 5 | ✅ completo |
 | **RF-010** | Administración de usuarios | P0 | `listUsers`, `getUser`, `updateUser` | 3 | 12 | 3 | ✅ completo |
 | **RF-011** | Registro de auditoría | P0 | `listAuditLog` | 1 | 9 | 1 | ✅ completo |
-| **RF-012** | Notificaciones asíncronas | P0 | — | 1 | 9 | — | ✅ completo |
+| **RF-012** | Notificaciones asíncronas | P0 | — | 1 | 12 | — | ✅ completo |
 | **RF-013** | Segundo factor obligatorio por correo | P1 | — | 1 | 5 | — | ✅ completo |
 | **RF-014** | Inicio de sesión con segundo factor | P1 | `verifyMfa`, `resendMfaCode` | 5 | 36 | 4 | ✅ completo |
 | **RF-015** | Restablecimiento de contraseña | P1 | `requestPasswordReset`, `confirmPasswordReset` | 3 | 33 | 3 | ✅ completo |
@@ -37,14 +37,14 @@ declaración de buenas intenciones.
 | **RNF-004** | Imágenes sin vulnerabilidades corregibles | P0 | — | — | 3 | — | 🟡 parcial |
 | **RNF-005** | Cobertura de pruebas ≥ 70 % | P0 | — | — | 25 | — | 🟡 parcial |
 | **RNF-006** | Procedencia verificable | P0 | — | — | — | — | 🔴 sin cubrir |
-| **RNF-007** | Observabilidad | P0 | — | — | — | — | 🔴 sin cubrir |
+| **RNF-007** | Observabilidad | P0 | — | — | 5 | — | 🟡 parcial |
 | **RNF-008** | Contenedores endurecidos | P0 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-009** | Cabeceras de seguridad | P0 | — | — | — | 6 | 🟡 parcial |
 | **RNF-010** | Latencia | P1 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-011** | Los specs son la fuente de verdad | P0 | — | — | 5 | — | 🟡 parcial |
 | **RNF-012** | Logs sin datos sensibles | P0 | — | — | 5 | — | 🟡 parcial |
 
-**Resumen:** 33 requisitos · 18 completos · 7 parciales · 6 sin cubrir · 2 diferidos (semana 4).
+**Resumen:** 33 requisitos · 18 completos · 8 parciales · 5 sin cubrir · 2 diferidos (semana 4).
 
 Leyenda de estado: *completo* = verificado por al menos dos de las tres
 columnas de prueba · *parcial* = una sola · *sin cubrir* = ninguna · *diferido (semana 4)* = backlog de semana 4 por decisión Q14.

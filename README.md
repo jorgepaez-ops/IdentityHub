@@ -16,9 +16,8 @@ Identity Hub es un proveedor de identidad desarrollado desde cero, comparable en
 
 - **Semana 2 cerrada:** 47 de 47 tareas completadas; el tag
   `v0.1.0-hardened` identifica el estado remediado en `main`, con CI verde.
-- **Semana 3 en curso:** SSO entre dominios, MFA por correo, alta de empleados y frontend funcional. El alcance y el progreso están en
-  [`odd/tasks/idp-semana-3.md`](odd/tasks/idp-semana-3.md).
-- **Semana 4:** entrega final, incluida la portabilidad del arranque y los artefactos de publicación.
+- **Semana 3 cerrada:** SSO entre dominios, MFA por correo, alta de empleados y frontend funcional.
+- **Semana 4:** documentación, IaC de referencia, grilla de roles, manual, informe y guion terminados; quedan la publicación de Docker Hub (T17), el tag, el release y la grabación del video. El seguimiento está en [`odd/tasks/idp-semana-4.md`](odd/tasks/idp-semana-4.md).
 
 ## 4. Tecnologías
 
@@ -36,7 +35,7 @@ La cobertura de integración tiene un gate mínimo de 70 % en el job **`6b · Pr
 
 ## 5. Arquitectura
 
-La visión y los contratos del sistema están en [`specs/00-vision.md`](specs/00-vision.md). Para recorrer la solución visualmente, consulte los diagramas de [arquitectura](docs/diagramas/01-arquitectura.html), [flujo SSO](docs/diagramas/02-flujo-sso.html) y [ciclo de vida de usuario](docs/diagramas/03-ciclo-de-vida-usuario.html). Las decisiones de arquitectura (ADR 0001 a 0011) están en [`specs/adr/`](specs/adr/), con su formato explicado en [`specs/adr/README.md`](specs/adr/README.md).
+La visión y los contratos del sistema están en [`specs/00-vision.md`](specs/00-vision.md). Para recorrer la solución visualmente, consulte los diagramas de [arquitectura](docs/diagramas/01-arquitectura.html), [flujo SSO](docs/diagramas/02-flujo-sso.html) y [ciclo de vida de usuario](docs/diagramas/03-ciclo-de-vida-usuario.html). Las decisiones de arquitectura (ADR 0001 a 0013) están en [`specs/adr/`](specs/adr/), con su formato explicado en [`specs/adr/README.md`](specs/adr/README.md).
 
 ## 6. Inicio rápido
 
@@ -66,8 +65,8 @@ El compose real vive en `deploy/` y el de la raíz lo incluye, de modo que un cl
 
 ## 7. Seguridad y evidencia DevSecOps
 
-- [Informe de seguridad](docs/security-report.html): la versión publicada se conserva como artefacto privado de claude.ai; el enlace no se incluye en el repositorio.
-- [Fichas de vulnerabilidades](security/findings/): 29 fichas, de VULN-001 a VULN-029; 27 remediadas, VULN-019 con remediación parcial y VULN-028 como riesgo aceptado hasta 2026-12-25.
+- [Informe de seguridad](docs/security-report.html): versión final de la evidencia versionada, incluida la remediación de VULN-019.
+- [Fichas de vulnerabilidades](security/findings/): 31 fichas, de VULN-001 a VULN-031 (VULN-001 a VULN-019 sembradas en la línea base); 30 remediadas y VULN-028 como riesgo aceptado hasta 2026-12-25.
 - [Evidencia por vulnerabilidad](docs/evidencia/): archivos `evidencia.json` por hallazgo; la [evidencia cruda de escáneres](security/evidence/) se conserva por ejecución.
 - [Modelo de amenazas](specs/05-security/threat-model.md): riesgos y mitigaciones por componente.
 - [ADR 0007](specs/adr/0007-linea-base-vulnerable-deliberada.md): explica la línea base vulnerable deliberada. El tag `v0.0.0-vuln-baseline` nunca debe desplegarse; `v0.1.0-hardened` representa el estado remediado.
@@ -77,10 +76,13 @@ El workflow de CI valida la deriva entre especificaciones y código, lint y tipo
 ## 8. Gestión del proyecto y trazabilidad
 
 - [Bitácora](docs/BITACORA.md): decisiones, avances y próximos pasos.
-- [Tareas de la semana 2](odd/tasks/idp-semana-2.md): cerradas; [tareas de la semana 3](odd/tasks/idp-semana-3.md): en curso.
+- [Tareas de la semana 2](odd/tasks/idp-semana-2.md): cerradas; [tareas de la semana 3](odd/tasks/idp-semana-3.md): cerradas; [tareas de la semana 4](odd/tasks/idp-semana-4.md): cierre en curso.
 - [Matriz de trazabilidad](specs/07-traceability.md): artefacto generado por [`scripts/traceability.py`](scripts/traceability.py).
 - [Especificaciones](specs/): requisitos, modelo de dominio, contrato [OpenAPI](specs/03-api/openapi.yaml), eventos y escenarios de aceptación.
 - [Guía de desarrollo](docs/guia-desarrollo.md): ejecución, generación y pruebas para desarrollo local.
+- [Manual de usuario](docs/manuales/usuario.md): flujos de empleado, administrador y Contabilidad con capturas.
+- [Informe técnico](docs/informe/informe-tecnico.md): fuente del PDF final; ejecute `make informe` para regenerarlo.
+- [Guion del video](docs/video/guion.md): demostración de 13 minutos; la grabación sigue pendiente.
 
 Para una revisión técnica ordenada, empiece por la [visión](specs/00-vision.md), continúe con los [ADRs](specs/adr/), revise el [modelo de amenazas](specs/05-security/threat-model.md) y cierre con la [matriz de trazabilidad](specs/07-traceability.md). Esta ruta permite contrastar intención, diseño, controles y evidencia.
 
