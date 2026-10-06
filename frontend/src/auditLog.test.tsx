@@ -184,4 +184,47 @@ describe('audit log metadata', () => {
     })
     expect(document.querySelector('img')).toBeNull()
   })
+
+  it('TestRF011_KeepsBothRowsWhenMetadataKeysFlattenToTheSameName', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    await open('/auditoria', {
+      'GET /api/v1/admin/audit-log': () => json(200, { items: [event(1, { metadata: { 'a.b': 'literal', a: { b: 'nested' } } })], nextCursor: null }),
+    })
+    const list = screen.getByRole('table', { name: 'Registro de auditoría' }).querySelector('dl.metadata-list') as HTMLElement
+    expect([...list.querySelectorAll('dd')].map((value) => value.textContent)).toEqual(['literal', 'nested'])
+    expect(errors.mock.calls.some((call) => String(call[0]).includes('same key'))).toBe(false)
+    errors.mockRestore()
+  })
+
+  it('TestRF011_AShortcutClearsAStaleActorError', async () => {
+    await open()
+    fireEvent.change(screen.getByLabelText('Actor (ID)'), { target: { value: 'not-a-uuid' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Filtrar' }))
+    expect(await screen.findByText('El ID del actor debe ser un UUID.')).toBeInTheDocument()
+    fireEvent.click(shortcut('Inicios fallidos'))
+    await waitFor(() => expect(screen.queryByText('El ID del actor debe ser un UUID.')).not.toBeInTheDocument())
+  })
+
+  it('TestRF011_AValidResubmitClearsTheActorErrorEvenWithUnchangedFilters', async () => {
+    await open()
+    fireEvent.change(screen.getByLabelText('Actor (ID)'), { target: { value: 'not-a-uuid' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Filtrar' }))
+    expect(await screen.findByText('El ID del actor debe ser un UUID.')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Actor (ID)'), { target: { value: '' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Filtrar' }))
+    await waitFor(() => expect(screen.queryByText('El ID del actor debe ser un UUID.')).not.toBeInTheDocument())
+  })
+
+  it('TestRF011_ResubmittingUnchangedFiltersReloadsTheLog', async () => {
+    const api = await open('/auditoria?accion=login_failed&desde=24h')
+    await waitFor(() => expect(auditCalls(api)).toHaveLength(1))
+    fireEvent.click(screen.getByRole('button', { name: 'Filtrar' }))
+    await waitFor(() => expect(auditCalls(api)).toHaveLength(2))
+    expect(lastParams(api).get('action')).toBe('login_failed')
+    fireEvent.change(screen.getByLabelText('Acción'), { target: { value: 'role_changed' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Filtrar' }))
+    await waitFor(() => expect(lastParams(api).get('action')).toBe('role_changed'))
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(auditCalls(api)).toHaveLength(3)
+  })
 })

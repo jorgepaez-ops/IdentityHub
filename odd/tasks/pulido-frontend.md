@@ -146,6 +146,15 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
   `mfa_code_rejected` pero su enlace filtra solo `login_failed`; «Cambios de roles» cubre `role_changed`
   (no `role_created`/`role_updated`/`role_deleted` de roles de aplicación); un objeto anidado vacío en
   los metadatos no muestra clave.
+  Commit `41fef8c`. La revisión de la rama completa ya no cabe en el contexto del revisor
+  (`lens_context_budget_exceeded`, 2325 líneas): desde aquí se revisa por tramos. Revisión nativa de P5
+  (medio, 9 archivos, 401 líneas, 1 lente): **aprobada** y acusada, con dos avisos y una sugerencia
+  corregidos por Claude con pruebas (RED observado en las tres primeras): claves de metadatos que
+  colisionan al aplanarse (`a.b` literal y `a: { b }`) ya no repiten la clave de React; los atajos y
+  «Filtrar por este actor» limpian el error del actor; volver a pulsar «Filtrar» sin cambios recarga
+  (recalcula la ventana de 24 h). Al probar este último se encontró una doble petición cuando el filtro sí
+  cambiaba; ahora solo se fuerza la recarga si la URL no cambia, y en ese caso también se limpia el error
+  (prueba añadida después del arreglo, sin RED observado). vitest 225/225, typecheck y lint limpios.
 - [ ] **P6 — Contabilidad: resumen.** Más datos de ejemplo, gráficos SVG (por estado, por categoría,
   línea de tiempo) y actividad reciente.
 - [ ] **P7 — Contabilidad: movimientos.** Búsqueda, filtros, orden, categoría al registrar,

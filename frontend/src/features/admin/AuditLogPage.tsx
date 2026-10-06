@@ -77,7 +77,8 @@ function MetadataList({ metadata }: { metadata: AuditEvent['metadata'] }) {
     <details>
       <summary>Ver</summary>
       <dl className="metadata-list">
-        {entries.map(([key, text]) => <div className="metadata-pair" key={key}><dt>{key}</dt><dd>{text}</dd></div>)}
+        {/* Flattened keys can collide (a literal "a.b" and a nested a.b), so the position keeps React keys unique. */}
+        {entries.map(([key, text], index) => <div className="metadata-pair" key={`${index}:${key}`}><dt>{key}</dt><dd>{text}</dd></div>)}
       </dl>
     </details>
   )
@@ -121,6 +122,8 @@ export function AuditLogPage({ onSessionEnded }: { onSessionEnded: () => void })
   const [error, setError] = useState<string | null>(null)
   const [filterError, setFilterError] = useState<string | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
+  // Bumped by "Filtrar" so re-submitting unchanged filters still reloads (and re-resolves a relative window).
+  const [reloads, setReloads] = useState(0)
   const generation = useRef(0)
   // The query sent for the first page is reused for "Cargar más", so a relative window never shifts mid-pagination.
   const query = useRef<AuditLogQuery>({})
@@ -153,10 +156,13 @@ export function AuditLogPage({ onSessionEnded }: { onSessionEnded: () => void })
         else setError('No fue posible cargar el registro de auditoría. Inténtalo de nuevo.')
       }
     })()
-  }, [applied, onSessionEnded])
+  }, [applied, reloads, onSessionEnded])
 
   // Changing any filter rewrites the URL (replace, like the user status filter); the effect above then reloads from the first page.
-  const apply = (next: Filters) => setParams(writeFilters(next), { replace: true })
+  const apply = (next: Filters) => {
+    setFilterError(null)
+    setParams(writeFilters(next), { replace: true })
+  }
 
   const filter = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -165,14 +171,13 @@ export function AuditLogPage({ onSessionEnded }: { onSessionEnded: () => void })
       setFilterError('El ID del actor debe ser un UUID.')
       return
     }
+    // An unchanged URL would not re-run the load effect, so force it; a changed URL reloads on its own.
+    if (writeFilters(next).toString() !== paramsKey) return apply(next)
     setFilterError(null)
-    apply(next)
+    setReloads((count) => count + 1)
   }
 
-  const clear = () => {
-    setFilterError(null)
-    apply(NO_FILTERS)
-  }
+  const clear = () => apply(NO_FILTERS)
 
   const toggleAction = (action: string) => apply({ ...applied, action: applied.action === action ? '' : action })
   const toggleLast24h = () => apply({ ...applied, since: applied.since === LAST_24H ? '' : LAST_24H })
