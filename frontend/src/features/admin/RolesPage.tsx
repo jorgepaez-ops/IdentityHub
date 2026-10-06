@@ -31,14 +31,14 @@ const users = (count: number) => (count === 1 ? '1 usuario' : `${count} usuarios
 
 type Report = { onProblems: (messages: string[]) => void; onSessionEnded: () => void }
 
-function RoleRow({ application, role, held, report, onUpdated, onDeleted }: {
+function RoleRow({ application, role, held, report, onUpdated, onDeleted }: Readonly<{
   application: Application
   role: ApplicationRole
   held: boolean
   report: Report
   onUpdated: (role: ApplicationRole) => void
   onDeleted: (role: ApplicationRole) => void
-}) {
+}>) {
   const [keys, setKeys] = useState<Set<string>>(() => new Set(role.permissionKeys))
   const [description, setDescription] = useState(role.description)
   const [confirming, setConfirming] = useState(false)
@@ -119,12 +119,12 @@ function RoleRow({ application, role, held, report, onUpdated, onDeleted }: {
   )
 }
 
-function NewRoleForm({ application, report, onCreated, onCancel }: {
+function NewRoleForm({ application, report, onCreated, onCancel }: Readonly<{
   application: Application
   report: Report
   onCreated: (role: ApplicationRole) => void
   onCancel: () => void
-}) {
+}>) {
   const prefix = `${application.clientId}.`
   const ids = useId()
   const [name, setName] = useState(prefix)
@@ -183,7 +183,7 @@ function NewRoleForm({ application, report, onCreated, onCancel }: {
   )
 }
 
-function ApplicationSection({ application, currentRoles, onSessionEnded, onNotice }: { application: Application; currentRoles: readonly string[]; onSessionEnded: () => void; onNotice: (message: string | null) => void }) {
+function ApplicationSection({ application, currentRoles, onSessionEnded, onNotice }: Readonly<{ application: Application; currentRoles: readonly string[]; onSessionEnded: () => void; onNotice: (message: string | null) => void }>) {
   const titleId = useId()
   // System roles (admin, user) are never edited here; only the application's own roles.
   const [roles, setRoles] = useState<ApplicationRole[]>(() => application.roles.filter((role) => !role.system))
@@ -249,7 +249,7 @@ function ApplicationSection({ application, currentRoles, onSessionEnded, onNotic
   )
 }
 
-export function RolesPage({ currentRoles, onSessionEnded }: { currentRoles: readonly string[]; onSessionEnded: () => void }) {
+export function RolesPage({ currentRoles, onSessionEnded }: Readonly<{ currentRoles: readonly string[]; onSessionEnded: () => void }>) {
   const [applications, setApplications] = useState<Application[] | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [notice, setNotice] = useState<{ text: string; id: number } | null>(null)

@@ -73,7 +73,7 @@ function metadataEntries(value: unknown, prefix = '', depth = 0): [string, strin
   return [[prefix, stringify(value)]]
 }
 
-function MetadataList({ metadata }: { metadata: AuditEvent['metadata'] }) {
+function MetadataList({ metadata }: Readonly<{ metadata: AuditEvent['metadata'] }>) {
   const entries = Object.keys(metadata ?? {}).length === 0 ? [] : metadataEntries(metadata)
   if (entries.length === 0) return <span className="muted">—</span>
   return (
@@ -115,7 +115,7 @@ function useActorEmails(events: AuditEvent[] | null): Record<string, string> {
   return emails
 }
 
-export function AuditLogPage({ onSessionEnded }: { onSessionEnded: () => void }) {
+export function AuditLogPage({ onSessionEnded }: Readonly<{ onSessionEnded: () => void }>) {
   const [params, setParams] = useSearchParams()
   const paramsKey = params.toString()
   const applied = useMemo(() => readFilters(new URLSearchParams(paramsKey)), [paramsKey])

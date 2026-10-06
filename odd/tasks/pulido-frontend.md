@@ -292,8 +292,18 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
     hay SARIF) y tolera `results` nulo o `runs` vacío (probado con SARIF de ejemplo); su comentario ya no
     sugiere que el gate cambió. Aviso aceptado con evidencia: la API recibe ahora un Host fijo; el backend
     no lo lee (búsqueda de `.Host`) y `make e2e` 52/52 cubre el SSO completo.
-  - [ ] **P9e — Deudas de fases 3 y 4:** avisos de SonarCloud, sugerencias de las revisiones nativas
+  - [x] **P9e — Deudas de fases 3 y 4:** avisos de SonarCloud, sugerencias de las revisiones nativas
     (correos, refresh, informe, capturas) y alerta de Grafana con runbook para la DLQ (AM-019).
+    Evidencia parcial (2026-10-06, Sonnet, sin cerrar; revisión de Claude pendiente): AM-019 con regla
+    aprovisionada `deploy/observability/grafana/alerting/dlq.yml` (se dispara con la DLQ > 0 durante 2 min),
+    uid fijo de la fuente Prometheus (con `deleteDatasources` para bases de Grafana ya creadas) y runbook
+    `docs/runbooks/dlq-notificaciones.md`; probada con un mensaje publicado a `identity.dlx`: inactive,
+    pending, firing y de nuevo inactive tras vaciar la cola. SonarCloud (3321 abiertas en main; 3108 en
+    `docs/diagramas`, ya regeneradas por P9c): constantes de títulos y detalles de problemas (S1192),
+    `Readonly<>` en props (S6759), helper `fieldValue` (S6551), aserciones de Storage (S5906), ternarios
+    anidados, `replaceAll`/`codePointAt`. Quedan sin hacer: complejidad cognitiva (S3776), roles ARIA a
+    elementos nativos (S6819), nombres de interfaces de un método (S8196), claves por índice (S6479) y
+    los avisos de `.github`, `e2e`, `scripts`, `db` y `security` (fuera de la superficie permitida).
 - [ ] **P10 — Documentación y evidencia.** Ajustes de E2E si hacen falta, capturas regeneradas,
   manual de usuario e informe técnico actualizados.
   Pendientes detectados (2026-10-06): en `docs/manuales/integracion-terceros.md` §2.3, la fila «Roles»

@@ -544,7 +544,7 @@ describe('audit log', () => {
     type('Actor (ID)', 'no-es-uuid')
     fireEvent.click(screen.getByRole('button', { name: 'Filtrar' }))
     expect(await screen.findByText('El ID del actor debe ser un UUID.')).toBeInTheDocument()
-    expect(api.calls.length).toBe(before)
+    expect(api.calls).toHaveLength(before)
   })
 
   it('TestRF011_ClearsTheFilters', async () => {

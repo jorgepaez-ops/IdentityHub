@@ -14,7 +14,7 @@ interface Props {
 const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
 /** Small modal confirmation: focus moves in on open, Tab stays inside, Escape cancels and focus returns to the trigger. */
-export function ConfirmDialog({ title, children, confirmLabel, tone, onConfirm, onCancel, fallbackFocus }: Props) {
+export function ConfirmDialog({ title, children, confirmLabel, tone, onConfirm, onCancel, fallbackFocus }: Readonly<Props>) {
   const titleId = useId()
   const bodyId = useId()
   const dialog = useRef<HTMLDivElement>(null)

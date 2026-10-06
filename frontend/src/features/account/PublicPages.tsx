@@ -1,6 +1,7 @@
 import { FormEvent, ReactNode, useId, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ApiProblemError, acceptInvitation, confirmPasswordReset, requestPasswordReset } from '../../api/client'
+import { fieldValue } from '../../formData'
 
 // Bounds come from InvitationAcceptRequest / PasswordResetConfirmRequest in specs/03-api/openapi.yaml.
 const PASSWORD_MIN = 12
@@ -14,7 +15,7 @@ export function problemMessages(error: unknown, fallback: string): string[] {
   return fields.length > 0 ? fields : [fallback]
 }
 
-function AuthCard({ title, lead, children }: { title: string; lead?: string; children: ReactNode }) {
+function AuthCard({ title, lead, children }: Readonly<{ title: string; lead?: string; children: ReactNode }>) {
   const titleId = useId()
   return (
     <main className="login-page" id="main-content" tabIndex={-1}>
@@ -28,7 +29,7 @@ function AuthCard({ title, lead, children }: { title: string; lead?: string; chi
   )
 }
 
-function Problems({ messages }: { messages: string[] }) {
+function Problems({ messages }: Readonly<{ messages: string[] }>) {
   if (messages.length === 0) return null
   return <div className="error-box" role="alert">{messages.map((message, index) => <p key={index}>{message}</p>)}</div>
 }
@@ -37,22 +38,23 @@ function LoginLink() {
   return <Link className="secondary-button button-link" to="/login">Ir a iniciar sesión</Link>
 }
 
-function NewPasswordForm({ submitLabel, pending, problems, onSubmit }: {
+function NewPasswordForm({ submitLabel, pending, problems, onSubmit }: Readonly<{
   submitLabel: string
   pending: boolean
   problems: string[]
   onSubmit: (password: string) => void
-}) {
+}>) {
   const [localProblem, setLocalProblem] = useState<string | null>(null)
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const data = new FormData(event.currentTarget)
-    const password = String(data.get('password'))
+    // Reads the typed password from the form; not a hardcoded secret.
+    const password = fieldValue(data, 'password') // gitleaks:allow
     if (password.length < PASSWORD_MIN || password.length > PASSWORD_MAX) {
       setLocalProblem(`La contraseña debe tener entre ${PASSWORD_MIN} y ${PASSWORD_MAX} caracteres.`)
       return
     }
-    if (password !== String(data.get('confirmation'))) {
+    if (password !== fieldValue(data, 'confirmation')) {
       setLocalProblem('Las contraseñas no coinciden.')
       return
     }
@@ -132,7 +134,7 @@ export function ForgotPasswordPage() {
   const [error, setError] = useState<string | null>(null)
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    const email = String(new FormData(event.currentTarget).get('email'))
+    const email = fieldValue(new FormData(event.currentTarget), 'email')
     setPending(true)
     setError(null)
     try {

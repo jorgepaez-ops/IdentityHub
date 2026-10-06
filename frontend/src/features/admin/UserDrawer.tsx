@@ -1,6 +1,7 @@
 import { FormEvent, KeyboardEvent, useEffect, useId, useRef, useState } from 'react'
 import { type AdminUser, type Application, type UserStatus, createUser, listApplications, updateUser } from '../../api/client'
 import { DIRECTORY_ROLES, DIRECTORY_ROLE_DESCRIPTION, Problems, STATUS_LABEL, adminProblems, isAuthFailure } from './shared'
+import { fieldValue } from '../../formData'
 
 export type DrawerTarget = { mode: 'create' } | { mode: 'edit'; user: AdminUser }
 
@@ -19,15 +20,17 @@ const EDIT_COPY: Record<number, string> = {
   404: 'La cuenta ya no existe.',
 }
 
-export function UserDrawer({ target, currentUserId, onClose, onSaved, onSessionEnded }: {
+export function UserDrawer({ target, currentUserId, onClose, onSaved, onSessionEnded }: Readonly<{
   target: DrawerTarget
   currentUserId: string
   onClose: () => void
   onSaved: (user: AdminUser, message: string) => void
   onSessionEnded: () => void
-}) {
+}>) {
   const editing = target.mode === 'edit' ? target.user : null
   const isSelf = editing?.id === currentUserId
+  const idleLabel = editing ? 'Guardar cambios' : 'Crear y enviar invitación'
+  const busyLabel = editing ? 'Guardando…' : 'Creando…'
   const titleId = useId()
   const dialogRef = useRef<HTMLElement>(null)
   const [status, setStatus] = useState<UserStatus>(editing?.status ?? 'active')
@@ -70,7 +73,7 @@ export function UserDrawer({ target, currentUserId, onClose, onSaved, onSessionE
     if (event.key !== 'Tab' || !dialogRef.current) return
     const items = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE))
     const first = items[0]
-    const last = items[items.length - 1]
+    const last = items.at(-1)
     if (!first || !last) return
     if (event.shiftKey && document.activeElement === first) {
       event.preventDefault()
@@ -114,8 +117,8 @@ export function UserDrawer({ target, currentUserId, onClose, onSaved, onSessionE
       return
     }
     const data = new FormData(event.currentTarget)
-    const displayName = String(data.get('displayName')).trim()
-    const email = String(data.get('email')).trim()
+    const displayName = fieldValue(data, 'displayName').trim()
+    const email = fieldValue(data, 'email').trim()
     if (displayName === '') {
       setProblems(['El nombre para mostrar no puede estar vacío.'])
       return
@@ -181,7 +184,7 @@ export function UserDrawer({ target, currentUserId, onClose, onSaved, onSessionE
           </fieldset>
           <div className="drawer-actions">
             <button className="primary-button fit" disabled={pending || isSelf} type="submit">
-              {editing ? (pending ? 'Guardando…' : 'Guardar cambios') : (pending ? 'Creando…' : 'Crear y enviar invitación')}
+              {pending ? busyLabel : idleLabel}
             </button>
             <button className="secondary-button fit" onClick={onClose} type="button">Cancelar</button>
           </div>
@@ -191,7 +194,7 @@ export function UserDrawer({ target, currentUserId, onClose, onSaved, onSessionE
   )
 }
 
-function RoleOption({ role, checked, disabled, hint, permissions, onToggle }: { role: string; checked: boolean; disabled: boolean; hint: string; permissions?: string; onToggle: (role: string) => void }) {
+function RoleOption({ role, checked, disabled, hint, permissions, onToggle }: Readonly<{ role: string; checked: boolean; disabled: boolean; hint: string; permissions?: string; onToggle: (role: string) => void }>) {
   return (
     <div className="role-option">
       <input id={`role-${role}`} type="checkbox" value={role} checked={checked} disabled={disabled} aria-describedby={`role-${role}-help`} onChange={() => onToggle(role)} />

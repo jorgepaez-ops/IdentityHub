@@ -57,7 +57,7 @@ async function loadRecent(): Promise<AuditEvent[]> {
 
 
 // A tile with `to` keeps its group name and count; its label becomes a link stretched over the whole tile.
-function StatTile({ label, count, tone, to }: { label: string; count: Count; tone?: string; to?: string }) {
+function StatTile({ label, count, tone, to }: Readonly<{ label: string; count: Count; tone?: string; to?: string }>) {
   const classes = ['stat-tile', tone ? `stat-${tone}` : '', to ? 'stat-link' : ''].filter(Boolean).join(' ')
   return (
     <div className={classes} role="group" aria-label={label}>
@@ -67,7 +67,7 @@ function StatTile({ label, count, tone, to }: { label: string; count: Count; ton
   )
 }
 
-export function HomePage({ onSessionEnded }: { onSessionEnded: () => void }) {
+export function HomePage({ onSessionEnded }: Readonly<{ onSessionEnded: () => void }>) {
   const [snapshot, setSnapshot] = useState<Snapshot>(LOADING)
   const [attempt, setAttempt] = useState(0)
   const generation = useRef(0)

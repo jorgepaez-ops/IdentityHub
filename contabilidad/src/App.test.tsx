@@ -127,8 +127,8 @@ describe('callback screen', () => {
 
   it('TestRF020_NothingStoredInBrowserStorageAfterSignIn', async () => {
     await signInAs(['contabilidad.senior'])
-    expect(localStorage.length).toBe(0)
-    expect(sessionStorage.length).toBe(0)
+    expect(localStorage).toHaveLength(0)
+    expect(sessionStorage).toHaveLength(0)
   })
 
   it('TestRF020_ExpiredTokenGoesBackToAuthorizeWithoutRefreshToken', async () => {
@@ -355,8 +355,8 @@ describe('logout', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cerrar sesión' }))
     expect(screen.getByRole('button', { name: 'Continuar con Identity Hub' })).toBeInTheDocument()
     expect(screen.queryByText('M-2041')).not.toBeInTheDocument()
-    expect(localStorage.length).toBe(0)
-    expect(sessionStorage.length).toBe(0)
+    expect(localStorage).toHaveLength(0)
+    expect(sessionStorage).toHaveLength(0)
     // A user that signed out does not reach the ledger by going back: a new login is required.
     await act(async () => { await Promise.resolve() })
     expect(screen.queryByRole('navigation', { name: 'Secciones' })).not.toBeInTheDocument()

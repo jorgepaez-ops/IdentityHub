@@ -3,7 +3,7 @@ import { CloseIcon } from './icons'
 
 const DISMISS_MS = 5000
 
-export function Toast({ message, onClose }: { message: string; onClose: () => void }) {
+export function Toast({ message, onClose }: Readonly<{ message: string; onClose: () => void }>) {
   // Keep the latest callback without restarting the timer: parents often pass a new arrow on every render.
   const close = useRef(onClose)
   useEffect(() => { close.current = onClose }, [onClose])

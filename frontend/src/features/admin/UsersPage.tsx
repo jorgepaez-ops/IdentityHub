@@ -18,7 +18,7 @@ const RESEND_COPY: Record<number, string> = {
   409: 'La cuenta ya no está pendiente: no hace falta reenviar la invitación.',
 }
 
-function StatTile({ label, value }: { label: string; value: number }) {
+function StatTile({ label, value }: Readonly<{ label: string; value: number }>) {
   return (
     <div className="stat-tile" role="group" aria-label={label}>
       <strong>{value}</strong>
@@ -33,7 +33,7 @@ function emptyMessage(search: string, status: AdminUser['status'] | null): strin
   return 'Todavía no hay usuarios.'
 }
 
-export function UsersPage({ currentUserId, onSessionEnded }: { currentUserId: string; onSessionEnded: () => void }) {
+export function UsersPage({ currentUserId, onSessionEnded }: Readonly<{ currentUserId: string; onSessionEnded: () => void }>) {
   const [users, setUsers] = useState<AdminUser[] | null>(null)
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)

@@ -16,7 +16,7 @@ interface Props {
   onLogout: () => void
 }
 
-export function Shell({ access, subject, onLogout }: Props) {
+export function Shell({ access, subject, onLogout }: Readonly<Props>) {
   const [view, setView] = useState<View>(access.canSeeReports ? 'summary' : 'transactions')
   const [movements, setMovements] = useState<Movement[]>(INITIAL_MOVEMENTS)
   const [closed, setClosed] = useState(false)

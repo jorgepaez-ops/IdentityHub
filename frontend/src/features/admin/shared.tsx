@@ -9,9 +9,10 @@ export const DIRECTORY_ROLE_DESCRIPTION: Record<string, string> = {
   user: 'Rol base de toda cuenta: acceso a Mi cuenta.',
 }
 
-const chipTone = (role: string) => (role === 'admin' ? 'accent' : role === 'contabilidad.senior' ? 'warn' : 'neutral')
+const TONE_BY_ROLE = new Map([['admin', 'accent'], ['contabilidad.senior', 'warn']])
+export const chipTone = (role: string) => TONE_BY_ROLE.get(role) ?? 'neutral'
 
-export function RoleChips({ roles }: { roles: readonly string[] }) {
+export function RoleChips({ roles }: Readonly<{ roles: readonly string[] }>) {
   return (
     <ul className="chips" aria-label="Roles">
       {roles.map((role) => <li className={`chip chip-${chipTone(role)}`} key={role}>{role}</li>)}
@@ -27,7 +28,7 @@ export const STATUS_LABEL: Record<AdminUser['status'], string> = {
 }
 const statusTone: Record<AdminUser['status'], string> = { active: 'ok', locked: 'danger', disabled: 'danger', pending_verification: 'warn' }
 
-export function StatusPill({ status }: { status: AdminUser['status'] }) {
+export function StatusPill({ status }: Readonly<{ status: AdminUser['status'] }>) {
   return <span className={`pill pill-${statusTone[status]}`}>{STATUS_LABEL[status]}</span>
 }
 
@@ -57,7 +58,7 @@ export function adminProblems(reason: unknown, byStatus: Record<number, string>,
   return [byStatus[reason.status] ?? fallback]
 }
 
-export function Problems({ messages }: { messages: string[] }) {
+export function Problems({ messages }: Readonly<{ messages: string[] }>) {
   if (messages.length === 0) return null
   return <div className="error-box" role="alert">{messages.map((message, index) => <p key={index}>{message}</p>)}</div>
 }

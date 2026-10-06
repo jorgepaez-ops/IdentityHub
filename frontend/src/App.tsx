@@ -12,6 +12,7 @@ import { RolesPage } from './features/admin/RolesPage'
 import { UsersPage } from './features/admin/UsersPage'
 import { AcceptInvitationPage, ForgotPasswordPage, ResetPasswordPage } from './features/account/PublicPages'
 import { ApiProblemError, clearSession, type CurrentUser, type MfaChallenge, getCurrentUser, login, logout, refreshSession, resendMfaCode, verifyMfa } from './api/client'
+import { fieldValue } from './formData'
 
 type ErrorStep = 'credentials' | 'verify' | 'resend'
 
@@ -32,7 +33,7 @@ function messageFor(error: unknown, step: ErrorStep = 'credentials') {
   }
 }
 
-function LoginPage({ onAuthenticated }: { onAuthenticated: (user: CurrentUser) => void }) {
+function LoginPage({ onAuthenticated }: Readonly<{ onAuthenticated: (user: CurrentUser) => void }>) {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   // RF-020: set when an OAuth client sent the user here (ADR 0009).
@@ -51,7 +52,8 @@ function LoginPage({ onAuthenticated }: { onAuthenticated: (user: CurrentUser) =
     setNotice(null)
     setCanStartOver(false)
     try {
-      setChallenge(await login({ email: String(data.get('email')), password: String(data.get('password')) }))
+      // Reads the typed password from the form; not a hardcoded secret.
+      setChallenge(await login({ email: fieldValue(data, 'email'), password: fieldValue(data, 'password') })) // gitleaks:allow
     } catch (reason) {
       setError(messageFor(reason))
     } finally {
@@ -62,7 +64,7 @@ function LoginPage({ onAuthenticated }: { onAuthenticated: (user: CurrentUser) =
   const verify = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!challenge) return
-    const code = String(new FormData(event.currentTarget).get('code'))
+    const code = fieldValue(new FormData(event.currentTarget), 'code')
     setPending(true)
     setError(null)
     setNotice(null)
@@ -154,7 +156,7 @@ function LoginPage({ onAuthenticated }: { onAuthenticated: (user: CurrentUser) =
   )
 }
 
-function AppShell({ user, onLogout, onUserChange, onSessionEnded }: { user: CurrentUser; onLogout: () => Promise<void>; onUserChange: (user: CurrentUser) => void; onSessionEnded: () => void }) {
+function AppShell({ user, onLogout, onUserChange, onSessionEnded }: Readonly<{ user: CurrentUser; onLogout: () => Promise<void>; onUserChange: (user: CurrentUser) => void; onSessionEnded: () => void }>) {
   const navigate = useNavigate()
   const isAdmin = user.roles.includes('admin')
   const home = isAdmin ? '/inicio' : '/me'

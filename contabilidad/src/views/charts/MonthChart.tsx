@@ -8,7 +8,7 @@ const WIDTH = 480
 const BASELINE = 170
 const PLOT_HEIGHT = 130
 
-export function MonthChart({ movements }: { movements: Movement[] }) {
+export function MonthChart({ movements }: Readonly<{ movements: Movement[] }>) {
   const totals = totalsByMonth(movements)
   const max = Math.max(1, ...totals.map((entry) => entry.total))
   const slot = WIDTH / Math.max(1, totals.length)

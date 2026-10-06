@@ -4,7 +4,7 @@ import { LogoutIcon, WarningIcon } from './icons'
 
 export type LoginState = { kind: 'idle' } | { kind: 'validating' } | { kind: 'error'; message: string }
 
-export function LoginScreen({ state, onContinue }: { state: LoginState; onContinue: () => void }) {
+export function LoginScreen({ state, onContinue }: Readonly<{ state: LoginState; onContinue: () => void }>) {
   useEffect(() => { document.title = 'Iniciar sesión · Contabilidad' }, [])
   return (
     <main className="login-page">
@@ -29,7 +29,7 @@ export function LoginScreen({ state, onContinue }: { state: LoginState; onContin
   )
 }
 
-export function AccessDenied({ onLogout }: { onLogout: () => void }) {
+export function AccessDenied({ onLogout }: Readonly<{ onLogout: () => void }>) {
   useEffect(() => { document.title = 'Sin acceso · Contabilidad' }, [])
   return (
     <main className="login-page">

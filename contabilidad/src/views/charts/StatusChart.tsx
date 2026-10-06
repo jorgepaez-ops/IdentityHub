@@ -6,7 +6,7 @@ const TITLE = 'Monto por estado'
 const RADIUS = 40
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS
 
-export function StatusChart({ movements }: { movements: Movement[] }) {
+export function StatusChart({ movements }: Readonly<{ movements: Movement[] }>) {
   const totals = totalsByStatus(movements)
   const grand = totals.reduce((sum, entry) => sum + entry.total, 0)
   let offset = 0

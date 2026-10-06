@@ -2,7 +2,7 @@ import type { Access } from '../access'
 import { LockIcon } from '../icons'
 import { LAST_CLOSE, PERIOD, countOf, inOpenPeriod, type Movement } from '../ledger'
 
-export function ClosingView({ access, movements, closed, onClose }: { access: Access; movements: Movement[]; closed: boolean; onClose: () => void }) {
+export function ClosingView({ access, movements, closed, onClose }: Readonly<{ access: Access; movements: Movement[]; closed: boolean; onClose: () => void }>) {
   if (!access.canClose) {
     return (
       <section aria-labelledby="view-title">

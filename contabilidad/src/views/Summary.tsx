@@ -8,7 +8,7 @@ import { StatusChart } from './charts/StatusChart'
 
 const RECENT_LIMIT = 6
 
-function Stat({ label, value, note }: { label: string; value: string; note?: string }) {
+function Stat({ label, value, note }: Readonly<{ label: string; value: string; note?: string }>) {
   return (
     <div className="stat">
       <span className="stat-label">{label}</span>
@@ -18,7 +18,7 @@ function Stat({ label, value, note }: { label: string; value: string; note?: str
   )
 }
 
-export function SummaryView({ access, movements }: { access: Access; movements: Movement[] }) {
+export function SummaryView({ access, movements }: Readonly<{ access: Access; movements: Movement[] }>) {
   if (access.level === 'none') return null
   if (!access.canSeeReports) {
     return (

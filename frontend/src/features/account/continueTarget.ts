@@ -7,10 +7,10 @@ const AUTHORIZE_PATH = '/oauth/authorize'
  * so the parameter can never become an open redirect. Anything else is ignored.
  */
 export function safeContinueTarget(value: string | null): string | null {
-  if (!value || !value.startsWith(AUTHORIZE_PATH)) return null
+  if (!value?.startsWith(AUTHORIZE_PATH)) return null
   // Backslashes, whitespace and control characters are normalized by browsers
   // into forms (`/\host`, tab/newline inside `//`) that parse as another origin.
-  if (/[\\\s#]/.test(value) || [...value].some((char) => char.charCodeAt(0) < 0x20 || char.charCodeAt(0) === 0x7f)) return null
+  if (/[\\\s#]/.test(value) || [...value].some((char) => { const code = char.codePointAt(0) ?? 0; return code < 0x20 || code === 0x7f })) return null
   let parsed: URL
   try {
     parsed = new URL(value, PLACEHOLDER_ORIGIN)

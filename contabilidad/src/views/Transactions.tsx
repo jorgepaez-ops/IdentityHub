@@ -5,6 +5,7 @@ import { csvFileName, downloadCsv, toCsv } from '../csv'
 import { CheckIcon, CloseIcon, DownloadIcon } from '../icons'
 import { KNOWN_CATEGORIES, STATUS_LABEL, formatCop, visibleMovements, type Movement } from '../ledger'
 import { ConfirmDialog } from './ConfirmDialog'
+import { fieldValue } from '../formData'
 
 interface Props {
   access: Access
@@ -25,7 +26,7 @@ const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
   { value: 'rejected', label: STATUS_LABEL.rejected },
 ]
 
-export function TransactionsView({ access, movements, onDecide, onRegister }: Props) {
+export function TransactionsView({ access, movements, onDecide, onRegister }: Readonly<Props>) {
   const [adding, setAdding] = useState(false)
   const [text, setText] = useState('')
   const [status, setStatus] = useState<StatusFilter>('all')
@@ -61,9 +62,9 @@ export function TransactionsView({ access, movements, onDecide, onRegister }: Pr
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const data = new FormData(event.currentTarget)
-    const amount = Number(data.get('amount'))
-    const description = String(data.get('description')).trim()
-    const chosen = String(data.get('category'))
+    const amount = Number(fieldValue(data, 'amount'))
+    const description = fieldValue(data, 'description').trim()
+    const chosen = fieldValue(data, 'category')
     if (!description || !Number.isFinite(amount) || amount <= 0 || !KNOWN_CATEGORIES.includes(chosen)) return
     onRegister(description, amount, chosen)
     setAdding(false)

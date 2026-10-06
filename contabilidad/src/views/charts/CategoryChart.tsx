@@ -8,7 +8,7 @@ const ROW = 30
 const LABEL_WIDTH = 110
 const BAR_MAX = 290
 
-export function CategoryChart({ movements }: { movements: Movement[] }) {
+export function CategoryChart({ movements }: Readonly<{ movements: Movement[] }>) {
   const totals = totalsByCategory(movements)
   const max = Math.max(1, ...totals.map((entry) => entry.total))
   const label = totals.length === 0 ? summarize(TITLE, ['sin movimientos']) : summarize(TITLE, totals.map((entry) => `${entry.category} ${formatCop(entry.total)}`))

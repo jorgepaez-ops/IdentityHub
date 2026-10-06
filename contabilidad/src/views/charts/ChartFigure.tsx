@@ -10,7 +10,7 @@ interface Props {
 }
 
 /** Shared frame: figure + caption, an SVG named for assistive tech and the same data as a table. */
-export function ChartFigure({ title, caption, columns, rows, children }: Props) {
+export function ChartFigure({ title, caption, columns, rows, children }: Readonly<Props>) {
   return (
     <figure className="card chart">
       <figcaption>{caption}</figcaption>
@@ -38,7 +38,7 @@ interface SvgProps {
 }
 
 /** Responsive drawing: width follows the container through the viewBox, never the `icon` size rule. */
-export function ChartSvg({ label, viewBox, children }: SvgProps) {
+export function ChartSvg({ label, viewBox, children }: Readonly<SvgProps>) {
   return <svg className="chart-svg" role="img" aria-label={label} viewBox={viewBox} preserveAspectRatio="xMidYMid meet">{children}</svg>
 }
 
