@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from './App'
 import { resetSessionForTests } from './api/client'
@@ -18,7 +18,9 @@ const byStatus = (counts: Record<string, { count: number; more?: boolean }>): Ha
 }
 const audit = (failed: ReturnType<typeof event>[], recent: ReturnType<typeof event>[]): Handler => (_body, url) => {
   const params = new URL(url, 'http://localhost').searchParams
-  return json(200, { items: params.get('action') === 'login_failed' ? failed : recent, nextCursor: null })
+  const action = params.get('action')
+  // mfa_code_rejected has no events unless a test overrides the whole handler.
+  return json(200, { items: action === 'login_failed' ? failed : action === 'mfa_code_rejected' ? [] : recent, nextCursor: null })
 }
 
 const homeApi = (extra: Record<string, Handler> = {}, user = adminUser) => stubApi({
@@ -130,6 +132,41 @@ describe('console home', () => {
     homeApi({ 'GET /api/v1/admin/audit-log': audit([], []) })
     render(<App />)
     expect(await screen.findByText('Todavía no hay actividad registrada.')).toBeInTheDocument()
+  })
+
+  it('TestRF010_LinksEachUserStatusTileToTheDirectoryFilteredByThatStatus', async () => {
+    goTo('/inicio')
+    homeApi()
+    render(<App />)
+    await within(await screen.findByRole('group', { name: 'Activos' })).findByText('7')
+    const hrefs = {
+      Activos: '/usuarios?estado=active',
+      Pendientes: '/usuarios?estado=pending_verification',
+      Bloqueados: '/usuarios?estado=locked',
+      Deshabilitados: '/usuarios?estado=disabled',
+    }
+    for (const [name, href] of Object.entries(hrefs)) {
+      expect(within(tile(name)).getByRole('link', { name })).toHaveAttribute('href', href)
+    }
+  })
+
+  it('TestRF010_LeavesTheFailedSignInsTileUnlinkedUntilTheAuditPageReadsFilters', async () => {
+    goTo('/inicio')
+    homeApi()
+    render(<App />)
+    await within(await screen.findByRole('group', { name: 'Activos' })).findByText('7')
+    expect(within(tile('Inicios de sesión fallidos (24 h)')).queryByRole('link')).not.toBeInTheDocument()
+  })
+
+  it('TestRF010_OpensTheFilteredDirectoryFromAHomeTile', async () => {
+    goTo('/inicio')
+    const api = homeApi()
+    render(<App />)
+    fireEvent.click(await within(await screen.findByRole('group', { name: 'Bloqueados' })).findByRole('link', { name: 'Bloqueados' }))
+    expect(await screen.findByRole('heading', { name: 'Usuarios' })).toBeInTheDocument()
+    expect(window.location.pathname + window.location.search).toBe('/usuarios?estado=locked')
+    expect(screen.getByRole('button', { name: 'Bloqueados' })).toHaveAttribute('aria-pressed', 'true')
+    await waitFor(() => expect(api.calls.filter((call) => call.key === 'GET /api/v1/admin/users').at(-1)?.url).toContain('status=locked'))
   })
 
   it('TestRF010_OffersShortcutsToUsersRolesAndAudit', async () => {

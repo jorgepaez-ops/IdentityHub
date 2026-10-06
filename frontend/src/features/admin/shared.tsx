@@ -61,3 +61,16 @@ export function Problems({ messages }: { messages: string[] }) {
   if (messages.length === 0) return null
   return <div className="error-box" role="alert">{messages.map((message, index) => <p key={index}>{message}</p>)}</div>
 }
+
+// Directory status filter: `null` is "all" and sends no `status` parameter. It is mirrored in the URL as ?estado=.
+export const STATUS_PARAM = 'estado'
+export const STATUS_FILTERS: (AdminUser['status'] | null)[] = [null, 'active', 'pending_verification', 'locked', 'disabled']
+export const STATUS_FILTER_LABEL: Record<AdminUser['status'] | 'all', string> = {
+  all: 'Todos',
+  active: 'Activos',
+  pending_verification: 'Pendientes',
+  locked: 'Bloqueados',
+  disabled: 'Deshabilitados',
+}
+export const parseStatusFilter = (value: string | null): AdminUser['status'] | null =>
+  STATUS_FILTERS.find((option) => option !== null && option === value) ?? null

@@ -112,7 +112,18 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
   la rama (aprobada y acusada) dejó otra sugerencia para P9: en login, páginas públicas y pantalla de
   restauración, `main#main-content` no tiene `tabIndex=-1`, así que el enlace para saltar puede no mover
   el foco.
-- [ ] **P4 — Usuarios.** Filtro por estado con el parámetro `status` existente y tarjetas clicables.
+- [x] **P4 — Usuarios.** Filtro por estado con el parámetro `status` existente y tarjetas clicables.
+  Ruta: delegada (Sonnet; Codex sin cuota), revisión y corrección de Claude. Evidencia (2026-10-06):
+  grupo «Filtrar por estado» con botones `aria-pressed` (Todos, Activos, Pendientes, Bloqueados,
+  Deshabilitados) que envía `status` a la API también en «Cargar más», reinicia el cursor, se combina con
+  la búsqueda y vive en la URL como `?estado=` (valores desconocidos se ignoran); las tarjetas de estado
+  del inicio enlazan a `/usuarios?estado=…` (la de fallidos queda sin enlace hasta P5, porque la
+  auditoría aún no lee filtros de la URL). La prueba de inicio ya no cuenta la actividad reciente como
+  `mfa_code_rejected` (sugerencia de la revisión de P3). RED: 11 pruebas fallaban sin el cambio.
+  Revisión de Claude: bajo un filtro, las tarjetas de Usuarios (que cuentan la lista cargada) mostraban
+  ceros falsos para los demás estados; ahora se ocultan mientras hay filtro (prueba nueva, RED observado),
+  y el ternario anidado del estado vacío pasó a una función. vitest 207/207, typecheck y lint limpios,
+  `make e2e` 52/52 (corrido por Sonnet antes de la corrección, que no toca flujos de E2E).
 - [ ] **P5 — Auditoría.** Atajos de filtro, actor resuelto a correo (`getUser`), metadatos legibles y
   «filtrar por este actor».
 - [ ] **P6 — Contabilidad: resumen.** Más datos de ejemplo, gráficos SVG (por estado, por categoría,
@@ -144,7 +155,7 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
 
 | Tareas | Hechas |
 |---|---|
-| P1 a P10 (10) | 3 (P1 a P3) |
+| P1 a P10 (10) | 4 (P1 a P4) |
 
 ## Entrega
 
@@ -154,4 +165,4 @@ notas). Commits por unidad de trabajo; un PR al final con confirmación del usua
 
 ## Siguiente paso
 
-P4 (usuarios: filtro por estado y tarjetas clicables).
+P5 (auditoría: atajos de filtro, actor como correo, metadatos legibles).

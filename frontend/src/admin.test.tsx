@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from './App'
+import { MemoryRouter } from 'react-router-dom'
 import { UsersPage } from './features/admin/UsersPage'
 import { AuditLogPage } from './features/admin/AuditLogPage'
 import { resetSessionForTests } from './api/client'
@@ -63,7 +64,7 @@ describe('admin page unmount safety', () => {
       'GET /api/v1/admin/users': () => late.promise,
       'POST /api/v1/auth/refresh': () => problem(401),
     })
-    const view = render(<UsersPage currentUserId="admin-id" onSessionEnded={onSessionEnded} />)
+    const view = render(<MemoryRouter><UsersPage currentUserId="admin-id" onSessionEnded={onSessionEnded} /></MemoryRouter>)
     await waitFor(() => expect(api.calls).toHaveLength(1))
     view.unmount()
     await act(async () => { late.resolve(problem(401)) })
@@ -92,7 +93,7 @@ describe('admin page unmount safety', () => {
       'POST /api/v1/admin/users/beto-id/invitation': () => late.promise,
       'POST /api/v1/auth/refresh': () => problem(401),
     })
-    const view = render(<UsersPage currentUserId="admin-id" onSessionEnded={onSessionEnded} />)
+    const view = render(<MemoryRouter><UsersPage currentUserId="admin-id" onSessionEnded={onSessionEnded} /></MemoryRouter>)
     const resend = await screen.findByRole('button', { name: 'Reenviar invitación a Beto Ruiz' })
     fireEvent.click(resend)
     await waitFor(() => expect(api.calls.some((call) => call.key === 'POST /api/v1/admin/users/beto-id/invitation')).toBe(true))

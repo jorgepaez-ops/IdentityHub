@@ -4,7 +4,7 @@ import { LoadingSkeleton } from '../../components/LoadingSkeleton'
 import { AuditIcon, ShieldIcon, UsersIcon } from '../../components/icons'
 import { type AuditEvent, type UserStatus, listAuditLog, listUsers } from '../../api/client'
 import { formatDate } from '../format'
-import { Problems, isAuthFailure } from './shared'
+import { Problems, STATUS_PARAM, isAuthFailure } from './shared'
 
 // D3: the API has no totals endpoint, so a count is exact up to one full page and "N+" beyond it.
 const COUNT_PAGE = 100
@@ -41,11 +41,13 @@ async function loadSnapshot(): Promise<Snapshot> {
   return { users, failedSignIns: sumCounts(failed.map(countOf)), recent: recent.items }
 }
 
-function StatTile({ label, count, tone }: { label: string; count: Count; tone?: string }) {
+// A tile with `to` keeps its group name and count; its label becomes a link stretched over the whole tile.
+function StatTile({ label, count, tone, to }: { label: string; count: Count; tone?: string; to?: string }) {
+  const classes = ['stat-tile', tone ? `stat-${tone}` : '', to ? 'stat-link' : ''].filter(Boolean).join(' ')
   return (
-    <div className={tone ? `stat-tile stat-${tone}` : 'stat-tile'} role="group" aria-label={label}>
+    <div className={classes} role="group" aria-label={label}>
       <strong>{countText(count)}</strong>
-      <span>{label}</span>
+      {to ? <Link to={to}>{label}</Link> : <span>{label}</span>}
     </div>
   )
 }
@@ -81,7 +83,7 @@ export function HomePage({ onSessionEnded }: { onSessionEnded: () => void }) {
       {snapshot && (
         <>
           <div className="stat-grid" aria-label="Indicadores">
-            {STATUS_ORDER.map((status) => <StatTile key={status} label={STATUS_TILE_LABEL[status]} count={snapshot.users[status]} tone={STATUS_TONE[status]} />)}
+            {STATUS_ORDER.map((status) => <StatTile key={status} label={STATUS_TILE_LABEL[status]} count={snapshot.users[status]} tone={STATUS_TONE[status]} to={`/usuarios?${STATUS_PARAM}=${status}`} />)}
             <StatTile label="Inicios de sesión fallidos (24 h)" count={snapshot.failedSignIns} tone={snapshot.failedSignIns.value > 0 ? 'danger' : 'ok'} />
           </div>
           <div className="home-grid">
