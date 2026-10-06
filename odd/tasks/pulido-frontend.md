@@ -97,6 +97,11 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
   (corrido por Sonnet antes de la corrección, que solo añade una consulta). E2E ajustadas:
   `roles-y-permisos` y `demo` esperan «Inicio» tras el login. Límite conocido: siete consultas por
   visita y la ventana de 24 h usa el reloj del navegador.
+  Commit `13cbcc4`. Revisión nativa (medio, 471 líneas, P3 más `47e88aa`, 1 lente de fiabilidad):
+  **aprobada** y acusada. Dos sugerencias no bloqueantes quedan como trabajo posterior (P9): el
+  manejador de auditoría de la prueba devuelve la lista reciente a la consulta `mfa_code_rejected` (enrutar
+  esa acción a una lista vacía por defecto), y el aviso de error pide reintentar sin ofrecer un botón;
+  además, un fallo en una de las siete consultas oculta todos los indicadores.
 - [ ] **P4 — Usuarios.** Filtro por estado con el parámetro `status` existente y tarjetas clicables.
 - [ ] **P5 — Auditoría.** Atajos de filtro, actor resuelto a correo (`getUser`), metadatos legibles y
   «filtrar por este actor».
