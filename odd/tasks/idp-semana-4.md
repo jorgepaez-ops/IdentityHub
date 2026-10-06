@@ -484,8 +484,8 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
 
 ## Siguiente paso
 
-**2026-10-06.** Fases 1 a 3 cerradas (T5 completa). PR de la fase 3 abierto con confirmación del
-usuario; siguiente: fase 4 desde T16.
+**2026-10-06.** Fases 1 a 3 cerradas y en main (PR #11, merge `8b4a18a`, CI 21/21). Siguiente:
+fase 4 desde T16.
 Codex: cuota diaria limitada; Sonnet como respaldo.
 
 ## Cambios de spec propuestos
