@@ -312,3 +312,20 @@ func TestRNF003_WorkerSigueExigiendoElBroker(t *testing.T) {
 		t.Errorf("LoadWorker no debe mencionar DATABASE_URL: %v", err)
 	}
 }
+
+// The worker must not carry the database credential even when the environment
+// still provides it (for example an old .env), so LoadWorker never reads it.
+func TestRNF003_WorkerIgnoraDatabaseURLAunqueExista(t *testing.T) {
+	const seed = "MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=" // base64 of the digits 0-9 repeated: a fake test key
+	t.Setenv("DATABASE_URL", "postgres://worker-should-not-see-this")
+	t.Setenv("RABBITMQ_URL", "amqp://x")
+	t.Setenv("JWT_SIGNING_KEY", seed)
+
+	cfg, err := LoadWorker()
+	if err != nil {
+		t.Fatalf("LoadWorker error = %v", err)
+	}
+	if cfg.DatabaseURL != "" {
+		t.Fatal("LoadWorker kept DATABASE_URL; the worker must not receive it")
+	}
+}

@@ -135,7 +135,8 @@ func load(requireDatabase bool) (*Config, error) {
 		return d
 	}
 
-	databaseURL := opt("DATABASE_URL", "")
+	// The worker does not read DATABASE_URL at all, even if the environment sets it.
+	databaseURL := ""
 	if requireDatabase {
 		databaseURL = req("DATABASE_URL")
 	}

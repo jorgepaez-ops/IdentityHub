@@ -88,7 +88,7 @@ locals {
     { name = "TRUSTED_PROXIES", value = var.vpc_cidr },
   ]
 
-  worker_secrets = [
+  common_secrets = [
     { name = "RABBITMQ_URL", valueFrom = local.secret_arn["rabbitmq-url"] },
     { name = "JWT_SIGNING_KEY", valueFrom = local.secret_arn["jwt-signing-key"] },
   ]
@@ -96,7 +96,7 @@ locals {
   # La api ademas necesita la base; el worker solo consume la cola y envia SMTP.
   app_secrets = concat(
     [{ name = "DATABASE_URL", valueFrom = local.secret_arn["database-url"] }],
-    local.worker_secrets,
+    local.common_secrets,
   )
 }
 
@@ -159,7 +159,7 @@ resource "aws_ecs_task_definition" "worker" {
     portMappings     = [{ containerPort = 9091, protocol = "tcp" }]
     logConfiguration = local.log_config["worker"]
     environment      = local.app_env
-    secrets          = local.worker_secrets
+    secrets          = local.common_secrets
   })])
 }
 

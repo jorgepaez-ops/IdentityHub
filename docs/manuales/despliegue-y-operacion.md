@@ -25,7 +25,7 @@ Complete `.env` sin guardar secretos en Git. Las variables que se muestran a con
 | Grupo | Variables | Uso |
 |---|---|---|
 | PostgreSQL | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | Usuario, contraseña y base del contenedor PostgreSQL. |
-| Rol de aplicación y migraciones | `IDENTITY_APP_PASSWORD`, `MIGRATE_DATABASE_URL`, `DATABASE_URL` | Credencial de mínimo privilegio, conexión del migrador y conexión de la API. El worker no recibe `DATABASE_URL`: solo consume la cola y envía SMTP. |
+| Rol de aplicación y migraciones | `IDENTITY_APP_PASSWORD`, `MIGRATE_DATABASE_URL`, `DATABASE_URL` | Credencial de mínimo privilegio, conexión del migrador y conexión de la API. El worker no recibe `DATABASE_URL`: solo consume la cola y envía SMTP. Al desplegar en AWS, publique primero la imagen del worker que ya usa `LoadWorker` y después aplique el Terraform que le quita el secreto y el acceso a la base; una imagen anterior exige `DATABASE_URL` y no arrancaría. |
 | RabbitMQ | `RABBITMQ_DEFAULT_USER`, `RABBITMQ_DEFAULT_PASS`, `RABBITMQ_URL` | Usuario, contraseña y URL AMQP del broker. |
 | API y JWT | `API_PORT`, `API_BASE_URL`, `LOG_LEVEL`, `JWT_SIGNING_KEY`, `JWT_ISSUER`, `TRUSTED_PROXIES`, `JWT_ACCESS_TTL`, `JWT_REFRESH_TTL` | Puerto, URL local, nivel de log, firma y parámetros de token; `JWT_SIGNING_KEY` no tiene valor por defecto. |
 | Correo local | `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM` | Destino SMTP para el worker; por defecto apunta a Mailpit. |

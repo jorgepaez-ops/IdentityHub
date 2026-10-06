@@ -957,7 +957,7 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 - [x] Estado · Ejecutor: `Claude` (instala Playwright y navegadores) + `Codex` (pruebas)
 - Una prueba por escenario Gherkin, lectura de correos por la API de Mailpit, el guion de la demo
   como prueba; `make e2e` real y job en CI; `spec-drift` comprueba la correspondencia.
-- Commit: —
+- Commit: ver las subtareas T14a a T14e; el job de CI es `ffaf6c1`.
 - Mapa (explorador, 2026-10-02): 37 escenarios en 6 features (`specs/06-acceptance/`, etiquetas
   `@RF-NNN`); `scripts/traceability.py` solo cuenta pruebas por RF (no falla si falta una);
   `make spec-drift` no existe; ningún job de CI levanta el stack; el admin inicial no tiene

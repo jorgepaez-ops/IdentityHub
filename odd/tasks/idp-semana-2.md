@@ -223,7 +223,7 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
   (sin `--force`) únicamente cuando el usuario lo autorice; Codex no configura el remoto ni sube nada.
 - Antes, commitear estos documentos (`AGENTS.md`, `odd/`, `.gga`, `docs/diagramas/`). `.atl/`
   (registro de skills local) no se versiona. AGENTS.md prohíbe a Codex commitear esos archivos de contexto.
-- [x] **Comprobación previa al push (obligatoria; el usuario confirmó el 2026-09-19 que las del compose son de prueba y no reutilizadas; queda por confirmar el resto)**: como el repo es público, y la
+- [x] **Comprobación previa al push (obligatoria; el usuario confirmó el 2026-09-19 las del compose y el 2026-10-06 el resto: ninguna es real ni reutilizada)**: como el repo es público, y la
   línea base contiene credenciales sembradas que quedarán visibles para siempre en el historial,
   confirmar que **ninguna** es real ni está reutilizada en otro sitio (cerrada el 2026-10-06: el usuario
   confirmó que ninguna credencial de la línea base es real ni se reutilizó en otro lugar; es un proyecto
