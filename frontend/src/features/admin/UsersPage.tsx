@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { LoadingSkeleton } from '../../components/LoadingSkeleton'
+import { Toast } from '../../components/Toast'
+import { SearchIcon, UsersIcon } from '../../components/icons'
 import { type AdminUser, listUsers, resendInvitation } from '../../api/client'
 import { formatDate } from '../format'
 import { type DrawerTarget, UserDrawer } from './UserDrawer'
@@ -6,7 +9,6 @@ import { Problems, RoleChips, StatusPill, adminProblems, initialsOf, isAuthFailu
 
 const PAGE_SIZE = 100
 const SEARCH_DELAY_MS = 250
-const TOAST_MS = 6000
 
 const RESEND_COPY: Record<number, string> = {
   403: 'No tienes permiso para reenviar invitaciones.',
@@ -46,14 +48,7 @@ export function UsersPage({ currentUserId, onSessionEnded }: { currentUserId: st
     }
   }, [])
   const opener = useRef<HTMLElement | null>(null)
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  const showToast = useCallback((message: string) => {
-    setToast(message)
-    if (toastTimer.current) clearTimeout(toastTimer.current)
-    toastTimer.current = setTimeout(() => setToast(null), TOAST_MS)
-  }, [])
-  useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current) }, [])
+  const showToast = useCallback((message: string) => setToast(message), [])
 
   useEffect(() => {
     const timer = setTimeout(() => setAppliedSearch(search.trim()), SEARCH_DELAY_MS)
@@ -141,7 +136,7 @@ export function UsersPage({ currentUserId, onSessionEnded }: { currentUserId: st
           <h1>Usuarios</h1>
           <p className="muted">Cuentas del Hub, sus roles y el estado de cada invitación.</p>
         </div>
-        <button className="primary-button fit" onClick={() => openDrawer({ mode: 'create' })} type="button">Nuevo usuario</button>
+        <button className="primary-button fit" onClick={() => openDrawer({ mode: 'create' })} type="button"><UsersIcon />Nuevo usuario</button>
       </div>
       <div className="stat-grid">
         <StatTile label="Usuarios activos" value={count('active')} />
@@ -154,11 +149,11 @@ export function UsersPage({ currentUserId, onSessionEnded }: { currentUserId: st
           <h2 id="directory-title">Directorio</h2>
           <div className="search-field">
             <label htmlFor="user-search">Buscar por correo o nombre</label>
-            <input id="user-search" type="search" value={search} maxLength={200} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar…" />
+            <div className="input-with-icon"><SearchIcon /><input id="user-search" type="search" value={search} maxLength={200} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar…" /></div>
           </div>
         </div>
         {loadError && <Problems messages={[loadError]} />}
-        {users === null && !loadError && <p className="muted">Cargando…</p>}
+        {users === null && !loadError && <LoadingSkeleton label="Cargando usuarios…" />}
         {users !== null && list.length === 0 && <p className="muted">{appliedSearch ? 'No hay usuarios que coincidan con la búsqueda.' : 'Todavía no hay usuarios.'}</p>}
         {list.length > 0 && (
           <div className="table-scroll">
@@ -195,7 +190,7 @@ export function UsersPage({ currentUserId, onSessionEnded }: { currentUserId: st
         {nextCursor && <button className="secondary-button fit" disabled={loadingMore} onClick={() => void loadMore()} type="button">{loadingMore ? 'Cargando…' : 'Cargar más'}</button>}
       </section>
       {drawer && <UserDrawer target={drawer} currentUserId={currentUserId} onClose={closeDrawer} onSaved={saved} onSessionEnded={onSessionEnded} />}
-      {toast && <div className="toast" role="status">{toast}</div>}
+      {toast && <Toast message={toast} onClose={() => setToast(null)} />}
     </section>
   )
 }

@@ -237,6 +237,16 @@ describe('authentication routes', () => {
     await waitFor(() => expect(screen.getByRole('link', { name: 'Usuarios' })).toHaveClass('active'))
   })
 
+  it('TestRF015_ExponeElDestinoDelEnlaceParaSaltarAlContenidoEnRutasPublicas', async () => {
+    window.history.replaceState({}, '', '/forgot-password')
+
+    render(<App />)
+
+    await screen.findByRole('heading', { name: 'Restablecer contraseña' })
+    expect(screen.getByRole('link', { name: 'Saltar al contenido' })).toHaveAttribute('href', '#main-content')
+    expect(document.querySelector('main#main-content')).toBeInTheDocument()
+  })
+
   it('TestRF007_LogsOutLocallyWhenRemoteLogoutFails', async () => {
     vi.stubGlobal('fetch', vi.fn()
       .mockResolvedValueOnce(json(401, { title: 'Unauthorized', status: 401 }))

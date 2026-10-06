@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from 'react'
+import { LoadingSkeleton } from '../../components/LoadingSkeleton'
 import { type AuditEvent, type AuditLogQuery, listAuditLog } from '../../api/client'
 import { formatDate } from '../format'
 import { Problems, isAuthFailure } from './shared'
@@ -110,7 +111,7 @@ export function AuditLogPage({ onSessionEnded }: { onSessionEnded: () => void })
         </form>
         {filterError && <Problems messages={[filterError]} />}
         {error && <Problems messages={[error]} />}
-        {events === null && !error && <p className="muted">Cargando…</p>}
+        {events === null && !error && <LoadingSkeleton label="Cargando auditoría…" />}
         {events !== null && events.length === 0 && <p className="muted">No hay eventos para los filtros elegidos.</p>}
         {events !== null && events.length > 0 && (
           <div className="table-scroll">

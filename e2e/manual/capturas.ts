@@ -21,7 +21,10 @@ import { purgeRole, roleCount } from '../support/roles'
  * message body (which carries codes and links) is never opened, only the message list is shown.
  */
 
-const OUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../docs/manuales/img/usuario')
+// CAPTURAS_OUT writes a preview elsewhere without touching the manual's images.
+const OUT = process.env.CAPTURAS_OUT
+  ? path.resolve(process.env.CAPTURAS_OUT)
+  : path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../docs/manuales/img/usuario')
 const VIEWPORT = { width: 1280, height: 800 }
 // Shots are staged outside the repository and copied in one pass at the end: the repo lives in a
 // synced folder (iCloud), which renames files that are deleted and rewritten while it syncs.

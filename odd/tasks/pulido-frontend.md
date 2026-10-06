@@ -50,9 +50,20 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
 
 ## Tareas
 
-- [ ] **P1 — Sistema visual del Hub.** Fuentes woff2 incluidas, íconos SVG en línea, favicon, selector de
+- [x] **P1 — Sistema visual del Hub.** Fuentes woff2 incluidas, íconos SVG en línea, favicon, selector de
   tema (`data-theme`), foco visible global, enlace para saltar al contenido, componente de aviso con
   cierre y esqueletos de carga.
+  Ruta: delegada (Codex; se quedó sin cuota al final de su verificación), cierre de Claude. Evidencia
+  (2026-10-06): fuentes `@fontsource` (IBM Plex Sans/Mono, Space Grotesk; también Fraunces y Plex para
+  Contabilidad, instaladas por Claude con red; `npm audit` 0), `fonts.css`, íconos SVG, favicon,
+  `ThemeToggle` con `data-theme`, foco visible, enlace para saltar al contenido, `Toast` con cierre
+  automático y `LoadingSkeleton`. Claude corrigió dos defectos: la prueba del cierre automático avanzaba
+  el reloj fuera de `act()`, y el `Toast` reiniciaba el temporizador cada vez que el padre pasaba un
+  callback nuevo (no se cerraba mientras se escribía en la búsqueda): ahora el callback vive en un ref;
+  prueba nueva que falla con la versión anterior. Verificación: typecheck y lint limpios, vitest 171/171,
+  build con los woff2 emitidos, `make e2e` 52/52, vista previa de capturas revisada (`CAPTURAS_OUT`,
+  variable nueva del script para no tocar las imágenes del manual). iCloud creó 224 copias « N» durante
+  la edición (43 idénticas, 181 versiones intermedias): movidas fuera del repo, sin borrar.
 - [ ] **P2 — Sistema visual de Contabilidad.** Lo mismo con su identidad cálida; el aviso se cierra solo.
 - [ ] **P3 — Inicio de la consola.** Ruta `/inicio` con indicadores (usuarios por estado, inicios
   fallidos en 24 h, actividad reciente) y accesos directos; los administradores aterrizan ahí.
@@ -88,7 +99,7 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
 
 | Tareas | Hechas |
 |---|---|
-| P1 a P10 (10) | 0 |
+| P1 a P10 (10) | 1 (P1) |
 
 ## Entrega
 
@@ -98,4 +109,4 @@ notas). Commits por unidad de trabajo; un PR al final con confirmación del usua
 
 ## Siguiente paso
 
-P1 (sistema visual del Hub): Claude descarga las fuentes (red) y Codex implementa.
+P2 (sistema visual de Contabilidad). Codex sin cuota hasta las 15:13; respaldo: Sonnet.
