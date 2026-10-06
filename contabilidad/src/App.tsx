@@ -62,7 +62,7 @@ export function App() {
   }, [])
 
   if (!session) return <LoginScreen state={login} onContinue={start} />
-  const access = accessFor(session.verified.roles)
+  const access = accessFor(session.verified.permissions, session.verified.roles)
   if (access.level === 'none') return <AccessDenied onLogout={logout} />
   return <Shell access={access} subject={session.verified.subject} onLogout={logout} />
 }

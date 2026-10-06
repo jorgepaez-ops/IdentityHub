@@ -17,16 +17,35 @@ type fakeRepository struct {
 	committed bool
 }
 type fakeWriter struct {
-	user       store.User
-	createErr  error
-	users      int
-	roles      []string
-	grantedBy  []uuid.UUID
-	roleErr    error
-	tokens     int
-	audits     int
-	auditActor *uuid.UUID
-	auditAct   string
+	user        store.User
+	createErr   error
+	users       int
+	roles       []string
+	grantedBy   []uuid.UUID
+	roleErr     error
+	validRoles  map[string]bool
+	validateErr error
+	tokens      int
+	audits      int
+	auditActor  *uuid.UUID
+	auditAct    string
+}
+
+func (w *fakeWriter) ValidateRoleNames(_ context.Context, names []string) ([]string, error) {
+	if w.validateErr != nil {
+		return nil, w.validateErr
+	}
+	valid := w.validRoles
+	if valid == nil {
+		valid = map[string]bool{"admin": true, "user": true, "contabilidad.senior": true, "contabilidad.analista": true}
+	}
+	found := make([]string, 0, len(names))
+	for _, name := range names {
+		if valid[name] {
+			found = append(found, name)
+		}
+	}
+	return found, nil
 }
 
 func (r *fakeRepository) WithinEmployeeCreationTransaction(_ context.Context, fn func(store.EmployeeCreationWriter) error) error {
@@ -158,6 +177,20 @@ func TestRF001_RolDesconocidoDevuelve400ConCampo(t *testing.T) {
 	}
 	if repo.writer.users != 0 {
 		t.Fatalf("CreateUser was called with an invalid role request")
+	}
+}
+
+func TestRF001_FalloDelValidadorDeRolesAbortaSinCrearCuenta(t *testing.T) {
+	repo := &fakeRepository{writer: &fakeWriter{validateErr: errors.New("roles lookup unavailable")}}
+	_, err := testService(repo, &fakeHasher{}, &fakePublisher{}).CreateEmployee(context.Background(), Input{
+		Email: "ana@example.com", DisplayName: "Ana", Roles: []string{"contabilidad.senior"}, ActorUserID: uuid.New(),
+	})
+	var invalid *InvalidInputError
+	if err == nil || errors.As(err, &invalid) {
+		t.Fatalf("CreateEmployee() error = %v, want an internal (non-validation) error", err)
+	}
+	if repo.writer.users != 0 || repo.committed {
+		t.Fatalf("users=%d committed=%t, want nothing created", repo.writer.users, repo.committed)
 	}
 }
 

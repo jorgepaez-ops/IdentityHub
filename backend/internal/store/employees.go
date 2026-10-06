@@ -24,6 +24,7 @@ type CreateInvitationTokenParams struct {
 // directory/application role grants, its invitation token, and the audit
 // trail (RF-001, RF-011).
 type EmployeeCreationWriter interface {
+	ValidateRoleNames(context.Context, []string) ([]string, error)
 	CreateUser(context.Context, CreateUserParams) (User, error)
 	AddUserRole(context.Context, uuid.UUID, string, uuid.UUID) error
 	CreateInvitationToken(context.Context, CreateInvitationTokenParams) error
@@ -52,6 +53,14 @@ func (s *Store) WithinEmployeeCreationTransaction(ctx context.Context, fn func(E
 
 type employeeCreationWriter struct{ queries *generated.Queries }
 
+func (w *employeeCreationWriter) ValidateRoleNames(ctx context.Context, names []string) ([]string, error) {
+	roles, err := w.queries.ValidateRoleNames(ctx, names)
+	if err != nil {
+		return nil, fmt.Errorf("validate employee role names: %w", err)
+	}
+	return roles, nil
+}
+
 func (w *employeeCreationWriter) CreateUser(ctx context.Context, params CreateUserParams) (User, error) {
 	user, err := w.queries.CreateUser(ctx, generated.CreateUserParams{Email: params.Email, PasswordHash: params.PasswordHash, DisplayName: params.DisplayName})
 	if err != nil {
@@ -61,8 +70,12 @@ func (w *employeeCreationWriter) CreateUser(ctx context.Context, params CreateUs
 }
 
 func (w *employeeCreationWriter) AddUserRole(ctx context.Context, userID uuid.UUID, roleName string, grantedBy uuid.UUID) error {
-	if err := w.queries.AddUserRole(ctx, generated.AddUserRoleParams{UserID: userID, Name: roleName, GrantedBy: pgtype.UUID{Bytes: grantedBy, Valid: true}}); err != nil {
+	rows, err := w.queries.AddUserRole(ctx, generated.AddUserRoleParams{UserID: userID, Name: roleName, GrantedBy: pgtype.UUID{Bytes: grantedBy, Valid: true}})
+	if err != nil {
 		return fmt.Errorf("add employee role: %w", err)
+	}
+	if rows != 1 {
+		return fmt.Errorf("add employee role: role %q is missing", roleName)
 	}
 	return nil
 }

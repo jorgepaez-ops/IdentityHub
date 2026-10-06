@@ -114,6 +114,22 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   `terraform validate` y Checkov, y la configuración y el despliegue se muestran con un diagrama.
   La ADR 0012 queda enmendada.
 
+- **D9 · Diseño de la grilla de roles (2026-10-05, aprobado por el usuario):** cada aplicación
+  declara sus permisos (tabla `permissions` ligada a `applications`, sembrada por migración); los
+  roles de aplicación son datos editables (`roles.application_id`, `role_permissions`), con
+  nombre `<app>.<nombre>`; `contabilidad.senior` y `contabilidad.analista` pasan a filas con
+  permisos (`movimientos.ver_todos`, `movimientos.aprobar`, `cierre.ejecutar`, `reportes.ver` y,
+  por ajuste de la revisión de T11, `movimientos.registrar`: hoy registrar no depende de ningún
+  permiso y el auditor de la demo debe ser de solo lectura)
+  sin cambiar su comportamiento. El token de la aplicación lleva `permissions` resueltos además de
+  `roles`; Contabilidad decide por permisos. Grilla solo para `admin`. Controles: (1) solo se
+  crean roles de aplicación (`admin`/`user` son del sistema, no editables ni borrables); (2) un
+  admin no edita los permisos de un rol que él tiene; (3) un rol solo lleva permisos de su
+  aplicación, permiso desconocido = 400; (4) no se borra un rol asignado; (5) auditoría
+  `role_created`/`role_updated`/`role_deleted`. Un cambio de permisos rige desde el siguiente
+  token (≤ 15 min). RF-021 nuevo; RF-009 y RF-020 enmendados. Escena de demo:
+  `contabilidad.auditor` con `reportes.ver` y `movimientos.ver_todos`.
+
 ## Preguntas abiertas
 
 - **Q1 · Docker Hub:** cuenta y namespace, repositorios (`api`, `worker`, `web` y ¿`contabilidad`?),
@@ -172,7 +188,7 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   existía (está en `backend/osv-scanner.toml`, riesgo aceptado de VULN-028 hasta 2026-12-25), y la
   causa del 502 de Nginx era incorrecta (es la IP vieja de `api` tras recrearlo; se arregla con
   `docker restart identity-hub-web-1`, no esperando a la API).
-- [ ] **T5 — Guía de integración de terceros.** Registro como cliente OAuth (`redirect_uri`, PKCE,
+- [x] **T5 — Guía de integración de terceros.** Registro como cliente OAuth (`redirect_uri`, PKCE,
   CORS), endpoints y JWKS, declaración de permisos de la aplicación (se completa tras la fase 3),
   cambios en el frontend del tercero y checklist de seguridad.
   Ruta: delegada (Sonnet; Codex sin cuota hasta las 16:20), revisión de Claude. Evidencia (2026-10-05):
@@ -180,6 +196,12 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   y cómo agregar un segundo, flujo con diagrama Mermaid, referencia de endpoints, claims y validación,
   cambios en el frontend del tercero, checklist y limitaciones); `docs/README.md` enlaza la guía como
   parcial. La sección 7 (declaración de permisos) queda como marcador y se completa tras T15.
+  Sección 7 completada (2026-10-06) — Ruta: inline (Claude, un archivo de documentación): modelo de
+  permisos, declaración por migración (`000009`), claves de Contabilidad, claim `permissions` con
+  ejemplo del auditor, endpoints de la grilla y los cinco controles; también el claim en la tabla de la
+  sección 5, «Guardas por permiso» en la 6, dos ítems del checklist y una limitación en la 9.
+  `docs/README.md` marca la guía como completa. Verificación estructural: todos los enlaces relativos
+  existen; datos contrastados con el ADR 0013, `token.go`, `jwt.ts` y la migración.
   Revisión de Claude: Mermaid renderiza (mermaid-cli 11.17.0); verificado contra el código que el
   cliente está fijo en `backend/internal/config/config.go:66-68` y sembrado en la migración
   000007. Corrección: la guía decía que el logout del Hub solo limpia la cookie; también revoca en
@@ -292,16 +314,152 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
 
 ## Fase 3 — Grilla de roles configurable
 
-- [ ] **T11 — Spec.** RF nuevo, ADR (modelo permisos por aplicación → roles → usuarios; qué viaja en
+- [x] **T11 — Spec.** RF nuevo, ADR (modelo permisos por aplicación → roles → usuarios; qué viaja en
   el token), escenarios Gherkin y enmienda del OpenAPI.
-- [ ] **T12 — Backend.** Migraciones (permisos y roles editables), store, API de roles y permisos,
+  Evidencia (2026-10-05): ruta delegada a Codex; `RF-021`, ADR 0013 y los escenarios diferidos
+  documentan D9. La correspondencia Gherkin↔E2E exige pruebas que se crean en T15, por lo que los
+  escenarios quedan en la ADR y la matriz registra RF-021 como diferido.
+  Revisión de Claude: requisitos y ADR coherentes con D9 (rutas por aplicación, códigos
+  400/403/404/409, GRANT mínimos, auditoría, razonamiento de los controles 1 y 2); verificado en el
+  código que el analista ya ve el Resumen (por eso lleva `reportes.ver`). Corrección: «Registrar
+  movimiento» no dependía de ningún permiso, así que el auditor «de solo lectura» habría podido
+  registrar; se agrega `movimientos.registrar` (senior y analista) y se ajusta el escenario.
+  `traceability.py --check` y `traceability_test.py` en verde.
+- [x] **T12 — Backend.** Migraciones (permisos y roles editables), store, API de roles y permisos,
   auditoría, controles (solo `admin`, sin autoasignación, sin permisos desconocidos) y token con los
   permisos de la aplicación.
-- [ ] **T13 — Consola del Hub.** Grilla roles × permisos por aplicación: crear, editar y borrar
+  T12a — Ruta: delegada (Codex), revisión de Claude. Evidencia (2026-10-05): RED observado con
+  `GOCACHE=/private/tmp/identity-hub-gocache go test ./internal/auth/token -run
+  'TestRF020_Token(ParaAplicacionTieneAudienciaYRolesAcotados|DelHubOmitePermisos)'`: la nueva
+  firma y `Claims.Permissions` aún no existían. GREEN: pruebas focalizadas de token, OAuth, admin,
+  employee, roles y API pasan; `go vet -tags=integration ./...` compila las pruebas de PostgreSQL.
+  Corrección de revisión: RED confirmó que un token de aplicación sin permisos omitía el claim;
+  GREEN conserva la omisión en tokens Hub e incluye `permissions: []` para la audiencia de aplicación.
+  T12a — Revisión de Claude: build, vet (también `-tags=integration`), unitarias con `-race` y
+  golangci-lint (0) en verde; frontend typecheck, lint y 148/148. La integración local se había
+  «aprobado» sin base (`TEST_DATABASE_URL` vacío, pruebas omitidas, cobertura 56,9 %); con un
+  Postgres desechable igual al de CI pasa entera con cobertura 78,9 % (`main`: 77,6 %). Bug
+  encontrado y corregido: el trigger de roles del sistema devolvía `OLD` también en `UPDATE`, lo
+  que en PostgreSQL descarta el cambio en silencio, así que ningún rol de aplicación habría sido
+  editable en T12b; además permitía crear roles `system = true` o promover uno. RED
+  (`TestRF021_TriggerSoloProtegeRolesDelSistema`: el UPDATE no persistía) y GREEN tras devolver
+  `NEW` y cubrir `INSERT`. `mfa_test.go` (fuera de las superficies) solo cambió una constante
+  eliminada por un literal, sin tocar aserciones.
+  T12a — Revisión nativa (`review-35646284ed805e4a`, alto, 902 líneas, 4 lentes): **aprobada**.
+  Observaciones que pasan a T12b: probar el error de la consulta de permisos en el canje OAuth y
+  los errores del validador en alta de empleado y en admin; quitar la etiqueta engañosa
+  `permissions,omitempty` de `Claims`; corregir los comentarios de columnas de la migración 000009.
+  Y a T13: el cajón de usuario sigue listando roles fijos; debe cargarlos de la API.
+  T12b — Ruta: delegada (Codex inició, sin cuota; completó Sonnet), revisión de Claude. Evidencia
+  (2026-10-06): lo de Codex (OpenAPI, sqlc, esqueleto de servicio/store/handlers) venía sin `gofmt`,
+  con `Application.key`/`Permission.applicationId` fuera de lo pedido, sin conteo de asignaciones ni
+  `description` al crear, sin pruebas más allá de una; se reescribieron servicio, store y handlers y
+  se conservaron las rutas, los parámetros y la composición en `Server`. RED observado:
+  `go test ./internal/auth/rolegrid` y `./internal/api -run RF021` no compilaban (`Description`,
+  `ActionRoleCreated`, `MaxDescriptionLength`, `ErrInvalidDescription`, `ErrEmptyUpdate` y la
+  forma de `Application` inexistentes); GREEN tras reescribir: cada control (1 nombre y rol del
+  sistema, 2 rol propio con el 403 antes del 409 al borrar, 3 permiso desconocido, 4 asignado,
+  5 auditoría `role_created/updated/deleted` en la misma transacción con IP y agente), duplicado,
+  404, éxito, fallo de auditoría que aborta, y handlers (mapeo de estados, 403 a no admin, 401
+  anónimo, 503 sin servicio, renombrar = 400). Seguimientos de T12a: pruebas del canje OAuth con
+  fallo de permisos, del validador en alta de empleado y en admin (verifican comportamiento ya
+  correcto: sin RED posible), etiqueta `Claims.Permissions` sin `omitempty` (la lee `Validate`;
+  `MarshalJSON` decide), comentarios de columnas de 000009 corregidos. Integración con Postgres
+  desechable (`make test-integration`): todo en verde, cobertura total 80,3 %. Cubre listado con
+  conteos, grants de `identity_app`, ciclo crear/actualizar/borrar con auditoría, rol propio,
+  asignado, trigger y FK mapeados, y un rol de otra aplicación como 404.
+  T12b — Verificación independiente de Claude: build, vet (también integración), unitarias `-race`,
+  golangci-lint 0, frontend typecheck y lint, trazabilidad; integración contra Postgres desechable
+  en verde con cobertura 80,3 % (T12a: 78,9 %). Servicio revisado: control 1 por prefijo del
+  `client_id`, controles 2 antes que 4 en el borrado (403 antes de 409, documentado), rol buscado
+  dentro de su aplicación (404 entre aplicaciones), auditoría en la misma transacción. Composición
+  real: con `make up` la base del usuario queda en la migración 9 con 5 permisos y los endpoints
+  de la grilla responden 401 sin sesión (no 501).
+  Correcciones de la revisión nativa de T12b (review-637b55288a3cf589, aprobada) — Ruta: delegada
+  (Sonnet), revisión de Claude: build, vet de integración, unitarias `-race`, lint 0 y trazabilidad repetidos en verde; Sonnet corrió la integración contra Postgres (80,4 %). Desviación aceptada en (4): las constantes de auditoría viven en `rolegrid` y `audit` las reutiliza, porque al revés hay un ciclo de imports. Se corrigieron siete avisos: (1) los 500 del admin de roles
+  registran el error con request_id sin filtrarlo al cliente (RED observado); (2) OpenAPI: patrón y
+  descripciones de `ApplicationRoleName` alineados con Go y 409/403 con `application/problem+json`;
+  (3) `mapRoleGridError` distingue por nombre de restricción (`roles_name_key`,
+  `user_roles_role_id_fkey`, `roles_application_id_fkey`) y envuelve el resto con `%w` (RED observado);
+  (4) las acciones de auditoría se definen una sola vez en rolegrid y `audit` las referencia (rolegrid
+  no puede importar audit: ciclo audit -> api -> rolegrid); (5) bloqueo `FOR UPDATE` de la fila del rol
+  en Update/Delete antes de evaluar el control 2 y el conteo (RED por compilación; prueba de integración
+  de bloqueo real); (6) pruebas de que el token del Hub no lleva `permissions` y el de aplicación con
+  lista vacía lleva `[]` (sin RED posible: el comportamiento ya existía); (7) motivo de RF-021 en
+  `DEFERRED` actualizado (API en T12; faltan interfaz y E2E, T13 a T15).
+- [x] **T13 — Consola del Hub.** Grilla roles × permisos por aplicación: crear, editar y borrar
   roles, y asignarlos a usuarios.
-- [ ] **T14 — Contabilidad.** Autoriza por permisos en lugar de por nombre de rol.
-- [ ] **T15 — E2E y trazabilidad.** Escena de la demo (crear `contabilidad.auditor` y verlo en
+  Ruta: delegada (Sonnet; Codex sin cuota), revisión de Claude. Evidencia (2026-10-06): RED con
+  `RolesPage` vacío: 11 de 12 pruebas nuevas de `roles.test.tsx` fallan (la del no admin ya pasaba) y
+  8 de `admin.test.tsx` fallan al exigir roles de aplicación desde la API; GREEN tras implementar
+  `RolesPage` (grilla roles × permisos, guardar con PATCH solo de lo cambiado, crear con nombre
+  validado, borrar con confirmación, solo lectura del rol propio, detalle RFC 7807) y el cajón de
+  usuario con los roles de `GET /admin/applications` agrupados por aplicación con sus permisos.
+  `npm run typecheck` y `npm run lint` limpios, `vitest run` 6 archivos / 162 pruebas en verde,
+  `npm run build` correcto, trazabilidad al día (matriz sin cambios). Pendiente: probarlo en el
+  stack real.
+  Revisión nativa de T13 (`review-86ef83509fad2952`, medio, 618 líneas): **aprobada**. Corregido:
+  la fila de la grilla no salía del estado «guardando» si el servidor devolvía el mismo rol (no hubo
+  RED posible con datos de prueba; arreglo de una línea).
+  Prueba en navegador real de Claude (el usuario hará la suya después): Playwright temporal contra el
+  stack, con admin sembrado y MFA vía Mailpit: crea `contabilidad.auditor-<id>` con `reportes.ver` y
+  `movimientos.ver_todos` desde la grilla, lo asigna a un empleado desde el cajón y el rol asignado
+  queda con «Eliminar» deshabilitado. Pasó; la suite E2E existente sigue 46/46 con T12 y T13. Ajuste
+  visual: los encabezados de permisos se cortaban a mitad de palabra; ahora `white-space: nowrap`
+  (un `<wbr>` rompía el nombre accesible de la columna). Roles de prueba borrados de la base local.
+- [x] **T14 — Contabilidad.** Autoriza por permisos en lugar de por nombre de rol.
+  Ruta: delegada (Sonnet), revisión de Claude. Evidencia (2026-10-06): RED con la implementación original y las pruebas nuevas: 7 TestRF021_* fallan (53 pasan); GREEN: npm run typecheck, lint y build limpios, vitest 60/60 (53 previas + 7 nuevas TestRF021_: 2 de jwt y 5 de App; los TestRF009_* intactos).
+  Verificación de Claude: typecheck, lint, 60/60, build y trazabilidad; `web` reconstruido y la
+  suite E2E completa contra el stack sigue 46/46 (senior, analista y la demo sin cambios).
+  Revisión nativa de T14 (`review-a0b97eb37397a2f5`, alto, 219 líneas, 4 lentes): **aprobada**,
+  sin bloqueantes. Ocho avisos informativos, a decidir como trabajo aparte: R3-001 (la prueba del
+  auditor dice verificar el cierre bloqueado pero no abre esa vista), R3-002 (el Resumen bloqueado no
+  tiene prueba de render), R4-001 (un token emitido antes de T12a, sin `permissions`, degrada a un
+  senior a «propios» hasta renovar la sesión), R2 (etiqueta derivada del nombre de rol; la grilla de
+  permisos repetida en `testing.ts` y `SEEDED_HINTS`; literales de permiso en `Closing.tsx` y
+  `Summary.tsx`; el centinela `undefined` de `signInAs`).
+- [x] **T15 — E2E y trazabilidad.** Escena de la demo (crear `contabilidad.auditor` y verlo en
   Contabilidad), matriz al día.
+  Ruta: delegada (Sonnet: necesita Docker y el stack), revisión de Claude. Evidencia (2026-10-06):
+  los seis escenarios del ADR 0013 pasan a `specs/06-acceptance/roles-y-permisos.feature` (el ADR
+  queda con un puntero); `e2e/tests/roles-y-permisos.spec.ts` con un E2E por escenario (la escena del
+  auditor por la interfaz de la consola y de Contabilidad; el resto por la API) y `e2e/support/roles.ts`;
+  RF-021 sale de `DEFERRED` y la matriz queda «completo» (6 escenarios, 31 pruebas Go, 6 E2E). RED: la
+  escena del auditor falló primero por un localizador ambiguo; las otras cinco pasaron a la primera
+  porque la API (T12) y la interfaz (T13) ya existían. Avisos de la revisión de T14: R3-001 (el botón de
+  Cierre está deshabilitado, así que la prueba de App verifica el candado y que no se abre) y R3-002
+  (`views/Locked.test.tsx` renderiza las vistas bloqueadas; mutación comprobada).
+  Verificación: `make e2e` 52/52, typecheck de e2e, typecheck/lint y vitest 63/63 de Contabilidad,
+  `make spec-drift` al día, sin roles de prueba en la base. Corrección de Claude: `purgeRole` se negaba
+  solo a nombres fuera de `contabilidad.*`; ahora también rechaza los roles sembrados (senior,
+  analista). Re-corrida: los 6 E2E de RF-021 pasan. Desviación aceptada: el E2E no decodifica el token;
+  verifica el texto «Tu rol permite…», que `access.ts` deriva de sus permisos (el contenido exacto del
+  claim lo cubren las pruebas de integración de T12a). Ojo: el E2E borra `contabilidad.auditor` al
+  empezar y al terminar (corregido después: ahora usa un nombre único, ver abajo).
+  Commit `ac3922f`. Revisión nativa (`review-c9e878db05b47f89`, alto, 451 líneas, 4 lentes): **aprobada**,
+  sin bloqueantes. Avisos informativos que coinciden en dos puntos: (1) el nombre fijo
+  `contabilidad.auditor` que el E2E purga directo en la base (R1-001, R4-001, R2-002, R3-003): borra un
+  auditor hecho a mano y choca entre corridas concurrentes; (2) el escenario promete «el token contiene
+  solo…» y el E2E no lo verifica (R1-002, R2-001, R3-001). Menores: R3-002 (la prueba del rol de
+  directorio solo mira `admin`, no `user`), R2-003, R2-004/R3-004 (el clic sobre un botón deshabilitado
+  no prueba nada nuevo).
+  Correcciones de los avisos (2026-10-06) — Ruta: inline (Claude): el E2E del auditor usa un nombre
+  único (`contabilidad.e2e-auditor-<hex>`) y ya no purga `contabilidad.auditor`; lee la respuesta de
+  `/oauth/token` y comprueba que el token trae el rol y exactamente `movimientos.ver_todos` y
+  `reportes.ver` (mutación: esperar también `cierre.ejecutar` hace fallar la prueba); la prueba del rol
+  de directorio mira `admin` y `user`; el escenario dice «un rol auditor» en vez del nombre fijo; se
+  quita el clic inútil de la prueba de App. Verificación: 6/6 E2E de RF-021, typecheck de e2e y de
+  Contabilidad, lint, vitest 63/63, `make spec-drift` al día, sin roles de prueba en la base.
+  **Hallazgo nuevo fuera de alcance (CI del PR #11, 2026-10-06):** el job «5 · Dependencias
+  vulnerables» (`npm audit --audit-level=high`) falla por GHSA-68fv-2mgg-jv7q (alta, DoS del event
+  loop) en `source-map-js` 1.2.1 de `frontend` (solo desarrollo: `@vitest/coverage-v8` → `magicast` y
+  `jsdom` → `css-tree`); Contabilidad ya tiene 1.2.2. Aviso publicado después de abrir la fase, no lo
+  introduce este PR. Sin id VULN asignado. Remediado en el mismo PR por decisión del usuario (inline,
+  Claude, necesita red): `source-map-js` 1.2.2 en `frontend/package-lock.json`; `npm audit` 0, vitest
+  con cobertura 162/162, build y lint en verde. SonarCloud: quality
+  gate aprobado con 12 code smells nuevos (props de solo lectura y `role="status"` en `RolesPage.tsx`,
+  literales repetidos en `admin_roles.go`, complejidad en `rolegrid_integration_test.go`, `ASC` en
+  `roles.sql`).
 
 ## Fase 4 — Publicación y entrega
 
@@ -318,36 +476,23 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
 
 | Fase | Tareas | Hechas |
 |---|---|---|
-| 1 — Documentación, UML e integración | T1 a T6 (6) | 5 (T1 a T4 y T6; T5 parcial) |
+| 1 — Documentación, UML e integración | T1 a T6 (6) | 6 (T1 a T6) — fase cerrada |
 | 2 — IaC de referencia | T7 a T10 (4) | 4 (T7 a T10) — fase cerrada |
-| 3 — Grilla de roles configurable | T11 a T15 (5) | 0 |
+| 3 — Grilla de roles configurable | T11 a T15 (5) | 5 (T11 a T15) — fase cerrada |
 | 4 — Publicación y entrega | T16 a T21 (6) | 0 |
-| **Total** | **21** | **9** (T1 a T4, T6 a T10; T5 parcial) |
+| **Total** | **21** | **15** (T1 a T15) |
 
 ## Siguiente paso
 
-Fase 3: T11 (spec de la grilla de roles configurable).
-
-CI del PR #10: falló Trivy config (job 8) sobre el Terraform y SonarCloud (seguridad 3). Corregido en
-`0c25846` con aprobación del usuario: logs de acceso del ALB en S3, `--only-binary` en la instalación
-de Checkov, rutas de `setup_env.py` limitadas a la raíz y tres excepciones de Trivy aprobadas
-(AWS-0053 ALB público, AWS-0104 salida 443 y SMTP a SES, AWS-0132 SSE-S3 obligatorio para logs del
-ALB). Revisión nativa (`review-5abdd5a5b69abbb7`) aprobada; de sus advertencias se corrigió un bug
-real: en us-east-1 los logs del ALB los entrega la cuenta de ELB de la región, no el principal de
-servicio (ahora se autorizan ambos); además prefijo único, rutas relativas desde la raíz (RED con el
-código anterior y GREEN 17/17), validación de `log_retention_days`. Verificado con Trivy 0.70.0 (la
-versión del CI), Checkov y gitleaks del historial.
-
-Revisión nativa de T10 (`review-a4d738df486230e0`, alto, 235 líneas, 4 lentes): **aprobada**.
-Corregido de sus advertencias: el log del WAF ocultaba nada y guardaba `Authorization` y `Cookie`
-(ahora `redacted_fields`); el comentario de RDS decía que registra cambios de datos pero
-`log_statement = ddl` (se deja `ddl` a propósito y se corrige el comentario: `mod` registraría
-hashes de contraseñas y tokens); `depends_on` del rol de monitoreo; familia del parameter group
-derivada de la versión; zonas en una variable validada; total de la tabla de progreso. T5 queda abierta hasta T15 (permisos).
+**2026-10-06.** Fases 1 a 3 cerradas (T5 completa). PR de la fase 3 abierto con confirmación del
+usuario; siguiente: fase 4 desde T16.
+Codex: cuota diaria limitada; Sonnet como respaldo.
 
 ## Cambios de spec propuestos
 
-Ninguno todavía (la fase 3 los define en T11).
+La definición aprobada está en `specs/01-requirements.md` (RF-021) y
+`specs/adr/0013-roles-y-permisos-configurables-por-aplicacion.md`; los fragmentos para actualizar
+OpenAPI en T12 están en la sección «Cambios de OpenAPI propuestos» de esa ADR.
 
 ## Notas de handoff Codex
 

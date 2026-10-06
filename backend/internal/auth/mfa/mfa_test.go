@@ -560,7 +560,7 @@ func TestRF017_FallaPublicarAccountLockedDesdeVerifyQuedaEnElLog(t *testing.T) {
 func TestRF009_ElAccessTokenDeMFASoloLlevaRolesDeDirectorio(t *testing.T) {
 	repo := &memoryRepository{
 		challenge: activeChallenge("123456", MaxAttempts),
-		roles:     []string{roles.User, roles.ContabilidadSenior},
+		roles:     []string{roles.User, "contabilidad.senior"},
 	}
 	signer := newSigner(t)
 	service := New(repo, &fakePublisher{}, bytes.NewReader(bytes.Repeat([]byte{9}, 64)), time.Now).WithTokenService(signer, time.Hour)

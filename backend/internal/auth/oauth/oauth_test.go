@@ -82,6 +82,33 @@ func TestRF020_CodigoEsDeUnUsoYVencePronto(t *testing.T) {
 	})
 }
 
+func TestRF020_CanjeResuelveLaUnionDePermisosDeLaAplicacion(t *testing.T) {
+	now := time.Date(2026, 10, 5, 12, 0, 0, 0, time.UTC)
+	client := Client{ID: "contabilidad", RedirectURI: "http://contabilidad.localhost:8080/callback"}
+	repository := &memoryRepository{
+		roles:       []string{"user", "contabilidad.senior", "contabilidad.analista", "otra.operador"},
+		permissions: []string{"movimientos.registrar", "movimientos.ver_todos", "reportes.ver"},
+	}
+	service := New(repository, client, bytesReader(), func() time.Time { return now })
+	issued, err := service.Authorize(context.Background(), uuid.New(), validAuthorizeInput(client))
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := service.Exchange(context.Background(), ExchangeInput{Code: issued.Code, ClientID: client.ID, RedirectURI: client.RedirectURI, CodeVerifier: "verifier"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := result.Roles, []string{"contabilidad.senior", "contabilidad.analista"}; !sameStrings(got, want) {
+		t.Fatalf("roles=%v, want %v", got, want)
+	}
+	if got, want := result.Permissions, []string{"movimientos.registrar", "movimientos.ver_todos", "reportes.ver"}; !sameStrings(got, want) {
+		t.Fatalf("permissions=%v, want %v", got, want)
+	}
+	if got := repository.permissionRoleNames; !sameStrings(got, result.Roles) || repository.permissionClientID != client.ID {
+		t.Fatalf("permission lookup roles=%v client=%q", got, repository.permissionClientID)
+	}
+}
+
 func TestRF020_CanjeRechazaVerificadorClienteYRedirectDistintos(t *testing.T) {
 	now := time.Now().UTC()
 	client := Client{ID: "contabilidad", RedirectURI: "http://contabilidad.localhost:8080/callback"}
@@ -140,6 +167,30 @@ func TestRF020_FalloPosteriorAlConsumoRevierteElCodigo(t *testing.T) {
 	repository.rolesErr = nil
 	if _, err := service.Exchange(context.Background(), input); err != nil {
 		t.Fatalf("exchange after rolled-back failure: %v", err)
+	}
+}
+
+// A failed permissions lookup must abort the transaction: no result (so no token
+// is issued) and the code stays redeemable, as with any other post-consumption failure.
+func TestRF020_FalloDeLaConsultaDePermisosAbortaElCanjeYNoEmiteToken(t *testing.T) {
+	client := Client{ID: "contabilidad", RedirectURI: "http://contabilidad.localhost:8080/callback"}
+	repository := &memoryRepository{roles: []string{"user", "contabilidad.senior"}, permissions: []string{"reportes.ver"}, permissionsErr: errors.New("permissions unavailable")}
+	service := New(repository, client, bytesReader(), time.Now)
+	issued, err := service.Authorize(context.Background(), uuid.New(), validAuthorizeInput(client))
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := ExchangeInput{Code: issued.Code, ClientID: client.ID, RedirectURI: client.RedirectURI, CodeVerifier: "verifier"}
+	result, err := service.Exchange(context.Background(), input)
+	if !errors.Is(err, repository.permissionsErr) {
+		t.Fatalf("exchange error=%v, want wrapped permissions failure", err)
+	}
+	if result.UserID != uuid.Nil || len(result.Roles) != 0 || len(result.Permissions) != 0 {
+		t.Fatalf("result=%+v, want empty so that no token is issued", result)
+	}
+	repository.permissionsErr = nil
+	if _, err := service.Exchange(context.Background(), input); err != nil {
+		t.Fatalf("exchange after rolled-back permissions failure: %v", err)
 	}
 }
 
@@ -225,14 +276,18 @@ func (*repeatReader) Read(p []byte) (int, error) {
 }
 
 type memoryRepository struct {
-	code        StoredCode
-	roles       []string
-	auditAction string
-	auditActor  uuid.UUID
-	exchangeErr error
-	rolesErr    error
-	auditErr    error
-	inTx        bool
+	code                StoredCode
+	roles               []string
+	auditAction         string
+	auditActor          uuid.UUID
+	exchangeErr         error
+	rolesErr            error
+	permissions         []string
+	permissionsErr      error
+	permissionRoleNames []string
+	permissionClientID  string
+	auditErr            error
+	inTx                bool
 }
 
 func (m *memoryRepository) WithinAuthorizationCodeTransaction(_ context.Context, fn func(ExchangeWriter) error) error {
@@ -269,10 +324,30 @@ func (m *memoryRepository) ListRolesForUser(context.Context, uuid.UUID) ([]strin
 	}
 	return m.roles, nil
 }
+func (m *memoryRepository) ListPermissionKeysForRolesAndApplication(_ context.Context, roleNames []string, clientID string) ([]string, error) {
+	m.permissionRoleNames = append([]string(nil), roleNames...)
+	m.permissionClientID = clientID
+	if m.permissionsErr != nil {
+		return nil, m.permissionsErr
+	}
+	return append([]string(nil), m.permissions...), nil
+}
 func (m *memoryRepository) InsertAuditEvent(_ context.Context, event AuditEvent) error {
 	if m.auditErr != nil {
 		return m.auditErr
 	}
 	m.auditAction, m.auditActor = event.Action, event.ActorUserID
 	return nil
+}
+
+func sameStrings(got, want []string) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for index := range got {
+		if got[index] != want[index] {
+			return false
+		}
+	}
+	return true
 }

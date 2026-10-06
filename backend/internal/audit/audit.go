@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jorgepaez/identity-hub/internal/api"
+	"github.com/jorgepaez/identity-hub/internal/auth/rolegrid"
 	"github.com/jorgepaez/identity-hub/internal/store"
 )
 
@@ -31,6 +32,11 @@ const (
 	RoleChanged          Action = "role_changed"
 	AccountLocked        Action = "account_locked"
 	UserDisabled         Action = "user_disabled"
+	// The role-grid actions are defined once, in rolegrid: that package cannot import audit
+	// (audit -> api -> rolegrid would be a cycle), so audit aliases them.
+	RoleCreated Action = rolegrid.ActionRoleCreated
+	RoleUpdated Action = rolegrid.ActionRoleUpdated
+	RoleDeleted Action = rolegrid.ActionRoleDeleted
 )
 
 // Event contains the application data for one immutable audit entry.
@@ -86,7 +92,8 @@ func Record(ctx context.Context, writer Writer, request *http.Request, event Eve
 func (a Action) valid() bool {
 	switch a {
 	case UserRegistered, EmailVerified, LoginSucceeded, LoginFailed, Logout, RefreshRotated,
-		RefreshReuseDetected, PasswordChanged, MFAEnabled, MFADisabled, RoleChanged, AccountLocked, UserDisabled:
+		RefreshReuseDetected, PasswordChanged, MFAEnabled, MFADisabled, RoleChanged, AccountLocked, UserDisabled,
+		RoleCreated, RoleUpdated, RoleDeleted:
 		return true
 	default:
 		return false

@@ -196,6 +196,13 @@ type MfaChallenge struct {
 	CreatedAt    pgtype.Timestamptz
 }
 
+type Permission struct {
+	ID            uuid.UUID
+	ApplicationID uuid.UUID
+	Key           string
+	Description   string
+}
+
 type RecoveryCode struct {
 	ID        uuid.UUID
 	UserID    uuid.UUID
@@ -222,6 +229,15 @@ type Role struct {
 	ID          uuid.UUID
 	Name        string
 	Description string
+	// NULL identifies a directory role; otherwise the owning application. Application role names (<client_id>.<slug>) are validated by the rolegrid service.
+	ApplicationID pgtype.UUID
+	// System directory roles (admin, user) are protected by the roles_reject_system_mutation trigger and refused by the rolegrid service.
+	System bool
+}
+
+type RolePermission struct {
+	RoleID       uuid.UUID
+	PermissionID uuid.UUID
 }
 
 type User struct {

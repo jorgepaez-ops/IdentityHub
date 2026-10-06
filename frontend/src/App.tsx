@@ -4,6 +4,7 @@ import { safeContinueTarget } from './features/account/continueTarget'
 import { redirectTo } from './navigation'
 import { MyAccountPage } from './features/account/MyAccountPage'
 import { AuditLogPage } from './features/admin/AuditLogPage'
+import { RolesPage } from './features/admin/RolesPage'
 import { UsersPage } from './features/admin/UsersPage'
 import { AcceptInvitationPage, ForgotPasswordPage, ResetPasswordPage } from './features/account/PublicPages'
 import { ApiProblemError, clearSession, type CurrentUser, type MfaChallenge, getCurrentUser, login, logout, refreshSession, resendMfaCode, verifyMfa } from './api/client'
@@ -168,6 +169,7 @@ function AppShell({ user, onLogout, onUserChange, onSessionEnded }: { user: Curr
         <div className="rail-brand"><span className="small-mark">IH</span><span>Identity Hub<small>Proveedor de identidad</small></span></div>
         <nav aria-label="Navegación principal">
           {isAdmin && <NavLink to="/usuarios">Usuarios</NavLink>}
+          {isAdmin && <NavLink to="/roles">Roles</NavLink>}
           {isAdmin && <NavLink to="/auditoria">Auditoría</NavLink>}
           <NavLink to="/me">Mi cuenta</NavLink>
         </nav>
@@ -177,6 +179,7 @@ function AppShell({ user, onLogout, onUserChange, onSessionEnded }: { user: Curr
       <main className="app-content">
         <Routes>
           <Route path="/usuarios" element={isAdmin ? <UsersPage currentUserId={user.id} onSessionEnded={onSessionEnded} /> : <Navigate to="/me" replace />} />
+          <Route path="/roles" element={isAdmin ? <RolesPage currentRoles={user.roles} onSessionEnded={onSessionEnded} /> : <Navigate to="/me" replace />} />
           <Route path="/auditoria" element={isAdmin ? <AuditLogPage onSessionEnded={onSessionEnded} /> : <Navigate to="/me" replace />} />
           <Route path="/me" element={<MyAccountPage user={user} onUserChange={onUserChange} onSessionEnded={onSessionEnded} />} />
           <Route path="*" element={<Navigate to={home} replace />} />

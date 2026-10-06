@@ -49,7 +49,7 @@ RETURNING *;
 DELETE FROM user_roles
 WHERE user_id = $1;
 
--- name: AddUserRole :exec
+-- name: AddUserRole :execrows
 INSERT INTO user_roles (user_id, role_id, granted_by)
 SELECT $1, id, $3
 FROM roles

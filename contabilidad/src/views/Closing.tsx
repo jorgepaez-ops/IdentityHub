@@ -6,7 +6,7 @@ export function ClosingView({ access, movements, closed, onClose }: { access: Ac
     return (
       <section aria-labelledby="view-title">
         <h1 id="view-title">Cierre contable</h1>
-        <div className="card locked-card">Requiere rol contador senior o admin</div>
+        <div className="card locked-card">Requiere el permiso cierre.ejecutar</div>
       </section>
     )
   }

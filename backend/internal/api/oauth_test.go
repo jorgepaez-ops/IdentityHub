@@ -218,6 +218,9 @@ func (r *exchangeRepository) ExchangeAuthorizationCode(context.Context, []byte, 
 func (r *exchangeRepository) ListRolesForUser(context.Context, uuid.UUID) ([]string, error) {
 	return []string{"user"}, nil
 }
+func (r *exchangeRepository) ListPermissionKeysForRolesAndApplication(context.Context, []string, string) ([]string, error) {
+	return nil, nil
+}
 func (r *exchangeRepository) InsertAuditEvent(context.Context, oauth.AuditEvent) error {
 	r.audits++
 	return nil
@@ -286,6 +289,9 @@ func (*oauthAPIRepository) ExchangeAuthorizationCode(context.Context, []byte, st
 	return oauth.StoredCode{}, oauth.ErrAuthorizationCodeInvalid
 }
 func (*oauthAPIRepository) ListRolesForUser(context.Context, uuid.UUID) ([]string, error) {
+	return nil, nil
+}
+func (*oauthAPIRepository) ListPermissionKeysForRolesAndApplication(context.Context, []string, string) ([]string, error) {
 	return nil, nil
 }
 func (*oauthAPIRepository) InsertAuditEvent(context.Context, oauth.AuditEvent) error { return nil }

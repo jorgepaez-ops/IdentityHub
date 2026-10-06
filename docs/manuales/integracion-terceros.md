@@ -168,6 +168,7 @@ El access token es un JWT firmado con `EdDSA` (Ed25519) emitido por [`token.go`]
 | `iat` | Instante de emisión. | Informativo. |
 | `jti` | Identificador aleatorio (hexadecimal). | Informativo; el Hub no ofrece endpoint de revocación ni introspección. |
 | `roles` | Roles de esa aplicación (por ejemplo `contabilidad.senior`). Si el usuario no tiene ninguno, el Hub lo serializa como `null`. | Tratar `null` como lista vacía y exigir que todo elemento sea una cadena. |
+| `permissions` | Unión de los permisos de esos roles para la audiencia (por ejemplo `["movimientos.ver_todos", "reportes.ver"]`); lista vacía si no tiene ninguno (sección 7). | Exigir una lista de cadenas; tratar su ausencia o `null` como lista vacía (no concede nada). Decidir las capacidades por esta lista, no por el nombre del rol. |
 
 Los tokens de aplicación no llevan `sid` (solo el token de la consola del Hub) ni `nbf`, y no incluyen correo ni nombre.
 
@@ -177,7 +178,7 @@ Los tokens de aplicación no llevan `sid` (solo el token de la consola del Hub) 
 2. Se busca en el JWKS la clave con el mismo `kid`, `kty: OKP` y `crv: Ed25519`; sin coincidencia se rechaza.
 3. Se verifica la firma Ed25519 sobre `cabecera.payload`.
 4. Se comprueban `iss`, `aud` y `exp` con una tolerancia de reloj de 60 segundos (`CLOCK_LEEWAY_SECONDS`); si existiera `nbf` se valida también.
-5. `sub` debe ser una cadena no vacía y `roles` una lista de cadenas.
+5. `sub` debe ser una cadena no vacía, y `roles` y `permissions` listas de cadenas (ausente o `null` cuenta como lista vacía).
 
 Esta verificación en el navegador sirve para mostrar la interfaz; no autoriza datos. Una API propia del tercero debe repetir la validación en el servidor (la API del Hub rechaza los tokens de aplicación: exige otra audiencia, `identity-hub`, en [`token.go`](../../backend/internal/auth/token/token.go)).
 
@@ -192,7 +193,7 @@ Contabilidad es la implementación de referencia; cada punto enlaza el archivo c
 | `state` | Generar 16 bytes aleatorios y guardarlos junto con el verifier en `sessionStorage` solo durante la ida y vuelta; consumirlos (una sola vez) al volver, haya éxito o error. | [`flow.ts`](../../contabilidad/src/auth/flow.ts) (`beginLogin`, `takeStoredFlow`) |
 | Ruta de callback | La ruta registrada (`/oauth/callback`) debe caer en la SPA (en Nginx, el `try_files ... /index.html`). Al llegar, quitar `code` y `state` de la URL antes de cualquier operación asíncrona, comparar `state`, tratar `error`, canjear el código con `credentials: 'omit'` y verificar el token con el JWKS. | [`flow.ts`](../../contabilidad/src/auth/flow.ts) (`completeCallback`), [`App.tsx`](../../contabilidad/src/App.tsx) |
 | Almacenamiento del token | Contabilidad lo guarda **solo en memoria** (estado de React), nunca en `localStorage` ni `sessionStorage`. Riesgo: cualquier XSS en la aplicación puede leerlo mientras viva la página; recargar la página cierra la sesión local (el SSO del Hub permite recuperarla sin credenciales). Guardarlo en `localStorage` ampliaría la exposición y su persistencia; no se recomienda. | [`App.tsx`](../../contabilidad/src/App.tsx), [ADR 0009](../../specs/adr/0009-sso-entre-dominios-con-authorization-code-y-pkce.md) |
-| Guardas por rol | Traducir los roles del token a permisos de interfaz (`contabilidad.senior`: acceso completo, aprobar y cerrar; `contabilidad.analista`: solo movimientos propios; sin rol: pantalla de acceso denegado). Es solo presentación: el servidor del tercero debe volver a aplicar los roles. | [`access.ts`](../../contabilidad/src/access.ts), [`Shell.tsx`](../../contabilidad/src/Shell.tsx), [`Login.tsx`](../../contabilidad/src/Login.tsx) |
+| Guardas por permiso | Tener al menos un rol de la aplicación da acceso (sin ninguno, pantalla de acceso denegado); cada capacidad se decide por una clave de `permissions` (sección 7), nunca por el nombre del rol, para que un rol nuevo armado en la grilla funcione sin desplegar la aplicación. Es solo presentación: el servidor del tercero debe volver a aplicar los permisos. | [`access.ts`](../../contabilidad/src/access.ts), [`Shell.tsx`](../../contabilidad/src/Shell.tsx), [`Login.tsx`](../../contabilidad/src/Login.tsx) |
 | Cierre de sesión | `Cerrar sesión` en Contabilidad solo borra el token de memoria. La sesión `hub_session` sigue viva, así que volver a pulsar Continuar entra sin credenciales. Cerrar sesión en el Hub (`POST /api/v1/auth/logout`) revoca el refresh token y todas las sesiones del Hub del usuario en el servidor ([`logout/logout.go`](../../backend/internal/auth/logout/logout.go)), audita el evento y limpia la cookie `hub_session`, pero no invalida un access token ya emitido: la aplicación lo sigue aceptando hasta que vence (15 minutos). | [`App.tsx`](../../contabilidad/src/App.tsx), [`logout.go`](../../backend/internal/api/logout.go) |
 | Reautenticación | Programar el inicio de un nuevo flujo cuando `exp` se cumpla (no hay refresh token). | [`App.tsx`](../../contabilidad/src/App.tsx) |
 | CSP | `connect-src` debe incluir el origen del Hub; el resto en `'self'`, sin scripts inline. | [`default.conf`](../../frontend/nginx/default.conf) |
@@ -201,16 +202,62 @@ Las pruebas que respaldan el flujo están en [`flow.test.ts`](../../contabilidad
 
 ## 7. Declaración de permisos de la aplicación
 
-> **Pendiente.** Esta sección se completa después de T15 (fase 3, grilla de roles configurable, T11 a T15 de [`odd/tasks/idp-semana-4.md`](../../odd/tasks/idp-semana-4.md)). La D4 prevé que las aplicaciones declaren sus permisos y que el administrador arme roles marcándolos en una grilla; nada de eso existe todavía, así que no se describe aquí un mecanismo de declaración.
+Los roles de aplicación son datos del Hub, no código ([ADR 0013](../../specs/adr/0013-roles-y-permisos-configurables-por-aplicacion.md), RF-021). Cada aplicación declara un catálogo de **permisos**; un administrador arma **roles** marcando permisos en la grilla de la consola (**Roles**) y los asigna a las cuentas. La aplicación solo lee el claim `permissions` del token.
 
-**Modelo actual.** Los roles son fijos y viven en código ([`roles.go`](../../backend/internal/auth/roles/roles.go), decisión D8 de [`odd/tasks/idp-semana-3.md`](../../odd/tasks/idp-semana-3.md)):
+### 7.1 Modelo
 
-- Roles de directorio del Hub: `admin` y `user`. El token de una aplicación nunca los lleva.
-- Roles de la aplicación Contabilidad: `contabilidad.senior` (todas las opciones, incluidos aprobar y cierre del mes) y `contabilidad.analista` (solo sus transacciones, sin cierre).
-- Convención: el rol de aplicación se llama `<client_id>.<nombre>`; el token de la aplicación incluye únicamente los roles cuyo prefijo coincide con su `client_id`.
-- Un administrador asigna los roles a las cuentas en el Hub; la aplicación decide qué muestra a partir de ellos.
+| Concepto | Dónde vive | Reglas |
+|---|---|---|
+| Permiso | Tabla `permissions`, ligada a `applications`. | Clave estable con forma `<recurso>.<acción>` (por ejemplo `cierre.ejecutar`). Pertenece a una sola aplicación. |
+| Rol de aplicación | Tabla `roles` con `application_id` no nulo. | Nombre `<client_id>.<nombre>` (por ejemplo `contabilidad.auditor`); se crea, edita y borra desde la grilla. |
+| Relación rol-permiso | Tabla `role_permissions`. | Un rol solo referencia permisos de su propia aplicación. |
+| Rol de directorio | `admin` y `user` (`application_id` nulo, marca de sistema). | Del propio Hub; la grilla no los crea, edita ni borra, y el token de una aplicación nunca los lleva. |
 
-Hoy, agregar una aplicación o un rol exige modificar el catálogo en código y desplegar.
+### 7.2 Cómo declara sus permisos una aplicación
+
+Hoy el catálogo se declara con una **migración** que siembra la aplicación y sus claves; no hay endpoint para declararlas. La de Contabilidad es [`000009_application_permissions.up.sql`](../../db/migrations/000009_application_permissions.up.sql), que también convierte los dos roles históricos en filas con sus permisos:
+
+| Clave de Contabilidad | Capacidad en la interfaz | `senior` | `analista` |
+|---|---|:-:|:-:|
+| `movimientos.registrar` | Botón «Registrar movimiento» y su formulario. | ✓ | ✓ |
+| `movimientos.ver_todos` | Ver los movimientos de todos (sin él, solo los propios). | ✓ | |
+| `movimientos.aprobar` | Aprobar y rechazar movimientos pendientes. | ✓ | |
+| `cierre.ejecutar` | Sección y botón de cierre contable. | ✓ | |
+| `reportes.ver` | Resumen con totales del período. | ✓ | ✓ |
+
+Para una aplicación nueva: elegir claves que describan capacidades (no puestos de trabajo), escribir la migración que inserte la aplicación y sus `permissions`, y hacer que el frontend decida cada capacidad por una clave. Los roles los arma después el administrador; la aplicación no debe conocer sus nombres.
+
+### 7.3 Cómo llegan al token
+
+Al emitir el token de una aplicación, el Hub incluye en `roles` solo los roles de esa aplicación y en `permissions` la unión de sus permisos ([`token.go`](../../backend/internal/auth/token/token.go)). Un cambio en la grilla se ve en el **siguiente** token: uno ya emitido conserva el estado anterior hasta que vence (15 minutos como máximo).
+
+Ejemplo: un empleado con el rol `contabilidad.auditor` (`reportes.ver` y `movimientos.ver_todos`) recibe:
+
+```json
+{ "aud": ["contabilidad"], "roles": ["contabilidad.auditor"], "permissions": ["movimientos.ver_todos", "reportes.ver"] }
+```
+
+Contabilidad le muestra todos los movimientos y el Resumen, pero no le ofrece registrar, aprobar ni cerrar el mes. Esta escena es la prueba E2E de [`roles-y-permisos.spec.ts`](../../e2e/tests/roles-y-permisos.spec.ts), que además verifica el claim exacto.
+
+### 7.4 Administración y controles
+
+Los endpoints de la grilla exigen `admin` (contrato en [`openapi.yaml`](../../specs/03-api/openapi.yaml)):
+
+| Operación | Endpoint |
+|---|---|
+| Listar aplicaciones, permisos y roles | `GET /api/v1/admin/applications` |
+| Listar roles de una aplicación | `GET /api/v1/admin/applications/{applicationId}/roles` |
+| Crear rol | `POST /api/v1/admin/applications/{applicationId}/roles` |
+| Actualizar permisos | `PATCH /api/v1/admin/applications/{applicationId}/roles/{roleId}` |
+| Eliminar rol | `DELETE /api/v1/admin/applications/{applicationId}/roles/{roleId}` |
+
+Controles que aplica el Hub, cada uno cubierto por un escenario de [`roles-y-permisos.feature`](../../specs/06-acceptance/roles-y-permisos.feature):
+
+1. Solo se crean roles de aplicación; `admin` y `user` no se crean, editan ni borran (`400` o `403`).
+2. Un administrador no modifica los permisos de un rol que posee (`403`).
+3. Un permiso desconocido o de otra aplicación se rechaza (`400`).
+4. Un rol asignado no se elimina (`409`).
+5. Crear, actualizar y borrar un rol queda en el audit log (`role_created`, `role_updated`, `role_deleted`); las asignaciones siguen registrando `role_changed`.
 
 ## 8. Checklist de seguridad para el integrador
 
@@ -220,7 +267,8 @@ Hoy, agregar una aplicación o un rol exige modificar el catálogo en código y 
 - [ ] Quitar `code` y `state` de la URL antes de cualquier llamada asíncrona; no registrarlos en logs ni en analítica.
 - [ ] Canjear el código con `credentials: 'omit'`; el Hub no usa cookies en `/oauth/token`.
 - [ ] Verificar el token: firma `EdDSA` con la clave del JWKS por `kid`, `iss` exacto, `aud` propio y `exp`. Fijar el algoritmo en el cliente.
-- [ ] No tratar la verificación en el navegador como autorización: repetirla y aplicar los roles en el servidor del tercero.
+- [ ] No tratar la verificación en el navegador como autorización: repetirla y aplicar los permisos en el servidor del tercero.
+- [ ] Decidir cada capacidad por una clave de `permissions`, nunca por el nombre del rol, y tratar un claim ausente como lista vacía.
 - [ ] Mantener el access token solo en memoria; no persistirlo en `localStorage`.
 - [ ] Aplicar una CSP estricta (sin scripts inline) con `connect-src` limitado a su origen y al del Hub.
 - [ ] Tratar `error` en el callback y los fallos `400`, `500` y `503` de los endpoints sin revelar detalles al usuario.
@@ -237,6 +285,7 @@ Hoy, agregar una aplicación o un rol exige modificar el catálogo en código y 
 | Sin secreto de cliente; solo clientes públicos con PKCE. | Autenticación de cliente confidencial para aplicaciones con backend. |
 | Sin refresh tokens para aplicaciones; la renovación pasa por un nuevo `/oauth/authorize`. | Un refresh token acotado por cliente, con rotación y revocación (el del Hub, [ADR 0005](../../specs/adr/0005-refresh-tokens-rotativos-con-familia.md), es solo de la consola). |
 | No es OpenID Connect: sin `id_token`, discovery (`/.well-known/openid-configuration`) ni `userinfo`. | Implementar OIDC para que clientes estándar se integren sin código a medida. |
+| Los permisos de una aplicación se declaran con una migración (sección 7.2). | Un endpoint o manifiesto con el que la aplicación registre su catálogo de permisos sin desplegar el Hub. |
 | Sin cierre de sesión único: salir del Hub no cierra la sesión de la aplicación hasta que vence su token (15 minutos). | Cierre de sesión por canal frontal o trasero y revocación de tokens. |
 | Sin revocación ni introspección de access tokens. | Endpoint de introspección o lista de revocación. |
 | El JWKS publica una sola clave. | Publicar varias claves y un procedimiento de rotación con `kid` (el cliente de referencia ya selecciona la clave por `kid`). |

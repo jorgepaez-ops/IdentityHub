@@ -34,6 +34,20 @@ describe('access token verification against the Hub JWKS', () => {
     expect(verified.roles).toEqual([])
   })
 
+  it('TestRF021_ParsesPermissionsClaimAndTreatsNullOrAbsentAsEmpty', async () => {
+    const withPermissions = await signToken(key, validClaims({ permissions: ['reportes.ver', 'movimientos.ver_todos'] }))
+    expect((await verifyAccessToken(withPermissions, { keys: [key.jwk] }, expected)).permissions).toEqual(['reportes.ver', 'movimientos.ver_todos'])
+    const nulled = await signToken(key, validClaims({ permissions: null }))
+    expect((await verifyAccessToken(nulled, { keys: [key.jwk] }, expected)).permissions).toEqual([])
+    const absent = await signToken(key, validClaims({ permissions: undefined }))
+    expect((await verifyAccessToken(absent, { keys: [key.jwk] }, expected)).permissions).toEqual([])
+  })
+
+  it('TestRF021_RejectsMalformedPermissionsClaim', async () => {
+    const token = await signToken(key, validClaims({ permissions: 'reportes.ver' }))
+    await expect(verifyAccessToken(token, { keys: [key.jwk] }, expected)).rejects.toThrow('invalid permissions claim')
+  })
+
   it('TestRF020_RejectsBadSignature', async () => {
     // Signed by a different key that reuses the same kid: the signature cannot verify.
     const token = await signToken(other, validClaims())

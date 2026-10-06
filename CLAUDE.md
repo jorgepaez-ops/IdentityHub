@@ -34,6 +34,11 @@ volver a acordarse.
   cerrar cualquier tarea que toque Go, instalarlo una vez (`go install
   github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2`, PATH incluye `~/go/bin`) y
   correrlo de verdad — CI sí lo tiene y es la única señal real hasta entonces.
+- **`make test-integration` sin `TEST_DATABASE_URL` se salta en silencio** las pruebas contra la
+  base (`t.Skip`, invisible sin `-v`): "pasa" y la cobertura cae a ~57 % en vez de ~79 %. Antes de
+  dar por buena una tarea de backend, levantar un Postgres desechable igual al de CI
+  (`postgres:16-bookworm` por digest, usuario/base `identity`, puerto libre como 55432) y exportar
+  `TEST_DATABASE_URL`. Así se detectó en T12a un trigger que descartaba UPDATEs.
 - Generadores cacheados: usar `~/go/bin/oapi-codegen` (v2.5.1 real, no "(devel)") y `~/go/bin/sqlc`.
   Evitar binarios en `/private/tmp/idp-gen-bin/` sin el ldflag de versión correcto.
 - **Hook de pre-commit instalado en este clon desde T16 (2026-10-05).** `pre-commit` vive en

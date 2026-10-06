@@ -13,6 +13,14 @@ function Stat({ label, value, note }: { label: string; value: string; note?: str
 
 export function SummaryView({ access, movements }: { access: Access; movements: Movement[] }) {
   if (access.level === 'none') return null
+  if (!access.canSeeReports) {
+    return (
+      <section aria-labelledby="view-title">
+        <h1 id="view-title">Resumen</h1>
+        <div className="card locked-card">Requiere el permiso reportes.ver</div>
+      </section>
+    )
+  }
   const rows = visibleMovements(movements, access.level)
   const own = access.level === 'own'
   return (

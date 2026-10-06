@@ -71,7 +71,6 @@ func TestRNF005_AdminUpdateRejectsInvalidAndSelfTargetedChanges(t *testing.T) {
 		want  error
 	}{
 		{name: "unknown status", input: UpdateInput{Status: statusPointer("unknown")}, want: ErrInvalidStatus},
-		{name: "unknown role", input: UpdateInput{ActorUserID: actorID, UserID: uuid.New(), Roles: rolesPointer([]string{"operator"})}, want: ErrInvalidRole},
 		{name: "self disable", input: UpdateInput{ActorUserID: actorID, UserID: actorID, Status: statusPointer(StatusDisabled)}, want: ErrSelfDisable},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -82,6 +81,10 @@ func TestRNF005_AdminUpdateRejectsInvalidAndSelfTargetedChanges(t *testing.T) {
 				t.Fatalf("transactions=%d, want no repository interaction", repository.txCalls)
 			}
 		})
+	}
+	validated := &repositoryStub{users: map[uuid.UUID]User{}, roles: map[uuid.UUID][]string{}, validRoles: map[string]bool{"admin": true, "user": true}}
+	if _, err := New(validated).UpdateUser(context.Background(), UpdateInput{ActorUserID: actorID, UserID: uuid.New(), Roles: rolesPointer([]string{"user", "operator"})}); !errors.Is(err, ErrInvalidRole) {
+		t.Fatalf("UpdateUser() unknown database role error=%v, want %v", err, ErrInvalidRole)
 	}
 	if _, err := New(nil).UpdateUser(context.Background(), UpdateInput{}); err == nil {
 		t.Fatal("UpdateUser() error=nil for unavailable service")

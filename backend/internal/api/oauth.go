@@ -131,7 +131,7 @@ func (s *Server) exchangeAuthorizationCode(w http.ResponseWriter, r *http.Reques
 		s.writeOAuthServerError(w, "exchange", "oauth-token-failed", "The authorization code could not be exchanged.", err)
 		return
 	}
-	access, err := s.tokens.IssueForAudience(result.UserID.String(), result.Roles, s.oauthClient.ID)
+	access, err := s.tokens.IssueForAudience(result.UserID.String(), result.Roles, result.Permissions, s.oauthClient.ID)
 	if err != nil {
 		s.writeOAuthServerError(w, "issue_access_token", "oauth-token-failed", "The access token could not be issued.", err)
 		return

@@ -31,6 +31,7 @@ import (
 	"github.com/jorgepaez/identity-hub/internal/auth/password"
 	"github.com/jorgepaez/identity-hub/internal/auth/passwordreset"
 	"github.com/jorgepaez/identity-hub/internal/auth/refresh"
+	"github.com/jorgepaez/identity-hub/internal/auth/rolegrid"
 	"github.com/jorgepaez/identity-hub/internal/auth/session"
 	"github.com/jorgepaez/identity-hub/internal/auth/token"
 	"github.com/jorgepaez/identity-hub/internal/config"
@@ -191,6 +192,7 @@ func run() error {
 	server.SetSessionService(session.New(db))
 	server.SetLogoutService(logout.New(db))
 	server.SetAdminUserService(admin.New(db))
+	server.SetRoleGridService(rolegrid.New(db))
 	server.SetAuditLogService(auditlog.New(db))
 	server.SetCurrentUserRepository(db)
 	server.SetTrustedProxies(cfg.TrustedProxies)

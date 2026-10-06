@@ -122,6 +122,13 @@ func (w *oauthWriter) ListRolesForUser(ctx context.Context, userID uuid.UUID) ([
 	}
 	return roles, nil
 }
+func (w *oauthWriter) ListPermissionKeysForRolesAndApplication(ctx context.Context, roleNames []string, clientID string) ([]string, error) {
+	keys, err := w.queries.ListPermissionKeysForRolesAndApplication(ctx, generated.ListPermissionKeysForRolesAndApplicationParams{RoleNames: roleNames, ClientID: clientID})
+	if err != nil {
+		return nil, fmt.Errorf("list oauth application permissions: %w", err)
+	}
+	return keys, nil
+}
 func (r oauthRepository) InsertAuditEvent(ctx context.Context, event oauth.AuditEvent) error {
 	return insertOAuthAuditEvent(ctx, r.store.queries, event)
 }

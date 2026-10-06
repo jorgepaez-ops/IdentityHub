@@ -13,6 +13,11 @@ export type Session = components['schemas']['Session']
 export type CurrentUser = components['schemas']['User']
 export type Problem = components['schemas']['Problem']
 export type Role = components['schemas']['Role']
+export type Application = components['schemas']['Application']
+export type ApplicationRole = components['schemas']['ApplicationRole']
+export type Permission = components['schemas']['Permission']
+type CreateApplicationRoleRequest = components['schemas']['CreateApplicationRoleRequest']
+type UpdateApplicationRoleRequest = components['schemas']['UpdateApplicationRoleRequest']
 export type UserStatus = components['schemas']['UserStatus']
 export type AdminUser = components['schemas']['User']
 export type UserPage = components['schemas']['UserPage']
@@ -178,6 +183,15 @@ export const updateUser = (userId: string, input: UpdateUserRequest) =>
 export const resendInvitation = (userId: string) =>
   authenticatedRequest<void>(`/api/v1/admin/users/${encodeURIComponent(userId)}/invitation`, { method: 'POST' })
 export const listAuditLog = (query: AuditLogQuery = {}) => authenticatedRequest<AuditLogPage>(withQuery('/api/v1/admin/audit-log', query))
+
+export const listApplications = () => authenticatedRequest<Application[]>('/api/v1/admin/applications')
+const rolesPath = (applicationId: string) => `/api/v1/admin/applications/${encodeURIComponent(applicationId)}/roles`
+export const createApplicationRole = (applicationId: string, input: CreateApplicationRoleRequest) =>
+  authenticatedRequest<ApplicationRole>(rolesPath(applicationId), { method: 'POST', body: JSON.stringify(input) })
+export const updateApplicationRole = (applicationId: string, roleId: string, input: UpdateApplicationRoleRequest) =>
+  authenticatedRequest<ApplicationRole>(`${rolesPath(applicationId)}/${encodeURIComponent(roleId)}`, { method: 'PATCH', body: JSON.stringify(input) })
+export const deleteApplicationRole = (applicationId: string, roleId: string) =>
+  authenticatedRequest<void>(`${rolesPath(applicationId)}/${encodeURIComponent(roleId)}`, { method: 'DELETE' })
 
 export async function logout(): Promise<void> {
   try {

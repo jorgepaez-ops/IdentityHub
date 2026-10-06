@@ -44,7 +44,7 @@ func TestRF020_TokenParaAplicacionTieneAudienciaYRolesAcotados(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw, err := service.IssueForAudience("user-1", []string{"contabilidad.senior"}, "contabilidad")
+	raw, err := service.IssueForAudience("user-1", []string{"contabilidad.senior"}, []string{"movimientos.registrar", "reportes.ver"}, "contabilidad")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,8 +52,55 @@ func TestRF020_TokenParaAplicacionTieneAudienciaYRolesAcotados(t *testing.T) {
 	if _, err := jwt.ParseWithClaims(raw, &claims, func(*jwt.Token) (any, error) { return service.PublicKey(), nil }, jwt.WithValidMethods([]string{"EdDSA"})); err != nil {
 		t.Fatal(err)
 	}
-	if len(claims.Audience) != 1 || claims.Audience[0] != "contabilidad" || len(claims.Roles) != 1 || claims.Roles[0] != "contabilidad.senior" {
+	if len(claims.Audience) != 1 || claims.Audience[0] != "contabilidad" || len(claims.Roles) != 1 || claims.Roles[0] != "contabilidad.senior" || len(claims.Permissions) != 2 {
 		t.Fatalf("claims=%+v", claims)
+	}
+}
+
+func TestRF020_TokenDeAplicacionVacioIncluyePermisos(t *testing.T) {
+	service, err := New(testSeed(), "issuer", "identity-hub", time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := service.IssueForAudience("user-1", nil, nil, "contabilidad")
+	if err != nil {
+		t.Fatal(err)
+	}
+	claims := jwt.MapClaims{}
+	if _, err := jwt.ParseWithClaims(raw, claims, func(*jwt.Token) (any, error) { return service.PublicKey(), nil }, jwt.WithValidMethods([]string{"EdDSA"})); err != nil {
+		t.Fatal(err)
+	}
+	permissions, ok := claims["permissions"]
+	if !ok {
+		t.Fatal("application token omitted permissions")
+	}
+	if list, ok := permissions.([]any); !ok || len(list) != 0 {
+		t.Fatalf("permissions=%#v, want empty array", permissions)
+	}
+}
+
+func TestRF020_TokenDelHubOmitePermisos(t *testing.T) {
+	service, err := New(testSeed(), "issuer", "identity-hub", time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := service.Issue("user-1", []string{"user"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	claims := Claims{}
+	if _, err := jwt.ParseWithClaims(raw, &claims, func(*jwt.Token) (any, error) { return service.PublicKey(), nil }, jwt.WithValidMethods([]string{"EdDSA"})); err != nil {
+		t.Fatal(err)
+	}
+	if len(claims.Permissions) != 0 {
+		t.Fatalf("hub claims permissions=%v, want omitted", claims.Permissions)
+	}
+	rawClaims := jwt.MapClaims{}
+	if _, err := jwt.ParseWithClaims(raw, rawClaims, func(*jwt.Token) (any, error) { return service.PublicKey(), nil }, jwt.WithValidMethods([]string{"EdDSA"})); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := rawClaims["permissions"]; ok {
+		t.Fatal("Hub token includes permissions")
 	}
 }
 
@@ -132,5 +179,51 @@ func TestRF004_RechazaTokenSinSujetoOFirmadoPorOtraClave(t *testing.T) {
 	}
 	if _, err := service.Validate(build("user-1", otherKey)); err == nil {
 		t.Error("token signed by another key with the right kid was accepted")
+	}
+}
+
+func rawClaimsOf(t *testing.T, service *Service, raw string) jwt.MapClaims {
+	t.Helper()
+	claims := jwt.MapClaims{}
+	if _, err := jwt.ParseWithClaims(raw, claims, func(*jwt.Token) (any, error) { return service.PublicKey(), nil }, jwt.WithValidMethods([]string{"EdDSA"})); err != nil {
+		t.Fatal(err)
+	}
+	return claims
+}
+
+func TestRF020_TokensDelHubNuncaLlevanLaClavePermissions(t *testing.T) {
+	service, err := New(testSeed(), "issuer", "identity-hub", time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	issuers := map[string]func() (string, error){
+		"Issue":           func() (string, error) { return service.Issue("user-1", []string{"admin"}) },
+		"IssueForSession": func() (string, error) { return service.IssueForSession("user-1", []string{"admin"}, "session-1") },
+	}
+	for name, issue := range issuers {
+		t.Run(name, func(t *testing.T) {
+			raw, err := issue()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, ok := rawClaimsOf(t, service, raw)["permissions"]; ok {
+				t.Fatal("Hub token JSON claims include a permissions key")
+			}
+		})
+	}
+}
+
+func TestRF020_TokenDeAplicacionConListaVaciaSerializaArregloVacio(t *testing.T) {
+	service, err := New(testSeed(), "issuer", "identity-hub", time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := service.IssueForAudience("user-1", []string{"contabilidad.auditor"}, []string{}, "contabilidad")
+	if err != nil {
+		t.Fatal(err)
+	}
+	permissions, ok := rawClaimsOf(t, service, raw)["permissions"].([]any)
+	if !ok || len(permissions) != 0 {
+		t.Fatalf("permissions=%#v, want an empty JSON array, not null or omitted", permissions)
 	}
 }

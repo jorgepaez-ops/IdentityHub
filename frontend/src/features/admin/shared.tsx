@@ -1,14 +1,13 @@
-import { ApiProblemError, type AdminUser, type Role } from '../../api/client'
+import { ApiProblemError, type AdminUser } from '../../api/client'
 import { connectionMessage } from '../account/PublicPages'
 
-// Role catalog: the keys are exhaustive over the generated Role enum (the compiler fails if the API adds one).
-export const ROLE_CATALOG: Record<Role, string> = {
+// Only the two directory roles are described locally; application roles and their permissions
+// come from GET /admin/applications (RF-021).
+export const DIRECTORY_ROLES = ['admin', 'user'] as const
+export const DIRECTORY_ROLE_DESCRIPTION: Record<string, string> = {
   admin: 'Control total del Hub y de todas las aplicaciones conectadas.',
   user: 'Rol base de toda cuenta: acceso a Mi cuenta.',
-  'contabilidad.senior': 'En Contabilidad: acceso completo, incluido el cierre contable.',
-  'contabilidad.analista': 'En Contabilidad: registra movimientos propios, sin cierre ni reportes consolidados.',
 }
-export const ROLES = Object.keys(ROLE_CATALOG) as Role[]
 
 const chipTone = (role: string) => (role === 'admin' ? 'accent' : role === 'contabilidad.senior' ? 'warn' : 'neutral')
 

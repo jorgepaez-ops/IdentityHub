@@ -23,6 +23,14 @@ export async function signToken(key: TestKey, claims: Record<string, unknown>, h
   return `${signingInput}.${encodeBase64Url(new Uint8Array(signature))}`
 }
 
+export const ALL_PERMISSIONS = ['movimientos.registrar', 'movimientos.ver_todos', 'movimientos.aprobar', 'cierre.ejecutar', 'reportes.ver']
+
+/** Permissions the seeded roles carry in the Hub (migration of the role grid). */
+export const SEEDED_PERMISSIONS: Record<string, string[]> = {
+  'contabilidad.senior': ALL_PERMISSIONS,
+  'contabilidad.analista': ['movimientos.registrar', 'reportes.ver'],
+}
+
 export const validClaims = (overrides: Record<string, unknown> = {}) => ({
   iss: ISSUER,
   sub: '3f2c1a9e-0000-4000-8000-000000000001',
@@ -31,5 +39,6 @@ export const validClaims = (overrides: Record<string, unknown> = {}) => ({
   iat: NOW,
   jti: 'abc',
   roles: ['contabilidad.senior'],
+  permissions: ALL_PERMISSIONS,
   ...overrides,
 })

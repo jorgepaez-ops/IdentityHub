@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -21,9 +22,14 @@ const AccessTokenExpiresIn = int(accessTokenTTL / time.Second)
 type Clock func() time.Time
 
 type Claims struct {
-	Roles     []string `json:"roles"`
-	SessionID string   `json:"sid,omitempty"`
+	Roles []string `json:"roles"`
+	// Permissions is read from the "permissions" claim when validating. When signing,
+	// MarshalJSON decides whether the claim is written (application tokens always carry
+	// it, even empty; Hub tokens omit it), so this tag never governs omission.
+	Permissions []string `json:"permissions"`
+	SessionID   string   `json:"sid,omitempty"`
 	jwt.RegisteredClaims
+	permissionsPresent bool
 }
 
 type Service struct {
@@ -66,7 +72,7 @@ func New(seed []byte, issuer, audience string, clock Clock) (*Service, error) {
 }
 
 func (s *Service) Issue(subject string, roles []string) (string, error) {
-	return s.issue(subject, roles, "")
+	return s.issue(subject, roles, nil, "")
 }
 
 // IssueForSession binds a console access token to its refresh-token family so
@@ -75,23 +81,23 @@ func (s *Service) IssueForSession(subject string, roles []string, sessionID stri
 	if sessionID == "" {
 		return "", fmt.Errorf("session ID is required")
 	}
-	return s.issue(subject, roles, sessionID)
+	return s.issue(subject, roles, nil, sessionID)
 }
 
 // IssueForAudience emits an application access token. It deliberately has no
 // session claim because browser applications never receive Hub refresh state.
-func (s *Service) IssueForAudience(subject string, roles []string, audience string) (string, error) {
+func (s *Service) IssueForAudience(subject string, roles, permissions []string, audience string) (string, error) {
 	if audience == "" {
 		return "", fmt.Errorf("jwt audience is required")
 	}
-	return s.issueForAudience(subject, roles, "", audience)
+	return s.issueForAudience(subject, roles, permissions, "", audience, true)
 }
 
-func (s *Service) issue(subject string, roles []string, sessionID string) (string, error) {
-	return s.issueForAudience(subject, roles, sessionID, s.audience)
+func (s *Service) issue(subject string, roles, permissions []string, sessionID string) (string, error) {
+	return s.issueForAudience(subject, roles, permissions, sessionID, s.audience, false)
 }
 
-func (s *Service) issueForAudience(subject string, roles []string, sessionID, audience string) (string, error) {
+func (s *Service) issueForAudience(subject string, roles, permissions []string, sessionID, audience string, permissionsPresent bool) (string, error) {
 	if subject == "" {
 		return "", fmt.Errorf("jwt subject is required")
 	}
@@ -101,8 +107,10 @@ func (s *Service) issueForAudience(subject string, roles []string, sessionID, au
 	}
 	now := s.clock()
 	claims := Claims{
-		Roles:     append([]string(nil), roles...),
-		SessionID: sessionID,
+		Roles:              append([]string(nil), roles...),
+		Permissions:        append([]string{}, permissions...),
+		SessionID:          sessionID,
+		permissionsPresent: permissionsPresent,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    s.issuer,
 			Subject:   subject,
@@ -119,6 +127,24 @@ func (s *Service) issueForAudience(subject string, roles []string, sessionID, au
 		return "", fmt.Errorf("sign access token: %w", err)
 	}
 	return raw, nil
+}
+
+// MarshalJSON keeps the Hub claim set unchanged while requiring every
+// application token to declare permissions, including an empty array.
+func (c Claims) MarshalJSON() ([]byte, error) {
+	type shared struct {
+		Roles     []string `json:"roles"`
+		SessionID string   `json:"sid,omitempty"`
+		jwt.RegisteredClaims
+	}
+	base := shared{Roles: c.Roles, SessionID: c.SessionID, RegisteredClaims: c.RegisteredClaims}
+	if !c.permissionsPresent {
+		return json.Marshal(base)
+	}
+	return json.Marshal(struct {
+		shared
+		Permissions []string `json:"permissions"`
+	}{shared: base, Permissions: c.Permissions})
 }
 
 func (s *Service) Validate(raw string) (Claims, error) {

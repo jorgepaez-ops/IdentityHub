@@ -19,7 +19,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/google/uuid"
-	"github.com/jorgepaez/identity-hub/internal/auth/roles"
 	"github.com/jorgepaez/identity-hub/internal/events"
 	"github.com/jorgepaez/identity-hub/internal/store"
 )
@@ -104,6 +103,13 @@ func (s *Service) CreateEmployee(ctx context.Context, input Input) (Result, erro
 	}
 	var result Result
 	err = s.repository.WithinEmployeeCreationTransaction(ctx, func(writer store.EmployeeCreationWriter) error {
+		found, validateErr := writer.ValidateRoleNames(ctx, finalRoles)
+		if validateErr != nil {
+			return fmt.Errorf("validate requested roles: %w", validateErr)
+		}
+		if len(found) != len(finalRoles) {
+			return &InvalidInputError{Field: "roles", Detail: "contains an unknown role"}
+		}
 		user, err := writer.CreateUser(ctx, store.CreateUserParams{Email: input.Email, PasswordHash: passwordHash, DisplayName: input.DisplayName})
 		if err != nil {
 			var pgErr interface{ SQLState() string }
@@ -148,8 +154,8 @@ func (s *Service) CreateEmployee(ctx context.Context, input Input) (Result, erro
 }
 
 // validate checks the request and returns the deduplicated role set the
-// account receives: every requested role must belong to the catalog
-// (roles.Valid), and "user" is always included even if the admin omitted it
+// account receives: role existence is checked in the database transaction, and
+// "user" is always included even if the admin omitted it
 // (RF-001: "toda cuenta recibe el rol base user").
 func validate(input Input) ([]string, error) {
 	if utf8.RuneCountInString(input.Email) == 0 || utf8.RuneCountInString(input.Email) > 254 {
@@ -165,12 +171,9 @@ func validate(input Input) ([]string, error) {
 	if len(input.Roles) == 0 {
 		return nil, &InvalidInputError{Field: "roles", Detail: "must include at least one role"}
 	}
-	final := []string{roles.User}
+	final := []string{"user"}
 	for _, role := range input.Roles {
-		if !roles.Valid(role) {
-			return nil, &InvalidInputError{Field: "roles", Detail: fmt.Sprintf("unknown role %q", role)}
-		}
-		if role != roles.User && !hasRole(final, role) {
+		if role != "user" && !hasRole(final, role) {
 			final = append(final, role)
 		}
 	}
