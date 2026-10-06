@@ -76,9 +76,10 @@ func Load() (*Config, error) {
 }
 
 // LoadWorker loads the configuration of the worker binary. It is identical to
-// Load except that DATABASE_URL is not required: the worker only consumes the
-// queue and sends SMTP, so it never opens a database connection and should not
-// be handed that credential (least privilege).
+// Load except that neither DATABASE_URL nor JWT_SIGNING_KEY is required or read:
+// the worker only consumes the queue and sends SMTP, so it never opens a
+// database connection nor signs or verifies tokens, and should not be handed
+// those credentials (least privilege).
 func LoadWorker() (*Config, error) {
 	return load(false)
 }
@@ -141,9 +142,13 @@ func load(requireDatabase bool) (*Config, error) {
 		databaseURL = req("DATABASE_URL")
 	}
 
-	jwtSigningKey := req("JWT_SIGNING_KEY")
-	if decoded, err := base64.StdEncoding.DecodeString(jwtSigningKey); err != nil || len(decoded) != 32 {
-		problems = append(problems, "JWT_SIGNING_KEY debe ser una semilla Ed25519 en base64 de 32 bytes")
+	// Likewise the worker never reads JWT_SIGNING_KEY, even if the environment sets it.
+	jwtSigningKey := ""
+	if requireDatabase {
+		jwtSigningKey = req("JWT_SIGNING_KEY")
+		if decoded, err := base64.StdEncoding.DecodeString(jwtSigningKey); err != nil || len(decoded) != 32 {
+			problems = append(problems, "JWT_SIGNING_KEY debe ser una semilla Ed25519 en base64 de 32 bytes")
+		}
 	}
 
 	passwordMemory := passwordNum("ARGON2_MEMORY_KIB", "65536", int(^uint32(0)))

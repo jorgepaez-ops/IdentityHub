@@ -233,7 +233,7 @@ día cuando cablee `main.go`). Obligatorias = el proceso no arranca sin ellas.
 |---|---|---|---|
 | `DATABASE_URL` | sí (no para el worker) | — | cadena de conexión a PostgreSQL; el worker arranca con `config.LoadWorker`, que no la exige |
 | `RABBITMQ_URL` | sí | — | cadena de conexión al broker |
-| `JWT_SIGNING_KEY` | sí | — | semilla Ed25519 de 32 bytes, en base64 (`openssl rand -base64 32`) |
+| `JWT_SIGNING_KEY` | sí (no para el worker) | — | semilla Ed25519 de 32 bytes, en base64 (`openssl rand -base64 32`); el worker no la recibe ni la lee |
 | `API_PORT` | no | `8081` | puerto HTTP de la API |
 | `LOG_LEVEL` | no | `info` | |
 | `JWT_ISSUER` | no | `http://identityhub.localhost:8080` | claim `iss` del token |
@@ -244,7 +244,7 @@ día cuando cablee `main.go`). Obligatorias = el proceso no arranca sin ellas.
 | `LOGIN_IP_MAX_FAILURES` | no | `20` | fallos por IP antes de bloquear (RF-017 / VULN-020) |
 | `LOGIN_FAILURE_WINDOW` | no | `15m` | ventana deslizante de los dos contadores |
 | `LOGIN_LOCKOUT_DURATION` | no | `15m` | duración del bloqueo de cuenta |
-| `TRUSTED_PROXIES` | no | vacío | CIDR separados por coma; sin esto, `X-Forwarded-For` se ignora siempre (T6) |
+| `TRUSTED_PROXIES` | no | vacío | CIDR separados por coma; sin esto, `X-Forwarded-For` se ignora siempre (T6); solo la API la recibe |
 | `ARGON2_MEMORY_KIB` / `_ITERATIONS` / `_PARALLELISM` / `_CONCURRENCY` | no | `65536` / `3` / `2` / `4` | parámetros de Argon2id |
 | `SMTP_HOST` / `_PORT` / `_FROM` | no | `mailpit` / `1025` / `no-reply@identity.local` | |
 | `PUBLIC_BASE_URL` | no | `http://identityhub.localhost:8080` | usado para armar enlaces en los correos |

@@ -159,13 +159,12 @@ services:
     environment:
       LOG_LEVEL: debug
       APP_VERSION: 0.1.0-baseline
-      # Sin DATABASE_URL: el worker solo consume la cola y envía SMTP (config.LoadWorker).
+      # Sin DATABASE_URL, JWT_SIGNING_KEY ni TRUSTED_PROXIES: el worker solo consume la cola y
+      # envía SMTP (config.LoadWorker).
       RABBITMQ_URL: "${RABBITMQ_URL:?RABBITMQ_URL must be set in the repository root .env}"
       SMTP_HOST: mailpit
       SMTP_PORT: 1025
       SMTP_FROM: no-reply@identity.local
-      JWT_SIGNING_KEY: "${JWT_SIGNING_KEY:?JWT_SIGNING_KEY must be set in the repository root .env}"
-      TRUSTED_PROXIES: "${TRUSTED_PROXIES:?TRUSTED_PROXIES must be set in the repository root .env}"
     ports:
       - "9091:9091"  # /metrics del worker
     restart: unless-stopped
