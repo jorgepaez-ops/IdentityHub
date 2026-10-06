@@ -346,11 +346,31 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
     código» (tres, como trabajo futuro); Inicio en lugar de Usuarios en informe, `guion-demo.md` y
     `video/guion.md`; PDF regenerado con `make informe` (47 páginas; está ignorado por git).
 
+- [x] **P11 — Código propio de Contabilidad (puerta de SonarCloud del PR #13).** La puerta falló por
+  duplicación (17,2 %, umbral 3 %) por copias idénticas de `theme.ts` y `csv.ts` (con sus pruebas) entre
+  el Hub y Contabilidad, más CSS repetido en los tres diagramas. Decisión del usuario (2026-10-06):
+  Contabilidad representa una aplicación real de un tercero, así que su código debe ser propio; no se
+  baja la puerta ni se añaden exclusiones, ni se disfrazan copias. Contabilidad pasa a un tema con
+  proveedor y hook de React y a un exportador de movimientos propio del dominio, con pruebas propias;
+  los diagramas comparten `docs/diagramas/diagramas.css`. El fallo de fiabilidad (S2871, `sort()` sin
+  comparador en `aggregate.ts`) ya se corrigió en `fd5703a`.
+  Evidencia (2026-10-06, Sonnet, revisión de Claude): Contabilidad usa `AppearanceProvider`/`useAppearance`
+  (reductor con preferencia fijada; escucha de `matchMedia` solo mientras no hay elección;
+  `paintFirstFrame()` evita el destello inicial) y `exportMovements.ts` (tabla de columnas tipada a
+  `Movement`, un solo `encodeField`, neutralización solo en texto libre, BOM, CRLF, revocación a 30 s).
+  También se reescribieron con diseño propio el atrapado de foco de `ConfirmDialog` y pruebas que
+  repetían la estructura del Hub. Se borraron `contabilidad/src/theme.ts`, `csv.ts` y `csv.test.ts`. Los
+  diagramas enlazan `diagramas.css` (capturas antes y después idénticas píxel a píxel, sin `<script>`).
+  `jscpd` (10 líneas, 50 tokens): ningún clon entre las apps; quedan 7 dentro de `frontend/src/App.test.tsx`
+  (0,67 %). vitest Contabilidad 147/147 y Hub 255/255 sin cambios, lint, typecheck y build limpios,
+  `make e2e` 52/52. RED del exportador observado (módulo inexistente); el proveedor de tema se escribió
+  antes que sus pruebas, cubiertas por las pruebas de comportamiento existentes.
+
 ## Progreso
 
 | Tareas | Hechas |
 |---|---|
-| P1 a P10 (10) | 10 (P1 a P10) |
+| P1 a P11 (11) | 11 (P1 a P11) |
 
 ## Entrega
 

@@ -1,9 +1,12 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { useState } from 'react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { accessFor } from '../access'
+import { exportMovements } from '../exportMovements'
 import { INITIAL_MOVEMENTS, formatCop, type Movement } from '../ledger'
 import { TransactionsView } from './Transactions'
+
+vi.mock('../exportMovements', () => ({ exportMovements: vi.fn() }))
 
 const senior = accessFor(['movimientos.registrar', 'movimientos.ver_todos', 'movimientos.aprobar'], ['contabilidad.senior'])
 const analyst = accessFor(['movimientos.registrar', 'reportes.ver'], ['contabilidad.analista'])
@@ -345,73 +348,36 @@ describe('table accessibility', () => {
   })
 })
 
-// jsdom has no object URLs: capture the Blob handed to the anchor and the file name it downloads.
-function captureDownload() {
-  const out: { name: string; text: string }[] = []
-  const blobs = new Map<string, Blob>()
-  let next = 0
-  Object.assign(URL, {
-    createObjectURL: (blob: Blob) => {
-      const url = `blob:test-${next++}`
-      blobs.set(url, blob)
-      return url
-    },
-    revokeObjectURL: vi.fn(),
-  })
-  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
-    const blob = blobs.get(this.getAttribute('href') ?? '')
-    if (!blob) return
-    const reader = new FileReader()
-    reader.onload = () => out.push({ name: this.download, text: new TextDecoder('utf-8', { ignoreBOM: true }).decode(reader.result as ArrayBuffer) })
-    reader.readAsArrayBuffer(blob)
-  })
-  return out
-}
+// The file content and the download are covered in exportMovements.test.ts; here only what the view hands over.
 const exportButton = () => screen.getByRole('button', { name: 'Exportar CSV' })
-const localDate = () => {
-  const now = new Date()
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-}
+const exported = () => vi.mocked(exportMovements).mock.calls.map(([rows]) => rows.map((movement) => movement.id))
 
 describe('movements CSV export', () => {
-  afterEach(() => {
-    vi.restoreAllMocks()
-    Reflect.deleteProperty(URL, 'createObjectURL')
-    Reflect.deleteProperty(URL, 'revokeObjectURL')
-  })
-
   const sample: Movement[] = [
-    { id: 'M-1', date: '2026-10-01', description: 'Café, "premium"', category: 'Papelería', amount: 1500, status: 'approved', mine: true },
-    { id: 'M-2', date: '2026-10-02', description: '=SUM(A1)', category: 'Impuestos', amount: -300, status: 'pending', mine: true },
+    { id: 'M-1', date: '2026-10-01', description: 'Café', category: 'Papelería', amount: 1500, status: 'approved', mine: true },
+    { id: 'M-2', date: '2026-10-02', description: 'Predial', category: 'Impuestos', amount: -300, status: 'pending', mine: true },
     { id: 'M-3', date: '2026-10-03', description: 'Otro', category: 'Impuestos', amount: 20, status: 'rejected', mine: true },
   ]
 
-  it('TestRF021_ExportsTheVisibleRowsWithTheAgreedColumns', async () => {
-    const out = captureDownload()
-    renderView(senior, sample)
-    fireEvent.click(exportButton())
-    await waitFor(() => expect(out).toHaveLength(1))
-    expect(out[0]?.name).toBe(`movimientos-${localDate()}.csv`)
-    expect(out[0]?.text.startsWith('﻿')).toBe(true)
-    expect(out[0]?.text.slice(1).split('\r\n')).toEqual([
-      'Folio,Fecha,Descripción,Categoría,Monto,Estado',
-      "M-3,2026-10-03,Otro,Impuestos,20,Rechazado",
-      "M-2,2026-10-02,'=SUM(A1),Impuestos,-300,Pendiente",
-      'M-1,2026-10-01,"Café, ""premium""",Papelería,1500,Aprobado',
-      '',
-    ])
+  beforeEach(() => {
+    vi.mocked(exportMovements).mockClear()
   })
 
-  it('TestRF021_ExportFollowsTheSearchFiltersAndSort', async () => {
-    const out = captureDownload()
+  it('TestRF021_ExportHandsOverTheRowsInTheOrderOnScreen', () => {
+    renderView(senior, sample)
+    fireEvent.click(exportButton())
+    expect(folios()).toEqual(['M-3', 'M-2', 'M-1'])
+    expect(exported()).toEqual([['M-3', 'M-2', 'M-1']])
+  })
+
+  it('TestRF021_ExportFollowsTheSearchFiltersAndSort', () => {
     renderView(senior, sample)
     pick('Filtrar por categoría', 'Impuestos')
     fireEvent.click(screen.getByRole('button', { name: /Monto/ }))
     fireEvent.click(screen.getByRole('button', { name: /Monto/ }))
     expect(folios()).toEqual(['M-2', 'M-3'])
     fireEvent.click(exportButton())
-    await waitFor(() => expect(out).toHaveLength(1))
-    expect(out[0]?.text.slice(1).split('\r\n').filter(Boolean).map((line) => line.split(',')[0])).toEqual(['Folio', 'M-2', 'M-3'])
+    expect(exported()).toEqual([['M-2', 'M-3']])
   })
 
   it('TestRF021_ExportDisablesWhenNothingIsVisible', () => {

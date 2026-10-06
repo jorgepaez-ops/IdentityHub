@@ -1,23 +1,30 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
-import { useState } from 'react'
+import { useState, type ReactElement } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { accessFor } from './access'
 import { Shell } from './Shell'
 import { ThemeToggle } from './ThemeToggle'
 import { Toast } from './Toast'
-import { initializeTheme, resetThemeForTests } from './theme'
+import { AppearanceProvider } from './AppearanceProvider'
+import { paintFirstFrame } from './colorScheme'
 
 function ToastHarness({ onClose }: { onClose: () => void }) {
   const [message, setMessage] = useState('Movimiento M-2043 aprobado.')
   return message ? <Toast message={message} onClose={() => { onClose(); setMessage('') }} /> : null
 }
 
+const withTheme = (ui: ReactElement) => render(<AppearanceProvider>{ui}</AppearanceProvider>)
+const mountToggle = () => withTheme(<ThemeToggle />)
+const blockStorage = () => [
+  vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new DOMException('blocked', 'SecurityError') }),
+  vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new DOMException('blocked', 'SecurityError') }),
+]
+
 const auditor = accessFor(['movimientos.ver_todos', 'reportes.ver'], ['contabilidad.auditor'])
 const senior = accessFor(['movimientos.registrar', 'movimientos.ver_todos', 'movimientos.aprobar', 'cierre.ejecutar', 'reportes.ver'], ['contabilidad.senior'])
 
 describe('visual system of Contabilidad', () => {
   afterEach(() => {
-    resetThemeForTests()
     vi.useRealTimers()
     vi.unstubAllGlobals()
     window.localStorage.clear()
@@ -25,117 +32,117 @@ describe('visual system of Contabilidad', () => {
   })
 
   describe('system theme changes', () => {
-    function fakeSystemTheme(dark: boolean) {
-      let matches = dark
-      const listeners = new Set<(event: { matches: boolean }) => void>()
+    // A stand-in for the operating system: flip() fires the same event a real change would.
+    function operatingSystem(startsDark: boolean) {
+      let dark = startsDark
+      const subscribers = new Set<(event: { matches: boolean }) => void>()
       vi.stubGlobal('matchMedia', vi.fn(() => ({
-        get matches() { return matches },
-        addEventListener: (_: string, listener: (event: { matches: boolean }) => void) => listeners.add(listener),
-        removeEventListener: (_: string, listener: (event: { matches: boolean }) => void) => listeners.delete(listener),
+        get matches() { return dark },
+        addEventListener: (_: string, fn: (event: { matches: boolean }) => void) => subscribers.add(fn),
+        removeEventListener: (_: string, fn: (event: { matches: boolean }) => void) => subscribers.delete(fn),
       })))
-      return (next: boolean) => {
-        matches = next
-        act(() => listeners.forEach((listener) => listener({ matches: next })))
+      return {
+        flip(to: boolean) {
+          dark = to
+          act(() => subscribers.forEach((fn) => fn({ matches: to })))
+        },
+        listeners: () => subscribers.size,
       }
     }
+    const themeNow = () => document.documentElement.dataset.theme
+    const toggle = () => fireEvent.click(screen.getByRole('button', { name: /Cambiar a tema/ }))
 
-    it('TestRF021_SinBotonDeTemaLaPaginaSigueAlSistemaEnVivo', () => {
-      const setSystemDark = fakeSystemTheme(false)
-      initializeTheme()
-      expect(document.documentElement).toHaveAttribute('data-theme', 'light')
-
-      setSystemDark(true)
-      expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
-    })
-
-    it('TestRF021_ElTemaSigueAlSistemaEnVivoSinEleccionGuardada', () => {
-      const setSystemDark = fakeSystemTheme(false)
-      initializeTheme()
-      render(<ThemeToggle />)
-      expect(document.documentElement).toHaveAttribute('data-theme', 'light')
-
-      setSystemDark(true)
-      expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    it('TestRF021_ElProveedorSigueAlSistemaEnVivoSinEleccionGuardada', () => {
+      const os = operatingSystem(false)
+      mountToggle()
+      expect(themeNow()).toBe('light')
+      os.flip(true)
+      expect(themeNow()).toBe('dark')
       expect(screen.getByRole('button', { name: 'Cambiar a tema claro' })).toBeInTheDocument()
     })
 
-    it('TestRF021_TrasUnClicElCambioDelSistemaSeIgnora', () => {
-      const setSystemDark = fakeSystemTheme(false)
-      initializeTheme()
-      render(<ThemeToggle />)
-      fireEvent.click(screen.getByRole('button', { name: 'Cambiar a tema oscuro' }))
-
-      setSystemDark(false)
-      setSystemDark(true)
-      expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
-      setSystemDark(false)
-      expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
-      expect(screen.getByRole('button', { name: 'Cambiar a tema claro' })).toBeInTheDocument()
-    })
-
-    it('TestRF021_UnTemaGuardadoAlArrancarIgnoraAlSistema', () => {
-      window.localStorage.setItem('contabilidad.theme', 'light')
-      const setSystemDark = fakeSystemTheme(false)
-      initializeTheme()
-      render(<ThemeToggle />)
-
-      setSystemDark(true)
-      expect(document.documentElement).toHaveAttribute('data-theme', 'light')
-      expect(screen.getByRole('button', { name: 'Cambiar a tema oscuro' })).toBeInTheDocument()
+    it.each([
+      ['a click in this page', () => undefined],
+      ['a saved choice', () => window.localStorage.setItem('contabilidad.theme', 'light')],
+    ])('TestRF021_DejaDeSeguirAlSistemaTras_%s', (_name, setup) => {
+      setup()
+      const os = operatingSystem(false)
+      mountToggle()
+      if (window.localStorage.getItem('contabilidad.theme') === null) toggle()
+      const chosen = themeNow()
+      os.flip(true)
+      os.flip(false)
+      os.flip(true)
+      expect(themeNow()).toBe(chosen)
+      expect(os.listeners()).toBe(0)
     })
 
     it('TestRF021_SiGuardarFallaElClicDejaDeSeguirAlSistema', () => {
-      const getItem = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new DOMException('blocked', 'SecurityError') })
-      const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new DOMException('blocked', 'SecurityError') })
+      const spies = blockStorage()
       try {
-        const setSystemDark = fakeSystemTheme(false)
-        initializeTheme()
-        render(<ThemeToggle />)
-        setSystemDark(true)
-        expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
-
-        fireEvent.click(screen.getByRole('button', { name: 'Cambiar a tema claro' }))
-        setSystemDark(false)
-        setSystemDark(true)
-        expect(document.documentElement).toHaveAttribute('data-theme', 'light')
+        const os = operatingSystem(false)
+        mountToggle()
+        os.flip(true)
+        expect(themeNow()).toBe('dark')
+        toggle()
+        os.flip(false)
+        os.flip(true)
+        expect(themeNow()).toBe('light')
         expect(screen.getByRole('button', { name: 'Cambiar a tema oscuro' })).toBeInTheDocument()
       } finally {
-        getItem.mockRestore()
-        setItem.mockRestore()
+        spies.forEach((spy) => spy.mockRestore())
       }
+    })
+
+    it('TestRF021_AlDesmontarseElProveedorDejaDeEscucharAlSistema', () => {
+      const os = operatingSystem(false)
+      const view = mountToggle()
+      expect(os.listeners()).toBe(1)
+      view.unmount()
+      expect(os.listeners()).toBe(0)
     })
   })
 
   it('TestRF021_PersisteElTemaEnLaLlaveDeContabilidad', () => {
-    render(<ThemeToggle />)
+    mountToggle()
     fireEvent.click(screen.getByRole('button', { name: 'Cambiar a tema oscuro' }))
     expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
     expect(window.localStorage.getItem('contabilidad.theme')).toBe('dark')
     expect(screen.getByRole('button', { name: 'Cambiar a tema claro' })).toBeInTheDocument()
   })
 
-  it('TestRF021_HidrataElTemaGuardado', () => {
+  it('TestRF021_HidrataElTemaGuardadoAntesDeQueReactPinte', () => {
     window.localStorage.setItem('contabilidad.theme', 'dark')
-    initializeTheme()
+    paintFirstFrame()
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+  })
+
+  it('TestRF021_ElPrimerCuadroUsaElSistemaSinEleccionGuardada', () => {
+    vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: true }))
+    paintFirstFrame()
     expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
   })
 
   it('TestRF021_ElTemaSobreviveAlAlmacenamientoBloqueado', () => {
-    const getItem = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new DOMException('blocked', 'SecurityError') })
-    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new DOMException('blocked', 'SecurityError') })
+    const spies = blockStorage()
     vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: true }))
     try {
-      expect(() => initializeTheme()).not.toThrow()
+      expect(() => paintFirstFrame()).not.toThrow()
       expect(document.documentElement.dataset.theme).toBe('dark')
-      render(<ThemeToggle />)
+      mountToggle()
       expect(() => fireEvent.click(screen.getByRole('button', { name: 'Cambiar a tema claro' }))).not.toThrow()
       expect(document.documentElement.dataset.theme).toBe('light')
       fireEvent.click(screen.getByRole('button', { name: 'Cambiar a tema oscuro' }))
       expect(document.documentElement.dataset.theme).toBe('dark')
     } finally {
-      getItem.mockRestore()
-      setItem.mockRestore()
+      spies.forEach((spy) => spy.mockRestore())
     }
+  })
+
+  it('TestRF021_UsarElBotonSinProveedorFallaConUnMensajeClaro', () => {
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    expect(() => render(<ThemeToggle />)).toThrow(/AppearanceProvider/)
+    quiet.mockRestore()
   })
 
   it('TestRF021_ElAvisoSeCierraSoloEnCincoSegundos', () => {
@@ -160,7 +167,7 @@ describe('visual system of Contabilidad', () => {
 
   it('TestRF021_UnMensajeRepetidoReiniciaElTemporizadorDelShell', () => {
     vi.useFakeTimers()
-    render(<Shell access={senior} subject="3f2c1a9e-0000" onLogout={() => undefined} />)
+    withTheme(<Shell access={senior} subject="3f2c1a9e-0000" onLogout={() => undefined} />)
     fireEvent.click(screen.getByRole('button', { name: 'Transacciones' }))
     fireEvent.click(screen.getByRole('button', { name: 'Aprobar M-2043' }))
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar aprobación' }))
@@ -176,7 +183,7 @@ describe('visual system of Contabilidad', () => {
 
   it('TestRF021_UnMismoTextoRepetidoReiniciaElTemporizadorDelShell', () => {
     vi.useFakeTimers()
-    render(<Shell access={senior} subject="3f2c1a9e-0000" onLogout={() => undefined} />)
+    withTheme(<Shell access={senior} subject="3f2c1a9e-0000" onLogout={() => undefined} />)
     fireEvent.click(screen.getByRole('button', { name: 'Transacciones' }))
     const register = (description: string) => {
       fireEvent.click(screen.getByRole('button', { name: '+ Registrar movimiento' }))
@@ -198,14 +205,14 @@ describe('visual system of Contabilidad', () => {
   })
 
   it('TestRF021_ElCandadoConservaElNombreAccesibleBloqueado', () => {
-    render(<Shell access={auditor} subject="3f2c1a9e-0000" onLogout={() => undefined} />)
+    withTheme(<Shell access={auditor} subject="3f2c1a9e-0000" onLogout={() => undefined} />)
     const closing = screen.getByRole('button', { name: /Cierre contable/ })
     expect(closing).toBeDisabled()
     expect(within(closing).getByRole('img', { name: 'Bloqueado' })).toBeInTheDocument()
   })
 
   it('TestRF021_OfreceUnEnlaceParaSaltarAlContenidoYUnaTablaConNombre', () => {
-    render(<Shell access={auditor} subject="3f2c1a9e-0000" onLogout={() => undefined} />)
+    withTheme(<Shell access={auditor} subject="3f2c1a9e-0000" onLogout={() => undefined} />)
     expect(screen.getByRole('link', { name: 'Saltar al contenido' })).toHaveAttribute('href', '#main-content')
     fireEvent.click(screen.getByRole('button', { name: 'Transacciones' }))
     expect(screen.getByRole('table', { name: /Movimientos/ })).toBeInTheDocument()

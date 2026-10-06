@@ -13,6 +13,13 @@ interface Props {
 
 const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
+/** The element Tab must jump to when it would leave the dialog, or undefined when the browser may move on its own. */
+function tabWrapTarget(items: HTMLElement[], current: Element | null, backwards: boolean): HTMLElement | undefined {
+  if (items.length === 0) return undefined
+  const edge = backwards ? 0 : items.length - 1
+  return items[edge] === current ? items[items.length - 1 - edge] : undefined
+}
+
 /** Small modal confirmation: focus moves in on open, Tab stays inside, Escape cancels and focus returns to the trigger. */
 export function ConfirmDialog({ title, children, confirmLabel, tone, onConfirm, onCancel, fallbackFocus }: Readonly<Props>) {
   const titleId = useId()
@@ -43,16 +50,10 @@ export function ConfirmDialog({ title, children, confirmLabel, tone, onConfirm, 
     }
     if (event.key !== 'Tab' || !dialog.current) return
     const items = [...dialog.current.querySelectorAll<HTMLElement>(FOCUSABLE)]
-    const first = items[0]
-    const last = items[items.length - 1]
-    if (!first || !last) return
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault()
-      last.focus()
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault()
-      first.focus()
-    }
+    const wrapTo = tabWrapTarget(items, document.activeElement, event.shiftKey)
+    if (!wrapTo) return
+    event.preventDefault()
+    wrapTo.focus()
   }
 
   return (

@@ -6,35 +6,7 @@
 <meta name="color-scheme" content="light dark">
 <title>Flujo SSO entre Contabilidad e Identity Hub</title>
 <meta name="description" content="Secuencia de OAuth2 Authorization Code con PKCE entre Contabilidad y Identity Hub, con login y MFA por correo y token JWT EdDSA.">
-<style>
-:root{--bg:#f8fafc;--grid:#e2e8f0;--text:#0f172a;--muted:#64748b;--dim:#94a3b8;--panel:#fff;--pborder:#e2e8f0;--lane:rgba(248,250,252,.65);--lstroke:#cbd5e1;--arrow:#94a3b8;--emph:#059669;--mask:#f8fafc;
---frontend-f:rgba(34,211,238,.15);--frontend-s:#0891b2;--backend-f:rgba(52,211,153,.18);--backend-s:#059669;--database-f:rgba(167,139,250,.2);--database-s:#7c3aed;--cloud-f:rgba(251,191,36,.18);--cloud-s:#d97706;--security-f:rgba(251,113,133,.15);--security-s:#e11d48;--bus-f:rgba(251,146,60,.15);--bus-s:#ea580c;--external-f:rgba(148,163,184,.18);--external-s:#64748b}
-@media (prefers-color-scheme:dark){:root{--bg:#020617;--grid:#1e293b;--text:#fff;--muted:#94a3b8;--dim:#475569;--panel:rgba(15,23,42,.5);--pborder:#1e293b;--lane:rgba(15,23,42,.22);--lstroke:#334155;--arrow:#64748b;--emph:#34d399;--mask:#0b1220;
---frontend-f:rgba(8,51,68,.4);--frontend-s:#22d3ee;--backend-f:rgba(6,78,59,.4);--backend-s:#34d399;--database-f:rgba(76,29,149,.4);--database-s:#a78bfa;--cloud-f:rgba(120,53,15,.3);--cloud-s:#fbbf24;--security-f:rgba(136,19,55,.4);--security-s:#fb7185;--bus-f:rgba(251,146,60,.3);--bus-s:#fb923c;--external-f:rgba(30,41,59,.5);--external-s:#94a3b8}}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
-main{max-width:1240px;margin:0 auto;padding:24px 16px 40px}
-h1{font-size:1.5rem;margin:0 0 .25rem}h2{font-size:1.1rem;margin:2rem 0 .5rem}
-p.lead{margin:0 0 1rem;color:var(--muted);max-width:75ch}
-.fig{overflow-x:auto;border:1px solid var(--pborder);border-radius:12px;background:var(--panel)}
-svg{display:block;width:100%;height:auto;min-width:880px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"DejaVu Sans Mono","Liberation Mono",monospace}
-.grid{stroke:var(--grid);stroke-width:.5;fill:none}
-.region{fill:var(--lane);stroke:var(--lstroke);stroke-width:1;stroke-dasharray:6 4}
-.rl{fill:var(--muted);font-size:11px;letter-spacing:.04em}
-.n{stroke-width:1.5}
-.frontend{fill:var(--frontend-f);stroke:var(--frontend-s)}.backend{fill:var(--backend-f);stroke:var(--backend-s)}.database{fill:var(--database-f);stroke:var(--database-s)}.cloud{fill:var(--cloud-f);stroke:var(--cloud-s)}.security{fill:var(--security-f);stroke:var(--security-s)}.bus{fill:var(--bus-f);stroke:var(--bus-s)}.external{fill:var(--external-f);stroke:var(--external-s)}
-.t{fill:var(--text);font-size:12.5px;font-weight:700}.s{fill:var(--muted);font-size:10.5px}.l{fill:var(--muted);font-size:10.5px}.lm{fill:var(--mask)}
-.e{fill:none;stroke:var(--arrow);stroke-width:1.5}.e.dash{stroke-dasharray:5 4}.e.emph{stroke:var(--emph);stroke-width:1.8}.e.sec{stroke:var(--security-s)}.e.bus{stroke:var(--bus-s)}
-.m{fill:var(--arrow)}.m.emph{fill:var(--emph)}.m.sec{fill:var(--security-s)}.m.bus{fill:var(--bus-s)}
-.life{stroke:var(--lstroke);stroke-width:1;stroke-dasharray:3 4}
-.note{fill:var(--cloud-f);stroke:var(--cloud-s);stroke-width:1}
-table{border-collapse:collapse;width:100%;font-size:.88rem;background:var(--panel)}
-th,td{border:1px solid var(--pborder);padding:.5rem .7rem;text-align:left;vertical-align:top}
-th{background:var(--lane);color:var(--muted);font-weight:600}
-code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.92em}
-footer{margin-top:1.5rem;color:var(--muted);font-size:.82rem}
-.tw{overflow-x:auto;border-radius:8px}
-</style>
+<link rel="stylesheet" href="diagramas.css">
 </head>
 <body>
 <main>

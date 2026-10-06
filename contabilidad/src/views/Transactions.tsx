@@ -1,7 +1,7 @@
 import { FormEvent, useRef, useState } from 'react'
 import type { Access } from '../access'
 import { categoriesOf, filterMovements, sortMovements, type SortDirection, type SortKey, type StatusFilter } from '../aggregate'
-import { csvFileName, downloadCsv, toCsv } from '../csv'
+import { exportMovements } from '../exportMovements'
 import { CheckIcon, CloseIcon, DownloadIcon } from '../icons'
 import { KNOWN_CATEGORIES, STATUS_LABEL, formatCop, visibleMovements, type Movement } from '../ledger'
 import { ConfirmDialog } from './ConfirmDialog'
@@ -53,11 +53,8 @@ export function TransactionsView({ access, movements, onDecide, onRegister }: Re
     </th>
   )
 
-  // Exports exactly the rows on screen (search, filters and sort applied); amounts stay plain numbers.
-  const exportRows = () => {
-    const header = ['Folio', 'Fecha', 'Descripción', 'Categoría', 'Monto', 'Estado']
-    downloadCsv(csvFileName('movimientos'), toCsv(header, rows.map((movement) => [movement.id, movement.date, movement.description, movement.category, movement.amount, STATUS_LABEL[movement.status]])))
-  }
+  // Exports exactly the rows on screen (search, filters and sort applied).
+  const exportRows = () => exportMovements(rows)
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
