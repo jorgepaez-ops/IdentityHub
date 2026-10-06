@@ -264,6 +264,11 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
     existe en el código; un bloqueo puesto a mano por un admin no vence (`locked_until` vacío); el worker
     no usa la base aunque recibe `DATABASE_URL` (y `despliegue-aws.md` dibuja Worker→RDS). Para P10:
     añadir los dos UML nuevos a la lista de `docs/manuales/arquitectura.md` (líneas 71–74).
+    Revisión nativa del tramo `1688db9`..`f56b9a9` (arreglo de Inicio + diagramas): autorizada por el
+    usuario, pero rechazada con `lens_context_budget_exceeded` (45.299 líneas, casi todas el borrado de
+    los HTML de archify); sin registro creado. La herramienta revisa hasta HEAD, así que no se pudo
+    aislar el arreglo de Inicio: queda **sin revisión nativa**, cubierto por su prueba (RED observado) y
+    la revisión visual de Claude. El siguiente tramo parte de `f56b9a9`.
   - [ ] **P9d — Imágenes base y alertas de infraestructura:** Trivy (6), Checkov (27), Semgrep de nginx
     (4) y sección «Alertas abiertas conocidas» en `README.md`.
   - [ ] **P9e — Deudas de fases 3 y 4:** avisos de SonarCloud, sugerencias de las revisiones nativas
