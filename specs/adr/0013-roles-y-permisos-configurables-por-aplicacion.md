@@ -272,52 +272,13 @@ components:
 ```
 
 
-## Escenarios de aceptación diferidos
+## Escenarios de aceptación
 
-La correspondencia uno a uno de `scripts/traceability.py` exige que cada escenario `@RF-021` tenga
-su prueba E2E literal. Como T15 crea esas pruebas y T11 no puede crear archivos en `e2e/tests/`,
-los escenarios quedan aquí hasta entonces; no se crea todavía un `.feature` que rompería ese gate.
-
-```gherkin
-@RF-021
-Escenario: Admin crea auditor de Contabilidad con capacidades acotadas
-  Dado un administrador autenticado y la aplicación "contabilidad"
-  Cuando crea el rol "contabilidad.auditor" con "reportes.ver" y "movimientos.ver_todos"
-  Y asigna ese rol a un empleado
-  Entonces el empleado ve todos los movimientos y el Resumen
-  Pero no puede registrar, aprobar movimientos ni ejecutar el cierre
-  Y el token de Contabilidad contiene solo "reportes.ver" y "movimientos.ver_todos"
-
-@RF-021
-Escenario: Se rechaza crear un rol de directorio desde la grilla
-  Dado un administrador autenticado
-  Cuando intenta crear el rol "admin"
-  Entonces recibe 400 o 403 y el rol de directorio no cambia
-
-@RF-021
-Escenario: Un administrador no edita permisos de un rol que posee
-  Dado un administrador que tiene el rol "contabilidad.auditor"
-  Cuando intenta actualizar sus permisos
-  Entonces recibe 403 y el rol no cambia
-
-@RF-021
-Escenario: Se rechaza un permiso de otra aplicación
-  Dado un administrador autenticado y un rol de "contabilidad"
-  Cuando intenta asignarle un permiso de otra aplicación
-  Entonces recibe 400 y el rol no cambia
-
-@RF-021
-Escenario: No se elimina un rol asignado
-  Dado un rol de aplicación asignado a un empleado
-  Cuando un administrador intenta eliminarlo
-  Entonces recibe 409 y el rol permanece asignado
-
-@RF-021
-Escenario: Cada cambio de rol queda auditado
-  Dado un administrador autenticado
-  Cuando crea, actualiza y elimina un rol de aplicación no asignado
-  Entonces el audit log contiene "role_created", "role_updated" y "role_deleted"
-```
+Los seis escenarios de RF-021 viven en `specs/06-acceptance/roles-y-permisos.feature` y cada uno
+tiene su prueba E2E en `e2e/tests/roles-y-permisos.spec.ts` (correspondencia uno a uno verificada
+por `scripts/traceability.py`). Cubren la escena de la demo (auditor de Contabilidad), el rechazo
+de roles de directorio, la edición de un rol propio, el permiso de otra aplicación, la eliminación
+de un rol asignado y la auditoría de cada cambio.
 
 ## Consecuencias
 

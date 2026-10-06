@@ -291,9 +291,16 @@ describe('permission driven access', () => {
     expect(within(rowOf('M-2043')).getByText('esperando aprobación')).toBeInTheDocument()
   })
 
-  it('TestRF021_AuditorHasTheClosingLockedWithThePermissionNamed', async () => {
+  it('TestRF021_AuditorHasTheClosingLockedInTheRailAndCannotOpenIt', async () => {
     await signInAs(['contabilidad.auditor'], 'shell', AUDITOR)
-    expect(within(rail()).getByRole('button', { name: /Cierre contable/ })).toBeDisabled()
+    const closing = within(rail()).getByRole('button', { name: /Cierre contable/ })
+    expect(closing).toBeDisabled()
+    expect(within(closing).getByRole('img', { name: 'Bloqueado' })).toBeInTheDocument()
+    // The locked section cannot be opened: clicking it leaves the summary on screen. The locked copy
+    // itself ("Requiere el permiso cierre.ejecutar") is proven in views/Locked.test.tsx.
+    fireEvent.click(closing)
+    expect(screen.getByRole('heading', { name: 'Resumen' })).toBeInTheDocument()
+    expect(screen.queryByText('Requiere el permiso cierre.ejecutar')).not.toBeInTheDocument()
     expect(screen.getByText(/ver todos los movimientos/)).toBeInTheDocument()
   })
 

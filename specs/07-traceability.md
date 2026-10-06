@@ -30,7 +30,7 @@ declaración de buenas intenciones.
 | **RF-018** | Claves de servicio | P2 | — | — | — | — | ⏳ diferido (semana 4) |
 | **RF-019** | Exportación del audit log | P2 | — | — | — | — | ⏳ diferido (semana 4) |
 | **RF-020** | Autorización de aplicaciones cliente | P1 | `authorizeClient`, `exchangeAuthorizationCode` | 10 | 31 | 8 | ✅ completo |
-| **RF-021** | Roles y permisos configurables por aplicación | P1 | `listApplications`, `listApplicationRoles`, `createApplicationRole`, `updateApplicationRole`, `deleteApplicationRole` | — | 31 | — | ⏳ diferido (semana 4) |
+| **RF-021** | Roles y permisos configurables por aplicación | P1 | `listApplications`, `listApplicationRoles`, `createApplicationRole`, `updateApplicationRole`, `deleteApplicationRole` | 6 | 31 | 6 | ✅ completo |
 | **RNF-001** | Contenerización total | P0 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-002** | Pipeline de ciclo completo | P0 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-003** | Cero secretos en el repositorio | P0 | — | — | 4 | — | 🟡 parcial |
@@ -44,7 +44,7 @@ declaración de buenas intenciones.
 | **RNF-011** | Los specs son la fuente de verdad | P0 | — | — | 5 | — | 🟡 parcial |
 | **RNF-012** | Logs sin datos sensibles | P0 | — | — | 5 | — | 🟡 parcial |
 
-**Resumen:** 33 requisitos · 17 completos · 7 parciales · 6 sin cubrir · 3 diferidos (semana 4).
+**Resumen:** 33 requisitos · 18 completos · 7 parciales · 6 sin cubrir · 2 diferidos (semana 4).
 
 Leyenda de estado: *completo* = verificado por al menos dos de las tres
 columnas de prueba · *parcial* = una sola · *sin cubrir* = ninguna · *diferido (semana 4)* = backlog de semana 4 por decisión Q14.
@@ -116,3 +116,10 @@ columnas de prueba · *parcial* = una sola · *sin cubrir* = ninguna · *diferid
   - autorizacion-oauth.feature — Sin sesión en el Hub se pasa por el login y se vuelve a la autorización
   - autorizacion-oauth.feature — Un "continue" absoluto o externo no provoca una redirección abierta
   - control-de-acceso.feature — Un empleado sin rol de aplicación no accede a Contabilidad
+- **RF-021**
+  - roles-y-permisos.feature — Admin crea auditor de Contabilidad con capacidades acotadas
+  - roles-y-permisos.feature — Se rechaza crear un rol de directorio desde la grilla
+  - roles-y-permisos.feature — Un administrador no edita permisos de un rol que posee
+  - roles-y-permisos.feature — Se rechaza un permiso de otra aplicación
+  - roles-y-permisos.feature — No se elimina un rol asignado
+  - roles-y-permisos.feature — Cada cambio de rol queda auditado

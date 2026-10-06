@@ -405,8 +405,31 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   Ruta: delegada (Sonnet), revisión de Claude. Evidencia (2026-10-06): RED con la implementación original y las pruebas nuevas: 7 TestRF021_* fallan (53 pasan); GREEN: npm run typecheck, lint y build limpios, vitest 60/60 (53 previas + 7 nuevas TestRF021_: 2 de jwt y 5 de App; los TestRF009_* intactos).
   Verificación de Claude: typecheck, lint, 60/60, build y trazabilidad; `web` reconstruido y la
   suite E2E completa contra el stack sigue 46/46 (senior, analista y la demo sin cambios).
-- [ ] **T15 — E2E y trazabilidad.** Escena de la demo (crear `contabilidad.auditor` y verlo en
+  Revisión nativa de T14 (`review-a0b97eb37397a2f5`, alto, 219 líneas, 4 lentes): **aprobada**,
+  sin bloqueantes. Ocho avisos informativos, a decidir como trabajo aparte: R3-001 (la prueba del
+  auditor dice verificar el cierre bloqueado pero no abre esa vista), R3-002 (el Resumen bloqueado no
+  tiene prueba de render), R4-001 (un token emitido antes de T12a, sin `permissions`, degrada a un
+  senior a «propios» hasta renovar la sesión), R2 (etiqueta derivada del nombre de rol; la grilla de
+  permisos repetida en `testing.ts` y `SEEDED_HINTS`; literales de permiso en `Closing.tsx` y
+  `Summary.tsx`; el centinela `undefined` de `signInAs`).
+- [x] **T15 — E2E y trazabilidad.** Escena de la demo (crear `contabilidad.auditor` y verlo en
   Contabilidad), matriz al día.
+  Ruta: delegada (Sonnet: necesita Docker y el stack), revisión de Claude. Evidencia (2026-10-06):
+  los seis escenarios del ADR 0013 pasan a `specs/06-acceptance/roles-y-permisos.feature` (el ADR
+  queda con un puntero); `e2e/tests/roles-y-permisos.spec.ts` con un E2E por escenario (la escena del
+  auditor por la interfaz de la consola y de Contabilidad; el resto por la API) y `e2e/support/roles.ts`;
+  RF-021 sale de `DEFERRED` y la matriz queda «completo» (6 escenarios, 31 pruebas Go, 6 E2E). RED: la
+  escena del auditor falló primero por un localizador ambiguo; las otras cinco pasaron a la primera
+  porque la API (T12) y la interfaz (T13) ya existían. Avisos de la revisión de T14: R3-001 (el botón de
+  Cierre está deshabilitado, así que la prueba de App verifica el candado y que no se abre) y R3-002
+  (`views/Locked.test.tsx` renderiza las vistas bloqueadas; mutación comprobada).
+  Verificación: `make e2e` 52/52, typecheck de e2e, typecheck/lint y vitest 63/63 de Contabilidad,
+  `make spec-drift` al día, sin roles de prueba en la base. Corrección de Claude: `purgeRole` se negaba
+  solo a nombres fuera de `contabilidad.*`; ahora también rechaza los roles sembrados (senior,
+  analista). Re-corrida: los 6 E2E de RF-021 pasan. Desviación aceptada: el E2E no decodifica el token;
+  verifica el texto «Tu rol permite…», que `access.ts` deriva de sus permisos (el contenido exacto del
+  claim lo cubren las pruebas de integración de T12a). Ojo: el E2E borra `contabilidad.auditor` al
+  empezar y al terminar, así que no conviene correrlo con un auditor creado a mano para la demo.
 
 ## Fase 4 — Publicación y entrega
 
@@ -425,18 +448,15 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
 |---|---|---|
 | 1 — Documentación, UML e integración | T1 a T6 (6) | 5 (T1 a T4 y T6; T5 parcial) |
 | 2 — IaC de referencia | T7 a T10 (4) | 4 (T7 a T10) — fase cerrada |
-| 3 — Grilla de roles configurable | T11 a T15 (5) | 4 (T11 a T14) |
+| 3 — Grilla de roles configurable | T11 a T15 (5) | 5 (T11 a T15) — fase cerrada |
 | 4 — Publicación y entrega | T16 a T21 (6) | 0 |
-| **Total** | **21** | **13** (T1 a T4, T6 a T14; T5 parcial) |
+| **Total** | **21** | **14** (T1 a T4, T6 a T15; T5 parcial) |
 
 ## Siguiente paso
 
-**Pausa 2026-10-06.** Retomar con T15: E2E de la escena del auditor (crear `contabilidad.auditor`
-con `reportes.ver` y `movimientos.ver_todos` en la grilla, asignarlo, entrar a Contabilidad: ve todo
-y el Resumen, no registra, aprueba ni cierra) más un E2E por cada escenario de RF-021; pasar los seis
-escenarios Gherkin del ADR 0013 a `specs/06-acceptance/roles-y-permisos.feature` y quitar RF-021 de
-`DEFERRED`. Después completar la sección de permisos de T5 y abrir el PR de la fase 3 (con
-confirmación del usuario). Pendiente: la revisión nativa de T14 (pedir consentimiento al retomar).
+**2026-10-06.** Fase 3 cerrada (T15 hecha; revisión nativa de T14 aprobada). Siguiente: completar
+la sección 7 (permisos) de la guía de integración (T5) y abrir el PR de la fase 3 con confirmación del
+usuario; después la fase 4 desde T16.
 Codex: cuota diaria limitada; Sonnet como respaldo.
 
 ## Cambios de spec propuestos
