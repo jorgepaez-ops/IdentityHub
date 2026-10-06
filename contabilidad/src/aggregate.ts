@@ -42,7 +42,7 @@ const nextMonth = (month: string): string => {
 const MONTH_KEY = /^\d{4}-(0[1-9]|1[0-2])$/
 
 export function totalsByMonth(movements: Movement[]): MonthTotal[] {
-  const keys = movements.map((movement) => movement.date.slice(0, 7)).filter((key) => MONTH_KEY.test(key)).sort()
+  const keys = movements.map((movement) => movement.date.slice(0, 7)).filter((key) => MONTH_KEY.test(key)).sort((a, b) => a.localeCompare(b))
   if (keys.length === 0) return []
   const first = keys[0] as string
   const last = keys[keys.length - 1] as string
