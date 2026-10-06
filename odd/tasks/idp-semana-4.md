@@ -488,6 +488,9 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   queda marcado como histórico. R3-002 (forma de `captura` en null): sigue el protocolo de evidencia.
 - [ ] **T17 — Docker Hub.** Workflow de release en tag `vX.Y.Z`: imágenes con `vX.Y.Z` y `latest`,
   SBOM con Syft y firma con Cosign (ADR 0011, Q1).
+  Pospuesta al final de la fase 4 por decisión del usuario (2026-10-06), a la espera de Q1 (namespace
+  y token de Docker Hub). Propuesta de Claude: repositorios `api`, `worker` y `web` (`web` ya sirve el
+  Hub y Contabilidad), environment protegido `dockerhub`, tag de prueba `v0.9.0` y `v1.0.0` en T21.
 - [ ] **T18 — Manual de usuario con capturas** (incluye la grilla de roles).
 - [ ] **T19 — Informe técnico PDF** con las 8 secciones del enunciado.
 - [ ] **T20 — Guion del video** de 10-15 minutos (ciclo completo: app, pipeline, despliegue,
@@ -507,7 +510,8 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
 ## Siguiente paso
 
 **2026-10-06.** Fases 1 a 3 cerradas y en main (PR #11, merge `8b4a18a`, CI 21/21). T16 hecha
-(VULN-019 remediado, capturas de Desktop incluidas). Siguiente: T17 (Docker Hub).
+(VULN-019 remediado, capturas de Desktop incluidas). T17 pospuesta al final (Q1). Siguiente: T18
+(manual de usuario con capturas).
 Codex: cuota diaria limitada; Sonnet como respaldo.
 
 ## Cambios de spec propuestos
