@@ -473,13 +473,19 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   rabbitmq y prometheus `up` (Claude lo repitió), Grafana 13.2.3 con sus dos fuentes de datos y el
   dashboard, Loki con logs del api vía Alloy, `make e2e` 52/52, `terraform fmt -check` y `validate`.
   RED no aplica (cambio de imágenes): la prueba es el escaneo antes/después.
-  Evidencia «después»: run `baseline-scan` 37471823657 (`workflow_dispatch`, `ref=14047c7`), total de
-  las 8 imágenes 710 → 137 (`mailpit` y `loki` 0); residual de proveedor detallado en
-  `security/evidence/actions-37471823657/README.md`; ficha, `evidencia.json` y README raíz al día
+  Evidencia «después»: run `baseline-scan` 37473616659 (`workflow_dispatch`, `ref=924b581`), total de
+  las 8 imágenes 710 → 108 (`mailpit` y `loki` 0); residual detallado en
+  `security/evidence/actions-37473616659/README.md`; ficha, `evidencia.json` y README raíz al día
   (28 fichas remediadas). Pendiente: capturas de Claude Desktop (`captura` en null hasta confirmarlas).
   Revisión nativa (`review-dad3dc9c349c9821`, medio, 26 líneas, 1 lente): **aprobada**; avisos
   informativos R3-001 a R3-005 (cambios de versión mayor sin prueba en el candidato, E2E con el nuevo
   mailpit, digests multiarquitectura), todos cubiertos por la verificación anterior.
+  Revisión nativa de la evidencia (`review-0acc883077aedd36`, alto, 191 líneas, 4 lentes): **aprobada**.
+  R1-001, R2-001 y R3-001 coincidían en que 51 de los 117 hallazgos de `postgres` tenían parche: se
+  vuelve a fijar `postgres:16-bookworm` en su digest reconstruido (misma 16.15) en el compose y en el
+  servicio de CI (`924b581`, Trivy local 117 → 88, con parche 51 → 22; base sana, `/readyz` 200,
+  `make e2e` 52/52) y se relanza el run (37473616659 reemplaza a 37471823657). R2-002: el párrafo de T30
+  queda marcado como histórico. R3-002 (forma de `captura` en null): sigue el protocolo de evidencia.
 - [ ] **T17 — Docker Hub.** Workflow de release en tag `vX.Y.Z`: imágenes con `vX.Y.Z` y `latest`,
   SBOM con Syft y firma con Cosign (ADR 0011, Q1).
 - [ ] **T18 — Manual de usuario con capturas** (incluye la grilla de roles).
@@ -501,7 +507,7 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
 ## Siguiente paso
 
 **2026-10-06.** Fases 1 a 3 cerradas y en main (PR #11, merge `8b4a18a`, CI 21/21). T16 hecha
-(VULN-019 remediado; faltan las capturas de Desktop del run 37471823657). Siguiente: T17 (Docker Hub).
+(VULN-019 remediado; faltan las capturas de Desktop del run 37473616659). Siguiente: T17 (Docker Hub).
 Codex: cuota diaria limitada; Sonnet como respaldo.
 
 ## Cambios de spec propuestos
