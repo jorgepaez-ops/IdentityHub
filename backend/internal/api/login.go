@@ -37,9 +37,13 @@ func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusLocked, "login-locked", "Locked", "Login is temporarily unavailable. Please try again later.")
 		observability.LoginAttempts.WithLabelValues("locked").Inc()
 	case errors.Is(err, login.ErrIPRateLimited):
+		// Not counted in LoginAttempts: the request is rejected before any credential is
+		// checked, so it is not an authentication outcome.
 		writeProblem(w, http.StatusLocked, "login-locked", "Locked", "Login is temporarily unavailable. Please try again later.")
 	case errors.Is(err, login.ErrInvalidCredentials):
 		writeProblem(w, http.StatusUnauthorized, "invalid-credentials", "Unauthorized", "Invalid email or password.")
+		// The attempt that triggers a lock also lands here (the domain reports invalid
+		// credentials); the following attempts are counted as "locked".
 		observability.LoginAttempts.WithLabelValues("failed").Inc()
 	case errors.Is(err, mfa.ErrIssuanceLimited):
 		writeProblem(w, http.StatusTooManyRequests, "mfa-challenge-rate-limited", "Too Many Requests", "Too many verification codes were requested. Please try again later.")

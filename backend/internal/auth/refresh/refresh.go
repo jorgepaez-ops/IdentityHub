@@ -168,7 +168,6 @@ func (s *Service) Refresh(ctx context.Context, input Input) (Result, error) {
 				return fmt.Errorf("record refresh reuse audit: %w", err)
 			}
 			event = &SecurityEvent{Type: "security.refresh_reuse_detected", UserID: rotation.UserID, FamilyID: rotation.FamilyID, RevokedCount: revokedCount, IP: input.IP}
-			observability.RefreshReuseDetected.Inc()
 			// Returning an error here would roll back the revocation and audit.
 			refreshErr = ErrRefreshReuse
 			return nil
@@ -178,6 +177,11 @@ func (s *Service) Refresh(ctx context.Context, input Input) (Result, error) {
 	})
 	if err != nil {
 		return Result{}, err
+	}
+	if event != nil {
+		// Counted only after the revocation committed, so a rolled-back or retried
+		// transaction never inflates the dashboard.
+		observability.RefreshReuseDetected.Inc()
 	}
 	if event != nil && s.publisher != nil {
 		if err := s.publisher.PublishSecurityEvent(ctx, *event); err != nil {

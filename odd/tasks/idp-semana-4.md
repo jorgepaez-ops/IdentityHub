@@ -552,6 +552,10 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   69 `succeeded`, 3 `failed`; 204 eventos `published`; 2 reusos; serie de `notifications.dlq` presente.
   Limitación aceptada: el intento que provoca el bloqueo se cuenta como `failed` (el dominio devuelve
   credenciales inválidas); los siguientes, como `locked`.
+  Commit `fa6d307`. Revisión nativa (alto, 286 líneas, 4 lentes): **aprobada**. Corregido después:
+  el contador de reuso sube solo tras el commit de la revocación (R3-001/R4), comentarios en el handler
+  de login sobre el límite de IP y el intento que bloquea (R2), y `Publish` sin retorno con nombre.
+  Sugerencias no aplicadas: constantes para las etiquetas, prueba de serialización duplicada.
   iCloud volvió a reemplazar 7 capturas del manual por versiones viejas y a crear copias « N»: se
   restauraron desde git (`6496a92`) y las copias se movieron fuera del repo, sin borrarlas. Causa
   (aclarada por el usuario): la sincronización continua del Mac con iCloud al reescribir archivos

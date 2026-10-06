@@ -98,7 +98,7 @@ func (b *Broker) declareTopology() error {
 
 // Publish serializa el evento y espera la confirmación del broker antes de
 // devolver. Si el broker no confirma, el llamante debe revertir su transacción.
-func (b *Broker) Publish(ctx context.Context, routingKey string, event any) (err error) {
+func (b *Broker) Publish(ctx context.Context, routingKey string, event any) error {
 	result := "failed"
 	defer func() {
 		observability.EventsPublished.WithLabelValues(routingKey, result).Inc()
