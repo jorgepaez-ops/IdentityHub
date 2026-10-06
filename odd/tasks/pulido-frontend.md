@@ -236,7 +236,14 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
     saltar fuera del `Shell`, que ya lo tenía); `resetThemeForTests()` en el `afterEach` de ambas suites;
     orden por monto con la lista completa y desempate por folio; `MFA_CODE_REJECTED_ACTION`. RED: 5
     pruebas. vitest Hub 253/253 y Contabilidad 143/143, typecheck y lint limpios, `make e2e` 52/52.
-  - [ ] **P9b — Acciones de GitHub fijadas por SHA** (50 alertas de Semgrep), con el tag como comentario.
+  - [x] **P9b — Acciones de GitHub fijadas por SHA** (50 alertas de Semgrep), con el tag como comentario.
+    Evidencia (2026-10-06, Sonnet con red, revisión de Claude): las 50 referencias de los tres workflows
+    van a SHA de 40 caracteres con `# vX.Y.Z`, dentro de su mayor actual (único cambio real:
+    `hadolint-action` v3.1.0 → v3.5.0); `trivy-action` v0.36.0 verificado contra el incidente de 2026
+    (tag anotado firmado, commit firmado en `master`, release inmutable); `.github/dependabot.yml` semanal
+    para `github-actions`. `actionlint` sin hallazgos y YAML válido. Claude verificó por su cuenta los SHA
+    de `checkout` y `trivy-action` con `gh api` y que no queda ningún `uses:` sin fijar. El efecto en CI se
+    ve en el próximo push.
   - [ ] **P9c — Diagramas regenerados** sin bibliotecas JavaScript (33 alertas de CodeQL) y UML de
     secuencia del SSO con PKCE y de estados del usuario en `docs/diagramas/uml/`.
   - [ ] **P9d — Imágenes base y alertas de infraestructura:** Trivy (6), Checkov (27), Semgrep de nginx
