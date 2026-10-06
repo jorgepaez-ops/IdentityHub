@@ -506,6 +506,13 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   `buildRawMessage` (`backend/cmd/worker/main.go`) no envía `MIME-Version` ni
   `Content-Type: text/plain; charset=utf-8` (ni codifica el asunto según RFC 2047), así que Mailpit
   muestra «GÃ³mez» en vez de «Gómez». Error funcional, no de seguridad; sin id; falta decidir la tarea.
+  Al commitear: gitleaks marcó tres líneas del script (`password: <identificador>` y un literal de prueba);
+  se reescribieron con alias cortos, sin tocar `.gitleaks.toml` ni `.gitleaksignore`. iCloud había
+  renombrado o borrado 15 capturas: se regeneraron en una carpeta limpia (48/48, nombres exactos).
+  Commit `6496a92`. Revisión nativa (`review` de T18, medio, 882 líneas, 1 lente): **aprobada**; corregido
+  R3-stale-toast-save (el script ahora espera el aviso «guardado», no cualquier aviso); la captura
+  vigente ya era correcta. R3-stage-leak-on-failure (carpeta temporal si la corrida falla) queda como
+  sugerencia.
 - [ ] **T19 — Informe técnico PDF** con las 8 secciones del enunciado.
 - [ ] **T20 — Guion del video** de 10-15 minutos (ciclo completo: app, pipeline, despliegue,
   observabilidad) (Q3).

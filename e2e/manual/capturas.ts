@@ -327,7 +327,8 @@ test('Capturas del manual de usuario', async ({ browser }) => {
       await expect(adminPage.getByRole('button', { name: `Guardar ${TEMPORARY_ROLE}` })).toBeEnabled()
       await shot(adminPage, 'administrador-10-permiso-marcado', { viewport: { width: 1600, height: 1000 }, widen: true })
       await adminPage.getByRole('button', { name: `Guardar ${TEMPORARY_ROLE}` }).click()
-      await expect(adminPage.getByRole('status')).toBeVisible()
+      // The creation toast may still be on screen; wait for the save message itself.
+      await expect(adminPage.getByRole('status')).toContainText(`Rol ${TEMPORARY_ROLE} guardado.`)
       await shot(adminPage, 'administrador-11-rol-guardado', { viewport: { width: 1600, height: 1000 }, widen: true })
 
       await adminPage.getByRole('button', { name: `Eliminar ${TEMPORARY_ROLE}` }).click()
