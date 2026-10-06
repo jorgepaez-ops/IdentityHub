@@ -686,7 +686,7 @@ cd docs/informe && npm install --ignore-scripts && node capturas-grafana.mjs --o
 make informe       # Markdown -> HTML -> PDF con Chromium (docs/informe/informe-tecnico.pdf)
 ```
 
-`make informe` instala las dependencias del informe (`marked`, `mermaid`, `playwright-core` y `pdfjs-dist`, con lockfile) si faltan y usa el Chromium de Playwright ya instalado en la máquina.
+`make informe` reinstala con `npm ci` las dependencias del informe (`marked`, `mermaid`, `playwright-core` y `pdfjs-dist`, con lockfile; necesita red) y usa el Chromium de Playwright ya instalado en la máquina.
 
 # Anexo B — Índice de artefactos del repositorio
 

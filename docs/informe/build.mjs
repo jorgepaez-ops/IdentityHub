@@ -55,17 +55,21 @@ function mermaidBlock(rel, n) {
 function codeLines(rel, range) {
   const [from, to] = range.split('-').map(Number)
   const lines = fs.readFileSync(path.resolve(here, '../..', rel), 'utf8').split('\n')
-  return lines.slice(from - 1, to).join('\n')
+  // An edited workflow must break the build, not silently shift the quoted excerpt.
+  if (!(from >= 1 && to >= from && to <= lines.length)) throw new Error(`${rel}:${range} is outside the file (${lines.length} lines)`)
+  const excerpt = lines.slice(from - 1, to)
+  if (excerpt.every((line) => line.trim() === '')) throw new Error(`${rel}:${range} is empty`)
+  return excerpt.join('\n')
 }
 
 // The seeded baseline reports contain real-looking (fake) secrets: the report only ever shows the
-// redacted copy, and this masks Secret/Match again as a second line of defence.
+// redacted copy, and this masks Secret/Match/Line again as a second line of defence.
 function redactedReport(rel, max) {
   const data = JSON.parse(fs.readFileSync(path.resolve(here, '../..', rel), 'utf8'))
   const mask = (o) => {
     if (Array.isArray(o)) return o.map(mask)
     if (o && typeof o === 'object')
-      return Object.fromEntries(Object.entries(o).map(([k, v]) => [k, ['Secret', 'Match'].includes(k) ? '<redactado>' : mask(v)]))
+      return Object.fromEntries(Object.entries(o).map(([k, v]) => [k, ['Secret', 'Match', 'Line'].includes(k) ? '<redactado>' : mask(v)]))
     return o
   }
   const first = mask(data.slice(0, max))
@@ -350,11 +354,19 @@ try {
   await printPdf(browser, pageHtml(meta, bodyHtml, null), draft)
   const first = await pageOfHeadings(draft)
   fs.rmSync(draft, { force: true })
-  await printPdf(browser, pageHtml(meta, bodyHtml, first.pages), OUTPUT)
-  const second = await pageOfHeadings(OUTPUT)
+  // Print to a temp file and move it into place only after the pagination check passes, so a failed
+  // build never leaves a PDF with a wrong table of contents where the release picks it up.
+  const final = path.join(os.tmpdir(), `informe-final-${process.pid}.pdf`)
+  await printPdf(browser, pageHtml(meta, bodyHtml, first.pages), final)
+  const second = await pageOfHeadings(final)
   for (const [id, pg] of first.pages) {
-    if (second.pages.get(id) !== pg) throw new Error(`Pagination moved between passes at ${id}`)
+    if (second.pages.get(id) !== pg) {
+      fs.rmSync(final, { force: true })
+      throw new Error(`Pagination moved between passes at ${id}`)
+    }
   }
+  fs.copyFileSync(final, OUTPUT)
+  fs.rmSync(final, { force: true })
   console.log(`informe-tecnico.pdf: ${second.total} pages, ${(fs.statSync(OUTPUT).size / 1024 / 1024).toFixed(2)} MB`)
   for (const h of headings) console.log(`${String(second.pages.get(h.id)).padStart(3)}  ${'  '.repeat(h.level - 1)}${h.num} ${h.title}`)
 } finally {

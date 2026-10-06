@@ -529,6 +529,11 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   límite, el PDF queda en `.gitignore`, se regenera con `make informe` y se adjunta al release en T21.
   Gitleaks marcó `const password = …` en `capturas-grafana.mjs` (valor leído en ejecución, no escrito):
   variable renombrada.
+  Commit `2315f09`. Revisión nativa (medio, 2681 líneas, 1 lente): **aprobada**. Corregido después:
+  el PDF final se escribe en un temporal y solo se copia si la paginación de las dos pasadas coincide;
+  los rangos de líneas citados de los workflows fallan el build si quedan fuera del archivo o vacíos; el
+  enmascarado de gitleaks cubre también `Line`; el anexo dice que `make informe` reinstala con `npm ci`.
+  Sugerencias no aplicadas: limpieza con try/finally, índice por subcadena, espera fija en las capturas.
   **Hallazgo nuevo fuera de alcance (T19):** el dashboard «Identity Hub — Seguridad» tiene paneles sin
   datos: `identity_login_attempts_total`, `identity_events_published_total` e
   `identity_refresh_reuse_detected_total` están definidas en `backend/internal/observability/metrics.go`
