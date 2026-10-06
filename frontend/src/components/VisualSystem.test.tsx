@@ -34,6 +34,15 @@ describe('visual system feedback', () => {
       }
     }
 
+    it('TestRF010_SinBotonDeTemaLaPaginaSigueAlSistemaEnVivo', () => {
+      const setSystemDark = fakeSystemTheme(false)
+      initializeTheme()
+      expect(document.documentElement).toHaveAttribute('data-theme', 'light')
+
+      setSystemDark(true)
+      expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    })
+
     it('TestRF010_ElTemaSigueAlSistemaEnVivoSinEleccionGuardada', () => {
       const setSystemDark = fakeSystemTheme(false)
       initializeTheme()

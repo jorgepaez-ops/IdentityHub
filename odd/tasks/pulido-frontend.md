@@ -124,6 +124,10 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
   ceros falsos para los demás estados; ahora se ocultan mientras hay filtro (prueba nueva, RED observado),
   y el ternario anidado del estado vacío pasó a una función. vitest 207/207, typecheck y lint limpios,
   `make e2e` 52/52 (corrido por Sonnet antes de la corrección, que no toca flujos de E2E).
+  Commit `c8059d7`. Revisión nativa del tramo tema + P4 (medio, 14 archivos, 518 líneas, 1 lente):
+  **aprobada** y acusada. Su sugerencia se atendió: prueba de que la página sigue al sistema sin el botón
+  de tema montado (pantallas públicas), en ambas apps; falla al quitar la suscripción de
+  `initializeTheme`. vitest Hub 208/208 y Contabilidad 77/77, lint y typecheck limpios.
 - [ ] **P5 — Auditoría.** Atajos de filtro, actor resuelto a correo (`getUser`), metadatos legibles y
   «filtrar por este actor».
 - [ ] **P6 — Contabilidad: resumen.** Más datos de ejemplo, gráficos SVG (por estado, por categoría,

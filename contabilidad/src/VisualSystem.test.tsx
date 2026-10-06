@@ -38,6 +38,15 @@ describe('visual system of Contabilidad', () => {
       }
     }
 
+    it('TestRF021_SinBotonDeTemaLaPaginaSigueAlSistemaEnVivo', () => {
+      const setSystemDark = fakeSystemTheme(false)
+      initializeTheme()
+      expect(document.documentElement).toHaveAttribute('data-theme', 'light')
+
+      setSystemDark(true)
+      expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    })
+
     it('TestRF021_ElTemaSigueAlSistemaEnVivoSinEleccionGuardada', () => {
       const setSystemDark = fakeSystemTheme(false)
       initializeTheme()
