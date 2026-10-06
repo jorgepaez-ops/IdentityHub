@@ -1,5 +1,5 @@
 # Minimo privilegio: ALB -> web (8080) -> api (8081) -> db (5432) / broker (5672);
-# worker -> db / broker / correo. Todo con reglas separadas y con descripcion.
+# worker -> broker / correo. Todo con reglas separadas y con descripcion.
 # No se aplica en LocalStack: solo CRUD (ADR 0012)
 
 locals {
@@ -85,7 +85,7 @@ resource "aws_vpc_security_group_ingress_rule" "api_from_web" {
 
 # ── Datos: db (5432) y broker (5672) ────────────────────────────────────────
 locals {
-  db_clients     = ["api", "worker", "migrate"]
+  db_clients     = ["api", "migrate"]
   broker_clients = ["api", "worker"]
 }
 

@@ -275,3 +275,40 @@ func TestConfig_BootstrapAdminEmailOpcionalYValidado(t *testing.T) {
 		})
 	}
 }
+
+// RNF-003 — El worker solo consume la cola y envía SMTP: no debe exigir (ni
+// recibir) la cadena de conexión a la base de datos.
+func TestRNF003_WorkerArrancaSinDatabaseURL(t *testing.T) {
+	const seed = "MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=" // base64 of the digits 0-9 repeated: a fake test key
+	t.Setenv("DATABASE_URL", "")
+	t.Setenv("RABBITMQ_URL", "amqp://x")
+	t.Setenv("JWT_SIGNING_KEY", seed)
+
+	cfg, err := LoadWorker()
+	if err != nil {
+		t.Fatalf("LoadWorker sin DATABASE_URL: %v", err)
+	}
+	if cfg.RabbitURL.Reveal() != "amqp://x" {
+		t.Errorf("LoadWorker perdió RABBITMQ_URL: %q", cfg.RabbitURL.Reveal())
+	}
+
+	// La API mantiene la exigencia.
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "DATABASE_URL") {
+		t.Fatalf("Load sin DATABASE_URL debe seguir fallando; se obtuvo: %v", err)
+	}
+}
+
+func TestRNF003_WorkerSigueExigiendoElBroker(t *testing.T) {
+	const seed = "MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=" // base64 of the digits 0-9 repeated: a fake test key
+	t.Setenv("DATABASE_URL", "")
+	t.Setenv("RABBITMQ_URL", "")
+	t.Setenv("JWT_SIGNING_KEY", seed)
+
+	_, err := LoadWorker()
+	if err == nil || !strings.Contains(err.Error(), "RABBITMQ_URL") {
+		t.Fatalf("LoadWorker sin RABBITMQ_URL debe fallar; se obtuvo: %v", err)
+	}
+	if strings.Contains(err.Error(), "DATABASE_URL") {
+		t.Errorf("LoadWorker no debe mencionar DATABASE_URL: %v", err)
+	}
+}

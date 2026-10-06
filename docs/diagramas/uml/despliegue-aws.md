@@ -55,7 +55,6 @@ flowchart TB
     Api -->|5432| RDS
     Api -->|AMQP 5672| Broker
     Worker -->|AMQP 5672| Broker
-    Worker -->|5432| RDS
     Worker -->|SMTP| NAT
     Migrate -->|5432| RDS
     NAT --> SES
@@ -101,6 +100,7 @@ sequenceDiagram
 
 - **TLS, DNS público y WAF** se definen pero no se prueban (solo se crean en LocalStack, y no se
   aplica en ninguna nube).
+- **El worker no toca la base de datos.** Solo consume la cola (AMQP) y envía SMTP: no recibe `DATABASE_URL` ni tiene regla de red hacia RDS.
 - **El correo por SES** exige que el worker soporte autenticación SMTP y STARTTLS, y hoy no lo hace.
 - **Detrás del ALB**, Nginx tiene que propagar la IP real del cliente; si no, el límite de fallos
   por IP trataría a todos los usuarios como uno solo.

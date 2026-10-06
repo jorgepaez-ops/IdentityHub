@@ -72,6 +72,18 @@ const (
 // abortar en el primero. Arrancar el contenedor cinco veces para descubrir cinco
 // variables faltantes es una forma tonta de perder una tarde.
 func Load() (*Config, error) {
+	return load(true)
+}
+
+// LoadWorker loads the configuration of the worker binary. It is identical to
+// Load except that DATABASE_URL is not required: the worker only consumes the
+// queue and sends SMTP, so it never opens a database connection and should not
+// be handed that credential (least privilege).
+func LoadWorker() (*Config, error) {
+	return load(false)
+}
+
+func load(requireDatabase bool) (*Config, error) {
 	var problems []string
 
 	req := func(key string) string {
@@ -123,6 +135,11 @@ func Load() (*Config, error) {
 		return d
 	}
 
+	databaseURL := opt("DATABASE_URL", "")
+	if requireDatabase {
+		databaseURL = req("DATABASE_URL")
+	}
+
 	jwtSigningKey := req("JWT_SIGNING_KEY")
 	if decoded, err := base64.StdEncoding.DecodeString(jwtSigningKey); err != nil || len(decoded) != 32 {
 		problems = append(problems, "JWT_SIGNING_KEY debe ser una semilla Ed25519 en base64 de 32 bytes")
@@ -145,7 +162,7 @@ func Load() (*Config, error) {
 		Port:                    num("API_PORT", "8081"),
 		LogLevel:                opt("LOG_LEVEL", "info"),
 		Version:                 opt("APP_VERSION", "dev"),
-		DatabaseURL:             Secret(req("DATABASE_URL")),
+		DatabaseURL:             Secret(databaseURL),
 		RabbitURL:               Secret(req("RABBITMQ_URL")),
 		SMTPHost:                opt("SMTP_HOST", "mailpit"),
 		SMTPPort:                num("SMTP_PORT", "1025"),

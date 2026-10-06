@@ -231,7 +231,7 @@ día cuando cablee `main.go`). Obligatorias = el proceso no arranca sin ellas.
 
 | Variable | Obligatoria | Default | Qué es |
 |---|---|---|---|
-| `DATABASE_URL` | sí | — | cadena de conexión a PostgreSQL |
+| `DATABASE_URL` | sí (no para el worker) | — | cadena de conexión a PostgreSQL; el worker arranca con `config.LoadWorker`, que no la exige |
 | `RABBITMQ_URL` | sí | — | cadena de conexión al broker |
 | `JWT_SIGNING_KEY` | sí | — | semilla Ed25519 de 32 bytes, en base64 (`openssl rand -base64 32`) |
 | `API_PORT` | no | `8081` | puerto HTTP de la API |
