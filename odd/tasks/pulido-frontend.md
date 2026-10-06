@@ -155,8 +155,20 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
   (recalcula la ventana de 24 h). Al probar este último se encontró una doble petición cuando el filtro sí
   cambiaba; ahora solo se fuerza la recarga si la URL no cambia, y en ese caso también se limpia el error
   (prueba añadida después del arreglo, sin RED observado). vitest 225/225, typecheck y lint limpios.
-- [ ] **P6 — Contabilidad: resumen.** Más datos de ejemplo, gráficos SVG (por estado, por categoría,
+- [x] **P6 — Contabilidad: resumen.** Más datos de ejemplo, gráficos SVG (por estado, por categoría,
   línea de tiempo) y actividad reciente.
+  Ruta: delegada (Sonnet; Codex sin cuota), revisión y corrección de Claude. Evidencia (2026-10-06):
+  47 movimientos deterministas (abril a septiembre de 2026, 7 categorías; folios `M-1xxx` por debajo del
+  contador, así que los nuevos siguen en `M-2047` y las E2E con `M-2041`…`M-2046` no cambian);
+  `aggregate.ts` con totales por estado, categoría y mes (meses vacíos en cero) y actividad reciente;
+  tres gráficos SVG hechos a mano (dona por estado, barras por categoría, columnas por mes), cada uno
+  `figure` con `figcaption`, `svg` con `role="img"` y `aria-label` resumido, y tabla alternativa en
+  `details`; sin estilos en línea ni clase `icon`. Las tarjetas «del mes» cuentan solo el periodo abierto
+  (`inOpenPeriod`, desde `2026-09-01`); los gráficos, todo el historial. RED: los módulos nuevos no
+  existían. Revisión de Claude: el cierre de septiembre contaba todo el historial (38 aprobados en vez de
+  5); ahora usa `inOpenPeriod` (prueba `TestRF021_ClosingCountsOnlyTheOpenPeriod`, RED observado). vitest
+  96/96, typecheck, lint y build limpios, `make e2e` 52/52 (corrido por Sonnet antes de la corrección del
+  cierre, que ninguna E2E afirma). Sin verificar a ojo: modo oscuro y móvil (P10).
 - [ ] **P7 — Contabilidad: movimientos.** Búsqueda, filtros, orden, categoría al registrar,
   confirmación antes de aprobar o rechazar, estado vacío, tabla accesible.
 - [ ] **P8 — Exportar CSV** en usuarios, auditoría y movimientos.
@@ -184,7 +196,7 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
 
 | Tareas | Hechas |
 |---|---|
-| P1 a P10 (10) | 5 (P1 a P5) |
+| P1 a P10 (10) | 6 (P1 a P6) |
 
 ## Entrega
 
@@ -194,4 +206,4 @@ notas). Commits por unidad de trabajo; un PR al final con confirmación del usua
 
 ## Siguiente paso
 
-P6 (Contabilidad: resumen con más datos de ejemplo y gráficos SVG).
+P7 (Contabilidad: movimientos con búsqueda, filtros, orden y confirmación).
