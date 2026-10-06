@@ -381,7 +381,7 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   de bloqueo real); (6) pruebas de que el token del Hub no lleva `permissions` y el de aplicación con
   lista vacía lleva `[]` (sin RED posible: el comportamiento ya existía); (7) motivo de RF-021 en
   `DEFERRED` actualizado (API en T12; faltan interfaz y E2E, T13 a T15).
-- [ ] **T13 — Consola del Hub.** Grilla roles × permisos por aplicación: crear, editar y borrar
+- [x] **T13 — Consola del Hub.** Grilla roles × permisos por aplicación: crear, editar y borrar
   roles, y asignarlos a usuarios.
   Ruta: delegada (Sonnet; Codex sin cuota), revisión de Claude. Evidencia (2026-10-06): RED con
   `RolesPage` vacío: 11 de 12 pruebas nuevas de `roles.test.tsx` fallan (la del no admin ya pasaba) y
@@ -394,8 +394,13 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   stack real.
   Revisión nativa de T13 (`review-86ef83509fad2952`, medio, 618 líneas): **aprobada**. Corregido:
   la fila de la grilla no salía del estado «guardando» si el servidor devolvía el mismo rol (no hubo
-  RED posible con datos de prueba; arreglo de una línea). Pendiente para cerrar T13: prueba en el
-  navegador del usuario (crear `contabilidad.auditor` y asignarlo).
+  RED posible con datos de prueba; arreglo de una línea).
+  Prueba en navegador real de Claude (el usuario hará la suya después): Playwright temporal contra el
+  stack, con admin sembrado y MFA vía Mailpit: crea `contabilidad.auditor-<id>` con `reportes.ver` y
+  `movimientos.ver_todos` desde la grilla, lo asigna a un empleado desde el cajón y el rol asignado
+  queda con «Eliminar» deshabilitado. Pasó; la suite E2E existente sigue 46/46 con T12 y T13. Ajuste
+  visual: los encabezados de permisos se cortaban a mitad de palabra; ahora `white-space: nowrap`
+  (un `<wbr>` rompía el nombre accesible de la columna). Roles de prueba borrados de la base local.
 - [ ] **T14 — Contabilidad.** Autoriza por permisos en lugar de por nombre de rol.
 - [ ] **T15 — E2E y trazabilidad.** Escena de la demo (crear `contabilidad.auditor` y verlo en
   Contabilidad), matriz al día.
