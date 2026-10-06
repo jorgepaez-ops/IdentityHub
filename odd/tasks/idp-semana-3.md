@@ -954,10 +954,10 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
 ## Fase 3 — Verificación, DAST y cierre
 
 ### T14 — E2E con Playwright
-- [ ] Estado · Ejecutor: `Claude` (instala Playwright y navegadores) + `Codex` (pruebas)
+- [x] Estado · Ejecutor: `Claude` (instala Playwright y navegadores) + `Codex` (pruebas)
 - Una prueba por escenario Gherkin, lectura de correos por la API de Mailpit, el guion de la demo
   como prueba; `make e2e` real y job en CI; `spec-drift` comprueba la correspondencia.
-- Commit: —
+- Commit: ver las subtareas T14a a T14e; el job de CI es `ffaf6c1`.
 - Mapa (explorador, 2026-10-02): 37 escenarios en 6 features (`specs/06-acceptance/`, etiquetas
   `@RF-NNN`); `scripts/traceability.py` solo cuenta pruebas por RF (no falla si falta una);
   `make spec-drift` no existe; ningún job de CI levanta el stack; el admin inicial no tiene
@@ -1065,8 +1065,9 @@ Ninguna: P1 a P4 resueltas en D8 a D11; D12 y D13 salieron de revisiones; D14, d
     de etiquetas es la rama `else` del parser). Decisión consciente: "no aceptó la invitación"
     fabrica el estado por SQL (contraseña conocida + `pending_verification`), porque un invitado
     real nunca tiene una contraseña conocida y solo así se prueba que el 401 viene del estado.
-  - [ ] T14e — Job E2E en CI (stack con `.env` generado), sin renombrar los 17 checks
-    obligatorios; verificarlo requiere push (decisión del usuario).
+  - [x] T14e — Job E2E en CI (stack con `.env` generado), sin renombrar los 17 checks
+    obligatorios; verificarlo requiere push (decisión del usuario). Cerrada (2026-10-06): el job
+    «7 · E2E (Playwright)» (`ffaf6c1`) corre en cada PR y pasó en los PR #11, #12 y #13.
     Escrito (2026-10-02, Sonnet; revisó y commiteó Claude): job `e2e` "7 · E2E (Playwright)"
     (`contents: read`, 30 min): `.env` desechable con secretos aleatorios enmascarados (dueño
     `identity` para migraciones y el helper `psql`; `identity_app` con `IDENTITY_APP_PASSWORD`, como

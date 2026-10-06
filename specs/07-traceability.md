@@ -19,7 +19,7 @@ declaración de buenas intenciones.
 | **RF-007** | Cierre de sesión | P0 | `logout` | 1 | 9 | 1 | ✅ completo |
 | **RF-008** | Perfil propio | P0 | `getCurrentUser`, `updateCurrentUser` | — | 7 | — | 🟡 parcial |
 | **RF-009** | Control de acceso por roles | P0 | — | 5 | 17 | 5 | ✅ completo |
-| **RF-010** | Administración de usuarios | P0 | `listUsers`, `getUser`, `updateUser` | 3 | 12 | 3 | ✅ completo |
+| **RF-010** | Administración de usuarios | P0 | `listUsers`, `getUser`, `updateUser` | 3 | 13 | 3 | ✅ completo |
 | **RF-011** | Registro de auditoría | P0 | `listAuditLog` | 1 | 9 | 1 | ✅ completo |
 | **RF-012** | Notificaciones asíncronas | P0 | — | 1 | 12 | — | ✅ completo |
 | **RF-013** | Segundo factor obligatorio por correo | P1 | — | 1 | 5 | — | ✅ completo |
@@ -33,7 +33,7 @@ declaración de buenas intenciones.
 | **RF-021** | Roles y permisos configurables por aplicación | P1 | `listApplications`, `listApplicationRoles`, `createApplicationRole`, `updateApplicationRole`, `deleteApplicationRole` | 6 | 31 | 6 | ✅ completo |
 | **RNF-001** | Contenerización total | P0 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-002** | Pipeline de ciclo completo | P0 | — | — | — | — | 🔴 sin cubrir |
-| **RNF-003** | Cero secretos en el repositorio | P0 | — | — | 4 | — | 🟡 parcial |
+| **RNF-003** | Cero secretos en el repositorio | P0 | — | — | 10 | — | 🟡 parcial |
 | **RNF-004** | Imágenes sin vulnerabilidades corregibles | P0 | — | — | 3 | — | 🟡 parcial |
 | **RNF-005** | Cobertura de pruebas ≥ 70 % | P0 | — | — | 25 | — | 🟡 parcial |
 | **RNF-006** | Procedencia verificable | P0 | — | — | — | — | 🔴 sin cubrir |

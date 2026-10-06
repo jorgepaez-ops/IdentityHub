@@ -1,6 +1,6 @@
 # Estados del ciclo de vida de una cuenta
 
-Una cuenta nace por alta administrativa en `pending_verification` y pasa a `active` cuando la persona acepta la invitación recibida por correo y elige su contraseña. Cinco fallos de contraseña o de código MFA en 15 minutos la bloquean (`locked`); el bloqueo se levanta al vencer `locked_until`, al confirmar un restablecimiento de contraseña o por decisión de un administrador, que también puede deshabilitar (`disabled`) y habilitar la cuenta. Solo `active` obtiene sesión. Los roles del directorio (`user` y `admin`) y los de aplicación (grilla de roles, ADR 0013) son ortogonales al estado: no lo cambian.
+Una cuenta nace por alta administrativa en `pending_verification` y pasa a `active` cuando la persona acepta la invitación recibida por correo y elige su contraseña. Cinco fallos de contraseña o de código MFA en 15 minutos la bloquean (`locked`); el bloqueo automático se levanta al vencer `locked_until`, y cualquier bloqueo (incluido el que un administrador fija a mano, que no tiene `locked_until` y por tanto no vence solo) se levanta al confirmar un restablecimiento de contraseña o cuando un administrador pasa la cuenta a `active`. El administrador también puede deshabilitar (`disabled`) y habilitar la cuenta. Solo `active` obtiene sesión. Los roles del directorio (`user` y `admin`) y los de aplicación (grilla de roles, ADR 0013) son ortogonales al estado: no lo cambian.
 
 ```mermaid
 stateDiagram-v2
@@ -10,7 +10,7 @@ stateDiagram-v2
     pending_verification --> active: acepta la invitación
 
     active --> locked: 5 fallos en 15 min
-    locked --> active: vence locked_until
+    locked --> active: vence locked_until (solo bloqueo automático)
     locked --> active: restablece la contraseña
     locked --> active: admin lo pasa a active
 
@@ -19,8 +19,16 @@ stateDiagram-v2
 
     note right of pending_verification
         No inicia sesión. La invitación vence a las 24 h
-        y la cuenta sigue pendiente; no hay purga automática.
+        y la cuenta sigue pendiente; no se elimina ni se purga
+        (se conserva la auditoría y el admin decide).
         Restablecer la contraseña no la activa.
+    end note
+
+    note right of locked
+        El bloqueo automático dura 15 min (locked_until).
+        Un bloqueo fijado a mano por un admin deja
+        locked_until vacío y no vence: solo un admin
+        (a active) o un restablecimiento lo levantan.
     end note
 
     note right of active

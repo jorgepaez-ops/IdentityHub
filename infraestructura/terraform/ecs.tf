@@ -78,21 +78,30 @@ locals {
     mountPoints            = [{ sourceVolume = "tmp", containerPath = "/tmp", readOnly = false }]
   }
 
-  # Variables que comparten api y worker (mismos nombres que el compose).
-  app_env = [
+  # Variables del worker; la api las hereda y agrega las suyas (mismos nombres que el compose).
+  worker_env = [
     { name = "LOG_LEVEL", value = "info" },
     { name = "APP_VERSION", value = var.app_version },
     { name = "SMTP_HOST", value = local.smtp_host },
     { name = "SMTP_PORT", value = local.smtp_port },
     { name = "SMTP_FROM", value = var.ses_from_address },
-    { name = "TRUSTED_PROXIES", value = var.vpc_cidr },
   ]
 
-  app_secrets = [
-    { name = "DATABASE_URL", valueFrom = local.secret_arn["database-url"] },
+  # El worker solo consume la cola y envia SMTP: no firma ni verifica tokens ni
+  # resuelve la IP del cliente, asi que no recibe JWT_SIGNING_KEY ni TRUSTED_PROXIES.
+  worker_secrets = [
     { name = "RABBITMQ_URL", valueFrom = local.secret_arn["rabbitmq-url"] },
-    { name = "JWT_SIGNING_KEY", valueFrom = local.secret_arn["jwt-signing-key"] },
   ]
+
+  # La api ademas necesita la base, la clave de firma y los proxies de confianza.
+  api_env = concat(local.worker_env, [
+    { name = "TRUSTED_PROXIES", value = var.vpc_cidr },
+  ])
+
+  api_secrets = concat(local.worker_secrets, [
+    { name = "DATABASE_URL", valueFrom = local.secret_arn["database-url"] },
+    { name = "JWT_SIGNING_KEY", valueFrom = local.secret_arn["jwt-signing-key"] },
+  ])
 }
 
 resource "aws_ecs_task_definition" "api" {
@@ -115,13 +124,13 @@ resource "aws_ecs_task_definition" "api" {
     user             = "65532:65532"
     portMappings     = [{ containerPort = 8081, protocol = "tcp" }]
     logConfiguration = local.log_config["api"]
-    environment = concat(local.app_env, [
+    environment = concat(local.api_env, [
       { name = "API_PORT", value = "8081" },
       { name = "PUBLIC_BASE_URL", value = local.hub_url },
       { name = "JWT_ISSUER", value = local.hub_url },
       { name = "BOOTSTRAP_ADMIN_EMAIL", value = var.bootstrap_admin_email },
     ])
-    secrets = local.app_secrets
+    secrets = local.api_secrets
     # La imagen distroless no tiene shell: el binario se autosondea.
     healthCheck = {
       command     = ["CMD", "/usr/local/bin/api", "healthcheck"]
@@ -153,8 +162,8 @@ resource "aws_ecs_task_definition" "worker" {
     user             = "65532:65532"
     portMappings     = [{ containerPort = 9091, protocol = "tcp" }]
     logConfiguration = local.log_config["worker"]
-    environment      = local.app_env
-    secrets          = local.app_secrets
+    environment      = local.worker_env
+    secrets          = local.worker_secrets
   })])
 }
 

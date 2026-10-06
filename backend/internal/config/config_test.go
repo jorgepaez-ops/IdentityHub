@@ -275,3 +275,96 @@ func TestConfig_BootstrapAdminEmailOpcionalYValidado(t *testing.T) {
 		})
 	}
 }
+
+// RNF-003 — El worker solo consume la cola y envía SMTP: no debe exigir (ni
+// recibir) la cadena de conexión a la base de datos.
+func TestRNF003_WorkerArrancaSinDatabaseURL(t *testing.T) {
+	const seed = "MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=" // base64 of the digits 0-9 repeated: a fake test key
+	t.Setenv("DATABASE_URL", "")
+	t.Setenv("RABBITMQ_URL", "amqp://x")
+	t.Setenv("JWT_SIGNING_KEY", seed)
+
+	cfg, err := LoadWorker()
+	if err != nil {
+		t.Fatalf("LoadWorker sin DATABASE_URL: %v", err)
+	}
+	if cfg.RabbitURL.Reveal() != "amqp://x" {
+		t.Errorf("LoadWorker perdió RABBITMQ_URL: %q", cfg.RabbitURL.Reveal())
+	}
+
+	// La API mantiene la exigencia.
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "DATABASE_URL") {
+		t.Fatalf("Load sin DATABASE_URL debe seguir fallando; se obtuvo: %v", err)
+	}
+}
+
+func TestRNF003_WorkerSigueExigiendoElBroker(t *testing.T) {
+	const seed = "MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=" // base64 of the digits 0-9 repeated: a fake test key
+	t.Setenv("DATABASE_URL", "")
+	t.Setenv("RABBITMQ_URL", "")
+	t.Setenv("JWT_SIGNING_KEY", seed)
+
+	_, err := LoadWorker()
+	if err == nil || !strings.Contains(err.Error(), "RABBITMQ_URL") {
+		t.Fatalf("LoadWorker sin RABBITMQ_URL debe fallar; se obtuvo: %v", err)
+	}
+	if strings.Contains(err.Error(), "DATABASE_URL") {
+		t.Errorf("LoadWorker no debe mencionar DATABASE_URL: %v", err)
+	}
+}
+
+// The worker must not carry the database credential even when the environment
+// still provides it (for example an old .env), so LoadWorker never reads it.
+func TestRNF003_WorkerIgnoraDatabaseURLAunqueExista(t *testing.T) {
+	const seed = "MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=" // base64 of the digits 0-9 repeated: a fake test key
+	t.Setenv("DATABASE_URL", "postgres://worker-should-not-see-this")
+	t.Setenv("RABBITMQ_URL", "amqp://x")
+	t.Setenv("JWT_SIGNING_KEY", seed)
+
+	cfg, err := LoadWorker()
+	if err != nil {
+		t.Fatalf("LoadWorker error = %v", err)
+	}
+	if cfg.DatabaseURL != "" {
+		t.Fatal("LoadWorker kept DATABASE_URL; the worker must not receive it")
+	}
+}
+
+// The worker never signs or verifies tokens, so it must start without the
+// signing key and must not carry it even when the environment provides one.
+func TestRNF003_WorkerArrancaSinClaveDeFirma(t *testing.T) {
+	t.Setenv("RABBITMQ_URL", "amqp://x")
+	t.Setenv("JWT_SIGNING_KEY", "")
+
+	cfg, err := LoadWorker()
+	if err != nil {
+		t.Fatalf("LoadWorker sin JWT_SIGNING_KEY: %v", err)
+	}
+	if cfg.JWTSigningKey != "" {
+		t.Error("LoadWorker produced a signing key from an empty environment")
+	}
+}
+
+func TestRNF003_WorkerIgnoraClaveDeFirmaAunqueExista(t *testing.T) {
+	const seed = "MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=" // base64 of the digits 0-9 repeated: a fake test key
+	t.Setenv("RABBITMQ_URL", "amqp://x")
+	t.Setenv("JWT_SIGNING_KEY", seed)
+
+	cfg, err := LoadWorker()
+	if err != nil {
+		t.Fatalf("LoadWorker error = %v", err)
+	}
+	if cfg.JWTSigningKey != "" {
+		t.Fatal("LoadWorker kept JWT_SIGNING_KEY; the worker must not receive it")
+	}
+}
+
+// A malformed key must not stop the worker either: it never reads the value.
+func TestRNF003_WorkerNoValidaClaveDeFirma(t *testing.T) {
+	t.Setenv("RABBITMQ_URL", "amqp://x")
+	t.Setenv("JWT_SIGNING_KEY", "not-a-valid-seed")
+
+	if _, err := LoadWorker(); err != nil {
+		t.Fatalf("LoadWorker must not validate JWT_SIGNING_KEY: %v", err)
+	}
+}

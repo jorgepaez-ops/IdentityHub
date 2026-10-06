@@ -543,11 +543,11 @@ Falco, que el enunciado menciona para la detección de comportamiento anómalo e
 
 ## Diferencias conocidas entre especificación y código
 
-La revisión de la rama de pulido encontró tres diferencias entre lo que dice la especificación (o la documentación de despliegue) y lo que hace el código. Se declaran aquí y se dejan como trabajo futuro; no se cambió el backend para cerrarlas.
+La revisión de la rama de pulido encontró tres diferencias entre lo que decía la especificación (o la configuración de despliegue) y lo que hace el código. Las tres se resolvieron el 2026-10-06; en dos se corrigió la especificación y en una la configuración:
 
-- **No hay purga de cuentas sin verificar a las 24 h.** `specs/02-domain-model.md` la describe, pero ningún proceso la ejecuta: una invitación vencida deja la cuenta pendiente hasta que un administrador la reenvíe o la elimine.
-- **Un bloqueo puesto por un administrador no vence.** El bloqueo automático por fallos sí tiene fecha (`locked_until`); el manual la deja vacía y la cuenta sigue bloqueada hasta que alguien la desbloquea.
-- **El worker recibe `DATABASE_URL` pero no la usa.** El worker solo consume la cola y envía SMTP; `despliegue-aws.md` dibuja una flecha Worker a RDS que el código no necesita, y la variable sobra.
+- **Purga de cuentas sin verificar a las 24 h: se corrigió la especificación.** `specs/02-domain-model.md` describía una purga por lote que ningún proceso ejecuta. Se decidió no implementarla: la invitación vence a las 24 h, la cuenta sigue en `pending_verification` y un administrador puede reenviar la invitación (token nuevo; el anterior deja de valer). No eliminar cuentas huérfanas conserva el rastro de auditoría y deja el control en manos del administrador, y una cuenta pendiente no inicia sesión, así que mantenerla no amplía la superficie de ataque.
+- **Bloqueo puesto por un administrador: se corrigió la especificación.** El bloqueo automático por fallos fija `locked_until` (15 min) y se levanta al vencer; el manual deja `locked_until` vacío y es intencional que no venza, porque una decisión humana no debe caducar sola. Lo levanta un administrador al pasar la cuenta a `active` o la confirmación de un restablecimiento de contraseña. El modelo de dominio y los diagramas de estados lo dicen ahora de forma explícita.
+- **`DATABASE_URL` del worker: se corrigió la configuración.** El worker solo consume la cola y envía SMTP, así que arranca con un cargador propio (`config.LoadWorker`) que no exige la variable, y se retiró de `deploy/docker-compose.yml`, de la definición de tarea del worker en Terraform y de la regla de red del worker hacia la base de datos. La API conserva la exigencia (`config.Load`) y ambas se prueban (`TestRNF003_WorkerArrancaSinDatabaseURL`). El diagrama de despliegue ya no dibuja la flecha Worker a RDS.
 
 ## Lecciones aprendidas
 
@@ -565,7 +565,6 @@ La revisión de la rama de pulido encontró tres diferencias entre lo que dice l
 2. **Cierre de la entrega (T20 y T21):** guion del video de 10 a 15 minutos, bitácora, matriz de trazabilidad, informe de seguridad final, tag de versión y PR.
 3. Corregir la codificación de los correos del worker y afinar la regla de Gitleaks que cruza saltos de línea.
 4. **Falco** para detección en ejecución, si hay tiempo (la alerta y el runbook de la DLQ, AM-019, ya están hechos).
-   Y resolver las diferencias entre especificación y código de la sección «Diferencias conocidas entre especificación y código» (purga de cuentas sin verificar, bloqueo manual sin vencimiento, `DATABASE_URL` del worker).
 5. **Soporte SMTP autenticado con STARTTLS** en el worker y hosts configurables, para poder aplicar de verdad la arquitectura de AWS.
 6. Evolucionar la integración de terceros: clientes OAuth en base de datos, OpenID Connect, refresh tokens por cliente, introspección y revocación; y reemplazar la publicación directa por un **outbox transaccional**.
 7. Funciones diferidas en la matriz: claves de servicio (RF-018) y exportación del audit log (RF-019).

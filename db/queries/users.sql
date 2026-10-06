@@ -40,8 +40,10 @@ ORDER BY u.id
 FOR UPDATE OF u;
 
 -- name: UpdateAdminUserStatus :one
+-- Every admin status change clears locked_until: a manual lock has no expiry
+-- and must never inherit the one left by an earlier automatic lockout.
 UPDATE users
-SET status = $2
+SET status = $2, locked_until = NULL
 WHERE id = $1
 RETURNING *;
 

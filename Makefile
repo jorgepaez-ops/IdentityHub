@@ -184,9 +184,13 @@ scan-deps: ## govulncheck y npm audit (RNF-004)
 	cd frontend && npm audit --audit-level=high || true
 	cd contabilidad && npm audit --audit-level=high || true
 
+# Same Trivy as CI (trivy-action v0.36.0 defaults to v0.70.0), pinned by digest. baseline-scan.yml keeps
+# 0.56.2 on purpose so the before/after VULN evidence stays comparable with its historical runs.
+TRIVY_IMAGE := aquasec/trivy:0.70.0@sha256:be1190afcb28352bfddc4ddeb71470835d16462af68d310f9f4bca710961a41e
+
 scan-config: ## Trivy config y Hadolint (RNF-008)
 	@echo "── Trivy config ──────────────────────────────────────────"
-	docker run --rm -v "$(PWD):/src" aquasec/trivy:0.56.2 \
+	docker run --rm -v "$(PWD):/src" $(TRIVY_IMAGE) \
 		config --severity HIGH,CRITICAL /src || true
 	@echo "── Hadolint ──────────────────────────────────────────────"
 	@for f in backend/Dockerfile frontend/Dockerfile; do \
@@ -204,6 +208,6 @@ scan-image: build ## Trivy sobre las imágenes construidas (RNF-004)
 	@for img in api worker web; do \
 		echo "  identity-hub-$$img"; \
 		docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
-			aquasec/trivy:0.56.2 image --severity HIGH,CRITICAL \
+			$(TRIVY_IMAGE) image --severity HIGH,CRITICAL \
 			--ignore-unfixed identity-hub-$$img:latest 2>&1 | tail -15 || true; \
 	done
