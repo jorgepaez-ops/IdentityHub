@@ -175,8 +175,18 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
   `YYYY-MM` válidas. Sugerencia aceptada como límite de la demo: el periodo abierto es una constante
   (`2026-09-01`) sin límite superior, así que un movimiento nuevo (fechado con el reloj real, octubre)
   cuenta en el cierre de septiembre y no cambia tras cerrar. vitest 97/97, typecheck y lint limpios.
-- [ ] **P7 — Contabilidad: movimientos.** Búsqueda, filtros, orden, categoría al registrar,
+- [x] **P7 — Contabilidad: movimientos.** Búsqueda, filtros, orden, categoría al registrar,
   confirmación antes de aprobar o rechazar, estado vacío, tabla accesible.
+  Ruta: delegada (Sonnet; Codex sin cuota), revisión de Claude. Evidencia (2026-10-06): búsqueda por
+  folio, descripción o categoría sin distinguir mayúsculas ni tildes; filtros por estado y categoría;
+  orden por fecha, folio y monto con `aria-sort` (por defecto, más reciente primero); categoría
+  obligatoria al registrar (`KNOWN_CATEGORIES`, adiós «Sin categoría»); `ConfirmDialog` modal
+  (`role="dialog"`, `aria-modal`, foco inicial en «Cancelar», Tab atrapado, Escape y clic fuera cancelan)
+  que nombra folio y monto; estado vacío con «Limpiar filtros»; columna «Fecha» propia; conteo de
+  resultados en `aria-live` sin crear otra región `role="status"`. RED: 24 de 25 pruebas nuevas
+  fallaban. vitest 123/123, typecheck, lint y build limpios, `make e2e` 52/52 (ninguna E2E pulsa
+  Aprobar/Rechazar, así que no hubo que tocarlas). Para P9: tras confirmar, el botón que abrió el diálogo
+  desaparece (la fila deja de estar pendiente) y el foco cae al `body`; devolverlo a la tabla o al aviso.
 - [ ] **P8 — Exportar CSV** en usuarios, auditoría y movimientos.
 - [ ] **P9 — Deudas menores.** Avisos de SonarCloud de las fases 3 y 4, sugerencias pendientes de las
   revisiones nativas (correos, refresh, informe, capturas) y alerta de Grafana más runbook para la DLQ
@@ -202,7 +212,7 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
 
 | Tareas | Hechas |
 |---|---|
-| P1 a P10 (10) | 6 (P1 a P6) |
+| P1 a P10 (10) | 7 (P1 a P7) |
 
 ## Entrega
 
@@ -212,4 +222,4 @@ notas). Commits por unidad de trabajo; un PR al final con confirmación del usua
 
 ## Siguiente paso
 
-P7 (Contabilidad: movimientos con búsqueda, filtros, orden y confirmación).
+P8 (exportar CSV en usuarios, auditoría y movimientos).

@@ -28,8 +28,8 @@ export function Shell({ access, subject, onLogout }: Props) {
     setMovements((current) => current.map((movement) => (movement.id === id ? { ...movement, status } : movement)))
     notify(status === 'approved' ? `Movimiento ${id} aprobado.` : `Movimiento ${id} rechazado.`)
   }
-  const register = (description: string, amount: number) => {
-    setMovements((current) => [...current, { id: nextId(current), date: new Date().toISOString().slice(0, 10), description, category: 'Sin categoría', amount, status: 'pending', mine: true }])
+  const register = (description: string, amount: number, category: string) => {
+    setMovements((current) => [...current, { id: nextId(current), date: new Date().toISOString().slice(0, 10), description, category, amount, status: 'pending', mine: true }])
     notify('Movimiento registrado, queda pendiente de aprobación.')
   }
   const close = () => {

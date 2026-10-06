@@ -58,3 +58,37 @@ export function totalsByMonth(movements: Movement[]): MonthTotal[] {
 export function recentMovements(movements: Movement[], limit: number): Movement[] {
   return [...movements].sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id)).slice(0, limit)
 }
+
+export type StatusFilter = Status | 'all'
+export type SortKey = 'date' | 'amount' | 'folio'
+export type SortDirection = 'ascending' | 'descending'
+export interface MovementQuery { text: string; status: StatusFilter; category: string }
+
+/** Lowercase text without diacritics, so "NOMINA" finds "Nómina". */
+export const normalizeText = (value: string): string => value.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim()
+
+/** Distinct categories of the given rows, alphabetical in Spanish. */
+export const categoriesOf = (movements: Movement[]): string[] => [...new Set(movements.map((movement) => movement.category))].sort((a, b) => a.localeCompare(b, 'es'))
+
+/** Text matches folio, description or category; status and category filters are exact ('all' / '' disable them). */
+export function filterMovements(movements: Movement[], query: MovementQuery): Movement[] {
+  const needle = normalizeText(query.text)
+  return movements.filter((movement) => {
+    if (query.status !== 'all' && movement.status !== query.status) return false
+    if (query.category !== '' && movement.category !== query.category) return false
+    if (needle === '') return true
+    return [movement.id, movement.description, movement.category].some((field) => normalizeText(field).includes(needle))
+  })
+}
+
+/** Stable sort; ties fall back to the folio so equal dates or amounts keep a predictable order. Does not mutate the input. */
+export function sortMovements(movements: Movement[], key: SortKey, direction: SortDirection): Movement[] {
+  const byFolio = (a: Movement, b: Movement) => a.id.localeCompare(b.id, 'es', { numeric: true })
+  const compare = (a: Movement, b: Movement): number => {
+    if (key === 'amount') return a.amount - b.amount || byFolio(a, b)
+    if (key === 'folio') return byFolio(a, b)
+    return a.date.localeCompare(b.date) || byFolio(a, b)
+  }
+  const sign = direction === 'ascending' ? 1 : -1
+  return [...movements].sort((a, b) => sign * compare(a, b))
+}

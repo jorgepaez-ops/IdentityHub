@@ -68,6 +68,9 @@ export const INITIAL_MOVEMENTS: Movement[] = [
   m('M-1041', '2026-09-29', 'Retención en la fuente septiembre', 'Impuestos', 2_790_000, 'pending'),
 ]
 
+/** Categories offered when registering a movement; the sample data uses exactly these. */
+export const KNOWN_CATEGORIES: readonly string[] = ['Arriendo', 'Impuestos', 'Nómina', 'Proveedores', 'Servicios', 'Ventas', 'Viáticos']
+
 export const PERIOD = 'Septiembre 2026'
 /** First day of the open period: everything on or after it has not been closed yet. */
 export const OPEN_PERIOD_START = '2026-09-01'

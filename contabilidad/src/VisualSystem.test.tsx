@@ -162,9 +162,11 @@ describe('visual system of Contabilidad', () => {
     render(<Shell access={senior} subject="3f2c1a9e-0000" onLogout={() => undefined} />)
     fireEvent.click(screen.getByRole('button', { name: 'Transacciones' }))
     fireEvent.click(screen.getByRole('button', { name: 'Aprobar M-2043' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar aprobación' }))
     expect(screen.getByText('Movimiento M-2043 aprobado.')).toBeInTheDocument()
     act(() => { vi.advanceTimersByTime(3000) })
     fireEvent.click(screen.getByRole('button', { name: 'Aprobar M-2044' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar aprobación' }))
     act(() => { vi.advanceTimersByTime(3000) })
     expect(screen.getByRole('status')).toHaveTextContent('Movimiento M-2044 aprobado.')
     act(() => { vi.advanceTimersByTime(2000) })
@@ -179,6 +181,7 @@ describe('visual system of Contabilidad', () => {
       fireEvent.click(screen.getByRole('button', { name: '+ Registrar movimiento' }))
       fireEvent.change(screen.getByLabelText('Descripción'), { target: { value: description } })
       fireEvent.change(screen.getByLabelText('Monto'), { target: { value: '100' } })
+      fireEvent.change(screen.getByLabelText('Categoría'), { target: { value: 'Servicios' } })
       fireEvent.click(screen.getByRole('button', { name: 'Registrar' }))
     }
     const notice = 'Movimiento registrado, queda pendiente de aprobación.'
