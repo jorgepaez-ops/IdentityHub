@@ -287,6 +287,11 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
     Hallazgo fuera de alcance (sin id): `make scan-image` y `make scan-config` fijan Trivy 0.56.2 mientras
     CI usa una versión mucho más nueva, así que el escaneo local puede no coincidir con CI; decidir en qué
     tarea se alinea.
+    Commit `4339a00`. Revisión nativa de P9d (riesgo alto, 6 archivos, 68 líneas, 4 lentes): **aprobada**
+    y acusada. Corregido por Claude: el paso `jq` no tapa un fallo de Checkov (sale sin hacer nada si no
+    hay SARIF) y tolera `results` nulo o `runs` vacío (probado con SARIF de ejemplo); su comentario ya no
+    sugiere que el gate cambió. Aviso aceptado con evidencia: la API recibe ahora un Host fijo; el backend
+    no lo lee (búsqueda de `.Host`) y `make e2e` 52/52 cubre el SSO completo.
   - [ ] **P9e — Deudas de fases 3 y 4:** avisos de SonarCloud, sugerencias de las revisiones nativas
     (correos, refresh, informe, capturas) y alerta de Grafana con runbook para la DLQ (AM-019).
 - [ ] **P10 — Documentación y evidencia.** Ajustes de E2E si hacen falta, capturas regeneradas,
