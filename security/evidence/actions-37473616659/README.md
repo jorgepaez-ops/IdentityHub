@@ -8,9 +8,11 @@
   digest de `postgres`). Un primer run, 37471823657 sobre `14047c7`, midió `postgres` con el digest
   anterior (117, de ellos 51 con parche); la revisión nativa señaló que esos 51 sí eran corregibles y se
   volvió a fijar `postgres`. El JSON de `postgres` de ese primer run se conserva como
-  `trivy-base-postgres-digest-anterior-run-37471823657.json`.
-- Archivos: `trivy-base-images.txt` y los JSON de las ocho imágenes del compose, copiados del artefacto
+  `trivy-base-postgres-digest-anterior-run-37471823657.json`, copiado de su artefacto
   `evidencia-linea-base` (retención 90 días).
+- Archivos: `trivy-base-images.txt` y los JSON de las ocho imágenes del compose, copiados del artefacto
+  `evidencia-linea-base` de este run (retención 90 días); la excepción es el JSON del primer run, arriba.
+- El run ejecuta el workflow de `main` (`8b4a18a`) y escanea el ref indicado.
 
 ## Imágenes del compose: Trivy 0.56.2, HIGH/CRITICAL, sin `--ignore-unfixed` (misma metodología que los runs 35534898422 y 36329751647)
 

@@ -26,12 +26,12 @@
     "workflow": "Escaneo de la línea base",
     "run_id": "37473616659",
     "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/37473616659",
-    "captura": null,
+    "captura": "informe Desktop, sección VULN-019 después (T16), capturas 93 a 95",
     "hallazgos": [
       "Trivy HIGH/CRITICAL (run 37473616659, misma metodología que el antes): postgres@sha256:0ea6700a (16.15 reconstruida) 88 (22 con parche, todos stdlib de Go en gosu); rabbitmq@sha256:ddc75301 2; axllent/mailpit@sha256:b68349e3 (v1.31.4) 0; migrate/migrate@sha256:76cc2074 (v4.20.1) 6; prom/prometheus@sha256:efd719c9 (v3.15.0) 2; grafana/loki@sha256:1107dd52 (3.7.8) 0; grafana/alloy@sha256:2aa2099a (v1.20.1) 2; grafana/grafana@sha256:b28bae15 (13.2.3) 8",
       "Total de las 8 imágenes del compose: 710 (antes) → 625 (T38) → 108 (T16)"
     ],
-    "observacion": "T16: baseline-scan.yml lanzado por workflow_dispatch con ref=924b5818a6d3572f3f0a46ca6c1e4bf79fa9a07c, job 112303216105, paso \"Trivy sobre las imágenes base\". Las 8 imágenes del compose quedan actualizadas y fijadas por digest. Residual: 66 paquetes del sistema de postgres sin parche publicado; con parche publicado pero no incorporado por el proveedor: stdlib de Go en gosu (postgres), módulos Go en migrate y en los plugins de grafana, openssl de Ubuntu (alloy y rabbitmq); en prometheus, probable falso positivo de seudoversión (CVE-2026-42154). Un primer run (37471823657, sobre 14047c7) medía postgres con el digest anterior. La captura queda en null hasta que el usuario confirme la sección del informe de Claude Desktop.",
+    "observacion": "T16: baseline-scan.yml lanzado por workflow_dispatch con ref=924b5818a6d3572f3f0a46ca6c1e4bf79fa9a07c, job 112303216105, paso \"Trivy sobre las imágenes base\". Las 8 imágenes del compose quedan actualizadas y fijadas por digest. Residual: 66 paquetes del sistema de postgres sin parche publicado; con parche publicado pero no incorporado por el proveedor: stdlib de Go en gosu (postgres), módulos Go en migrate y en los plugins de grafana, openssl de Ubuntu (alloy y rabbitmq); en prometheus, probable falso positivo de seudoversión (CVE-2026-42154). Un primer run (37471823657, sobre 14047c7) medía postgres con el digest anterior. Capturas confirmadas por el usuario (Claude Desktop, 2026-10-06), sin secretos que recortar. El run corre el workflow de main (8b4a18a) y escanea el ref 924b581; el mismo paso escanea además las 4 imágenes de la línea base fijadas en el workflow (debian:11-slim, golang:1.22-bullseye, node:18-bullseye y nginx:latest), que no cuentan en los 108.",
     "artefacto": "security/evidence/actions-37473616659/README.md",
     "parcial_T38": {
       "commit": "2ee59e2565a68b05be74b46a2c498f69d5eb17ce",

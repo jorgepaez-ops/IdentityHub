@@ -476,7 +476,7 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   Evidencia «después»: run `baseline-scan` 37473616659 (`workflow_dispatch`, `ref=924b581`), total de
   las 8 imágenes 710 → 108 (`mailpit` y `loki` 0); residual detallado en
   `security/evidence/actions-37473616659/README.md`; ficha, `evidencia.json` y README raíz al día
-  (28 fichas remediadas). Pendiente: capturas de Claude Desktop (`captura` en null hasta confirmarlas).
+  (28 fichas remediadas). Capturas de Claude Desktop confirmadas (informe, capturas 93 a 95).
   Revisión nativa (`review-dad3dc9c349c9821`, medio, 26 líneas, 1 lente): **aprobada**; avisos
   informativos R3-001 a R3-005 (cambios de versión mayor sin prueba en el candidato, E2E con el nuevo
   mailpit, digests multiarquitectura), todos cubiertos por la verificación anterior.
@@ -507,7 +507,7 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
 ## Siguiente paso
 
 **2026-10-06.** Fases 1 a 3 cerradas y en main (PR #11, merge `8b4a18a`, CI 21/21). T16 hecha
-(VULN-019 remediado; faltan las capturas de Desktop del run 37473616659). Siguiente: T17 (Docker Hub).
+(VULN-019 remediado, capturas de Desktop incluidas). Siguiente: T17 (Docker Hub).
 Codex: cuota diaria limitada; Sonnet como respaldo.
 
 ## Cambios de spec propuestos
