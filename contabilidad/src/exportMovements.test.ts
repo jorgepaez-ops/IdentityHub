@@ -28,8 +28,17 @@ describe('movements export content', () => {
 
   it.each(['=SUM(A1)', '+1', '-2', '@cmd', '\tcell', '\rcell'])('TestRF021_ExportNeutralizesFormulaStart_%j', (text) => {
     const csv = movementsCsv([movement({ description: text, category: text })])
-    expect(csv).not.toMatch(new RegExp(`,${text.replace(/[+@=()]/g, '\\$&')}`))
-    expect(csv).toContain(`'${text}`.replace(/[\r\n]/g, (c) => c))
+    // Description and category are adjacent columns; each must come out as the neutralized, quoted-if-needed field.
+    const neutralized = `'${text}`
+    const field = /[",\r\n]/.test(neutralized) ? `"${neutralized}"` : neutralized
+    expect(csv).toContain(`,${field},${field},`)
+  })
+
+  it('TestRF021_ExportLeavesNonFiniteAmountsEmpty', () => {
+    const [, nan, infinite] = lines(movementsCsv([movement({ amount: Number.NaN }), movement({ id: 'M-2', amount: Number.POSITIVE_INFINITY })]))
+    expect(nan).not.toContain('NaN')
+    expect(infinite).not.toContain('Infinity')
+    expect(nan).toMatch(/,,[^,]+$/)
   })
 
   it('TestRF021_ExportLeavesAmountsAsPlainNumbers', () => {

@@ -365,6 +365,12 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
   (0,67 %). vitest Contabilidad 147/147 y Hub 255/255 sin cambios, lint, typecheck y build limpios,
   `make e2e` 52/52. RED del exportador observado (módulo inexistente); el proveedor de tema se escribió
   antes que sus pruebas, cubiertas por las pruebas de comportamiento existentes.
+  Revisión nativa: el tramo desde `cb63cf0` (90 archivos, con las 55 capturas) no cupo en el contexto
+  del revisor; se revisó el tramo desde `79ac26e` (P10b, `sort()` y P11; 27 archivos, 983 líneas):
+  **aprobado** y acusado. Sugerencias aplicadas por Claude: un monto no finito se exporta como celda
+  vacía (prueba nueva, RED observado) y la prueba de neutralización compara el campo exacto en vez de un
+  `replace` sin efecto. Quedan sin revisión nativa la corrección de la alerta de la DLQ (`c8761ad`), el
+  CSS móvil (`37a83a9`) y el manual con capturas (`79ac26e`), cubiertos por sus verificaciones.
 
 ## Progreso
 

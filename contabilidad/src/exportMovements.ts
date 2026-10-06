@@ -28,6 +28,8 @@ const FORMULA_LEAD = /^(?=[=+\-@\t\r])/
 const SPECIAL = /[",\r\n]/
 
 function encodeField(raw: string | number, untrusted: boolean): string {
+  // A non-finite amount (NaN, Infinity) is not a value a spreadsheet can use, so the cell stays empty.
+  if (typeof raw === 'number' && !Number.isFinite(raw)) return ''
   const text = untrusted ? String(raw).replace(FORMULA_LEAD, "'") : String(raw)
   return SPECIAL.test(text) ? `"${text.replaceAll('"', '""')}"` : text
 }
