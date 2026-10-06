@@ -2,11 +2,12 @@ import { FormEvent, useCallback, useEffect, useState } from 'react'
 import { BrowserRouter, Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { LoadingSkeleton } from './components/LoadingSkeleton'
 import { ThemeToggle } from './components/ThemeToggle'
-import { AccountIcon, AuditIcon, LogoutIcon, ShieldIcon, UsersIcon } from './components/icons'
+import { AccountIcon, AuditIcon, HomeIcon, LogoutIcon, ShieldIcon, UsersIcon } from './components/icons'
 import { safeContinueTarget } from './features/account/continueTarget'
 import { redirectTo } from './navigation'
 import { MyAccountPage } from './features/account/MyAccountPage'
 import { AuditLogPage } from './features/admin/AuditLogPage'
+import { HomePage } from './features/admin/HomePage'
 import { RolesPage } from './features/admin/RolesPage'
 import { UsersPage } from './features/admin/UsersPage'
 import { AcceptInvitationPage, ForgotPasswordPage, ResetPasswordPage } from './features/account/PublicPages'
@@ -78,7 +79,7 @@ function LoginPage({ onAuthenticated }: { onAuthenticated: (user: CurrentUser) =
       }
       const user = await getCurrentUser()
       onAuthenticated(user)
-      navigate(user.roles.includes('admin') ? '/usuarios' : '/me', { replace: true })
+      navigate(user.roles.includes('admin') ? '/inicio' : '/me', { replace: true })
     } catch (reason) {
       if (mfaVerified) {
         clearSession()
@@ -156,7 +157,7 @@ function LoginPage({ onAuthenticated }: { onAuthenticated: (user: CurrentUser) =
 function AppShell({ user, onLogout, onUserChange, onSessionEnded }: { user: CurrentUser; onLogout: () => Promise<void>; onUserChange: (user: CurrentUser) => void; onSessionEnded: () => void }) {
   const navigate = useNavigate()
   const isAdmin = user.roles.includes('admin')
-  const home = isAdmin ? '/usuarios' : '/me'
+  const home = isAdmin ? '/inicio' : '/me'
   const closeSession = async () => {
     try {
       await onLogout()
@@ -171,6 +172,7 @@ function AppShell({ user, onLogout, onUserChange, onSessionEnded }: { user: Curr
       <aside className="left-rail">
         <div className="rail-brand"><span className="small-mark" aria-hidden="true">IH</span><span>Identity Hub<small>Proveedor de identidad</small></span></div>
         <nav aria-label="Navegación principal">
+          {isAdmin && <NavLink to="/inicio"><HomeIcon />Inicio</NavLink>}
           {isAdmin && <NavLink to="/usuarios"><UsersIcon />Usuarios</NavLink>}
           {isAdmin && <NavLink to="/roles"><ShieldIcon />Roles</NavLink>}
           {isAdmin && <NavLink to="/auditoria"><AuditIcon />Auditoría</NavLink>}
@@ -181,6 +183,7 @@ function AppShell({ user, onLogout, onUserChange, onSessionEnded }: { user: Curr
       </aside>
       <main className="app-content" id="main-content" tabIndex={-1}>
         <Routes>
+          <Route path="/inicio" element={isAdmin ? <HomePage onSessionEnded={onSessionEnded} /> : <Navigate to="/me" replace />} />
           <Route path="/usuarios" element={isAdmin ? <UsersPage currentUserId={user.id} onSessionEnded={onSessionEnded} /> : <Navigate to="/me" replace />} />
           <Route path="/roles" element={isAdmin ? <RolesPage currentRoles={user.roles} onSessionEnded={onSessionEnded} /> : <Navigate to="/me" replace />} />
           <Route path="/auditoria" element={isAdmin ? <AuditLogPage onSessionEnded={onSessionEnded} /> : <Navigate to="/me" replace />} />
@@ -209,6 +212,7 @@ function AppRoutes() {
       '/forgot-password': 'Restablecer contraseña',
       '/password-reset': 'Nueva contraseña',
       '/invitations/accept': 'Activar cuenta',
+      '/inicio': 'Inicio',
       '/usuarios': 'Usuarios',
       '/roles': 'Roles y permisos',
       '/auditoria': 'Auditoría',
@@ -240,7 +244,7 @@ function AppRoutes() {
       <Route path="/invitations/accept" element={<AcceptInvitationPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/password-reset" element={<ResetPasswordPage />} />
-      <Route path="/login" element={user && !hasContinueTarget() ? <Navigate to={user.roles.includes('admin') ? '/usuarios' : '/me'} replace /> : <LoginPage onAuthenticated={setUser} />} />
+      <Route path="/login" element={user && !hasContinueTarget() ? <Navigate to={user.roles.includes('admin') ? '/inicio' : '/me'} replace /> : <LoginPage onAuthenticated={setUser} />} />
       <Route path="/*" element={user ? <AppShell user={user} onLogout={async () => { try { await logout() } finally { setUser(null) } }} onUserChange={setUser} onSessionEnded={endSession} /> : <Navigate to="/login" replace />} />
     </Routes>
   )

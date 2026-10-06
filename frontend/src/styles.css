@@ -103,6 +103,20 @@ nav a.active { background: var(--accent-soft); color: var(--accent); font-weight
 .stat-tile { display: grid; gap: .15rem; padding: 1rem 1.25rem; background: var(--panel); border: 1px solid var(--line); border-radius: 1rem; }
 .stat-tile strong { font-family: var(--display); font-size: 1.75rem; line-height: 1.1; }
 .stat-tile span { color: var(--muted); font-size: .78rem; font-weight: 600; }
+.stat-tile { border-left: 4px solid var(--line); }
+.stat-tile.stat-ok { border-left-color: var(--ok); }
+.stat-tile.stat-warn { border-left-color: var(--warn); }
+.stat-tile.stat-danger { border-left-color: var(--danger); }
+.home-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); gap: 1rem; align-items: start; }
+.activity-list { display: grid; gap: .1rem; margin: 0; padding: 0; list-style: none; }
+.activity-list li { display: flex; align-items: baseline; justify-content: space-between; gap: .75rem; flex-wrap: wrap; padding: .5rem 0; border-bottom: 1px solid var(--line); }
+.activity-list li:last-child { border-bottom: 0; }
+.activity-list time { color: var(--muted); font-size: .8rem; }
+.shortcuts { display: grid; gap: .5rem; }
+.shortcuts h2 { margin-bottom: .25rem; }
+.shortcuts a { display: grid; grid-template-columns: auto 1fr; column-gap: .65rem; align-items: center; padding: .65rem .75rem; color: var(--ink); text-decoration: none; border: 1px solid var(--line); border-radius: .65rem; font-weight: 600; }
+.shortcuts a small { grid-column: 2; color: var(--muted); font-weight: 400; }
+.shortcuts a:hover, .shortcuts a:focus-visible { background: var(--accent-soft); color: var(--accent); }
 .directory { margin-top: 1.25rem; }
 .panel-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
 .panel-header h2 { margin: 0; }

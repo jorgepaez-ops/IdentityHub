@@ -84,8 +84,19 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
   usuarios y roles; un error y «Nuevo rol» retiran el aviso de éxito; almacenamiento bloqueado usa el
   tema del sistema y el botón sigue alternando. Cada prueba falla al revertir su comportamiento. vitest
   Hub 176/176 y Contabilidad 72/72, lint y typecheck limpios.
-- [ ] **P3 — Inicio de la consola.** Ruta `/inicio` con indicadores (usuarios por estado, inicios
+- [x] **P3 — Inicio de la consola.** Ruta `/inicio` con indicadores (usuarios por estado, inicios
   fallidos en 24 h, actividad reciente) y accesos directos; los administradores aterrizan ahí.
+  Ruta: delegada (Sonnet; Codex sin cuota hasta las 15:13), revisión y corrección de Claude. Evidencia
+  (2026-10-06): `HomePage.tsx` con cuatro tarjetas por estado, fallidos en 24 h, últimos 10 eventos y
+  accesos directos; conteos «N+» con `limit` 100 (D3); aterrizaje de admin en `/inicio` (comodín,
+  `/login` y tras MFA); no administradores a `/me`. RED: 11 de 13 pruebas nuevas fallaban sin la página.
+  Revisión de Claude: los fallidos solo contaban `login_failed`, pero el backend registra el código MFA
+  rechazado como `mfa_code_rejected` y el requisito lo cuenta como fallo; se suman ambas acciones
+  (prueba `TestRF011_CountsRejectedMfaCodesAsFailedSignIns`, RED observado antes del cambio) y el
+  ternario anidado del tono pasó a un mapa. vitest 190/190, typecheck y lint limpios, `make e2e` 52/52
+  (corrido por Sonnet antes de la corrección, que solo añade una consulta). E2E ajustadas:
+  `roles-y-permisos` y `demo` esperan «Inicio» tras el login. Límite conocido: siete consultas por
+  visita y la ventana de 24 h usa el reloj del navegador.
 - [ ] **P4 — Usuarios.** Filtro por estado con el parámetro `status` existente y tarjetas clicables.
 - [ ] **P5 — Auditoría.** Atajos de filtro, actor resuelto a correo (`getUser`), metadatos legibles y
   «filtrar por este actor».
@@ -118,7 +129,7 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
 
 | Tareas | Hechas |
 |---|---|
-| P1 a P10 (10) | 2 (P1 y P2) |
+| P1 a P10 (10) | 3 (P1 a P3) |
 
 ## Entrega
 
@@ -128,4 +139,4 @@ notas). Commits por unidad de trabajo; un PR al final con confirmación del usua
 
 ## Siguiente paso
 
-P3 (inicio de la consola).
+P4 (usuarios: filtro por estado y tarjetas clicables).

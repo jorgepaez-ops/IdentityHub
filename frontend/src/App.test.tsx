@@ -29,7 +29,7 @@ describe('authentication routes', () => {
     fireEvent.change(screen.getByLabelText('Código de verificación'), { target: { value: '123456' } })
     fireEvent.click(screen.getByRole('button', { name: 'Verificar' }))
 
-    expect(await screen.findByRole('heading', { name: 'Usuarios' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Inicio' })).toBeInTheDocument()
   })
 
   it('TestRF013_RoutesMemberAfterMfaVerification', async () => {
@@ -211,7 +211,7 @@ describe('authentication routes', () => {
 
     render(<App />)
 
-    expect(await screen.findByRole('heading', { name: 'Usuarios' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Inicio' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Iniciar sesión' })).not.toBeInTheDocument()
   })
 
@@ -233,8 +233,8 @@ describe('authentication routes', () => {
 
     render(<App />)
 
-    // The link renders before the redirect to /usuarios settles; wait for the route, not the node.
-    await waitFor(() => expect(screen.getByRole('link', { name: 'Usuarios' })).toHaveClass('active'))
+    // The link renders before the redirect to /inicio settles; wait for the route, not the node.
+    await waitFor(() => expect(screen.getByRole('link', { name: 'Inicio' })).toHaveClass('active'))
   })
 
   it('TestRF015_ExponeElDestinoDelEnlaceParaSaltarAlContenidoEnRutasPublicas', async () => {
@@ -263,7 +263,7 @@ describe('authentication routes', () => {
     await screen.findByLabelText('Código de verificación')
     fireEvent.change(screen.getByLabelText('Código de verificación'), { target: { value: '123456' } })
     fireEvent.click(screen.getByRole('button', { name: 'Verificar' }))
-    await screen.findByRole('heading', { name: 'Usuarios' })
+    await screen.findByRole('heading', { name: 'Inicio' })
     fireEvent.click(screen.getByRole('button', { name: 'Cerrar sesión' }))
 
     expect(await screen.findByRole('button', { name: 'Iniciar sesión' })).toBeInTheDocument()
