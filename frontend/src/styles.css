@@ -191,7 +191,7 @@ select { width: 100%; padding: .7rem .75rem; color: var(--ink); background: var(
 :root[data-theme="light"] { color-scheme: light; --bg: #f3f6fb; --panel: #fff; --ink: #142033; --muted: #5e6d83; --line: #d9e1ee; --accent: #174ea6; --accent-ink: #fff; --accent-soft: #e8f0fe; --ok: #137a45; --ok-soft: #e5f5ea; --danger: #b42318; --danger-soft: #feebe8; --warn: #9a6700; --warn-soft: #fff4d6; }
 :root[data-theme="dark"] { color-scheme: dark; --bg: #101828; --panel: #172236; --ink: #edf3ff; --muted: #aab9cf; --line: #2a3b55; --accent: #9bc1ff; --accent-ink: #10203a; --accent-soft: #203a62; --ok: #65d29a; --ok-soft: #173d31; --danger: #ff9c93; --danger-soft: #482222; --warn: #f2c76c; --warn-soft: #483a19; --shadow: 0 12px 32px rgb(0 0 0 / 25%); }
 body { min-width: 320px; }
-svg { width: 1.1rem; height: 1.1rem; flex: none; }
+svg.icon { width: 1.1rem; height: 1.1rem; flex: none; }
 :focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
 .skip-link { position: fixed; z-index: 100; top: .75rem; left: .75rem; padding: .6rem .85rem; color: var(--accent-ink); background: var(--accent); border-radius: .5rem; transform: translateY(-200%); }
 .skip-link:focus { transform: translateY(0); }

@@ -128,6 +128,10 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
   **aprobada** y acusada. Su sugerencia se atendió: prueba de que la página sigue al sistema sin el botón
   de tema montado (pantallas públicas), en ambas apps; falla al quitar la suscripción de
   `initializeTheme`. vitest Hub 208/208 y Contabilidad 77/77, lint y typecheck limpios.
+  Cuarta revisión nativa de la rama (aprobada y acusada): la regla global `svg` del Hub achicaba todo SVG en
+  línea al tamaño de ícono (afectaría los gráficos); ahora se limita a `svg.icon`. Para P9 quedan dos
+  sugerencias: `tabIndex=-1` en `main#main-content` de las páginas públicas (ya anotada) y reiniciar el
+  estado de módulo de `theme.ts` en el `afterEach` de las pruebas para que no dependan del orden.
 - [ ] **P5 — Auditoría.** Atajos de filtro, actor resuelto a correo (`getUser`), metadatos legibles y
   «filtrar por este actor».
 - [ ] **P6 — Contabilidad: resumen.** Más datos de ejemplo, gráficos SVG (por estado, por categoría,
