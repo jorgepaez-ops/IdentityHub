@@ -188,7 +188,7 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   existía (está en `backend/osv-scanner.toml`, riesgo aceptado de VULN-028 hasta 2026-12-25), y la
   causa del 502 de Nginx era incorrecta (es la IP vieja de `api` tras recrearlo; se arregla con
   `docker restart identity-hub-web-1`, no esperando a la API).
-- [ ] **T5 — Guía de integración de terceros.** Registro como cliente OAuth (`redirect_uri`, PKCE,
+- [x] **T5 — Guía de integración de terceros.** Registro como cliente OAuth (`redirect_uri`, PKCE,
   CORS), endpoints y JWKS, declaración de permisos de la aplicación (se completa tras la fase 3),
   cambios en el frontend del tercero y checklist de seguridad.
   Ruta: delegada (Sonnet; Codex sin cuota hasta las 16:20), revisión de Claude. Evidencia (2026-10-05):
@@ -196,6 +196,12 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   y cómo agregar un segundo, flujo con diagrama Mermaid, referencia de endpoints, claims y validación,
   cambios en el frontend del tercero, checklist y limitaciones); `docs/README.md` enlaza la guía como
   parcial. La sección 7 (declaración de permisos) queda como marcador y se completa tras T15.
+  Sección 7 completada (2026-10-06) — Ruta: inline (Claude, un archivo de documentación): modelo de
+  permisos, declaración por migración (`000009`), claves de Contabilidad, claim `permissions` con
+  ejemplo del auditor, endpoints de la grilla y los cinco controles; también el claim en la tabla de la
+  sección 5, «Guardas por permiso» en la 6, dos ítems del checklist y una limitación en la 9.
+  `docs/README.md` marca la guía como completa. Verificación estructural: todos los enlaces relativos
+  existen; datos contrastados con el ADR 0013, `token.go`, `jwt.ts` y la migración.
   Revisión de Claude: Mermaid renderiza (mermaid-cli 11.17.0); verificado contra el código que el
   cliente está fijo en `backend/internal/config/config.go:66-68` y sembrado en la migración
   000007. Corrección: la guía decía que el logout del Hub solo limpia la cookie; también revoca en
@@ -460,17 +466,16 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
 
 | Fase | Tareas | Hechas |
 |---|---|---|
-| 1 — Documentación, UML e integración | T1 a T6 (6) | 5 (T1 a T4 y T6; T5 parcial) |
+| 1 — Documentación, UML e integración | T1 a T6 (6) | 6 (T1 a T6) — fase cerrada |
 | 2 — IaC de referencia | T7 a T10 (4) | 4 (T7 a T10) — fase cerrada |
 | 3 — Grilla de roles configurable | T11 a T15 (5) | 5 (T11 a T15) — fase cerrada |
 | 4 — Publicación y entrega | T16 a T21 (6) | 0 |
-| **Total** | **21** | **14** (T1 a T4, T6 a T15; T5 parcial) |
+| **Total** | **21** | **15** (T1 a T15) |
 
 ## Siguiente paso
 
-**2026-10-06.** Fase 3 cerrada (T15 hecha; revisión nativa de T14 aprobada). Siguiente: completar
-la sección 7 (permisos) de la guía de integración (T5) y abrir el PR de la fase 3 con confirmación del
-usuario; después la fase 4 desde T16.
+**2026-10-06.** Fases 1 a 3 cerradas (T5 completa). PR de la fase 3 abierto con confirmación del
+usuario; siguiente: fase 4 desde T16.
 Codex: cuota diaria limitada; Sonnet como respaldo.
 
 ## Cambios de spec propuestos
