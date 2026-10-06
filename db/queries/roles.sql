@@ -52,6 +52,10 @@ LEFT JOIN permissions p ON p.id = rp.permission_id
 WHERE r.id = $1 AND r.application_id = $2
 GROUP BY r.id;
 
+-- name: LockApplicationRole :one
+-- Row lock for Update/Delete (GetApplicationRole aggregates, so it cannot carry FOR UPDATE itself).
+SELECT id FROM roles WHERE id = $1 AND application_id = $2 FOR UPDATE;
+
 -- name: ValidateApplicationPermissionKeys :many
 SELECT key FROM permissions
 WHERE application_id = $1 AND key = ANY(sqlc.arg(keys)::text[])

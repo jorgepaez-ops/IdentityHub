@@ -338,6 +338,23 @@ func (q *Queries) ListRolesWithApplication(ctx context.Context) ([]ListRolesWith
 	return items, nil
 }
 
+const lockApplicationRole = `-- name: LockApplicationRole :one
+SELECT id FROM roles WHERE id = $1 AND application_id = $2 FOR UPDATE
+`
+
+type LockApplicationRoleParams struct {
+	ID            uuid.UUID
+	ApplicationID pgtype.UUID
+}
+
+// Row lock for Update/Delete (GetApplicationRole aggregates, so it cannot carry FOR UPDATE itself).
+func (q *Queries) LockApplicationRole(ctx context.Context, arg LockApplicationRoleParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, lockApplicationRole, arg.ID, arg.ApplicationID)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const updateApplicationRoleDescription = `-- name: UpdateApplicationRoleDescription :exec
 UPDATE roles SET description = $2 WHERE id = $1
 `

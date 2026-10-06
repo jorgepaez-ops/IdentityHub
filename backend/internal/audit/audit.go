@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jorgepaez/identity-hub/internal/api"
+	"github.com/jorgepaez/identity-hub/internal/auth/rolegrid"
 	"github.com/jorgepaez/identity-hub/internal/store"
 )
 
@@ -31,9 +32,11 @@ const (
 	RoleChanged          Action = "role_changed"
 	AccountLocked        Action = "account_locked"
 	UserDisabled         Action = "user_disabled"
-	RoleCreated          Action = "role_created"
-	RoleUpdated          Action = "role_updated"
-	RoleDeleted          Action = "role_deleted"
+	// The role-grid actions are defined once, in rolegrid: that package cannot import audit
+	// (audit -> api -> rolegrid would be a cycle), so audit aliases them.
+	RoleCreated Action = rolegrid.ActionRoleCreated
+	RoleUpdated Action = rolegrid.ActionRoleUpdated
+	RoleDeleted Action = rolegrid.ActionRoleDeleted
 )
 
 // Event contains the application data for one immutable audit entry.

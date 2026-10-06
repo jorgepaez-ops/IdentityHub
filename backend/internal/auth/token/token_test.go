@@ -181,3 +181,49 @@ func TestRF004_RechazaTokenSinSujetoOFirmadoPorOtraClave(t *testing.T) {
 		t.Error("token signed by another key with the right kid was accepted")
 	}
 }
+
+func rawClaimsOf(t *testing.T, service *Service, raw string) jwt.MapClaims {
+	t.Helper()
+	claims := jwt.MapClaims{}
+	if _, err := jwt.ParseWithClaims(raw, claims, func(*jwt.Token) (any, error) { return service.PublicKey(), nil }, jwt.WithValidMethods([]string{"EdDSA"})); err != nil {
+		t.Fatal(err)
+	}
+	return claims
+}
+
+func TestRF020_TokensDelHubNuncaLlevanLaClavePermissions(t *testing.T) {
+	service, err := New(testSeed(), "issuer", "identity-hub", time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	issuers := map[string]func() (string, error){
+		"Issue":           func() (string, error) { return service.Issue("user-1", []string{"admin"}) },
+		"IssueForSession": func() (string, error) { return service.IssueForSession("user-1", []string{"admin"}, "session-1") },
+	}
+	for name, issue := range issuers {
+		t.Run(name, func(t *testing.T) {
+			raw, err := issue()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, ok := rawClaimsOf(t, service, raw)["permissions"]; ok {
+				t.Fatal("Hub token JSON claims include a permissions key")
+			}
+		})
+	}
+}
+
+func TestRF020_TokenDeAplicacionConListaVaciaSerializaArregloVacio(t *testing.T) {
+	service, err := New(testSeed(), "issuer", "identity-hub", time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := service.IssueForAudience("user-1", []string{"contabilidad.auditor"}, []string{}, "contabilidad")
+	if err != nil {
+		t.Fatal(err)
+	}
+	permissions, ok := rawClaimsOf(t, service, raw)["permissions"].([]any)
+	if !ok || len(permissions) != 0 {
+		t.Fatalf("permissions=%#v, want an empty JSON array, not null or omitted", permissions)
+	}
+}

@@ -89,7 +89,16 @@ func (w *roleGridWriter) GetApplication(ctx context.Context, id uuid.UUID) (role
 	return rolegrid.Application{ID: row.ID, ClientID: row.ClientID, Name: row.Name}, nil
 }
 
-func (w *roleGridWriter) GetApplicationRole(ctx context.Context, applicationID, roleID uuid.UUID) (rolegrid.Role, error) {
+func (w *roleGridWriter) GetApplicationRoleForUpdate(ctx context.Context, applicationID, roleID uuid.UUID) (rolegrid.Role, error) {
+	// The lock comes first: the read below then runs after any concurrent writer committed
+	// (READ COMMITTED), and assigning the role (user_roles FK) waits for this row lock.
+	_, err := w.queries.LockApplicationRole(ctx, generated.LockApplicationRoleParams{ID: roleID, ApplicationID: pgtype.UUID{Bytes: applicationID, Valid: true}})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return rolegrid.Role{}, rolegrid.ErrRoleNotFound
+	}
+	if err != nil {
+		return rolegrid.Role{}, fmt.Errorf("lock application role: %w", err)
+	}
 	row, err := w.queries.GetApplicationRole(ctx, generated.GetApplicationRoleParams{ID: roleID, ApplicationID: pgtype.UUID{Bytes: applicationID, Valid: true}})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return rolegrid.Role{}, rolegrid.ErrRoleNotFound
@@ -159,21 +168,24 @@ func (w *roleGridWriter) InsertRoleGridAuditEvent(ctx context.Context, event rol
 	return nil
 }
 
-// mapRoleGridError translates database refusals into typed errors: a duplicate
-// name, the system-role trigger (defensive: the service already refuses system
-// roles) and the user_roles foreign key that restricts deleting an assigned role.
+// mapRoleGridError translates database refusals into typed errors by constraint
+// name (roles_name_key, user_roles_role_id_fkey and roles_application_id_fkey, see
+// migrations 000001 and 000009) and by the system-role trigger (defensive: the
+// service already refuses system roles). Any other database error is wrapped.
 func mapRoleGridError(err error) error {
 	var pgErr *pgconn.PgError
 	if !errors.As(err, &pgErr) {
 		return err
 	}
 	switch {
-	case pgErr.Code == "23505":
+	case pgErr.Code == "23505" && pgErr.ConstraintName == "roles_name_key":
 		return rolegrid.ErrDuplicateRole
-	case pgErr.Code == "23503":
+	case pgErr.Code == "23503" && pgErr.ConstraintName == "user_roles_role_id_fkey":
 		return rolegrid.ErrRoleAssigned
+	case pgErr.Code == "23503" && pgErr.ConstraintName == "roles_application_id_fkey":
+		return rolegrid.ErrApplicationNotFound
 	case pgErr.Code == "P0001" && strings.Contains(pgErr.Message, "system roles"):
 		return rolegrid.ErrSystemRole
 	}
-	return err
+	return fmt.Errorf("role grid database error (%s, constraint %q): %w", pgErr.Code, pgErr.ConstraintName, err)
 }

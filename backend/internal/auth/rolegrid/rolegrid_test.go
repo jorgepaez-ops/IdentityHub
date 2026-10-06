@@ -341,12 +341,14 @@ type fakeWriter struct {
 	updatedDescription string
 	deleted            bool
 	audits             []AuditEvent
+	lockedReads        int
 }
 
 func (w *fakeWriter) GetApplication(context.Context, uuid.UUID) (Application, error) {
 	return w.application, w.applicationErr
 }
-func (w *fakeWriter) GetApplicationRole(context.Context, uuid.UUID, uuid.UUID) (Role, error) {
+func (w *fakeWriter) GetApplicationRoleForUpdate(context.Context, uuid.UUID, uuid.UUID) (Role, error) {
+	w.lockedReads++
 	return w.role, w.roleErr
 }
 func (w *fakeWriter) ValidatePermissionKeys(_ context.Context, _ uuid.UUID, keys []string) ([]string, error) {
@@ -388,4 +390,22 @@ func (w *fakeWriter) InsertRoleGridAuditEvent(_ context.Context, event AuditEven
 	}
 	w.audits = append(w.audits, event)
 	return nil
+}
+
+func TestRF021_ActualizaYEliminaLeenElRolConBloqueoDeFila(t *testing.T) {
+	description := "Nueva"
+	service, writer := fixture()
+	if _, err := service.Update(context.Background(), UpdateInput{ActorUserID: testActor, ApplicationID: testApp, RoleID: testRoleID, Description: &description}); err != nil {
+		t.Fatalf("Update() error = %v", err)
+	}
+	if writer.lockedReads != 1 {
+		t.Fatalf("Update() locked reads = %d, want 1 so controls 2 and 4 see a locked role row", writer.lockedReads)
+	}
+	service, writer = fixture()
+	if err := service.Delete(context.Background(), DeleteInput{ActorUserID: testActor, ApplicationID: testApp, RoleID: testRoleID}); err != nil {
+		t.Fatalf("Delete() error = %v", err)
+	}
+	if writer.lockedReads != 1 {
+		t.Fatalf("Delete() locked reads = %d, want 1", writer.lockedReads)
+	}
 }

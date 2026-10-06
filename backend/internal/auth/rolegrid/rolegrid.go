@@ -16,7 +16,8 @@ import (
 	"github.com/google/uuid"
 )
 
-// Audit actions written by this package (also accepted by internal/audit).
+// Audit actions written by this package. internal/audit aliases these as its
+// Action constants (rolegrid cannot import audit without an import cycle).
 const (
 	ActionRoleCreated = "role_created"
 	ActionRoleUpdated = "role_updated"
@@ -100,8 +101,10 @@ type DeleteInput struct {
 // Writer groups the operations that must share one transaction.
 type Writer interface {
 	GetApplication(context.Context, uuid.UUID) (Application, error)
-	// GetApplicationRole returns the role with its permission keys and assignment count.
-	GetApplicationRole(ctx context.Context, applicationID, roleID uuid.UUID) (Role, error)
+	// GetApplicationRoleForUpdate locks the role row (FOR UPDATE) until the transaction ends and
+	// returns it with its permission keys and assignment count, so controls 2 and 4 are
+	// evaluated against a role that no concurrent assignment or change can alter.
+	GetApplicationRoleForUpdate(ctx context.Context, applicationID, roleID uuid.UUID) (Role, error)
 	// ValidatePermissionKeys returns the subset of keys declared by the application.
 	ValidatePermissionKeys(context.Context, uuid.UUID, []string) ([]string, error)
 	ActorHoldsApplicationRole(ctx context.Context, userID, roleID uuid.UUID) (bool, error)
@@ -193,7 +196,7 @@ func (s *Service) Update(ctx context.Context, input UpdateInput) (Role, error) {
 	}
 	var result Role
 	err := s.repository.WithinRoleGridTransaction(ctx, func(w Writer) error {
-		role, err := w.GetApplicationRole(ctx, input.ApplicationID, input.RoleID)
+		role, err := w.GetApplicationRoleForUpdate(ctx, input.ApplicationID, input.RoleID)
 		if err != nil {
 			return err
 		}
@@ -241,7 +244,7 @@ func (s *Service) Delete(ctx context.Context, input DeleteInput) error {
 		return errUnavailable
 	}
 	return s.repository.WithinRoleGridTransaction(ctx, func(w Writer) error {
-		role, err := w.GetApplicationRole(ctx, input.ApplicationID, input.RoleID)
+		role, err := w.GetApplicationRoleForUpdate(ctx, input.ApplicationID, input.RoleID)
 		if err != nil {
 			return err
 		}

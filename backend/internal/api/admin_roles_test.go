@@ -1,9 +1,11 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -244,5 +246,43 @@ func TestRF021_SinServicioDevuelve503(t *testing.T) {
 		if response := roleGridRequest(t, server, call.method, call.path, call.body, actor, "admin"); response.Code != http.StatusServiceUnavailable {
 			t.Fatalf("%s %s: status=%d, want 503", call.method, call.path, response.Code)
 		}
+	}
+}
+
+func TestRF021_ErrorInesperadoSeRegistraConRequestIDSinFiltrarseAlCliente(t *testing.T) {
+	actor, appID, roleID := uuid.New(), uuid.New(), uuid.New()
+	base := "/api/v1/admin/applications"
+	roleBase := base + "/" + appID.String() + "/roles"
+	for _, call := range []struct{ method, path, body string }{
+		{http.MethodGet, base, ``},
+		{http.MethodGet, roleBase, ``},
+		{http.MethodPost, roleBase, `{"name":"contabilidad.auditor","permissionKeys":[]}`},
+		{http.MethodPatch, roleBase + "/" + roleID.String(), `{"description":"x"}`},
+		{http.MethodDelete, roleBase + "/" + roleID.String(), ``},
+	} {
+		t.Run(call.method+" "+call.path, func(t *testing.T) {
+			var logs bytes.Buffer
+			server := roleGridServer(t, actor, []string{"admin"}, &roleGridStub{err: errors.New("pq: secret-detail unavailable")})
+			server.logger = slog.New(slog.NewTextHandler(&logs, nil))
+			r := httptest.NewRequest(call.method, call.path, strings.NewReader(call.body))
+			r.Header.Set("Content-Type", "application/json")
+			r.Header.Set("X-Request-Id", "role-grid-request-id")
+			raw, err := apiTestService(t).Issue(actor.String(), []string{"admin"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			r.Header.Set("Authorization", "Bearer "+raw)
+			response := httptest.NewRecorder()
+			server.Routes().ServeHTTP(response, r)
+			if response.Code != http.StatusInternalServerError {
+				t.Fatalf("status=%d body=%s, want 500", response.Code, response.Body.String())
+			}
+			if strings.Contains(response.Body.String(), "secret-detail") {
+				t.Fatalf("response leaks the underlying error: %s", response.Body.String())
+			}
+			if output := logs.String(); !strings.Contains(output, "level=ERROR") || !strings.Contains(output, "secret-detail") || !strings.Contains(output, "request_id=role-grid-request-id") {
+				t.Fatalf("logs=%q", output)
+			}
+		})
 	}
 }

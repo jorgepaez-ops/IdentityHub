@@ -99,13 +99,17 @@ type ApplicationRole struct {
 	Description   string             `json:"description"`
 	Id            openapi_types.UUID `json:"id"`
 
-	// Name Rol configurable exclusivo de una aplicación.
+	// Name Rol configurable exclusivo de una aplicación, con la forma `<client_id>.<nombre>`. El patrón solo
+	// comprueba esa forma genérica; el servidor exige además que el prefijo sea exactamente el client_id
+	// de la aplicación y que el nombre cumpla `^[a-z0-9][a-z0-9_-]{1,40}$`.
 	Name           ApplicationRoleName `json:"name"`
 	PermissionKeys []string            `json:"permissionKeys"`
 	System         bool                `json:"system"`
 }
 
-// ApplicationRoleName defines model for ApplicationRoleName.
+// ApplicationRoleName Rol configurable exclusivo de una aplicación, con la forma `<client_id>.<nombre>`. El patrón solo
+// comprueba esa forma genérica; el servidor exige además que el prefijo sea exactamente el client_id
+// de la aplicación y que el nombre cumpla `^[a-z0-9][a-z0-9_-]{1,40}$`.
 type ApplicationRoleName = string
 
 // AuditEvent defines model for AuditEvent.
@@ -131,7 +135,7 @@ type AuditLogPage struct {
 type CreateApplicationRoleRequest struct {
 	Description *string `json:"description,omitempty"`
 
-	// Name Debe ser `<clientId>.<nombre>`; el nombre cumple `^[a-z0-9][a-z0-9_-]{1,40}$`.
+	// Name El prefijo debe ser igual al client_id de la aplicación (`<client_id>.<nombre>`) y el nombre cumple `^[a-z0-9][a-z0-9_-]{1,40}$`; de lo contrario, 400.
 	Name           ApplicationRoleName `json:"name"`
 	PermissionKeys []string            `json:"permissionKeys"`
 }

@@ -627,7 +627,11 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
-        '409': { description: Ya existe un rol con ese nombre }
+        '409':
+          description: Ya existe un rol con ese nombre
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
 
   /api/v1/admin/applications/{applicationId}/roles/{roleId}:
     patch:
@@ -645,7 +649,11 @@ paths:
         '200': { description: Rol actualizado, content: { application/json: { schema: { $ref: '#/components/schemas/ApplicationRole' } } } }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
+        '403':
+          description: Un administrador no puede cambiar ni eliminar un rol que él tiene, y los roles de sistema (admin, user) no se pueden modificar
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
         '404': { $ref: '#/components/responses/NotFound' }
     delete:
       operationId: deleteApplicationRole
@@ -657,9 +665,17 @@ paths:
       responses:
         '204': { description: Rol eliminado }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
+        '403':
+          description: Un administrador no puede cambiar ni eliminar un rol que él tiene, y los roles de sistema (admin, user) no se pueden modificar
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
         '404': { $ref: '#/components/responses/NotFound' }
-        '409': { description: El rol tiene asignaciones activas }
+        '409':
+          description: El rol tiene asignaciones activas
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
 
 components:
   securitySchemes:
@@ -819,11 +835,14 @@ components:
       "x-requirement": RF-021
 
     ApplicationRoleName:
-      allOf:
-        - $ref: '#/components/schemas/Role'
-        - type: string
-          pattern: '^[a-z][a-z0-9_-]{0,62}\.[a-z][a-z0-9_-]{0,62}$'
-      description: Rol configurable exclusivo de una aplicación.
+      type: string
+      minLength: 4
+      maxLength: 127
+      pattern: '^[a-z0-9][a-z0-9_-]*\.[a-z0-9][a-z0-9_-]{1,40}$'
+      description: |
+        Rol configurable exclusivo de una aplicación, con la forma `<client_id>.<nombre>`. El patrón solo
+        comprueba esa forma genérica; el servidor exige además que el prefijo sea exactamente el client_id
+        de la aplicación y que el nombre cumpla `^[a-z0-9][a-z0-9_-]{1,40}$`.
     Permission:
       type: object
       required: [key, description]
@@ -857,7 +876,7 @@ components:
         name:
           allOf:
             - $ref: '#/components/schemas/ApplicationRoleName'
-          description: Debe ser `<clientId>.<nombre>`; el nombre cumple `^[a-z0-9][a-z0-9_-]{1,40}$`.
+          description: El prefijo debe ser igual al client_id de la aplicación (`<client_id>.<nombre>`) y el nombre cumple `^[a-z0-9][a-z0-9_-]{1,40}$`; de lo contrario, 400.
           example: contabilidad.auditor
         description: { type: string, maxLength: 500 }
         permissionKeys: { type: array, uniqueItems: true, items: { type: string } }

@@ -9,6 +9,7 @@ import (
 	"net/netip"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jorgepaez/identity-hub/internal/auth/rolegrid"
@@ -215,10 +216,72 @@ func TestRF021_StoreMapeaElTriggerYLaRestriccionDeAsignaciones(t *testing.T) {
 		t.Fatal(err)
 	}
 	err = repository.WithinRoleGridTransaction(ctx, func(w rolegrid.Writer) error {
-		_, err := w.GetApplicationRole(ctx, foreignID, analystRoleID)
+		_, err := w.GetApplicationRoleForUpdate(ctx, foreignID, analystRoleID)
 		return err
 	})
 	if !errors.Is(err, rolegrid.ErrRoleNotFound) {
 		t.Fatalf("cross-application lookup error = %v, want ErrRoleNotFound", err)
+	}
+}
+
+func TestRF021_StoreBloqueaLaFilaDelRolYMapeaRestriccionesPorNombre(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test requires a PostgreSQL server")
+	}
+	ctx := context.Background()
+	pool := testdb.New(t)
+	repository, err := store.NewWithPool(pool)
+	if err != nil {
+		t.Fatal(err)
+	}
+	user := createAdminTestUser(t, ctx, repository, "grid-lock@example.test", "Grid Lock", "")
+	var roleID, appID uuid.UUID
+	if err := pool.QueryRow(ctx, `SELECT r.id, r.application_id FROM roles r WHERE r.name = 'contabilidad.senior'`).Scan(&roleID, &appID); err != nil {
+		t.Fatal(err)
+	}
+
+	// While the role row is locked, assigning the role (user_roles FK) must wait for the transaction.
+	assigned := make(chan error, 1)
+	err = repository.WithinRoleGridTransaction(ctx, func(w rolegrid.Writer) error {
+		if _, err := w.GetApplicationRoleForUpdate(ctx, appID, roleID); err != nil {
+			return err
+		}
+		go func() {
+			_, err := pool.Exec(ctx, `INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)`, user.ID, roleID)
+			assigned <- err
+		}()
+		select {
+		case err := <-assigned:
+			t.Errorf("assignment finished while the role row was locked (err=%v)", err)
+		case <-time.After(500 * time.Millisecond):
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case err := <-assigned:
+		if err != nil {
+			t.Fatalf("assignment after the lock was released: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("assignment never completed after the lock was released")
+	}
+
+	// A missing application is ErrApplicationNotFound and a duplicate name ErrDuplicateRole.
+	err = repository.WithinRoleGridTransaction(ctx, func(w rolegrid.Writer) error {
+		_, err := w.CreateApplicationRole(ctx, uuid.New(), "ghost.rol", "")
+		return err
+	})
+	if !errors.Is(err, rolegrid.ErrApplicationNotFound) {
+		t.Fatalf("create in missing application error = %v, want ErrApplicationNotFound", err)
+	}
+	err = repository.WithinRoleGridTransaction(ctx, func(w rolegrid.Writer) error {
+		_, err := w.CreateApplicationRole(ctx, appID, "contabilidad.senior", "")
+		return err
+	})
+	if !errors.Is(err, rolegrid.ErrDuplicateRole) {
+		t.Fatalf("duplicate create error = %v, want ErrDuplicateRole", err)
 	}
 }

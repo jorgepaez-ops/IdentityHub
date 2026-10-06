@@ -508,8 +508,12 @@ export interface components {
         UserStatus: "pending_verification" | "active" | "locked" | "disabled";
         /** @description Rol de directorio (`admin` o `user`) o rol configurable `<aplicacion>.<nombre>`. */
         Role: string;
-        /** @description Rol configurable exclusivo de una aplicación. */
-        ApplicationRoleName: components["schemas"]["Role"] & string;
+        /**
+         * @description Rol configurable exclusivo de una aplicación, con la forma `<client_id>.<nombre>`. El patrón solo
+         *     comprueba esa forma genérica; el servidor exige además que el prefijo sea exactamente el client_id
+         *     de la aplicación y que el nombre cumpla `^[a-z0-9][a-z0-9_-]{1,40}$`.
+         */
+        ApplicationRoleName: string;
         Permission: {
             /** @example movimientos.ver_todos */
             key: string;
@@ -541,7 +545,7 @@ export interface components {
         };
         CreateApplicationRoleRequest: {
             /**
-             * @description Debe ser `<clientId>.<nombre>`; el nombre cumple `^[a-z0-9][a-z0-9_-]{1,40}$`.
+             * @description El prefijo debe ser igual al client_id de la aplicación (`<client_id>.<nombre>`) y el nombre cumple `^[a-z0-9][a-z0-9_-]{1,40}$`; de lo contrario, 400.
              * @example contabilidad.auditor
              */
             name: components["schemas"]["ApplicationRoleName"];
@@ -1490,7 +1494,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
             };
         };
     };
@@ -1514,14 +1520,24 @@ export interface operations {
                 content?: never;
             };
             401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
+            /** @description Un administrador no puede cambiar ni eliminar un rol que él tiene, y los roles de sistema (admin, user) no se pueden modificar */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
             404: components["responses"]["NotFound"];
             /** @description El rol tiene asignaciones activas */
             409: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
             };
         };
     };
@@ -1552,7 +1568,15 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
+            /** @description Un administrador no puede cambiar ni eliminar un rol que él tiene, y los roles de sistema (admin, user) no se pueden modificar */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
             404: components["responses"]["NotFound"];
         };
     };

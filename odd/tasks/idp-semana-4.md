@@ -369,6 +369,18 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   dentro de su aplicación (404 entre aplicaciones), auditoría en la misma transacción. Composición
   real: con `make up` la base del usuario queda en la migración 9 con 5 permisos y los endpoints
   de la grilla responden 401 sin sesión (no 501).
+  Correcciones de la revisión nativa de T12b (review-637b55288a3cf589, aprobada) — Ruta: delegada
+  (Sonnet), revisión de Claude: build, vet de integración, unitarias `-race`, lint 0 y trazabilidad repetidos en verde; Sonnet corrió la integración contra Postgres (80,4 %). Desviación aceptada en (4): las constantes de auditoría viven en `rolegrid` y `audit` las reutiliza, porque al revés hay un ciclo de imports. Se corrigieron siete avisos: (1) los 500 del admin de roles
+  registran el error con request_id sin filtrarlo al cliente (RED observado); (2) OpenAPI: patrón y
+  descripciones de `ApplicationRoleName` alineados con Go y 409/403 con `application/problem+json`;
+  (3) `mapRoleGridError` distingue por nombre de restricción (`roles_name_key`,
+  `user_roles_role_id_fkey`, `roles_application_id_fkey`) y envuelve el resto con `%w` (RED observado);
+  (4) las acciones de auditoría se definen una sola vez en rolegrid y `audit` las referencia (rolegrid
+  no puede importar audit: ciclo audit -> api -> rolegrid); (5) bloqueo `FOR UPDATE` de la fila del rol
+  en Update/Delete antes de evaluar el control 2 y el conteo (RED por compilación; prueba de integración
+  de bloqueo real); (6) pruebas de que el token del Hub no lleva `permissions` y el de aplicación con
+  lista vacía lleva `[]` (sin RED posible: el comportamiento ya existía); (7) motivo de RF-021 en
+  `DEFERRED` actualizado (API en T12; faltan interfaz y E2E, T13 a T15).
 - [ ] **T13 — Consola del Hub.** Grilla roles × permisos por aplicación: crear, editar y borrar
   roles, y asignarlos a usuarios.
 - [ ] **T14 — Contabilidad.** Autoriza por permisos en lugar de por nombre de rol.

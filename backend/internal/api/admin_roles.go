@@ -18,6 +18,7 @@ func (s *Server) listApplications(w http.ResponseWriter, r *http.Request) {
 	}
 	applications, err := s.roleGrid.ListApplications(r.Context())
 	if err != nil {
+		s.logRoleGridError(r, "applications load failed", err)
 		writeProblem(w, http.StatusInternalServerError, "applications-load-failed", "Internal Server Error", "Applications could not be loaded.")
 		return
 	}
@@ -34,7 +35,7 @@ func (s *Server) listApplicationRoles(w http.ResponseWriter, r *http.Request, ap
 	}
 	roles, err := s.roleGrid.ListRoles(r.Context(), uuid.UUID(applicationID))
 	if err != nil {
-		s.writeRoleGridError(w, err)
+		s.writeRoleGridError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, apiApplicationRoles(roles))
@@ -62,7 +63,7 @@ func (s *Server) createApplicationRole(w http.ResponseWriter, r *http.Request, a
 	}
 	role, err := s.roleGrid.Create(r.Context(), input)
 	if err != nil {
-		s.writeRoleGridError(w, err)
+		s.writeRoleGridError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, apiApplicationRole(role))
@@ -91,7 +92,7 @@ func (s *Server) updateApplicationRole(w http.ResponseWriter, r *http.Request, a
 	}
 	role, err := s.roleGrid.Update(r.Context(), input)
 	if err != nil {
-		s.writeRoleGridError(w, err)
+		s.writeRoleGridError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, apiApplicationRole(role))
@@ -111,7 +112,7 @@ func (s *Server) deleteApplicationRole(w http.ResponseWriter, r *http.Request, a
 		input.IP = *ip
 	}
 	if err := s.roleGrid.Delete(r.Context(), input); err != nil {
-		s.writeRoleGridError(w, err)
+		s.writeRoleGridError(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -136,7 +137,14 @@ func decodeRoleGridRequest(w http.ResponseWriter, r *http.Request, target any) b
 	return true
 }
 
-func (s *Server) writeRoleGridError(w http.ResponseWriter, err error) {
+// logRoleGridError records an unexpected failure with the request id; the client only gets the generic problem.
+func (s *Server) logRoleGridError(r *http.Request, message string, err error) {
+	if s.logger != nil {
+		s.logger.Error(message, "error", err, "request_id", TraceIDFrom(r.Context()))
+	}
+}
+
+func (s *Server) writeRoleGridError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, rolegrid.ErrInvalidRoleName):
 		writeProblem(w, http.StatusBadRequest, "invalid-application-role", "Bad Request", "The role name must be <application>.<name> with lowercase letters, digits, '_' or '-'.")
@@ -157,6 +165,7 @@ func (s *Server) writeRoleGridError(w http.ResponseWriter, err error) {
 	case errors.Is(err, rolegrid.ErrRoleAssigned):
 		writeProblem(w, http.StatusConflict, "application-role-conflict", "Conflict", "The role is assigned to users and cannot be deleted.")
 	default:
+		s.logRoleGridError(r, "application role operation failed", err)
 		writeProblem(w, http.StatusInternalServerError, "application-role-change-failed", "Internal Server Error", "The role operation could not be completed.")
 	}
 }
