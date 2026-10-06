@@ -583,9 +583,14 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
     Claude: worker reconstruido y correo real en Mailpit con las tres cabeceras. La inyección no era
     explotable desde fuera (el correo del destinatario se valida al crear la cuenta y los asuntos son
     fijos), así que no se abre un VULN; queda como defensa en profundidad.
-  - [ ] **T21b — Documentación de cierre.** Entrada de la semana 4 en `docs/BITACORA.md`, versión final
+  - [x] **T21b — Documentación de cierre.** Entrada de la semana 4 en `docs/BITACORA.md`, versión final
     de `docs/security-report.html` (VULN-019 remediado), coherencia de `docs/README.md`, README raíz y
     matriz; informe técnico regenerado con el docente (Jaider Ospina Navas).
+    Ruta: delegada (Codex), revisión por Claude pendiente. Evidencia (2026-10-06): se añadió la entrada
+    de semana 4 sin reescribir los estados históricos; el informe finaliza VULN-019 con el run 37473616659
+    sobre `924b581` (8 imágenes: 710 → 108) y los README reflejan T1–T21, T17 pendiente y los enlaces al
+    manual, informe y guion. Comprobaciones: `python3 scripts/traceability.py --check`, enlaces relativos,
+    búsqueda de «parcial», parseo HTML y `git diff --check` (sin errores).
   - [ ] **T21c — PR de la fase 4** (con confirmación del usuario). Tag, release y T17 quedan para el final.
 
 ## Progreso

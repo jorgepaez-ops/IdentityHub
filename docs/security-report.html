@@ -532,7 +532,7 @@ footer p { margin-bottom: 0.5rem; }
 <div class="doc">
 
   <header class="masthead">
-    <p class="eyebrow">Identity Hub · Proyecto final de materia · Versión 3</p>
+    <p class="eyebrow">Identity Hub · Proyecto final de materia · Versión 4</p>
     <h1>Informe de seguridad de la línea base</h1>
     <p class="standfirst">
       Qué encontró el pipeline cuando se le dio, a propósito, algo real que
@@ -543,8 +543,8 @@ footer p { margin-bottom: 0.5rem; }
       <div><dt>Línea base</dt><dd>v0.0.0-vuln-baseline</dd></div>
       <div><dt>Medida</dt><dd>2026-09-05 · 053e15f</dd></div>
       <div><dt>Remediado</dt><dd>v0.1.0-hardened</dd></div>
-      <div><dt>Medido</dt><dd>2026-09-27 · 2ee59e2</dd></div>
-      <div><dt>Fichas</dt><dd>31 · 29 remediadas</dd></div>
+      <div><dt>Medido</dt><dd>2026-10-06 · 924b581</dd></div>
+      <div><dt>Fichas</dt><dd>31 · 30 remediadas · 1 aceptada</dd></div>
     </dl>
   </header>
 
@@ -554,8 +554,8 @@ footer p { margin-bottom: 0.5rem; }
       El tag <code>v0.0.0-vuln-baseline</code> nunca se despliega. Existe para
       demostrar que cada control del pipeline detecta lo que dice detectar; la
       rama <code>main</code> es la versión remediada, congelada en el tag
-      <code>v0.1.0-hardened</code>. Esta tercera versión conserva las
-      cifras de la línea base, la medición del estado corregido y los hallazgos nuevos de DAST.
+      <code>v0.1.0-hardened</code>. Esta cuarta versión conserva las
+      cifras de la línea base, la medición del estado corregido, los hallazgos nuevos de DAST y la evidencia final de VULN-019.
     </p>
   </div>
 
@@ -1001,7 +1001,7 @@ footer p { margin-bottom: 0.5rem; }
       <li><strong>Imágenes:</strong> Trivy 0.56.2 midió 0 CVE corregibles <span class="mono">HIGH</span>/<span class="mono">CRITICAL</span> en <code>api</code> y <code>worker</code> al pasar a <code>static-debian12</code>, y en <code>web</code>; la web conserva 67 CVE sin parche del proveedor.</li>
       <li><strong>Secretos:</strong> <code>.gitleaks.toml</code> y <code>.gitleaksignore</code> dejan 0 hallazgos; los 12 secretos sembrados siguen en el historial público y se suprimen por huella, no se eliminaron (VULN-023).</li>
       <li><strong>Dependencias:</strong> <code>govulncheck</code> deja 0 vulnerabilidades alcanzables. GO-2026-5932 sigue requerida pero no alcanzable ni parcheada; es el riesgo aceptado VULN-028 y permanece filtrada en <code>backend/osv-scanner.toml</code> hasta 2026-12-25.</li>
-      <li><strong>Imágenes del compose (VULN-019):</strong> <code>baseline-scan.yml</code> sobre <code>v0.1.0-hardened</code> (run 36329751647) cuenta 625 <span class="mono">HIGH</span>/<span class="mono">CRITICAL</span> en las ocho imágenes de infraestructura, frente a 710 en la línea base. La diferencia viene toda de <code>postgres</code> (197 → 115; los 22 con parche están en el binario <code>gosu</code> de la imagen oficial) y <code>rabbitmq</code> (3 → 0). Mailpit, migrate y las cuatro imágenes de observabilidad no se actualizaron: remediación parcial.</li>
+      <li><strong>Imágenes del compose (VULN-019):</strong> el <code>baseline-scan.yml</code> ejecutado como <code>workflow_dispatch</code> sobre <code>924b581</code> (run 37473616659) reduce las ocho imágenes de infraestructura de 710 a 108 hallazgos <span class="mono">HIGH</span>/<span class="mono">CRITICAL</span>. Las ocho imágenes están actualizadas y fijadas por digest; los 108 avisos residuales son componentes o paquetes que los proveedores aún no incorporan. El desglose está en <code>security/evidence/actions-37473616659/README.md</code> y la ficha en <code>security/findings/VULN-019-imagenes-base-antiguas-compose.md</code>.</li>
       <li><strong>Contenedores y endurecimiento:</strong> los tres contenedores de aplicación usan UID 65532, 65532 y 101; la infraestructura queda fuera de esta métrica. Nginx emite CSP, HSTS, <code>X-Content-Type-Options</code>, <code>X-Frame-Options</code> y <code>Referrer-Policy</code>, y oculta la versión de <code>Server</code>. Las tres imágenes, incluidos sus builders, se fijan por <code>sha256</code>.</li>
     </ul>
   </section>
@@ -1046,7 +1046,7 @@ trivy image --severity HIGH,CRITICAL identity-hub-api:latest
       <li>GitHub Actions sí se ejecutó: runs de línea base 35476102444 y 35534898422; runs finales en verde 36283211113, 36284740966 y, sobre el tag corregido, 36329751647.</li>
       <li>El CI ejecuta CodeQL con <code>security-extended</code> para Go y JavaScript/TypeScript, y Semgrep con las reglas OWASP; este último rompe la build ante hallazgos de severidad <code>ERROR</code>. El informe no sustituye la revisión de las alertas SARIF publicadas.</li>
       <li>Los gates DAST de OWASP ZAP y E2E de Playwright ya están cableados. El run 37065094942 terminó con 15/15 jobs en verde; ZAP dejó en PASS 10055, 30002 y 40018.</li>
-      <li>VULN-019 es parcial: Mailpit, migrate y cuatro imágenes de observabilidad no se actualizaron. VULN-028 es un riesgo aceptado mientras GO-2026-5932 siga no alcanzable y filtrada hasta 2026-12-25.</li>
+      <li>VULN-019 está remediada: las ocho imágenes del compose se actualizaron y se fijaron por digest; los 108 avisos residuales dependen de componentes de proveedor pendientes de una imagen posterior. VULN-028 es un riesgo aceptado mientras GO-2026-5932 siga no alcanzable y filtrada hasta 2026-12-25.</li>
       <li>No se ha hecho modelado de amenazas de la cadena de suministro del propio pipeline más allá de restringir los permisos por job.</li>
     </ul>
   </section>
@@ -1057,7 +1057,7 @@ trivy image --severity HIGH,CRITICAL identity-hub-api:latest
       Cifras medidas el 2026-09-05 sobre <span class="mono">v0.0.0-vuln-baseline</span>
       (<span class="mono">053e15f</span>). Versión 2: remediación medida el 2026-09-27 sobre
       <span class="mono">c6fa5d6</span>, mismo código que <span class="mono">v0.1.0-hardened</span>
-      (<span class="mono">2ee59e2</span>). Versión 3 (2026-10-05): incorpora VULN-030 y VULN-031, y los gates DAST y E2E verificados en el run 37065094942.
+      (<span class="mono">2ee59e2</span>). Versión 3 (2026-10-05): incorpora VULN-030 y VULN-031, y los gates DAST y E2E verificados en el run 37065094942. Versión 4 final (2026-10-06): VULN-019 queda remediada con el run 37473616659 sobre <span class="mono">924b581</span>; las ocho imágenes del compose pasan de 710 a 108 hallazgos HIGH/CRITICAL.
     </p>
     <p>
       Documentos relacionados: <span class="mono">specs/05-security/threat-model.md</span> ·

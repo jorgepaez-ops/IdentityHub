@@ -1,6 +1,6 @@
 # Índice de la entrega final
 
-Este índice conecta los requisitos de `ENUNCIADO-TRABAJO-FINAL.md` con los artefactos realmente versionados en Identity Hub. Úselo para revisar primero qué ya existe, qué sirve como antecedente y qué queda planificado para la semana 4.
+Este índice conecta los requisitos de `ENUNCIADO-TRABAJO-FINAL.md` con los artefactos realmente versionados en Identity Hub. Úselo para revisar qué está cerrado y qué queda pendiente para el cierre en vivo de la semana 4.
 
 ## Estructura del enunciado -> estructura del repositorio
 
@@ -8,10 +8,10 @@ Este índice conecta los requisitos de `ENUNCIADO-TRABAJO-FINAL.md` con los arte
 |---|---|---|
 | `LICENSE` | [`../LICENSE`](../LICENSE) | Licencia Apache-2.0 versionada en la raíz. |
 | `README.md` | [`../README.md`](../README.md) | Presenta el propósito, tecnologías, seguridad, inicio rápido y trazabilidad. |
-| `docker-compose.yml` | [`../deploy/docker-compose.yml`](../deploy/docker-compose.yml) | El compose actual vive en `deploy/`; T6 creará la entrada portátil desde la raíz. |
+| `docker-compose.yml` | [`../docker-compose.yml`](../docker-compose.yml) y [`../deploy/docker-compose.yml`](../deploy/docker-compose.yml) | El compose de raíz incluye el compose real de `deploy/`; `make setup` prepara el entorno local sin versionar secretos. |
 | `.github/workflows/` | [`../.github/workflows/`](../.github/workflows/) y [`../e2e/`](../e2e/) | Los workflows automatizan CI/CD y ejecutan la suite E2E versionada. |
-| `infraestructura/` | No existe todavía | T8 creará los módulos de Terraform para la arquitectura de referencia. |
-| `orquestacion/` | [`../deploy/`](../deploy/) y [`../deploy/docker-compose.yml`](../deploy/docker-compose.yml) | `deploy/` concentra Docker Compose y observabilidad; `deploy/docker-compose.prod.yml` es la producción simulada (T9). |
+| `infraestructura/` | [`../infraestructura/`](../infraestructura/) | Módulos Terraform para la arquitectura AWS de referencia; no requieren una nube de pago para levantar el proyecto local. |
+| `orquestacion/` | [`../deploy/`](../deploy/), [`../deploy/docker-compose.yml`](../deploy/docker-compose.yml) y [`../deploy/docker-compose.prod.yml`](../deploy/docker-compose.prod.yml) | `deploy/` concentra Docker Compose y observabilidad; el compose de producción simulada está terminado. |
 | `servicios/` | [`../backend/`](../backend/), [`../frontend/`](../frontend/), [`../contabilidad/`](../contabilidad/) y [`../e2e/`](../e2e/) | Los servicios se separan por responsabilidad; `e2e/` contiene sus pruebas de extremo a extremo. |
 | `docs/` | [`docs/`](./), [`../specs/`](../specs/), [`../security/`](../security/) y [`../scripts/`](../scripts/) | `docs/` reúne la entrega; las especificaciones, evidencia de seguridad y trazabilidad versionada la respaldan. |
 
@@ -29,17 +29,17 @@ La columna **Ubicación actual** solo enlaza rutas que existen en este checkout.
 | Diagrama de casos de uso | 123–131 | [`diagramas/uml/casos-de-uso.md`](diagramas/uml/casos-de-uso.md) | hecho |
 | DFD nivel 0 y nivel 1 con OWASP Threat Dragon | 123–131 | [`threat-model/`](threat-model/) | hecho |
 | Manual de desarrollo: entorno, servicios, pruebas y contribución | 132–139 | [`guia-desarrollo.md`](guia-desarrollo.md) | hecho (T4) |
-| Manual de despliegue y operación | 140–149 | [`manuales/despliegue-y-operacion.md`](manuales/despliegue-y-operacion.md) | parcial: operación local hecha (T4); producción pendiente (T7–T9) |
+| Manual de despliegue y operación | 140–149 | [`manuales/despliegue-y-operacion.md`](manuales/despliegue-y-operacion.md) | hecho (T4, T7–T9) |
 | Manual de seguridad: amenazas, herramientas, reportes y vulnerabilidades | 151–156 | [`manuales/seguridad.md`](manuales/seguridad.md) | hecho (T4) |
 | Manual de usuario con capturas | 157–159 | [`manuales/usuario.md`](manuales/usuario.md) y sus 48 capturas en [`manuales/img/usuario/`](manuales/img/usuario/), regenerables con `make capturas` | hecho (T18) |
 | Fase 1: Threat Dragon, DFD y STRIDE | 75–79 | [`threat-model/`](threat-model/) | hecho |
 | Fase 2: hooks, SAST y SCA | 80–84 | [`../.pre-commit-config.yaml`](../.pre-commit-config.yaml) y [`../.github/workflows/ci.yml`](../.github/workflows/ci.yml) | hecho |
 | Fase 3: build de imágenes, escaneo y gate de CVE | 85–89 | [`../.github/workflows/ci.yml`](../.github/workflows/ci.yml), [`../backend/Dockerfile`](../backend/Dockerfile) y [`../frontend/Dockerfile`](../frontend/Dockerfile) | hecho |
 | Fase 4: pruebas unitarias y DAST | 90–93 | [`../.github/workflows/ci.yml`](../.github/workflows/ci.yml), [`../e2e/`](../e2e/) y [`../security/zap-reports/`](../security/zap-reports/) | hecho |
-| Fase 5: IaC, Checkov/tfsec y orquestación simulada | 94–98 | [`../deploy/docker-compose.yml`](../deploy/docker-compose.yml) | hecho (T8, T9 y T10) |
+| Fase 5: IaC, Checkov/tfsec y orquestación simulada | 94–98 | [`../infraestructura/`](../infraestructura/), [`../deploy/docker-compose.prod.yml`](../deploy/docker-compose.prod.yml) y [`../.github/workflows/ci.yml`](../.github/workflows/ci.yml) | hecho (T8, T9 y T10) |
 | Fase 6: métricas, logs y detección en ejecución | 99–103 | [`../deploy/docker-compose.yml`](../deploy/docker-compose.yml) y [`../deploy/observability/`](../deploy/observability/) | parcial: Prometheus, Grafana y Loki (vía Grafana Alloy) hechos; Falco fuera salvo que sobre tiempo |
-| Repositorio GitHub público con código, pipeline, IaC y documentación | 163–166 | [`../README.md`](../README.md) y [`../.github/workflows/`](../.github/workflows/) | parcial (T21) |
-| Imágenes publicadas y versionadas en Docker Hub | 163–167 | [`../specs/adr/0011-docker-hub-como-registry.md`](../specs/adr/0011-docker-hub-como-registry.md) | pendiente (T17) |
+| Repositorio GitHub público con código, pipeline, IaC y documentación | 163–166 | [`../README.md`](../README.md), [`../.github/workflows/`](../.github/workflows/) e [`../infraestructura/`](../infraestructura/) | parcial: cierre de PR de fase 4 pendiente (T21c) |
+| Imágenes publicadas y versionadas en Docker Hub | 163–167 | [`../specs/adr/0011-docker-hub-como-registry.md`](../specs/adr/0011-docker-hub-como-registry.md) | pendiente (T17): namespace y token de Docker Hub se resolverán en el cierre en vivo |
 | Informe técnico en PDF | 163–168 | PDF generado con `make informe` (no se versiona por tamaño; se adjunta al release de GitHub en T21), fuente en [`informe/informe-tecnico.md`](informe/informe-tecnico.md); `make informe` lo regenera | hecho (T19) |
 | Video-demostración de 10–15 minutos | 163–169 | [`video/guion.md`](video/guion.md) | guion completo de 13 minutos (T20); grabación pendiente |
 | PDF: portada | 174 | [`informe/informe-tecnico.md`](informe/informe-tecnico.md) | hecho (T19) |
@@ -57,7 +57,7 @@ No los exige el enunciado, pero responden a la demo en vivo con el profesor:
 
 | Entregable | Ubicación actual | Estado |
 |---|---|---|
-| Grilla de roles y permisos configurable desde el Hub | No existe todavía | pendiente (T11 a T15) |
+| Grilla de roles y permisos configurable desde el Hub | [`../specs/adr/0013-roles-y-permisos-configurables-por-aplicacion.md`](../specs/adr/0013-roles-y-permisos-configurables-por-aplicacion.md) y [`../specs/06-acceptance/roles-y-permisos.feature`](../specs/06-acceptance/roles-y-permisos.feature) | hecho (T11 a T15; RF-021) |
 | Guía de integración de plataformas de terceros | [`manuales/integracion-terceros.md`](manuales/integracion-terceros.md) | completa |
 
 ## Cómo navegar
@@ -73,4 +73,4 @@ No los exige el enunciado, pero responden a la demo en vivo con el profesor:
 
 ## Próximos artefactos
 
-T2 incorpora los diagramas UML versionables y T3 el modelo de Threat Dragon; T4 completó los manuales. T8 añade IaC, T9 el compose de producción simulado y T19 produce el informe PDF. Este índice debe actualizarse cuando cada artefacto quede verificado.
+La documentación, los diagramas, la IaC de referencia, la grilla de roles, el manual de usuario, el informe técnico y el guion del video están verificados. Quedan la publicación de T17, el tag y release finales, y la grabación del video.

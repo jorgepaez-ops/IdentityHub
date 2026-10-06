@@ -12,6 +12,48 @@ retomar el trabajo no exija reconstruir el contexto desde cero.
 
 ---
 
+## 2026-10-06 · Semana 4 — Documentación, IaC de referencia, grilla de roles y cierre
+
+Cierra el trabajo verificable de la semana 4 antes de la publicación en Docker Hub. El detalle por tarea y la evidencia trazable permanecen en `odd/tasks/idp-semana-4.md`; esta entrada resume el estado para el equipo que hará el cierre en vivo.
+
+### Hecho
+
+- **Fase 1 (T1–T6):** se organizaron los manuales, diagramas UML, el modelo Threat Dragon y la guía de integración; la portabilidad quedó documentada con `make setup` y `docker compose up -d`.
+- **Fase 2 (T7–T10):** se incorporaron la arquitectura AWS de referencia como IaC, el compose de producción simulada y los controles de Checkov, sin convertir una nube de pago en requisito local.
+- **Fase 3 (T11–T15):** la grilla configurable de roles y permisos implementa RF-021 y ADR 0013; se integró en `main` mediante el PR #11.
+- **Fase 4:** T16 remedia VULN-019: el escaneo de las ocho imágenes del compose baja de 710 a 108 hallazgos HIGH/CRITICAL. T18 incorpora el manual de usuario, T19 el informe técnico y la corrección de métricas del dashboard, T20 el guion del video y T21a corrige la codificación MIME de los correos.
+
+### Verificado contra la evidencia versionada
+
+| Comprobación | Resultado |
+|---|---|
+| PR #11 | merge `8b4a18a` en `main`; CI 21/21 en verde |
+| VULN-019 | run `baseline-scan` 37473616659 sobre `924b581`: 710 → 108 en ocho imágenes |
+| Riesgo aceptado | VULN-028 permanece aceptado hasta 2026-12-25 |
+
+### Decisiones tomadas sobre la marcha
+
+- La infraestructura AWS y el compose de producción son referencias verificables, no un despliegue real en una nube de pago.
+- Docker Hub, el tag de versión y el release se reservan para el cierre en vivo con el equipo; no se publican de forma anticipada.
+
+### Hallazgos
+
+- VULN-019 ya no es parcial: las ocho imágenes del compose están actualizadas y fijadas por digest. Los 108 avisos residuales dependen de paquetes o componentes que los proveedores aún no incorporan; el detalle queda en `security/evidence/actions-37473616659/README.md`.
+- La corrección del dashboard conecta las métricas de login, eventos y reuso de refresh, y consulta la métrica detallada de RabbitMQ para la DLQ.
+
+### Estado
+
+- Permanecen pendientes T17 (publicación en Docker Hub), el tag `vX.Y.Z` y el release de GitHub con el PDF adjunto: el equipo los hará en vivo al final.
+- La grabación del video sigue pendiente; el guion de 13 minutos está listo.
+
+### Siguiente paso
+
+1. Resolver Q1 y publicar las imágenes de T17 en Docker Hub durante el cierre en vivo.
+2. Crear el tag `vX.Y.Z` y el release de GitHub con el PDF del informe adjunto.
+3. Grabar el video con el guion versionado.
+
+---
+
 ## 2026-10-05 · Semana 3 — OAuth, dominios locales, frontend, E2E y DAST
 
 Cierra las fases 0 a 3 de la semana 3. El detalle por tarea y la evidencia trazable permanecen en
