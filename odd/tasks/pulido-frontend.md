@@ -209,7 +209,7 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
   **aprobada** y acusada; su sugerencia se aplicó: la URL del `Blob` se revoca a los 30 s y no de
   inmediato, porque algunos navegadores inician la descarga de forma asíncrona (prueba con relojes
   falsos: no se revoca al segundo, sí a los 31).
-- [ ] **P9 — Deudas menores.** Avisos de SonarCloud de las fases 3 y 4, sugerencias pendientes de las
+- [x] **P9 — Deudas menores.** Avisos de SonarCloud de las fases 3 y 4, sugerencias pendientes de las
   revisiones nativas (correos, refresh, informe, capturas) y alerta de Grafana más runbook para la DLQ
   (AM-019).
   Ampliada (2026-10-06, con el usuario) con las 120 alertas abiertas de code scanning en `main`:

@@ -223,9 +223,11 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
   (sin `--force`) únicamente cuando el usuario lo autorice; Codex no configura el remoto ni sube nada.
 - Antes, commitear estos documentos (`AGENTS.md`, `odd/`, `.gga`, `docs/diagramas/`). `.atl/`
   (registro de skills local) no se versiona. AGENTS.md prohíbe a Codex commitear esos archivos de contexto.
-- [ ] **Comprobación previa al push (obligatoria; el usuario confirmó el 2026-09-19 que las del compose son de prueba y no reutilizadas; queda por confirmar el resto)**: como el repo es público, y la
+- [x] **Comprobación previa al push (obligatoria; el usuario confirmó el 2026-09-19 que las del compose son de prueba y no reutilizadas; queda por confirmar el resto)**: como el repo es público, y la
   línea base contiene credenciales sembradas que quedarán visibles para siempre en el historial,
-  confirmar que **ninguna** es real ni está reutilizada en otro sitio: las de
+  confirmar que **ninguna** es real ni está reutilizada en otro sitio (cerrada el 2026-10-06: el usuario
+  confirmó que ninguna credencial de la línea base es real ni se reutilizó en otro lugar; es un proyecto
+  universitario para documentar DevSecOps): las de
   `deploy/docker-compose.yml`, el código legacy del backend (`backend/internal/api/legacy_auth.go`),
   los `ENV` de `backend/Dockerfile` y los valores de `.env.example`. Si alguna coincide con una
   credencial real o reutilizada, rotarla antes del push y no subir hasta que esté resuelto.
@@ -473,7 +475,8 @@ la Fase 1 (ninguna es `Remedia:`) solo cuando el usuario haya commiteado estos d
   proxy confiable se respeta; `govulncheck` ya no informa GO-2026-5774/5775/5777.
 - Verificación: `make test-go`; `cd backend && go run golang.org/x/vuln/cmd/govulncheck@latest ./...` (las otras alertas siguen hasta T23/T24); `make lint`.
 - Commit: 902a047
-- [ ] Evidencia (`Usuario`): VULN-020 chi: captura "después" en el informe tras run verde del job `sca` sin esos avisos, y datos de texto para el `despues` de `docs/evidencia/VULN-020/evidencia.json`.
+- [x] Evidencia (`Usuario`): VULN-020 chi: captura "después" en el informe tras run verde del job `sca` sin esos avisos, y datos de texto para el `despues` de `docs/evidencia/VULN-020/evidencia.json`. Cerrada (verificado 2026-10-06): el `despues` de
+  `docs/evidencia/VULN-020/evidencia.json` registra el run verde 36283211113 sobre `59cf8cff`.
 
 ### T7 — Argon2id
 - [x] Estado · Ejecutor: `Codex` · Cubre: RF-001, AM-001, AM-004, AM-017, invariante 1, ADR 0004 · Remedia: — (prepara VULN-002) · Depende de: T5
@@ -750,7 +753,7 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 - Verificación: `make test-go`; `make test-integration`; `make lint` y `cd backend && golangci-lint run ./...` sin hallazgos G101/G201/G401/G404; `govulncheck` sin GO-2024-3250/GO-2025-3553.
 - Commit: `51a7a4f`
 - Evidencia (`Usuario`), una casilla por carpeta, todas tras run verde de `CI`:
-  - [ ] VULN-001 (parcial, falta `docker-compose.yml`/`Dockerfile`)  - [x] VULN-002  - [x] VULN-004  - [x] VULN-005  - [x] VULN-006  - [x] VULN-007  - [x] VULN-021
+  - [x] VULN-001 (completa: `despues` con el run verde 36283211113 sobre `59cf8cff`, que ya contiene `51a7a4f` y `afab4e9`; verificado 2026-10-06)  - [x] VULN-002  - [x] VULN-004  - [x] VULN-005  - [x] VULN-006  - [x] VULN-007  - [x] VULN-021
 
 ### T24 — Dependencias Go: pgx y `golang.org/x/text`
 - [x] Estado · Ejecutor: `Claude` (Codex quedó bloqueado por DNS del sandbox: no resolvía `proxy.golang.org`, sin tocar ningún archivo) · Cubre: AM-006, AM-009, RNF-004 · Remedia: VULN-022 (pgx >= 5.5.4, mejor la última estable), VULN-026 (x/text GO-2026-5970 -> v0.39.0 o superior) · Bloqueada por: T0.3
