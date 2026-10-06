@@ -325,6 +325,18 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
   `docs/manuales/usuario.md`, aclarar al inicio que hay dos roles de sistema (`admin`, `user`) y roles de
   aplicación ilimitados creados en **Roles** (la tabla de la sección 1 lista perfiles, no roles, y se
   presta a leer «solo dos roles»); actualizar también el aterrizaje en **Inicio** (§3, dice «Usuarios»).
+  - [x] **P10a — Capturas, manual de usuario y comprobaciones visuales** (Sonnet, revisión de Claude,
+    2026-10-06). `capturas.ts` aterriza en Inicio, elige categoría y confirma la aprobación;
+    `actionTimeout` de 30 s para que un elemento ausente no cuelgue 900 s. 7 capturas nuevas (Inicio,
+    filtro de estado, atajo y metadatos de auditoría, gráficos, filtros de movimientos, diálogo) y 48
+    regeneradas; el manual referencia las 55 y ninguna sobra. Manual: Inicio y «100+», filtros y CSV,
+    auditoría, gráficos y confirmación, selector de tema y un recuadro inicial que aclara dos roles de
+    sistema frente a roles de aplicación ilimitados. Modo oscuro y 390 px revisados en 24 capturas:
+    tres defectos de CSS corregidos (metadatos que se salían de la tabla, desplazamiento lateral de la
+    página en Usuarios por un `.sr-only` fuera del contenedor, folios partidos). Descarga real de CSV en
+    Chromium: BOM, CRLF, encabezados y montos numéricos correctos. Verificación: `make capturas` limpio
+    (sin roles de prueba restantes), `make e2e` 52/52, vitest Hub 255/255 y Contabilidad 144/144. Los
+    conteos de Inicio en las capturas reflejan cuentas de E2E en la base local (100+ deshabilitados).
 
 ## Progreso
 

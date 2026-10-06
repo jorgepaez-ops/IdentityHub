@@ -21,6 +21,7 @@ export default defineConfig({
     baseURL: hubUrl,
     viewport: { width: 1280, height: 800 },
     deviceScaleFactor: 1,
+    actionTimeout: 30_000,
     locale: 'es-CO',
     colorScheme: 'light',
   },
