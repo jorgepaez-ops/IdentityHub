@@ -430,6 +430,13 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   verifica el texto «Tu rol permite…», que `access.ts` deriva de sus permisos (el contenido exacto del
   claim lo cubren las pruebas de integración de T12a). Ojo: el E2E borra `contabilidad.auditor` al
   empezar y al terminar, así que no conviene correrlo con un auditor creado a mano para la demo.
+  Commit `ac3922f`. Revisión nativa (`review-c9e878db05b47f89`, alto, 451 líneas, 4 lentes): **aprobada**,
+  sin bloqueantes. Avisos informativos que coinciden en dos puntos: (1) el nombre fijo
+  `contabilidad.auditor` que el E2E purga directo en la base (R1-001, R4-001, R2-002, R3-003): borra un
+  auditor hecho a mano y choca entre corridas concurrentes; (2) el escenario promete «el token contiene
+  solo…» y el E2E no lo verifica (R1-002, R2-001, R3-001). Menores: R3-002 (la prueba del rol de
+  directorio solo mira `admin`, no `user`), R2-003, R2-004/R3-004 (el clic sobre un botón deshabilitado
+  no prueba nada nuevo).
 
 ## Fase 4 — Publicación y entrega
 
