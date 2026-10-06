@@ -143,23 +143,40 @@ Reglas que el sistema garantiza siempre. Cada una tiene una prueba con su nombre
                    ▼
         ┌──────────────────────┐
         │ pending_verification │──── acepta invitación ────────┐
-        └──────────┬───────────┘                              │
-                   │ 24 h sin verificar                        ▼
-                   ▼                                    ┌──────────┐
-              (purga por lote)                          │  active  │
-                                                        └────┬─────┘
-                        5 fallos en 15 min  ◄────────────────┤
-                                │                            │ admin deshabilita
-                                ▼                            ▼
-                        ┌──────────────┐              ┌────────────┐
-                        │    locked    │              │  disabled  │
-                        └──────┬───────┘              └────────────┘
-                               │ expira locked_until
-                               └────────────► active
+        └─────┬──────────▲─────┘                              │
+              │          │ admin reenvía (token nuevo;         ▼
+              │          │ el anterior deja de valer)    ┌──────────┐
+              └──────────┘                               │  active  │
+        la invitación vence a las 24 h                   └────┬─────┘
+        y la cuenta sigue pendiente                           │
+                                                              │
+        5 fallos en 15 min  ◄─────────────────────────────────┤
+                │                                             │ admin deshabilita
+                ▼                                             ▼
+        ┌──────────────┐                               ┌────────────┐
+        │    locked    │                               │  disabled  │
+        └──────┬───────┘                               └────────────┘
+               │ expira locked_until (solo el bloqueo automático)
+               │ o restablecimiento de contraseña
+               │ o un admin lo pasa a active
+               └────────────► active
 ```
 
 ## Notas de diseño
 
+- **Una invitación vencida no purga la cuenta.** A las 24 h el token de invitación deja de ser
+  válido, pero la cuenta permanece en `pending_verification`: ningún proceso la elimina. Un `admin`
+  puede reenviar la invitación (RF-001), lo que emite un token nuevo e invalida el anterior. No
+  hay purga por lote porque borrar cuentas huérfanas destruiría rastro de auditoría
+  (`audit_log` referencia a la cuenta) y quitaría al administrador el control sobre quién sigue
+  en el directorio; una cuenta pendiente no inicia sesión (invariante 4), así que mantenerla no
+  amplía la superficie de ataque.
+- **El bloqueo manual de un administrador no vence.** El bloqueo automático por fallos fija
+  `locked_until` (+15 min) y el siguiente intento de login lo levanta al vencer. Cuando un `admin`
+  deja una cuenta en `locked` mediante `PATCH /admin/users/{id}`, `locked_until` queda vacío y el
+  login lo trata como bloqueo sin fin (`locked_until` nulo). Es intencional: una decisión humana
+  no debe caducar sola. Solo lo levantan un `admin` que pasa la cuenta a `active` o la
+  confirmación de un restablecimiento de contraseña (que pone `active` y borra `locked_until`).
 - **`citext` para el correo.** La comparación insensible a mayúsculas se resuelve en la base de
   datos y no en código de aplicación, donde es fácil olvidarla y abrir un registro duplicado.
 - **`family_id` en los refresh tokens** es lo que hace posible RF-006: la detección de reuso
