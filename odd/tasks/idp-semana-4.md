@@ -598,7 +598,8 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
     `e2e/support/db.ts`. Code smells nuevos (complejidad en `login_test.go`, estilo en `build.mjs` y
     `capturas.ts`) no afectan el gate y quedan anotados.
     Tras `6c8bc11`: CI 21/21 y quality gate de SonarCloud aprobado; PR #12 listo para merge (decisión
-    del usuario). Pendiente al final, en vivo: T17, tag `vX.Y.Z` y release con el PDF del informe.
+    del usuario). Merge el 2026-10-06 (`f96e5f1`). Pendiente al final, en vivo: T17, tag `vX.Y.Z` y
+    release con el PDF del informe.
 
 ## Progreso
 
