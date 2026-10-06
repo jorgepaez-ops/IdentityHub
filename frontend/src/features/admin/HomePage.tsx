@@ -55,7 +55,6 @@ async function loadRecent(): Promise<AuditEvent[]> {
   return (await listAuditLog({ limit: RECENT_LIMIT })).items
 }
 
-const settle = <T,>(result: PromiseSettledResult<T>): Group<T> => (result.status === 'fulfilled' ? { state: 'ready', data: result.value } : { state: 'error' })
 
 // A tile with `to` keeps its group name and count; its label becomes a link stretched over the whole tile.
 function StatTile({ label, count, tone, to }: { label: string; count: Count; tone?: string; to?: string }) {
@@ -75,16 +74,28 @@ export function HomePage({ onSessionEnded }: { onSessionEnded: () => void }) {
 
   useEffect(() => {
     const mine = ++generation.current
-    void (async () => {
-      const [users, failedSignIns, recent] = await Promise.allSettled([loadUsers(), loadFailedSignIns(), loadRecent()])
-      if (mine !== generation.current) return
-      // A 401 that survived the client refresh in any group ends the session.
-      if ([users, failedSignIns, recent].some((result) => result.status === 'rejected' && isAuthFailure(result.reason))) {
-        onSessionEnded()
-        return
-      }
-      setSnapshot({ users: settle(users), failedSignIns: settle(failedSignIns), recent: settle(recent) })
-    })()
+    let ended = false
+    // Each group renders as soon as it settles, so a slow or failing one never holds the others back.
+    const run = <K extends keyof Snapshot>(key: K, load: () => Promise<Extract<Snapshot[K], { state: 'ready' }>['data']>) => {
+      load().then(
+        (data) => {
+          if (mine === generation.current) setSnapshot((current) => ({ ...current, [key]: { state: 'ready', data } }))
+        },
+        (reason: unknown) => {
+          if (mine !== generation.current) return
+          // A 401 that survived the client refresh in any group ends the session, once.
+          if (isAuthFailure(reason)) {
+            if (!ended) onSessionEnded()
+            ended = true
+            return
+          }
+          setSnapshot((current) => ({ ...current, [key]: { state: 'error' } }))
+        },
+      )
+    }
+    run('users', loadUsers)
+    run('failedSignIns', loadFailedSignIns)
+    run('recent', loadRecent)
     return () => {
       generation.current += 1
     }
@@ -113,6 +124,7 @@ export function HomePage({ onSessionEnded }: { onSessionEnded: () => void }) {
         <>
           <div className="stat-grid" aria-label="Indicadores">
             {users.state === 'ready' && STATUS_ORDER.map((status) => <StatTile key={status} label={STATUS_TILE_LABEL[status]} count={users.data[status]} tone={STATUS_TONE[status]} to={`/usuarios?${STATUS_PARAM}=${status}`} />)}
+            {(users.state === 'loading' || failedSignIns.state === 'loading') && <p className="muted">Cargando conteos de usuarios…</p>}
             {failedSignIns.state === 'ready' && <StatTile label="Inicios de sesión fallidos (24 h)" count={failedSignIns.data} tone={failedSignIns.data.value > 0 ? 'danger' : 'ok'} to={AUDIT_FAILED_SIGN_IN_PATH} />}
           </div>
           <div className="home-grid">
@@ -127,7 +139,7 @@ export function HomePage({ onSessionEnded }: { onSessionEnded: () => void }) {
                     ))}
                   </ul>
                 ))}
-              {recent.state === 'loading' && <LoadingSkeleton rows={2} label="Cargando actividad…" />}
+              {recent.state === 'loading' && <p className="muted">Cargando actividad…</p>}
             </section>
             <section className="panel shortcuts" aria-label="Accesos directos">
               <h2>Accesos directos</h2>

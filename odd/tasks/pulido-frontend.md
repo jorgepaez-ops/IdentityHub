@@ -244,6 +244,12 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
     para `github-actions`. `actionlint` sin hallazgos y YAML válido. Claude verificó por su cuenta los SHA
     de `checkout` y `trivy-action` con `gh api` y que no queda ningún `uses:` sin fijar. El efecto en CI se
     ve en el próximo push.
+  Revisión nativa de P9a + P9b (riesgo alto por la CI, 17 archivos, 348 líneas, 4 lentes en paralelo):
+  **aprobada** y acusada, sin hallazgos en la CI. Sugerencias sobre Inicio: `Promise.allSettled` hacía
+  esperar a todos los grupos por el más lento y el esqueleto por grupo nunca se veía; ahora cada grupo se
+  muestra al resolverse (prueba con una respuesta que nunca llega, RED observado) y los grupos aún en
+  carga muestran texto, no otra región `role="status"`. Queda como menor: la prueba del enlace para
+  saltar enfoca el destino a mano (jsdom no mueve el foco al navegar a un fragmento). vitest Hub 254/254.
   - [ ] **P9c — Diagramas regenerados** sin bibliotecas JavaScript (33 alertas de CodeQL) y UML de
     secuencia del SSO con PKCE y de estados del usuario en `docs/diagramas/uml/`.
   - [ ] **P9d — Imágenes base y alertas de infraestructura:** Trivy (6), Checkov (27), Semgrep de nginx

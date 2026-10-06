@@ -212,6 +212,15 @@ describe('console home', () => {
     expect(screen.queryByText('No fue posible cargar la actividad reciente.')).not.toBeInTheDocument()
   })
 
+  it('TestRF010_ShowsAGroupAsSoonAsItLoadsWithoutWaitingForASlowOne', async () => {
+    goTo('/inicio')
+    homeApi({ 'GET /api/v1/admin/users': () => new Promise<Response>(() => undefined) })
+    render(<App />)
+    expect(await screen.findByRole('list', { name: 'Actividad reciente' })).toBeInTheDocument()
+    expect(within(tile('Inicios de sesión fallidos (24 h)')).getByText('1')).toBeInTheDocument()
+    expect(screen.getByText('Cargando conteos de usuarios…')).toBeInTheDocument()
+  })
+
   it('TestRF011_KeepsTheUserCountsWhenTheAuditLogCannotBeLoaded', async () => {
     goTo('/inicio')
     homeApi({ 'GET /api/v1/admin/audit-log': () => problem(500) })
