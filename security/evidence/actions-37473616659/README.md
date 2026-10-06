@@ -7,7 +7,8 @@
 - Código escaneado: commit `924b581` de T16 en `feat/idp-semana-4` (imágenes de `14047c7` más el nuevo
   digest de `postgres`). Un primer run, 37471823657 sobre `14047c7`, midió `postgres` con el digest
   anterior (117, de ellos 51 con parche); la revisión nativa señaló que esos 51 sí eran corregibles y se
-  volvió a fijar `postgres`.
+  volvió a fijar `postgres`. El JSON de `postgres` de ese primer run se conserva como
+  `trivy-base-postgres-digest-anterior-run-37471823657.json`.
 - Archivos: `trivy-base-images.txt` y los JSON de las ocho imágenes del compose, copiados del artefacto
   `evidencia-linea-base` (retención 90 días).
 
@@ -28,7 +29,8 @@
 ## Lectura
 
 - Las seis imágenes que T30 dejó abiertas bajan de 510 a 18 hallazgos, todos en binarios o paquetes que
-  empaqueta el proveedor; se cierran fijando la siguiente imagen que los corrija.
+  empaqueta el proveedor. Los que tienen parche publicado se cierran fijando la siguiente imagen que lo
+  incorpore; `pgproto3/v2` (migrate) no tiene parche y el de prometheus es probable falso positivo.
   - `migrate` (6): módulos Go dentro del binario `migrate` (`pgproto3/v2` sin parche; `x/crypto`, `x/text`
     y `grpc` con versión corregida que la imagen aún no incorpora).
   - `prometheus` (2): CVE-2026-42154 sobre el módulo `github.com/prometheus/prometheus`, que Trivy 0.56.2
