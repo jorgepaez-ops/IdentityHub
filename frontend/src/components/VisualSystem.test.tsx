@@ -43,6 +43,19 @@ describe('visual system feedback', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 
+  it('TestRF010_ElTemaUsaElDelSistemaSiElAlmacenamientoFalla', () => {
+    const getItem = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new DOMException('blocked', 'SecurityError') })
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new DOMException('blocked', 'SecurityError') })
+    try {
+      expect(() => initializeTheme()).not.toThrow()
+      render(<ThemeToggle />)
+      expect(() => fireEvent.click(screen.getByRole('button', { name: /Cambiar a tema/ }))).not.toThrow()
+    } finally {
+      getItem.mockRestore()
+      setItem.mockRestore()
+    }
+  })
+
   it('TestRF010_ElAvisoSeCierraAunqueElPadreCambieElCallback', () => {
     vi.useFakeTimers()
     const calls: number[] = []

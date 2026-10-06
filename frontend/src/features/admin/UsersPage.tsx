@@ -33,7 +33,7 @@ export function UsersPage({ currentUserId, onSessionEnded }: { currentUserId: st
   const [appliedSearch, setAppliedSearch] = useState('')
   const [loadingMore, setLoadingMore] = useState(false)
   const [drawer, setDrawer] = useState<DrawerTarget | null>(null)
-  const [toast, setToast] = useState<string | null>(null)
+  const [toast, setToast] = useState<{ text: string; id: number } | null>(null)
   const [resending, setResending] = useState<string | null>(null)
   const generation = useRef(0)
   const mounted = useRef(true)
@@ -48,7 +48,8 @@ export function UsersPage({ currentUserId, onSessionEnded }: { currentUserId: st
     }
   }, [])
   const opener = useRef<HTMLElement | null>(null)
-  const showToast = useCallback((message: string) => setToast(message), [])
+  // The id remounts the toast, so the same message shown twice restarts its timer.
+  const showToast = useCallback((text: string) => setToast((current) => ({ text, id: (current?.id ?? 0) + 1 })), [])
 
   useEffect(() => {
     const timer = setTimeout(() => setAppliedSearch(search.trim()), SEARCH_DELAY_MS)
@@ -190,7 +191,7 @@ export function UsersPage({ currentUserId, onSessionEnded }: { currentUserId: st
         {nextCursor && <button className="secondary-button fit" disabled={loadingMore} onClick={() => void loadMore()} type="button">{loadingMore ? 'Cargando…' : 'Cargar más'}</button>}
       </section>
       {drawer && <UserDrawer target={drawer} currentUserId={currentUserId} onClose={closeDrawer} onSaved={saved} onSessionEnded={onSessionEnded} />}
-      {toast && <Toast message={toast} onClose={() => setToast(null)} />}
+      {toast && <Toast key={toast.id} message={toast.text} onClose={() => setToast(null)} />}
     </section>
   )
 }

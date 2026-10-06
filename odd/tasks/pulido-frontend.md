@@ -64,6 +64,11 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
   build con los woff2 emitidos, `make e2e` 52/52, vista previa de capturas revisada (`CAPTURAS_OUT`,
   variable nueva del script para no tocar las imágenes del manual). iCloud creó 224 copias « N» durante
   la edición (43 idénticas, 181 versiones intermedias): movidas fuera del repo, sin borrar.
+  Commit `6ad0e55`. Revisión nativa (medio, 548 líneas, 1 lente): **aprobada**. Corregido después: el tema
+  usa el del sistema si `localStorage` lanza excepción (prueba nueva, RED con el código anterior); un
+  error en la grilla de roles retira el aviso de éxito y «Nuevo rol» también lo retira; los avisos
+  llevan un id, así que el mismo texto dos veces reinicia el temporizador. vitest 172/172, lint y
+  typecheck limpios, `make e2e` 52/52.
 - [ ] **P2 — Sistema visual de Contabilidad.** Lo mismo con su identidad cálida; el aviso se cierra solo.
 - [ ] **P3 — Inicio de la consola.** Ruta `/inicio` con indicadores (usuarios por estado, inicios
   fallidos en 24 h, actividad reciente) y accesos directos; los administradores aterrizan ahí.
