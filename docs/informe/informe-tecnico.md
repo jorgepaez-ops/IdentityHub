@@ -466,9 +466,9 @@ Se activa con `make up-obs` y las credenciales de Grafana viven en `.env` (`GRAF
 
 El dashboard aprovisionado (`deploy/observability/grafana/dashboards/seguridad.json`) tiene cinco paneles: intentos de inicio de sesión por resultado, reusos de refresh token detectados, profundidad de la DLQ de RabbitMQ, latencia p95 por ruta y eventos publicados frente a consumidos. Los paneles se alinean con amenazas del modelo: fuerza bruta (AM-001), reuso de refresh token (AM-002) y cola saturada (AM-019).
 
-![Dashboard de Grafana «Identity Hub — Seguridad» tras la ejecución de la suite E2E: latencia p95 por ruta y eventos consumidos con datos; los paneles de intentos de inicio de sesión y de la DLQ muestran «No data».](img/grafana-dashboard-seguridad.png)
+![Dashboard de Grafana «Identity Hub — Seguridad» tras la ejecución de la suite E2E: intentos de inicio de sesión por resultado, reusos de refresh token detectados, profundidad de la DLQ, latencia p95 por ruta y eventos publicados frente a consumidos, todos con datos.](img/grafana-dashboard-seguridad.png)
 
-**Hallazgo de la captura, sin corregir.** Dos de los cinco paneles aparecen sin datos y es un defecto real, no un descuido de la toma. Los contadores `identity_login_attempts_total` e `identity_events_published_total` están definidos en `backend/internal/observability/metrics.go`, pero ningún código los incrementa, de modo que Prometheus nunca los expone; y el panel de la DLQ consulta `rabbitmq_queue_messages{queue="notifications.dlq"}`, mientras que el plugin de métricas de RabbitMQ agrega por defecto sin la etiqueta `queue`. Los otros paneles sí muestran datos reales. Corregirlo exige cambiar código de la aplicación y el JSON del dashboard, fuera del alcance de este informe; queda anotado en el trabajo futuro, sin identificador `VULN`, porque es un defecto de observabilidad y no de seguridad. (El panel de reusos de refresh token muestra 0 aunque la suite sí provocó reusos: los contadores viven en memoria y `make e2e` recrea el contenedor de la API al terminar para restaurar el límite por IP, de modo que el contador se reinició; las series históricas de Prometheus sí conservan la actividad previa, como se ve en la latencia.)
+Los cinco paneles muestran datos reales. Durante la redacción del informe la captura reveló que tres contadores (`identity_login_attempts_total`, `identity_events_published_total` e `identity_refresh_reuse_detected_total`) estaban definidos pero ningún código los incrementaba, y que el panel de la DLQ consultaba una serie sin la etiqueta `queue`. Se corrigió en la misma semana: el broker cuenta cada publicación (confirmada o fallida), el servicio de refresh cuenta cada reuso solo cuando la revocación se confirma en la base, los handlers de inicio de sesión y verificación MFA cuentan `mfa_required`, `failed`, `locked` y `succeeded`, y Prometheus raspa además el endpoint detallado de RabbitMQ (`/metrics/detailed`, familia `queue_coarse_metrics`), del que el panel lee `rabbitmq_detailed_queue_messages`. Cada contador tiene su prueba (`TestRNF007_*`). El panel de reusos muestra una serie por instancia: la de la API acumula los reusos que provoca la suite y la del worker queda en 0, porque el worker no atiende refresh.
 
 ## Explore: logs en Loki
 
@@ -490,7 +490,7 @@ La página de objetivos de Prometheus confirma que la API, el worker, RabbitMQ y
 
 ## Alcance de la observabilidad
 
-Falco, que el enunciado menciona para la detección de comportamiento anómalo en tiempo de ejecución, quedó **fuera del alcance** salvo que sobrara tiempo: es el único faltante del bonus de observabilidad. Tampoco hay una regla de alerta versionada para la DLQ (AM-019); el panel existe, pero no la alerta ni el runbook, y, como se vio arriba, dos paneles del dashboard no reciben datos todavía.
+Falco, que el enunciado menciona para la detección de comportamiento anómalo en tiempo de ejecución, quedó **fuera del alcance** salvo que sobrara tiempo: es el único faltante del bonus de observabilidad. Tampoco hay una regla de alerta versionada para la DLQ (AM-019); el panel existe y recibe datos, pero no la alerta ni el runbook.
 
 # Conclusiones
 
@@ -530,7 +530,7 @@ Falco, que el enunciado menciona para la detección de comportamiento anómalo e
 1. **Publicar en Docker Hub (T17):** workflow de release en el tag `vX.Y.Z` con etiquetas `vX.Y.Z` y `latest`, SBOM con Syft y firma con Cosign (ADR 0011); con ello se cierran AM-008, AM-009 y AM-022. Propuesta: repositorios `api`, `worker` y `web`, environment protegido `dockerhub`, tag de prueba `v0.9.0` y `v1.0.0` en el cierre.
 2. **Cierre de la entrega (T20 y T21):** guion del video de 10 a 15 minutos, bitácora, matriz de trazabilidad, informe de seguridad final, tag de versión y PR.
 3. Corregir la codificación de los correos del worker y afinar la regla de Gitleaks que cruza saltos de línea.
-4. **Alerta y runbook de la DLQ** en Grafana (AM-019), instrumentar `identity_login_attempts_total` e `identity_events_published_total` y corregir la consulta del panel de la DLQ, y, si hay tiempo, **Falco** para detección en ejecución.
+4. **Alerta y runbook de la DLQ** en Grafana (AM-019) y, si hay tiempo, **Falco** para detección en ejecución.
 5. **Soporte SMTP autenticado con STARTTLS** en el worker y hosts configurables, para poder aplicar de verdad la arquitectura de AWS.
 6. Evolucionar la integración de terceros: clientes OAuth en base de datos, OpenID Connect, refresh tokens por cliente, introspección y revocación; y reemplazar la publicación directa por un **outbox transaccional**.
 7. Funciones diferidas en la matriz: claves de servicio (RF-018) y exportación del audit log (RF-019).
