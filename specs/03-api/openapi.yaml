@@ -650,7 +650,7 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403':
-          description: Un administrador no puede cambiar ni eliminar un rol que él tiene, y los roles de sistema (admin, user) no se pueden modificar
+          description: Quien llama no es administrador, o es un administrador que intenta cambiar o eliminar un rol que él tiene, o el rol es de sistema (admin, user)
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }
@@ -666,7 +666,7 @@ paths:
         '204': { description: Rol eliminado }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403':
-          description: Un administrador no puede cambiar ni eliminar un rol que él tiene, y los roles de sistema (admin, user) no se pueden modificar
+          description: Quien llama no es administrador, o es un administrador que intenta cambiar o eliminar un rol que él tiene, o el rol es de sistema (admin, user)
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }
