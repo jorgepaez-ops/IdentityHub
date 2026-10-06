@@ -1,7 +1,16 @@
 apiVersion: 1
 
+# Las bases de Grafana creadas antes de fijar el uid tienen la fuente con un uid
+# generado; cambiar el uid de una fuente existente rompe el aprovisionamiento
+# ("data source not found"). Se borra la fuente y se recrea con el uid fijo, que
+# es el que usan las reglas de alerta (grafana/alerting).
+deleteDatasources:
+  - name: Prometheus
+    orgId: 1
+
 datasources:
   - name: Prometheus
+    uid: prometheus
     type: prometheus
     access: proxy
     url: http://prometheus:9090

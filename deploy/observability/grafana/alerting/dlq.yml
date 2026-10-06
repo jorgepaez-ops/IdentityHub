@@ -1,0 +1,51 @@
+# AM-019: alerta de la cola de mensajes muertos (DLQ) de notificaciones.
+# Runbook: docs/runbooks/dlq-notificaciones.md
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: identity-hub-broker
+    folder: Identity Hub
+    interval: 1m
+    rules:
+      - uid: identity-dlq-not-empty
+        title: DLQ de notificaciones con mensajes
+        condition: C
+        for: 2m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: warning
+          service: broker
+        annotations:
+          summary: "La cola notifications.dlq tiene {{ $values.B.Value }} mensaje(s)"
+          description: >-
+            Hay eventos que el worker no pudo entregar tras 3 intentos y terminaron en
+            notifications.dlq: algún correo no salió.
+          runbook_url: docs/runbooks/dlq-notificaciones.md
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: 'max(rabbitmq_detailed_queue_messages{queue="notifications.dlq"})'
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+              settings: { mode: dropNN }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0] }

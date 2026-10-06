@@ -42,51 +42,54 @@ const context = await browser.newContext({
   colorScheme: 'light',
 })
 
-const login = await context.request.post(`${GRAFANA}/login`, { data: { user, password: clave } })
-if (!login.ok()) throw new Error(`Grafana login failed (${login.status()})`)
+// The browser is closed in `finally`, so a failed login or capture never leaves Chromium running.
+try {
+  const login = await context.request.post(`${GRAFANA}/login`, { data: { user, password: clave } })
+  if (!login.ok()) throw new Error(`Grafana login failed (${login.status()})`)
 
-const sources = await (await context.request.get(`${GRAFANA}/api/datasources`)).json()
-const uid = (type) => sources.find((s) => s.type === type)?.uid
-const lokiUid = uid('loki')
-const promUid = uid('prometheus')
-if (!lokiUid || !promUid) throw new Error('Loki or Prometheus data source is not provisioned')
+  const sources = await (await context.request.get(`${GRAFANA}/api/datasources`)).json()
+  const uid = (type) => sources.find((s) => s.type === type)?.uid
+  const lokiUid = uid('loki')
+  const promUid = uid('prometheus')
+  if (!lokiUid || !promUid) throw new Error('Loki or Prometheus data source is not provisioned')
 
-const page = await context.newPage()
-const shot = async (name) => {
-  await page.waitForTimeout(3500)
-  await page.screenshot({ path: path.join(OUT, name), fullPage: false })
-  console.log('captured', name)
-}
+  const page = await context.newPage()
+  const shot = async (name) => {
+    await page.waitForTimeout(3500)
+    await page.screenshot({ path: path.join(OUT, name), fullPage: false })
+    console.log('captured', name)
+  }
 
-// 1. Provisioned dashboard "Identity Hub — Seguridad"
-await page.goto(`${GRAFANA}/d/identity-security?orgId=1&from=now-1h&to=now&refresh=`, { waitUntil: 'networkidle' })
-await shot('grafana-dashboard-seguridad.png')
+  // 1. Provisioned dashboard "Identity Hub — Seguridad"
+  await page.goto(`${GRAFANA}/d/identity-security?orgId=1&from=now-1h&to=now&refresh=`, { waitUntil: 'networkidle' })
+  await shot('grafana-dashboard-seguridad.png')
 
-// 2. Explore with Loki: structured logs of the worker (asynchronous notifications)
-const explore = (ds, dsType, expr, extra = {}) =>
-  `${GRAFANA}/explore?schemaVersion=1&orgId=1&panes=` +
-  encodeURIComponent(
-    JSON.stringify({
-      a: {
-        datasource: ds,
-        queries: [{ refId: 'A', expr, datasource: { type: dsType, uid: ds }, ...extra }],
-        range: { from: 'now-1h', to: 'now' },
-      },
-    }),
+  // 2. Explore with Loki: structured logs of the worker (asynchronous notifications)
+  const explore = (ds, dsType, expr, extra = {}) =>
+    `${GRAFANA}/explore?schemaVersion=1&orgId=1&panes=` +
+    encodeURIComponent(
+      JSON.stringify({
+        a: {
+          datasource: ds,
+          queries: [{ refId: 'A', expr, datasource: { type: dsType, uid: ds }, ...extra }],
+          range: { from: 'now-1h', to: 'now' },
+        },
+      }),
+    )
+
+  await page.goto(explore(lokiUid, 'loki', '{service="worker"} | json | msg="notificación entregada"'), { waitUntil: 'networkidle' })
+  await shot('grafana-explore-loki.png')
+
+  // 3. Explore with Prometheus: events consumed by the worker, by type
+  await page.goto(
+    explore(promUid, 'prometheus', 'sum by (event_type) (rate(identity_events_consumed_total[5m]))', { range: true, instant: false }),
+    { waitUntil: 'networkidle' },
   )
+  await shot('grafana-explore-prometheus.png')
 
-await page.goto(explore(lokiUid, 'loki', '{service="worker"} | json | msg="notificación entregada"'), { waitUntil: 'networkidle' })
-await shot('grafana-explore-loki.png')
-
-// 3. Explore with Prometheus: events consumed by the worker, by type
-await page.goto(
-  explore(promUid, 'prometheus', 'sum by (event_type) (rate(identity_events_consumed_total[5m]))', { range: true, instant: false }),
-  { waitUntil: 'networkidle' },
-)
-await shot('grafana-explore-prometheus.png')
-
-// 4. Prometheus: scrape targets
-await page.goto(`${PROMETHEUS}/targets`, { waitUntil: 'load' })
-await shot('prometheus-targets.png')
-
-await browser.close()
+  // 4. Prometheus: scrape targets
+  await page.goto(`${PROMETHEUS}/targets`, { waitUntil: 'load' })
+  await shot('prometheus-targets.png')
+} finally {
+  await browser.close()
+}
