@@ -159,6 +159,34 @@ func TestRNF007_ReusoRefreshSeCuentaAunqueFalleLaPublicacion(t *testing.T) {
 	}
 }
 
+// commitFailingRepository runs the callback like a real transaction and then
+// reports a commit failure, so the revocation never persists.
+type commitFailingRepository struct{ repositoryStub }
+
+func (r *commitFailingRepository) WithinRefreshTransaction(ctx context.Context, fn func(Writer) error) error {
+	if err := fn(&r.repositoryStub); err != nil {
+		return err
+	}
+	return errors.New("commit failed")
+}
+
+func TestRNF007_ReusoRefreshNoSeCuentaSiElCommitFalla(t *testing.T) {
+	signer, err := token.New(make([]byte, 32), "https://issuer.test", "identity-hub", time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo := &commitFailingRepository{repositoryStub{rotation: Rotation{Status: RotationReused, UserID: uuid.New(), FamilyID: uuid.New()}}}
+	before := testutil.ToFloat64(observability.RefreshReuseDetected)
+
+	if _, err := New(repo, signer, time.Hour).Refresh(context.Background(), Input{RefreshToken: "reused"}); err == nil {
+		t.Fatal("Refresh succeeded; want the commit error")
+	}
+
+	if got := testutil.ToFloat64(observability.RefreshReuseDetected); got != before {
+		t.Fatalf("contador de reusos = %v; se esperaba %v (la revocación no se confirmó)", got, before)
+	}
+}
+
 func TestRF005_TokenInexistenteDevuelveInvalido(t *testing.T) {
 	signer, err := token.New(make([]byte, 32), "https://issuer.test", "identity-hub", time.Now)
 	if err != nil {

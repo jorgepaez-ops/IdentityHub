@@ -37,7 +37,7 @@ declaración de buenas intenciones.
 | **RNF-004** | Imágenes sin vulnerabilidades corregibles | P0 | — | — | 3 | — | 🟡 parcial |
 | **RNF-005** | Cobertura de pruebas ≥ 70 % | P0 | — | — | 25 | — | 🟡 parcial |
 | **RNF-006** | Procedencia verificable | P0 | — | — | — | — | 🔴 sin cubrir |
-| **RNF-007** | Observabilidad | P0 | — | — | 4 | — | 🟡 parcial |
+| **RNF-007** | Observabilidad | P0 | — | — | 5 | — | 🟡 parcial |
 | **RNF-008** | Contenedores endurecidos | P0 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-009** | Cabeceras de seguridad | P0 | — | — | — | 6 | 🟡 parcial |
 | **RNF-010** | Latencia | P1 | — | — | — | — | 🔴 sin cubrir |
