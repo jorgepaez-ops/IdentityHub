@@ -65,10 +65,16 @@ describe('csv helper', () => {
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
       clicked.push({ href: this.getAttribute('href') ?? '', download: this.download })
     })
+    vi.useFakeTimers()
     downloadCsv('x-2026-10-06.csv', 'hello')
     expect(clicked).toEqual([{ href: 'blob:test', download: 'x-2026-10-06.csv' }])
     expect(created[0]?.type).toContain('text/csv')
     expect(document.querySelector('a[download]')).toBeNull()
-    await vi.waitFor(() => expect(revokeObjectURL).toHaveBeenCalledWith('blob:test'))
+    // Revoking right away can cancel an asynchronous download, so the URL lives for a while first.
+    vi.advanceTimersByTime(1000)
+    expect(revokeObjectURL).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(30_000)
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:test')
+    vi.useRealTimers()
   })
 })

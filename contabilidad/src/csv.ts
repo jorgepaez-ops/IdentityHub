@@ -30,6 +30,8 @@ const pad = (value: number) => String(value).padStart(2, '0')
 /** For example `usuarios-2026-10-06.csv`, using the local calendar date. */
 export const csvFileName = (prefix: string, date: Date = new Date()) => `${prefix}-${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}.csv`
 
+const REVOKE_DELAY_MS = 30_000
+
 /** Downloads through a Blob URL (no data: URL, so the CSP is untouched) and revokes the URL afterwards. */
 export function downloadCsv(fileName: string, content: string): void {
   const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' }))
@@ -40,5 +42,6 @@ export function downloadCsv(fileName: string, content: string): void {
   document.body.appendChild(link)
   link.click()
   link.remove()
-  window.setTimeout(() => URL.revokeObjectURL(url), 0)
+  // Some browsers start the download asynchronously; revoking right away can cancel it.
+  window.setTimeout(() => URL.revokeObjectURL(url), REVOKE_DELAY_MS)
 }
