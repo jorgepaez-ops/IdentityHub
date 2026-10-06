@@ -20,9 +20,9 @@ CREATE TABLE role_permissions (
 );
 
 COMMENT ON COLUMN roles.application_id IS
-    'NULL identifies a directory role. T12b validates application role names in Go.';
+    'NULL identifies a directory role; otherwise the owning application. Application role names (<client_id>.<slug>) are validated by the rolegrid service.';
 COMMENT ON COLUMN roles.system IS
-    'System directory roles are protected by Go validation and a database trigger.';
+    'System directory roles (admin, user) are protected by the roles_reject_system_mutation trigger and refused by the rolegrid service.';
 
 UPDATE roles
 SET system = true

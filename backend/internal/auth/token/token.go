@@ -22,8 +22,11 @@ const AccessTokenExpiresIn = int(accessTokenTTL / time.Second)
 type Clock func() time.Time
 
 type Claims struct {
-	Roles       []string `json:"roles"`
-	Permissions []string `json:"permissions,omitempty"`
+	Roles []string `json:"roles"`
+	// Permissions is read from the "permissions" claim when validating. When signing,
+	// MarshalJSON decides whether the claim is written (application tokens always carry
+	// it, even empty; Hub tokens omit it), so this tag never governs omission.
+	Permissions []string `json:"permissions"`
 	SessionID   string   `json:"sid,omitempty"`
 	jwt.RegisteredClaims
 	permissionsPresent bool

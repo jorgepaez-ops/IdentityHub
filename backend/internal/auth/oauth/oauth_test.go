@@ -170,6 +170,30 @@ func TestRF020_FalloPosteriorAlConsumoRevierteElCodigo(t *testing.T) {
 	}
 }
 
+// A failed permissions lookup must abort the transaction: no result (so no token
+// is issued) and the code stays redeemable, as with any other post-consumption failure.
+func TestRF020_FalloDeLaConsultaDePermisosAbortaElCanjeYNoEmiteToken(t *testing.T) {
+	client := Client{ID: "contabilidad", RedirectURI: "http://contabilidad.localhost:8080/callback"}
+	repository := &memoryRepository{roles: []string{"user", "contabilidad.senior"}, permissions: []string{"reportes.ver"}, permissionsErr: errors.New("permissions unavailable")}
+	service := New(repository, client, bytesReader(), time.Now)
+	issued, err := service.Authorize(context.Background(), uuid.New(), validAuthorizeInput(client))
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := ExchangeInput{Code: issued.Code, ClientID: client.ID, RedirectURI: client.RedirectURI, CodeVerifier: "verifier"}
+	result, err := service.Exchange(context.Background(), input)
+	if !errors.Is(err, repository.permissionsErr) {
+		t.Fatalf("exchange error=%v, want wrapped permissions failure", err)
+	}
+	if result.UserID != uuid.Nil || len(result.Roles) != 0 || len(result.Permissions) != 0 {
+		t.Fatalf("result=%+v, want empty so that no token is issued", result)
+	}
+	repository.permissionsErr = nil
+	if _, err := service.Exchange(context.Background(), input); err != nil {
+		t.Fatalf("exchange after rolled-back permissions failure: %v", err)
+	}
+}
+
 func TestRF020_FalloDeAuditoriaRevierteElCodigo(t *testing.T) {
 	client := Client{ID: "contabilidad", RedirectURI: "http://contabilidad.localhost:8080/callback"}
 	repository := &memoryRepository{roles: []string{"user"}}

@@ -81,6 +81,33 @@ type AdminUpdateUserRequest struct {
 	Status *UserStatus `json:"status,omitempty"`
 }
 
+// Application defines model for Application.
+type Application struct {
+	ClientId    string             `json:"clientId"`
+	Id          openapi_types.UUID `json:"id"`
+	Name        string             `json:"name"`
+	Permissions []Permission       `json:"permissions"`
+	Roles       []ApplicationRole  `json:"roles"`
+}
+
+// ApplicationRole defines model for ApplicationRole.
+type ApplicationRole struct {
+	ApplicationId openapi_types.UUID `json:"applicationId"`
+
+	// AssignedCount Usuarios que tienen asignado el rol.
+	AssignedCount int                `json:"assignedCount"`
+	Description   string             `json:"description"`
+	Id            openapi_types.UUID `json:"id"`
+
+	// Name Rol configurable exclusivo de una aplicación.
+	Name           ApplicationRoleName `json:"name"`
+	PermissionKeys []string            `json:"permissionKeys"`
+	System         bool                `json:"system"`
+}
+
+// ApplicationRoleName defines model for ApplicationRoleName.
+type ApplicationRoleName = string
+
 // AuditEvent defines model for AuditEvent.
 type AuditEvent struct {
 	Action       string                  `json:"action"`
@@ -98,6 +125,15 @@ type AuditEvent struct {
 type AuditLogPage struct {
 	Items      []AuditEvent `json:"items"`
 	NextCursor *string      `json:"nextCursor"`
+}
+
+// CreateApplicationRoleRequest defines model for CreateApplicationRoleRequest.
+type CreateApplicationRoleRequest struct {
+	Description *string `json:"description,omitempty"`
+
+	// Name Debe ser `<clientId>.<nombre>`; el nombre cumple `^[a-z0-9][a-z0-9_-]{1,40}$`.
+	Name           ApplicationRoleName `json:"name"`
+	PermissionKeys []string            `json:"permissionKeys"`
 }
 
 // EmailRequest defines model for EmailRequest.
@@ -189,6 +225,12 @@ type PasswordResetConfirmRequest struct {
 	Token    string `json:"token"`
 }
 
+// Permission defines model for Permission.
+type Permission struct {
+	Description string `json:"description"`
+	Key         string `json:"key"`
+}
+
 // Problem Error en formato RFC 7807. Nunca revela si un correo está registrado.
 type Problem struct {
 	Detail *string `json:"detail,omitempty"`
@@ -252,6 +294,12 @@ type TokenRequest struct {
 	Token string `json:"token"`
 }
 
+// UpdateApplicationRoleRequest El nombre de un rol no se puede cambiar; solo descripción y permisos.
+type UpdateApplicationRoleRequest struct {
+	Description    *string   `json:"description,omitempty"`
+	PermissionKeys *[]string `json:"permissionKeys,omitempty"`
+}
+
 // UpdateProfileRequest defines model for UpdateProfileRequest.
 type UpdateProfileRequest struct {
 	DisplayName *string `json:"displayName,omitempty"`
@@ -286,6 +334,9 @@ type Action = string
 // ActorId defines model for ActorId.
 type ActorId = openapi_types.UUID
 
+// ApplicationId defines model for ApplicationId.
+type ApplicationId = openapi_types.UUID
+
 // Cursor defines model for Cursor.
 type Cursor = string
 
@@ -294,6 +345,9 @@ type Limit = int
 
 // Query defines model for Query.
 type Query = string
+
+// RoleId defines model for RoleId.
+type RoleId = openapi_types.UUID
 
 // SessionId defines model for SessionId.
 type SessionId = openapi_types.UUID
@@ -368,6 +422,12 @@ type AuthorizeClientParamsResponseType string
 // AuthorizeClientParamsCodeChallengeMethod defines parameters for AuthorizeClient.
 type AuthorizeClientParamsCodeChallengeMethod string
 
+// CreateApplicationRoleJSONRequestBody defines body for CreateApplicationRole for application/json ContentType.
+type CreateApplicationRoleJSONRequestBody = CreateApplicationRoleRequest
+
+// UpdateApplicationRoleJSONRequestBody defines body for UpdateApplicationRole for application/json ContentType.
+type UpdateApplicationRoleJSONRequestBody = UpdateApplicationRoleRequest
+
 // CreateEmployeeJSONRequestBody defines body for CreateEmployee for application/json ContentType.
 type CreateEmployeeJSONRequestBody = AdminCreateUserRequest
 
@@ -403,6 +463,21 @@ type ServerInterface interface {
 	// Clave pública para validar los tokens emitidos
 	// (GET /.well-known/jwks.json)
 	GetJwks(w http.ResponseWriter, r *http.Request)
+	// Listar aplicaciones, permisos y roles configurables
+	// (GET /api/v1/admin/applications)
+	ListApplications(w http.ResponseWriter, r *http.Request)
+
+	// (GET /api/v1/admin/applications/{applicationId}/roles)
+	ListApplicationRoles(w http.ResponseWriter, r *http.Request, applicationId ApplicationId)
+
+	// (POST /api/v1/admin/applications/{applicationId}/roles)
+	CreateApplicationRole(w http.ResponseWriter, r *http.Request, applicationId ApplicationId)
+	// Eliminar un rol de aplicación sin asignaciones
+	// (DELETE /api/v1/admin/applications/{applicationId}/roles/{roleId})
+	DeleteApplicationRole(w http.ResponseWriter, r *http.Request, applicationId ApplicationId, roleId RoleId)
+	// Actualizar descripción o permisos de un rol (no admite renombrar)
+	// (PATCH /api/v1/admin/applications/{applicationId}/roles/{roleId})
+	UpdateApplicationRole(w http.ResponseWriter, r *http.Request, applicationId ApplicationId, roleId RoleId)
 	// Consultar el registro de auditoría
 	// (GET /api/v1/admin/audit-log)
 	ListAuditLog(w http.ResponseWriter, r *http.Request, params ListAuditLogParams)
@@ -478,6 +553,34 @@ type Unimplemented struct{}
 // Clave pública para validar los tokens emitidos
 // (GET /.well-known/jwks.json)
 func (_ Unimplemented) GetJwks(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Listar aplicaciones, permisos y roles configurables
+// (GET /api/v1/admin/applications)
+func (_ Unimplemented) ListApplications(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/v1/admin/applications/{applicationId}/roles)
+func (_ Unimplemented) ListApplicationRoles(w http.ResponseWriter, r *http.Request, applicationId ApplicationId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /api/v1/admin/applications/{applicationId}/roles)
+func (_ Unimplemented) CreateApplicationRole(w http.ResponseWriter, r *http.Request, applicationId ApplicationId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Eliminar un rol de aplicación sin asignaciones
+// (DELETE /api/v1/admin/applications/{applicationId}/roles/{roleId})
+func (_ Unimplemented) DeleteApplicationRole(w http.ResponseWriter, r *http.Request, applicationId ApplicationId, roleId RoleId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Actualizar descripción o permisos de un rol (no admite renombrar)
+// (PATCH /api/v1/admin/applications/{applicationId}/roles/{roleId})
+func (_ Unimplemented) UpdateApplicationRole(w http.ResponseWriter, r *http.Request, applicationId ApplicationId, roleId RoleId) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -627,6 +730,168 @@ func (siw *ServerInterfaceWrapper) GetJwks(w http.ResponseWriter, r *http.Reques
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetJwks(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListApplications operation middleware
+func (siw *ServerInterfaceWrapper) ListApplications(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListApplications(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListApplicationRoles operation middleware
+func (siw *ServerInterfaceWrapper) ListApplicationRoles(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "applicationId" -------------
+	var applicationId ApplicationId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "applicationId", chi.URLParam(r, "applicationId"), &applicationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "applicationId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListApplicationRoles(w, r, applicationId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateApplicationRole operation middleware
+func (siw *ServerInterfaceWrapper) CreateApplicationRole(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "applicationId" -------------
+	var applicationId ApplicationId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "applicationId", chi.URLParam(r, "applicationId"), &applicationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "applicationId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateApplicationRole(w, r, applicationId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteApplicationRole operation middleware
+func (siw *ServerInterfaceWrapper) DeleteApplicationRole(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "applicationId" -------------
+	var applicationId ApplicationId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "applicationId", chi.URLParam(r, "applicationId"), &applicationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "applicationId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "roleId" -------------
+	var roleId RoleId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "roleId", chi.URLParam(r, "roleId"), &roleId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "roleId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteApplicationRole(w, r, applicationId, roleId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateApplicationRole operation middleware
+func (siw *ServerInterfaceWrapper) UpdateApplicationRole(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "applicationId" -------------
+	var applicationId ApplicationId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "applicationId", chi.URLParam(r, "applicationId"), &applicationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "applicationId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "roleId" -------------
+	var roleId RoleId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "roleId", chi.URLParam(r, "roleId"), &roleId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "roleId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateApplicationRole(w, r, applicationId, roleId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1386,6 +1651,21 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/.well-known/jwks.json", wrapper.GetJwks)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/admin/applications", wrapper.ListApplications)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/admin/applications/{applicationId}/roles", wrapper.ListApplicationRoles)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/admin/applications/{applicationId}/roles", wrapper.CreateApplicationRole)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/v1/admin/applications/{applicationId}/roles/{roleId}", wrapper.DeleteApplicationRole)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/api/v1/admin/applications/{applicationId}/roles/{roleId}", wrapper.UpdateApplicationRole)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/admin/audit-log", wrapper.ListAuditLog)

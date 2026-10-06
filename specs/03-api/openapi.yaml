@@ -581,6 +581,86 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
+  /api/v1/admin/applications:
+    get:
+      operationId: listApplications
+      tags: [admin]
+      summary: Listar aplicaciones, permisos y roles configurables
+      x-requirement: RF-021
+      responses:
+        '200':
+          description: Aplicaciones con su catálogo declarativo
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Application' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/v1/admin/applications/{applicationId}/roles:
+    get:
+      operationId: listApplicationRoles
+      tags: [admin]
+      x-requirement: RF-021
+      parameters: [{ $ref: '#/components/parameters/ApplicationId' }]
+      responses:
+        '200':
+          description: Roles configurables de la aplicación
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/ApplicationRole' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      operationId: createApplicationRole
+      tags: [admin]
+      x-requirement: RF-021
+      parameters: [{ $ref: '#/components/parameters/ApplicationId' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CreateApplicationRoleRequest' } } }
+      responses:
+        '201': { description: Rol creado, content: { application/json: { schema: { $ref: '#/components/schemas/ApplicationRole' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: Ya existe un rol con ese nombre }
+
+  /api/v1/admin/applications/{applicationId}/roles/{roleId}:
+    patch:
+      operationId: updateApplicationRole
+      tags: [admin]
+      summary: Actualizar descripción o permisos de un rol (no admite renombrar)
+      description: |
+        El nombre no se puede cambiar. Un administrador no puede cambiar los permisos de un rol que él tiene (403).
+      x-requirement: RF-021
+      parameters: [{ $ref: '#/components/parameters/ApplicationId' }, { $ref: '#/components/parameters/RoleId' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/UpdateApplicationRoleRequest' } } }
+      responses:
+        '200': { description: Rol actualizado, content: { application/json: { schema: { $ref: '#/components/schemas/ApplicationRole' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      operationId: deleteApplicationRole
+      tags: [admin]
+      summary: Eliminar un rol de aplicación sin asignaciones
+      description: Un administrador no puede eliminar un rol que él tiene (403, se evalúa antes que las asignaciones); un rol asignado devuelve 409.
+      x-requirement: RF-021
+      parameters: [{ $ref: '#/components/parameters/ApplicationId' }, { $ref: '#/components/parameters/RoleId' }]
+      responses:
+        '204': { description: Rol eliminado }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: El rol tiene asignaciones activas }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -590,6 +670,16 @@ components:
       description: Access token Ed25519. Validar contra el JWKS; se rechaza cualquier `alg` distinto de `EdDSA`.
 
   parameters:
+    ApplicationId:
+      name: applicationId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    RoleId:
+      name: roleId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
     UserId:
       name: userId
       in: path
@@ -727,6 +817,56 @@ components:
       pattern: '^(admin|user|[a-z][a-z0-9_-]{0,62}\.[a-z][a-z0-9_-]{0,62})$'
       description: Rol de directorio (`admin` o `user`) o rol configurable `<aplicacion>.<nombre>`.
       "x-requirement": RF-021
+
+    ApplicationRoleName:
+      allOf:
+        - $ref: '#/components/schemas/Role'
+        - type: string
+          pattern: '^[a-z][a-z0-9_-]{0,62}\.[a-z][a-z0-9_-]{0,62}$'
+      description: Rol configurable exclusivo de una aplicación.
+    Permission:
+      type: object
+      required: [key, description]
+      properties:
+        key: { type: string, example: movimientos.ver_todos }
+        description: { type: string, example: Ver todos los movimientos contables }
+    Application:
+      type: object
+      required: [id, clientId, name, permissions, roles]
+      properties:
+        id: { type: string, format: uuid }
+        clientId: { type: string, example: contabilidad }
+        name: { type: string, example: Contabilidad }
+        permissions: { type: array, items: { $ref: '#/components/schemas/Permission' } }
+        roles: { type: array, items: { $ref: '#/components/schemas/ApplicationRole' } }
+    ApplicationRole:
+      type: object
+      required: [id, name, description, applicationId, permissionKeys, system, assignedCount]
+      properties:
+        id: { type: string, format: uuid }
+        name: { $ref: '#/components/schemas/ApplicationRoleName', example: contabilidad.auditor }
+        description: { type: string }
+        applicationId: { type: string, format: uuid }
+        permissionKeys: { type: array, items: { type: string } }
+        system: { type: boolean }
+        assignedCount: { type: integer, minimum: 0, description: Usuarios que tienen asignado el rol. }
+    CreateApplicationRoleRequest:
+      type: object
+      required: [name, permissionKeys]
+      properties:
+        name:
+          allOf:
+            - $ref: '#/components/schemas/ApplicationRoleName'
+          description: Debe ser `<clientId>.<nombre>`; el nombre cumple `^[a-z0-9][a-z0-9_-]{1,40}$`.
+          example: contabilidad.auditor
+        description: { type: string, maxLength: 500 }
+        permissionKeys: { type: array, uniqueItems: true, items: { type: string } }
+    UpdateApplicationRoleRequest:
+      type: object
+      description: El nombre de un rol no se puede cambiar; solo descripción y permisos.
+      properties:
+        description: { type: string, maxLength: 500 }
+        permissionKeys: { type: array, uniqueItems: true, items: { type: string } }
 
     User:
       type: object

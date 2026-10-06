@@ -10,7 +10,7 @@ declaración de buenas intenciones.
 
 | Requisito | Título | Pri | Operaciones de la API | Escenarios | Pruebas Go | E2E | Estado |
 |---|---|---|---|---|---|---|---|
-| **RF-001** | Alta de empleados por administración | P0 | `createEmployee`, `resendInvitation` | 4 | 34 | 4 | ✅ completo |
+| **RF-001** | Alta de empleados por administración | P0 | `createEmployee`, `resendInvitation` | 4 | 35 | 4 | ✅ completo |
 | **RF-002** | Aceptación de invitación y verificación de correo | P0 | `acceptInvitation` | 4 | 16 | 3 | ✅ completo |
 | **RF-003** | Inicio de sesión | P0 | `login` | 2 | 14 | 2 | ✅ completo |
 | **RF-004** | Emisión y validación de JWT | P0 | `getJwks` | 1 | 8 | 1 | ✅ completo |
@@ -18,7 +18,7 @@ declaración de buenas intenciones.
 | **RF-006** | Detección de reuso de refresh token | P0 | — | 1 | 5 | 1 | ✅ completo |
 | **RF-007** | Cierre de sesión | P0 | `logout` | 1 | 9 | 1 | ✅ completo |
 | **RF-008** | Perfil propio | P0 | `getCurrentUser`, `updateCurrentUser` | — | 7 | — | 🟡 parcial |
-| **RF-009** | Control de acceso por roles | P0 | — | 5 | 16 | 5 | ✅ completo |
+| **RF-009** | Control de acceso por roles | P0 | — | 5 | 17 | 5 | ✅ completo |
 | **RF-010** | Administración de usuarios | P0 | `listUsers`, `getUser`, `updateUser` | 3 | 12 | 3 | ✅ completo |
 | **RF-011** | Registro de auditoría | P0 | `listAuditLog` | 1 | 9 | 1 | ✅ completo |
 | **RF-012** | Notificaciones asíncronas | P0 | — | 1 | 9 | — | ✅ completo |
@@ -29,8 +29,8 @@ declaración de buenas intenciones.
 | **RF-017** | Bloqueo por fuerza bruta | P1 | — | 4 | 23 | 1 | ✅ completo |
 | **RF-018** | Claves de servicio | P2 | — | — | — | — | ⏳ diferido (semana 4) |
 | **RF-019** | Exportación del audit log | P2 | — | — | — | — | ⏳ diferido (semana 4) |
-| **RF-020** | Autorización de aplicaciones cliente | P1 | `authorizeClient`, `exchangeAuthorizationCode` | 10 | 28 | 8 | ✅ completo |
-| **RF-021** | Roles y permisos configurables por aplicación | P1 | — | — | 2 | — | ⏳ diferido (semana 4) |
+| **RF-020** | Autorización de aplicaciones cliente | P1 | `authorizeClient`, `exchangeAuthorizationCode` | 10 | 29 | 8 | ✅ completo |
+| **RF-021** | Roles y permisos configurables por aplicación | P1 | `listApplications`, `listApplicationRoles`, `createApplicationRole`, `updateApplicationRole`, `deleteApplicationRole` | — | 27 | — | ⏳ diferido (semana 4) |
 | **RNF-001** | Contenerización total | P0 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-002** | Pipeline de ciclo completo | P0 | — | — | — | — | 🔴 sin cubrir |
 | **RNF-003** | Cero secretos en el repositorio | P0 | — | — | 4 | — | 🟡 parcial |

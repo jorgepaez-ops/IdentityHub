@@ -12,6 +12,221 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const actorHoldsApplicationRole = `-- name: ActorHoldsApplicationRole :one
+SELECT EXISTS(SELECT 1 FROM user_roles WHERE user_id = $1 AND role_id = $2)
+`
+
+type ActorHoldsApplicationRoleParams struct {
+	UserID uuid.UUID
+	RoleID uuid.UUID
+}
+
+func (q *Queries) ActorHoldsApplicationRole(ctx context.Context, arg ActorHoldsApplicationRoleParams) (bool, error) {
+	row := q.db.QueryRow(ctx, actorHoldsApplicationRole, arg.UserID, arg.RoleID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const addApplicationRolePermission = `-- name: AddApplicationRolePermission :execrows
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT $1, id FROM permissions WHERE application_id = $2 AND key = $3
+`
+
+type AddApplicationRolePermissionParams struct {
+	RoleID        uuid.UUID
+	ApplicationID uuid.UUID
+	Key           string
+}
+
+func (q *Queries) AddApplicationRolePermission(ctx context.Context, arg AddApplicationRolePermissionParams) (int64, error) {
+	result, err := q.db.Exec(ctx, addApplicationRolePermission, arg.RoleID, arg.ApplicationID, arg.Key)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const createApplicationRole = `-- name: CreateApplicationRole :one
+INSERT INTO roles (name, description, application_id, system)
+VALUES ($2, $3, $1, false)
+RETURNING id, name, description, application_id, system
+`
+
+type CreateApplicationRoleParams struct {
+	ApplicationID pgtype.UUID
+	Name          string
+	Description   string
+}
+
+func (q *Queries) CreateApplicationRole(ctx context.Context, arg CreateApplicationRoleParams) (Role, error) {
+	row := q.db.QueryRow(ctx, createApplicationRole, arg.ApplicationID, arg.Name, arg.Description)
+	var i Role
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Description,
+		&i.ApplicationID,
+		&i.System,
+	)
+	return i, err
+}
+
+const deleteApplicationRole = `-- name: DeleteApplicationRole :exec
+DELETE FROM roles WHERE id = $1
+`
+
+func (q *Queries) DeleteApplicationRole(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteApplicationRole, id)
+	return err
+}
+
+const deleteApplicationRolePermissions = `-- name: DeleteApplicationRolePermissions :exec
+DELETE FROM role_permissions WHERE role_id = $1
+`
+
+func (q *Queries) DeleteApplicationRolePermissions(ctx context.Context, roleID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteApplicationRolePermissions, roleID)
+	return err
+}
+
+const getApplicationRole = `-- name: GetApplicationRole :one
+SELECT r.id, r.name, r.description, r.application_id, r.system,
+       COALESCE(array_agg(p.key ORDER BY p.key) FILTER (WHERE p.key IS NOT NULL), '{}')::text[] AS permission_keys,
+       (SELECT count(*) FROM user_roles ur WHERE ur.role_id = r.id)::bigint AS assigned_count
+FROM roles r
+LEFT JOIN role_permissions rp ON rp.role_id = r.id
+LEFT JOIN permissions p ON p.id = rp.permission_id
+WHERE r.id = $1 AND r.application_id = $2
+GROUP BY r.id
+`
+
+type GetApplicationRoleParams struct {
+	ID            uuid.UUID
+	ApplicationID pgtype.UUID
+}
+
+type GetApplicationRoleRow struct {
+	ID             uuid.UUID
+	Name           string
+	Description    string
+	ApplicationID  pgtype.UUID
+	System         bool
+	PermissionKeys []string
+	AssignedCount  int64
+}
+
+func (q *Queries) GetApplicationRole(ctx context.Context, arg GetApplicationRoleParams) (GetApplicationRoleRow, error) {
+	row := q.db.QueryRow(ctx, getApplicationRole, arg.ID, arg.ApplicationID)
+	var i GetApplicationRoleRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Description,
+		&i.ApplicationID,
+		&i.System,
+		&i.PermissionKeys,
+		&i.AssignedCount,
+	)
+	return i, err
+}
+
+const getRoleGridApplication = `-- name: GetRoleGridApplication :one
+SELECT id, client_id, name FROM applications WHERE id = $1
+`
+
+type GetRoleGridApplicationRow struct {
+	ID       uuid.UUID
+	ClientID string
+	Name     string
+}
+
+func (q *Queries) GetRoleGridApplication(ctx context.Context, id uuid.UUID) (GetRoleGridApplicationRow, error) {
+	row := q.db.QueryRow(ctx, getRoleGridApplication, id)
+	var i GetRoleGridApplicationRow
+	err := row.Scan(&i.ID, &i.ClientID, &i.Name)
+	return i, err
+}
+
+const listApplicationPermissions = `-- name: ListApplicationPermissions :many
+SELECT key, description FROM permissions WHERE application_id = $1 ORDER BY key
+`
+
+type ListApplicationPermissionsRow struct {
+	Key         string
+	Description string
+}
+
+func (q *Queries) ListApplicationPermissions(ctx context.Context, applicationID uuid.UUID) ([]ListApplicationPermissionsRow, error) {
+	rows, err := q.db.Query(ctx, listApplicationPermissions, applicationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListApplicationPermissionsRow
+	for rows.Next() {
+		var i ListApplicationPermissionsRow
+		if err := rows.Scan(&i.Key, &i.Description); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listApplicationRoles = `-- name: ListApplicationRoles :many
+SELECT r.id, r.name, r.description, r.application_id, r.system,
+       COALESCE(array_agg(p.key ORDER BY p.key) FILTER (WHERE p.key IS NOT NULL), '{}')::text[] AS permission_keys,
+       (SELECT count(*) FROM user_roles ur WHERE ur.role_id = r.id)::bigint AS assigned_count
+FROM roles r
+LEFT JOIN role_permissions rp ON rp.role_id = r.id
+LEFT JOIN permissions p ON p.id = rp.permission_id
+WHERE r.application_id = $1
+GROUP BY r.id
+ORDER BY r.name
+`
+
+type ListApplicationRolesRow struct {
+	ID             uuid.UUID
+	Name           string
+	Description    string
+	ApplicationID  pgtype.UUID
+	System         bool
+	PermissionKeys []string
+	AssignedCount  int64
+}
+
+func (q *Queries) ListApplicationRoles(ctx context.Context, applicationID pgtype.UUID) ([]ListApplicationRolesRow, error) {
+	rows, err := q.db.Query(ctx, listApplicationRoles, applicationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListApplicationRolesRow
+	for rows.Next() {
+		var i ListApplicationRolesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Description,
+			&i.ApplicationID,
+			&i.System,
+			&i.PermissionKeys,
+			&i.AssignedCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPermissionKeysForRolesAndApplication = `-- name: ListPermissionKeysForRolesAndApplication :many
 SELECT DISTINCT permissions.key
 FROM role_permissions
@@ -42,6 +257,36 @@ func (q *Queries) ListPermissionKeysForRolesAndApplication(ctx context.Context, 
 			return nil, err
 		}
 		items = append(items, key)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listRoleGridApplications = `-- name: ListRoleGridApplications :many
+SELECT id, client_id, name FROM applications ORDER BY client_id
+`
+
+type ListRoleGridApplicationsRow struct {
+	ID       uuid.UUID
+	ClientID string
+	Name     string
+}
+
+func (q *Queries) ListRoleGridApplications(ctx context.Context) ([]ListRoleGridApplicationsRow, error) {
+	rows, err := q.db.Query(ctx, listRoleGridApplications)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListRoleGridApplicationsRow
+	for rows.Next() {
+		var i ListRoleGridApplicationsRow
+		if err := rows.Scan(&i.ID, &i.ClientID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -86,6 +331,51 @@ func (q *Queries) ListRolesWithApplication(ctx context.Context) ([]ListRolesWith
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updateApplicationRoleDescription = `-- name: UpdateApplicationRoleDescription :exec
+UPDATE roles SET description = $2 WHERE id = $1
+`
+
+type UpdateApplicationRoleDescriptionParams struct {
+	ID          uuid.UUID
+	Description string
+}
+
+func (q *Queries) UpdateApplicationRoleDescription(ctx context.Context, arg UpdateApplicationRoleDescriptionParams) error {
+	_, err := q.db.Exec(ctx, updateApplicationRoleDescription, arg.ID, arg.Description)
+	return err
+}
+
+const validateApplicationPermissionKeys = `-- name: ValidateApplicationPermissionKeys :many
+SELECT key FROM permissions
+WHERE application_id = $1 AND key = ANY($2::text[])
+ORDER BY key
+`
+
+type ValidateApplicationPermissionKeysParams struct {
+	ApplicationID uuid.UUID
+	Keys          []string
+}
+
+func (q *Queries) ValidateApplicationPermissionKeys(ctx context.Context, arg ValidateApplicationPermissionKeysParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, validateApplicationPermissionKeys, arg.ApplicationID, arg.Keys)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var key string
+		if err := rows.Scan(&key); err != nil {
+			return nil, err
+		}
+		items = append(items, key)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

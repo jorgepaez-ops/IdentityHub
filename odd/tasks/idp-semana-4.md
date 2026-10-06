@@ -319,7 +319,7 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   movimiento» no dependía de ningún permiso, así que el auditor «de solo lectura» habría podido
   registrar; se agrega `movimientos.registrar` (senior y analista) y se ajusta el escenario.
   `traceability.py --check` y `traceability_test.py` en verde.
-- [ ] **T12 — Backend.** Migraciones (permisos y roles editables), store, API de roles y permisos,
+- [x] **T12 — Backend.** Migraciones (permisos y roles editables), store, API de roles y permisos,
   auditoría, controles (solo `admin`, sin autoasignación, sin permisos desconocidos) y token con los
   permisos de la aplicación.
   T12a — Ruta: delegada (Codex), revisión de Claude. Evidencia (2026-10-05): RED observado con
@@ -344,6 +344,31 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   los errores del validador en alta de empleado y en admin; quitar la etiqueta engañosa
   `permissions,omitempty` de `Claims`; corregir los comentarios de columnas de la migración 000009.
   Y a T13: el cajón de usuario sigue listando roles fijos; debe cargarlos de la API.
+  T12b — Ruta: delegada (Codex inició, sin cuota; completó Sonnet), revisión de Claude. Evidencia
+  (2026-10-06): lo de Codex (OpenAPI, sqlc, esqueleto de servicio/store/handlers) venía sin `gofmt`,
+  con `Application.key`/`Permission.applicationId` fuera de lo pedido, sin conteo de asignaciones ni
+  `description` al crear, sin pruebas más allá de una; se reescribieron servicio, store y handlers y
+  se conservaron las rutas, los parámetros y la composición en `Server`. RED observado:
+  `go test ./internal/auth/rolegrid` y `./internal/api -run RF021` no compilaban (`Description`,
+  `ActionRoleCreated`, `MaxDescriptionLength`, `ErrInvalidDescription`, `ErrEmptyUpdate` y la
+  forma de `Application` inexistentes); GREEN tras reescribir: cada control (1 nombre y rol del
+  sistema, 2 rol propio con el 403 antes del 409 al borrar, 3 permiso desconocido, 4 asignado,
+  5 auditoría `role_created/updated/deleted` en la misma transacción con IP y agente), duplicado,
+  404, éxito, fallo de auditoría que aborta, y handlers (mapeo de estados, 403 a no admin, 401
+  anónimo, 503 sin servicio, renombrar = 400). Seguimientos de T12a: pruebas del canje OAuth con
+  fallo de permisos, del validador en alta de empleado y en admin (verifican comportamiento ya
+  correcto: sin RED posible), etiqueta `Claims.Permissions` sin `omitempty` (la lee `Validate`;
+  `MarshalJSON` decide), comentarios de columnas de 000009 corregidos. Integración con Postgres
+  desechable (`make test-integration`): todo en verde, cobertura total 80,3 %. Cubre listado con
+  conteos, grants de `identity_app`, ciclo crear/actualizar/borrar con auditoría, rol propio,
+  asignado, trigger y FK mapeados, y un rol de otra aplicación como 404.
+  T12b — Verificación independiente de Claude: build, vet (también integración), unitarias `-race`,
+  golangci-lint 0, frontend typecheck y lint, trazabilidad; integración contra Postgres desechable
+  en verde con cobertura 80,3 % (T12a: 78,9 %). Servicio revisado: control 1 por prefijo del
+  `client_id`, controles 2 antes que 4 en el borrado (403 antes de 409, documentado), rol buscado
+  dentro de su aplicación (404 entre aplicaciones), auditoría en la misma transacción. Composición
+  real: con `make up` la base del usuario queda en la migración 9 con 5 permisos y los endpoints
+  de la grilla responden 401 sin sesión (no 501).
 - [ ] **T13 — Consola del Hub.** Grilla roles × permisos por aplicación: crear, editar y borrar
   roles, y asignarlos a usuarios.
 - [ ] **T14 — Contabilidad.** Autoriza por permisos en lugar de por nombre de rol.
@@ -367,7 +392,7 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
 |---|---|---|
 | 1 — Documentación, UML e integración | T1 a T6 (6) | 5 (T1 a T4 y T6; T5 parcial) |
 | 2 — IaC de referencia | T7 a T10 (4) | 4 (T7 a T10) — fase cerrada |
-| 3 — Grilla de roles configurable | T11 a T15 (5) | 0 |
+| 3 — Grilla de roles configurable | T11 a T15 (5) | 2 (T11 y T12) |
 | 4 — Publicación y entrega | T16 a T21 (6) | 0 |
 | **Total** | **21** | **9** (T1 a T4, T6 a T10; T5 parcial) |
 

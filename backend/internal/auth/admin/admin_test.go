@@ -14,10 +14,11 @@ import (
 )
 
 type repositoryStub struct {
-	users      map[uuid.UUID]User
-	roles      map[uuid.UUID][]string
-	audits     []AuditEvent
-	validRoles map[string]bool
+	users       map[uuid.UUID]User
+	roles       map[uuid.UUID][]string
+	audits      []AuditEvent
+	validRoles  map[string]bool
+	validateErr error
 }
 
 func (r *repositoryStub) ListUsers(context.Context, ListInput) ([]User, error) { return nil, nil }
@@ -47,6 +48,9 @@ func (r *repositoryStub) ListRolesForUser(_ context.Context, id uuid.UUID) ([]st
 	return append([]string(nil), r.roles[id]...), nil
 }
 func (r *repositoryStub) ValidateRoleNames(_ context.Context, names []string) ([]string, error) {
+	if r.validateErr != nil {
+		return nil, r.validateErr
+	}
 	valid := r.validRoles
 	if valid == nil {
 		valid = map[string]bool{"admin": true, "user": true, "contabilidad.senior": true, "contabilidad.analista": true}
@@ -173,6 +177,23 @@ func TestRF009_UpdateUserAceptaRolesDeNegocioDeContabilidad(t *testing.T) {
 	}
 	if !testHasRole(repository.roles[targetID], "contabilidad.senior") {
 		t.Fatalf("persisted roles=%v, want contabilidad.senior included", repository.roles[targetID])
+	}
+}
+
+func TestRF009_FalloDelValidadorDeRolesAbortaSinCambiarRoles(t *testing.T) {
+	actorID, targetID := uuid.New(), uuid.New()
+	repository := &repositoryStub{
+		users:       map[uuid.UUID]User{actorID: {ID: actorID, Status: StatusActive}, targetID: {ID: targetID, Status: StatusActive}},
+		roles:       map[uuid.UUID][]string{actorID: {"admin"}, targetID: {"user"}},
+		validateErr: errors.New("roles lookup unavailable"),
+	}
+	newRoles := []string{"user", "contabilidad.senior"}
+	_, err := New(repository).UpdateUser(context.Background(), UpdateInput{ActorUserID: actorID, UserID: targetID, Roles: &newRoles})
+	if !errors.Is(err, repository.validateErr) || errors.Is(err, ErrInvalidRole) {
+		t.Fatalf("UpdateUser() error=%v, want the wrapped lookup failure and not ErrInvalidRole", err)
+	}
+	if testHasRole(repository.roles[targetID], "contabilidad.senior") || len(repository.audits) != 0 {
+		t.Fatalf("roles=%v audits=%d, want nothing changed", repository.roles[targetID], len(repository.audits))
 	}
 }
 

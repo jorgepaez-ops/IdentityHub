@@ -393,6 +393,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/applications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Listar aplicaciones, permisos y roles configurables */
+        get: operations["listApplications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/applications/{applicationId}/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listApplicationRoles"];
+        put?: never;
+        post: operations["createApplicationRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/applications/{applicationId}/roles/{roleId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Eliminar un rol de aplicación sin asignaciones
+         * @description Un administrador no puede eliminar un rol que él tiene (403, se evalúa antes que las asignaciones); un rol asignado devuelve 409.
+         */
+        delete: operations["deleteApplicationRole"];
+        options?: never;
+        head?: never;
+        /**
+         * Actualizar descripción o permisos de un rol (no admite renombrar)
+         * @description El nombre no se puede cambiar. Un administrador no puede cambiar los permisos de un rol que él tiene (403).
+         */
+        patch: operations["updateApplicationRole"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -451,6 +508,51 @@ export interface components {
         UserStatus: "pending_verification" | "active" | "locked" | "disabled";
         /** @description Rol de directorio (`admin` o `user`) o rol configurable `<aplicacion>.<nombre>`. */
         Role: string;
+        /** @description Rol configurable exclusivo de una aplicación. */
+        ApplicationRoleName: components["schemas"]["Role"] & string;
+        Permission: {
+            /** @example movimientos.ver_todos */
+            key: string;
+            /** @example Ver todos los movimientos contables */
+            description: string;
+        };
+        Application: {
+            /** Format: uuid */
+            id: string;
+            /** @example contabilidad */
+            clientId: string;
+            /** @example Contabilidad */
+            name: string;
+            permissions: components["schemas"]["Permission"][];
+            roles: components["schemas"]["ApplicationRole"][];
+        };
+        ApplicationRole: {
+            /** Format: uuid */
+            id: string;
+            /** @example contabilidad.auditor */
+            name: components["schemas"]["ApplicationRoleName"];
+            description: string;
+            /** Format: uuid */
+            applicationId: string;
+            permissionKeys: string[];
+            system: boolean;
+            /** @description Usuarios que tienen asignado el rol. */
+            assignedCount: number;
+        };
+        CreateApplicationRoleRequest: {
+            /**
+             * @description Debe ser `<clientId>.<nombre>`; el nombre cumple `^[a-z0-9][a-z0-9_-]{1,40}$`.
+             * @example contabilidad.auditor
+             */
+            name: components["schemas"]["ApplicationRoleName"];
+            description?: string;
+            permissionKeys: string[];
+        };
+        /** @description El nombre de un rol no se puede cambiar; solo descripción y permisos. */
+        UpdateApplicationRoleRequest: {
+            description?: string;
+            permissionKeys?: string[];
+        };
         User: {
             /** Format: uuid */
             id: string;
@@ -629,6 +731,8 @@ export interface components {
         };
     };
     parameters: {
+        ApplicationId: string;
+        RoleId: string;
         UserId: string;
         SessionId: string;
         /** @description Búsqueda parcial por correo o nombre */
@@ -1304,6 +1408,152 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    listApplications: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Aplicaciones con su catálogo declarativo */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Application"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    listApplicationRoles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                applicationId: components["parameters"]["ApplicationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Roles configurables de la aplicación */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationRole"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createApplicationRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                applicationId: components["parameters"]["ApplicationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateApplicationRoleRequest"];
+            };
+        };
+        responses: {
+            /** @description Rol creado */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationRole"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description Ya existe un rol con ese nombre */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    deleteApplicationRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                applicationId: components["parameters"]["ApplicationId"];
+                roleId: components["parameters"]["RoleId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Rol eliminado */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description El rol tiene asignaciones activas */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    updateApplicationRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                applicationId: components["parameters"]["ApplicationId"];
+                roleId: components["parameters"]["RoleId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateApplicationRoleRequest"];
+            };
+        };
+        responses: {
+            /** @description Rol actualizado */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationRole"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
 }

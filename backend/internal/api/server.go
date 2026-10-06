@@ -28,6 +28,7 @@ import (
 	"github.com/jorgepaez/identity-hub/internal/auth/oauth"
 	"github.com/jorgepaez/identity-hub/internal/auth/passwordreset"
 	"github.com/jorgepaez/identity-hub/internal/auth/refresh"
+	"github.com/jorgepaez/identity-hub/internal/auth/rolegrid"
 	"github.com/jorgepaez/identity-hub/internal/auth/token"
 )
 
@@ -54,6 +55,7 @@ type Server struct {
 	sessions         sessionManager
 	logout           logout.Revoker
 	adminUsers       admin.Manager
+	roleGrid         rolegrid.Manager
 	auditLog         auditlog.Reader
 	trustedProxies   []netip.Prefix
 }
@@ -121,6 +123,9 @@ func (s *Server) SetLogoutService(service logout.Revoker) { s.logout = service }
 
 // SetAdminUserService is used by composition and focused admin handler tests.
 func (s *Server) SetAdminUserService(service admin.Manager) { s.adminUsers = service }
+
+// SetRoleGridService is used by composition and focused role-grid handler tests.
+func (s *Server) SetRoleGridService(service rolegrid.Manager) { s.roleGrid = service }
 
 // SetAuditLogService is used by composition and focused audit-log handler tests.
 func (s *Server) SetAuditLogService(service auditlog.Reader) { s.auditLog = service }
@@ -209,6 +214,31 @@ func (s *Server) ResendInvitation(w http.ResponseWriter, r *http.Request, userID
 	RequireAuth(s.tokens)(RequireRole(s.currentUsers, "admin")(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
 		s.resendInvitation(w, request, userID)
 	}))).ServeHTTP(w, r)
+}
+
+// adminOnly wraps a handler with authentication and the admin role, like the other admin routes.
+func (s *Server) adminOnly(next http.HandlerFunc) http.Handler {
+	return RequireAuth(s.tokens)(RequireRole(s.currentUsers, "admin")(next))
+}
+
+func (s *Server) ListApplications(w http.ResponseWriter, r *http.Request) {
+	s.adminOnly(s.listApplications).ServeHTTP(w, r)
+}
+
+func (s *Server) ListApplicationRoles(w http.ResponseWriter, r *http.Request, applicationID ApplicationId) {
+	s.adminOnly(func(w http.ResponseWriter, r *http.Request) { s.listApplicationRoles(w, r, applicationID) }).ServeHTTP(w, r)
+}
+
+func (s *Server) CreateApplicationRole(w http.ResponseWriter, r *http.Request, applicationID ApplicationId) {
+	s.adminOnly(func(w http.ResponseWriter, r *http.Request) { s.createApplicationRole(w, r, applicationID) }).ServeHTTP(w, r)
+}
+
+func (s *Server) UpdateApplicationRole(w http.ResponseWriter, r *http.Request, applicationID ApplicationId, roleID RoleId) {
+	s.adminOnly(func(w http.ResponseWriter, r *http.Request) { s.updateApplicationRole(w, r, applicationID, roleID) }).ServeHTTP(w, r)
+}
+
+func (s *Server) DeleteApplicationRole(w http.ResponseWriter, r *http.Request, applicationID ApplicationId, roleID RoleId) {
+	s.adminOnly(func(w http.ResponseWriter, r *http.Request) { s.deleteApplicationRole(w, r, applicationID, roleID) }).ServeHTTP(w, r)
 }
 
 // AcceptInvitation is unauthenticated (security: [] in openapi.yaml): the
