@@ -1520,7 +1520,7 @@ export interface operations {
                 content?: never;
             };
             401: components["responses"]["Unauthorized"];
-            /** @description Un administrador no puede cambiar ni eliminar un rol que él tiene, y los roles de sistema (admin, user) no se pueden modificar */
+            /** @description Quien llama no es administrador, o es un administrador que intenta cambiar o eliminar un rol que él tiene, o el rol es de sistema (admin, user) */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -1568,7 +1568,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
-            /** @description Un administrador no puede cambiar ni eliminar un rol que él tiene, y los roles de sistema (admin, user) no se pueden modificar */
+            /** @description Quien llama no es administrador, o es un administrador que intenta cambiar o eliminar un rol que él tiene, o el rol es de sistema (admin, user) */
             403: {
                 headers: {
                     [name: string]: unknown;
