@@ -392,6 +392,10 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   `npm run typecheck` y `npm run lint` limpios, `vitest run` 6 archivos / 162 pruebas en verde,
   `npm run build` correcto, trazabilidad al día (matriz sin cambios). Pendiente: probarlo en el
   stack real.
+  Revisión nativa de T13 (`review-86ef83509fad2952`, medio, 618 líneas): **aprobada**. Corregido:
+  la fila de la grilla no salía del estado «guardando» si el servidor devolvía el mismo rol (no hubo
+  RED posible con datos de prueba; arreglo de una línea). Pendiente para cerrar T13: prueba en el
+  navegador del usuario (crear `contabilidad.auditor` y asignarlo).
 - [ ] **T14 — Contabilidad.** Autoriza por permisos en lugar de por nombre de rol.
 - [ ] **T15 — E2E y trazabilidad.** Escena de la demo (crear `contabilidad.auditor` y verlo en
   Contabilidad), matriz al día.

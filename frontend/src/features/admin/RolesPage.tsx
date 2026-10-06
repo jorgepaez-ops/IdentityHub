@@ -68,6 +68,9 @@ function RoleRow({ application, role, held, report, onUpdated, onDeleted }: {
         ...(description !== role.description ? { description } : {}),
         ...(!sameKeys(keys, role.permissionKeys) ? { permissionKeys } : {}),
       }))
+      // Do not rely on the parent remounting the row: if the server returns the same role, the
+      // row would stay disabled.
+      setPending(false)
     } catch (reason) {
       fail(reason, 'No fue posible guardar el rol. Inténtalo de nuevo.')
     }
