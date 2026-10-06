@@ -8,9 +8,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-// Métricas del dominio de seguridad. Son las que alimentan el panel de Grafana
-// descrito en RNF-007; las de proceso y runtime las aporta el colector por
-// defecto de client_golang.
 // Label values of the result dimension, shared by the code that increments the
 // counters so a typo cannot create a silent new series.
 const (
@@ -24,6 +21,9 @@ const (
 	ResultMalformed   = "malformed"
 )
 
+// Métricas del dominio de seguridad. Son las que alimentan el panel de Grafana
+// descrito en RNF-007; las de proceso y runtime las aporta el colector por
+// defecto de client_golang.
 var (
 	HTTPRequests = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "identity_http_requests_total",

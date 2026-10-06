@@ -12,7 +12,8 @@ groups:
         title: DLQ de notificaciones con mensajes
         condition: C
         for: 2m
-        noDataState: OK
+        # Without data (broker down, scrape broken, metric renamed) emails may be failing too, so alert.
+        noDataState: Alerting
         execErrState: Error
         labels:
           severity: warning
@@ -20,9 +21,10 @@ groups:
         annotations:
           summary: "La cola notifications.dlq tiene {{ $values.B.Value }} mensaje(s)"
           description: >-
-            Hay eventos que el worker no pudo entregar tras 3 intentos y terminaron en
-            notifications.dlq: algún correo no salió.
-          runbook_url: docs/runbooks/dlq-notificaciones.md
+            Hay eventos que el worker no pudo entregar tras agotar los reintentos de la cola
+            (x-delivery-limit) y terminaron en notifications.dlq: algún correo no salió. Si la
+            alerta indica falta de datos, Prometheus no está leyendo las métricas del broker.
+          runbook_url: https://github.com/jorgepaez-ops/IdentityHub/blob/main/docs/runbooks/dlq-notificaciones.md
         data:
           - refId: A
             relativeTimeRange: { from: 300, to: 0 }

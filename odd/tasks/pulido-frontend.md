@@ -294,7 +294,7 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
     no lo lee (búsqueda de `.Host`) y `make e2e` 52/52 cubre el SSO completo.
   - [x] **P9e — Deudas de fases 3 y 4:** avisos de SonarCloud, sugerencias de las revisiones nativas
     (correos, refresh, informe, capturas) y alerta de Grafana con runbook para la DLQ (AM-019).
-    Evidencia parcial (2026-10-06, Sonnet, sin cerrar; revisión de Claude pendiente): AM-019 con regla
+    Evidencia (2026-10-06, Sonnet, revisión de Claude): AM-019 con regla
     aprovisionada `deploy/observability/grafana/alerting/dlq.yml` (se dispara con la DLQ > 0 durante 2 min),
     uid fijo de la fuente Prometheus (con `deleteDatasources` para bases de Grafana ya creadas) y runbook
     `docs/runbooks/dlq-notificaciones.md`; probada con un mensaje publicado a `identity.dlx`: inactive,
@@ -304,6 +304,19 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
     anidados, `replaceAll`/`codePointAt`. Quedan sin hacer: complejidad cognitiva (S3776), roles ARIA a
     elementos nativos (S6819), nombres de interfaces de un método (S8196), claves por índice (S6479) y
     los avisos de `.github`, `e2e`, `scripts`, `db` y `security` (fuera de la superficie permitida).
+    Lo no hecho queda **justificado o diferido**, no abierto: S3776 pide una tarea por función
+    (`login.go` 32, `admin.go` 33, `mfa.go` 21, `config.go` 20); S6819 usa roles ARIA válidos; S8196
+    sigue la convención hexagonal (`Repository`); S1135 en `events_test.go` es un falso positivo («todo»).
+    Pasan a P10: el JSON del modelo de amenazas, `informe-tecnico.md` y `guion.md` aún dicen AM-019
+    «Open». Commits `bcfda55` (alerta), `3dcb0e2` (backend) y `cb63cf0` (frontend; dos líneas que leen la
+    contraseña tecleada llevan `gitleaks:allow`, falsos positivos de la regla propia). Verificación de
+    Claude: `go build`, `go test`, `golangci-lint` 0, Hub 255/255 y Contabilidad 144/144.
+    Revisión nativa de P9e (riesgo alto, 65 archivos, 687 líneas, 4 lentes): **aprobada** y acusada.
+    Corregido por Claude: la alerta usa `noDataState: Alerting` (sin métricas del broker tampoco se sabe
+    si salen correos), `runbook_url` absoluto y descripción sin el «3 intentos» fijo; el comentario de las
+    métricas vuelve a documentar su bloque `var`. Aviso descartado con evidencia: `events.AccountLocked`
+    tiene la misma forma JSON que el struct que reemplazó. Queda como sugerencia: sin verificación
+    automática de que la regla y el uid de la fuente resuelven (solo la prueba manual).
 - [ ] **P10 — Documentación y evidencia.** Ajustes de E2E si hacen falta, capturas regeneradas,
   manual de usuario e informe técnico actualizados.
   Pendientes detectados (2026-10-06): en `docs/manuales/integracion-terceros.md` §2.3, la fila «Roles»
@@ -317,7 +330,7 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
 
 | Tareas | Hechas |
 |---|---|
-| P1 a P10 (10) | 8 (P1 a P8) |
+| P1 a P10 (10) | 9 (P1 a P9) |
 
 ## Entrega
 
@@ -327,4 +340,4 @@ notas). Commits por unidad de trabajo; un PR al final con confirmación del usua
 
 ## Siguiente paso
 
-P9 (deudas menores y alertas de code scanning).
+P10 (documentación y evidencia).

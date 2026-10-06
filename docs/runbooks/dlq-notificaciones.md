@@ -73,5 +73,7 @@ cola con el comando del paso 3 de la remediación.
 - La regla no tiene punto de contacto propio: usa la política por defecto de Grafana, que en el entorno
   local no envía correos. En producción hay que definir un punto de contacto y una política de
   notificación (correo, Slack o PagerDuty) para la etiqueta `severity=warning`.
-- Con `noDataState: OK`, si Prometheus deja de raspar `broker:15692/metrics/detailed` la alerta no se
-  dispara: revise el objetivo `rabbitmq_detailed` en Prometheus (`:9090/targets`).
+- Con `noDataState: Alerting`, la alerta también se dispara si Prometheus deja de raspar
+  `broker:15692/metrics/detailed` (broker caído, objetivo roto o métrica renombrada): en ese caso revise
+  primero el objetivo `rabbitmq_detailed` en Prometheus (`:9090/targets`), porque sin métricas tampoco se
+  sabe si los correos están saliendo.
