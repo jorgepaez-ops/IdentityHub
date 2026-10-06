@@ -560,8 +560,16 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   restauraron desde git (`6496a92`) y las copias se movieron fuera del repo, sin borrarlas. Causa
   (aclarada por el usuario): la sincronización continua del Mac con iCloud al reescribir archivos
   generados, no ediciones simultáneas desde otro equipo.
-- [ ] **T20 — Guion del video** de 10-15 minutos (ciclo completo: app, pipeline, despliegue,
+- [x] **T20 — Guion del video** de 10-15 minutos (ciclo completo: app, pipeline, despliegue,
   observabilidad) (Q3).
+  Ruta: delegada (Codex), revisión de Claude. Evidencia (2026-10-06): `docs/video/guion.md`, 10 escenas
+  en 13:00 (apertura, arquitectura, flujo del empleado, historia RF-021 del auditor, pipeline con
+  VULN-019 de 710 a 108 y el hook de gitleaks en clip pregrabado, despliegue local, producción simulada
+  con T17 condicional, Terraform sin apply, observabilidad y cierre), reparto sugerido entre los cinco
+  integrantes, checklist de preparación (`make setup` antes de `make up-obs`, sin mostrar `.env`) y plan
+  de contingencia. Verificación (Codex): 22 enlaces relativos existen, los objetivos de make citados
+  existen, tiempos 13:00. Revisión de Claude: escenas 1 a 5 leídas; `docs/README.md` conserva el guion
+  de la demo en vivo (`guion-demo.md`, ~5 min) junto al del video. Pendiente: grabar (Q3).
 - [ ] **T21 — Cierre.** Bitácora, matriz, informe de seguridad final, tag de versión y PR.
 
 ## Progreso
@@ -571,14 +579,14 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
 | 1 — Documentación, UML e integración | T1 a T6 (6) | 6 (T1 a T6) — fase cerrada |
 | 2 — IaC de referencia | T7 a T10 (4) | 4 (T7 a T10) — fase cerrada |
 | 3 — Grilla de roles configurable | T11 a T15 (5) | 5 (T11 a T15) — fase cerrada |
-| 4 — Publicación y entrega | T16 a T21 (6) | 3 (T16, T18 y T19) |
-| **Total** | **21** | **18** (T1 a T16, T18 y T19) |
+| 4 — Publicación y entrega | T16 a T21 (6) | 4 (T16, T18, T19 y T20) |
+| **Total** | **21** | **19** (T1 a T16 y T18 a T20) |
 
 ## Siguiente paso
 
 **2026-10-06.** Fases 1 a 3 cerradas y en main (PR #11, merge `8b4a18a`, CI 21/21). T16 hecha
-(VULN-019 remediado, capturas de Desktop incluidas). T17 pospuesta al final (Q1). T18 y T19 hechas. Siguiente: T20
-(guion del video).
+(VULN-019 remediado, capturas de Desktop incluidas). T17 pospuesta al final (Q1). T18 a T20 hechas, más la corrección de
+las métricas del dashboard. Siguiente: T21 (cierre) y T17 (Docker Hub, pendiente de Q1).
 Codex: cuota diaria limitada; Sonnet como respaldo.
 
 ## Cambios de spec propuestos
