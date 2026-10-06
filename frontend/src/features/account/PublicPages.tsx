@@ -17,7 +17,7 @@ export function problemMessages(error: unknown, fallback: string): string[] {
 function AuthCard({ title, lead, children }: { title: string; lead?: string; children: ReactNode }) {
   const titleId = useId()
   return (
-    <main className="login-page" id="main-content">
+    <main className="login-page" id="main-content" tabIndex={-1}>
       <section className="login-card" aria-labelledby={titleId}>
         <div className="brand-mark" aria-hidden="true">IH</div>
         <h1 id={titleId}>{title}</h1>

@@ -119,7 +119,7 @@ function LoginPage({ onAuthenticated }: { onAuthenticated: (user: CurrentUser) =
   }
 
   return (
-    <main className="login-page" id="main-content">
+    <main className="login-page" id="main-content" tabIndex={-1}>
       <section className="login-card" aria-labelledby="login-title">
         <div className="brand-mark" aria-hidden="true">IH</div>
         <h1 id="login-title">Identity Hub</h1>
@@ -237,7 +237,7 @@ function AppRoutes() {
     return () => { active = false }
   }, [])
 
-  if (restoring) return <main className="login-page" id="main-content"><section className="login-card restoring-card" aria-busy="true"><span className="brand-mark" aria-hidden="true">IH</span><h1>Identity Hub</h1><p className="muted">Validando tu sesión…</p><LoadingSkeleton rows={2} label="Cargando sesión…" /></section></main>
+  if (restoring) return <main className="login-page" id="main-content" tabIndex={-1}><section className="login-card restoring-card" aria-busy="true"><span className="brand-mark" aria-hidden="true">IH</span><h1>Identity Hub</h1><p className="muted">Validando tu sesión…</p><LoadingSkeleton rows={2} label="Cargando sesión…" /></section></main>
 
   return (
     <Routes>

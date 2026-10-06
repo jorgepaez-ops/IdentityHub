@@ -58,3 +58,10 @@ export function initializeTheme() {
   stopFollowingSystem()
   stopFollowingSystem = subscribeToSystemTheme(applyTheme)
 }
+
+// Test-only: drops the module-level state so a suite does not depend on the order of the tests before it.
+export function resetThemeForTests() {
+  chosenInPage = false
+  stopFollowingSystem()
+  stopFollowingSystem = () => {}
+}

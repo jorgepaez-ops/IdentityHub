@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { accessFor } from '../access'
-import { INITIAL_MOVEMENTS, type Movement } from '../ledger'
+import { INITIAL_MOVEMENTS, formatCop, type Movement } from '../ledger'
 import { TransactionsView } from './Transactions'
 
 const senior = accessFor(['movimientos.registrar', 'movimientos.ver_todos', 'movimientos.aprobar'], ['contabilidad.senior'])
@@ -123,16 +123,23 @@ describe('movements sorting', () => {
 
   it('TestRF021_AmountHeaderSortsByValueBothWays', () => {
     renderView()
+    const byAmount = (direction: 1 | -1) => [...INITIAL_MOVEMENTS]
+      .sort((a, b) => direction * (a.amount - b.amount || a.id.localeCompare(b.id, 'es', { numeric: true })))
+    const expectOrder = (direction: 1 | -1) => {
+      const expected = byAmount(direction)
+      expect(amounts()).toEqual(expected.map((movement) => formatCop(movement.amount)))
+      // Equal amounts keep the folio tie-break in the same direction as the sort.
+      expect(folios()).toEqual(expected.map((movement) => movement.id))
+    }
     fireEvent.click(within(header('Monto')).getByRole('button'))
-    const values = INITIAL_MOVEMENTS.map((movement) => movement.amount).sort((a, b) => b - a)
-    expect(bodyRows().map((row) => row.querySelector('td.num')?.textContent)).toHaveLength(values.length)
-    expect(folios()[0]).toBe(INITIAL_MOVEMENTS.find((movement) => movement.amount === values[0])?.id)
     expect(header('Monto')).toHaveAttribute('aria-sort', 'descending')
     expect(header('Fecha')).not.toHaveAttribute('aria-sort')
+    expectOrder(-1)
     fireEvent.click(within(header('Monto')).getByRole('button'))
     expect(header('Monto')).toHaveAttribute('aria-sort', 'ascending')
-    expect(folios()[0]).toBe(INITIAL_MOVEMENTS.find((movement) => movement.amount === Math.min(...values))?.id)
-    expect(amounts()).toHaveLength(values.length)
+    expectOrder(1)
+    // The data really has ties, so the folio tie-break is exercised.
+    expect(new Set(INITIAL_MOVEMENTS.map((movement) => movement.amount)).size).toBeLessThan(INITIAL_MOVEMENTS.length)
   })
 
   it('TestRF021_FolioHeaderSortsNumericallyAscendingThenDescending', () => {

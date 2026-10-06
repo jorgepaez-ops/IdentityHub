@@ -226,6 +226,23 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
   - 27 de Checkov (omisiones ya justificadas en el código) y 4 de Semgrep (`request-host-used` en nginx).
   - Lo que no se pueda corregir se documenta en `README.md`, sección «Alertas abiertas conocidas», con
     motivo y justificación, para la exposición.
+  Subtareas (2026-10-06, todas delegadas a Sonnet por decisión del usuario, una a la vez):
+  - [x] **P9a — Sugerencias pendientes del frontend:** reintentar y fallo parcial en Inicio, `tabIndex=-1`
+    del destino del enlace para saltar en páginas públicas, reinicio del estado de `theme.ts` en las
+    pruebas, orden por monto con aserción completa, constante para `mfa_code_rejected`.
+    Evidencia (2026-10-06, Sonnet, revisión de Claude): Inicio carga tres grupos con `Promise.allSettled`
+    (error en línea por grupo, «Reintentar», un 401 en cualquiera cierra la sesión); `tabIndex=-1` en
+    `main#main-content` de login, restauración y páginas públicas (Contabilidad no tiene enlace para
+    saltar fuera del `Shell`, que ya lo tenía); `resetThemeForTests()` en el `afterEach` de ambas suites;
+    orden por monto con la lista completa y desempate por folio; `MFA_CODE_REJECTED_ACTION`. RED: 5
+    pruebas. vitest Hub 253/253 y Contabilidad 143/143, typecheck y lint limpios, `make e2e` 52/52.
+  - [ ] **P9b — Acciones de GitHub fijadas por SHA** (50 alertas de Semgrep), con el tag como comentario.
+  - [ ] **P9c — Diagramas regenerados** sin bibliotecas JavaScript (33 alertas de CodeQL) y UML de
+    secuencia del SSO con PKCE y de estados del usuario en `docs/diagramas/uml/`.
+  - [ ] **P9d — Imágenes base y alertas de infraestructura:** Trivy (6), Checkov (27), Semgrep de nginx
+    (4) y sección «Alertas abiertas conocidas» en `README.md`.
+  - [ ] **P9e — Deudas de fases 3 y 4:** avisos de SonarCloud, sugerencias de las revisiones nativas
+    (correos, refresh, informe, capturas) y alerta de Grafana con runbook para la DLQ (AM-019).
 - [ ] **P10 — Documentación y evidencia.** Ajustes de E2E si hacen falta, capturas regeneradas,
   manual de usuario e informe técnico actualizados.
   Pendientes detectados (2026-10-06): en `docs/manuales/integracion-terceros.md` §2.3, la fila «Roles»

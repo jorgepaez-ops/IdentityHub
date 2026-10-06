@@ -80,4 +80,5 @@ export const parseStatusFilter = (value: string | null): AdminUser['status'] | n
 export const AUDIT_PARAM = { action: 'accion', actor: 'actor', since: 'desde' } as const
 export const LAST_24H = '24h'
 export const FAILED_SIGN_IN_ACTION = 'login_failed'
+export const MFA_CODE_REJECTED_ACTION = 'mfa_code_rejected'
 export const AUDIT_FAILED_SIGN_IN_PATH = `/auditoria?${AUDIT_PARAM.action}=${FAILED_SIGN_IN_ACTION}&${AUDIT_PARAM.since}=${LAST_24H}`

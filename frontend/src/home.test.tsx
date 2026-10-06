@@ -200,12 +200,54 @@ describe('console home', () => {
     expect(api.calls.some((call) => call.key.includes('/admin/'))).toBe(false)
   })
 
-  it('TestRF010_ShowsTheErrorNoticeWhenAnIndicatorCannotBeLoaded', async () => {
+  it('TestRF010_ShowsTheErrorOnlyForTheGroupThatFailedAndKeepsTheOthers', async () => {
+    goTo('/inicio')
+    homeApi({ 'GET /api/v1/admin/users': () => problem(500) })
+    render(<App />)
+    expect(await screen.findByText('No fue posible cargar los conteos de usuarios.')).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toBeInTheDocument()
+    expect(await screen.findByRole('list', { name: 'Actividad reciente' })).toBeInTheDocument()
+    expect(within(tile('Inicios de sesión fallidos (24 h)')).getByText('1')).toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Activos' })).not.toBeInTheDocument()
+    expect(screen.queryByText('No fue posible cargar la actividad reciente.')).not.toBeInTheDocument()
+  })
+
+  it('TestRF011_KeepsTheUserCountsWhenTheAuditLogCannotBeLoaded', async () => {
     goTo('/inicio')
     homeApi({ 'GET /api/v1/admin/audit-log': () => problem(500) })
     render(<App />)
-    expect(await screen.findByText('No fue posible cargar los indicadores. Inténtalo de nuevo.')).toBeInTheDocument()
-    expect(screen.getByRole('alert')).toBeInTheDocument()
+    expect(await within(await screen.findByRole('group', { name: 'Activos' })).findByText('7')).toBeInTheDocument()
+    expect(await screen.findByText('No fue posible cargar los inicios de sesión fallidos.')).toBeInTheDocument()
+    expect(await screen.findByText('No fue posible cargar la actividad reciente.')).toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Inicios de sesión fallidos (24 h)' })).not.toBeInTheDocument()
+  })
+
+  it('TestRF010_RetriesEveryGroupFromTheRetryButton', async () => {
+    goTo('/inicio')
+    let healthy = false
+    const api = homeApi({
+      'GET /api/v1/admin/users': (body, url) => (healthy ? byStatus({ active: { count: 7 } })(body, url) : problem(500)),
+    })
+    render(<App />)
+    await screen.findByText('No fue posible cargar los conteos de usuarios.')
+    const before = api.calls.length
+    healthy = true
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }))
+    expect(await within(await screen.findByRole('group', { name: 'Activos' })).findByText('7')).toBeInTheDocument()
+    expect(api.calls.length).toBeGreaterThan(before)
+    expect(screen.queryByText('No fue posible cargar los conteos de usuarios.')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Reintentar' })).not.toBeInTheDocument()
+  })
+
+  it('TestRF011_EndsTheSessionWhenOnlyTheAuditGroupKeepsFailingAuthentication', async () => {
+    goTo('/inicio')
+    let refreshes = 0
+    homeApi({
+      'GET /api/v1/admin/audit-log': () => problem(401),
+      'POST /api/v1/auth/refresh': () => (++refreshes === 1 ? json(200, { accessToken: 'access', tokenType: 'Bearer', expiresIn: 900 }) : problem(401)),
+    })
+    render(<App />)
+    expect(await screen.findByRole('button', { name: 'Iniciar sesión' })).toBeInTheDocument()
   })
 
   it('TestRF010_KeepsASingleStatusRegionWhileLoadingAndAfter', async () => {

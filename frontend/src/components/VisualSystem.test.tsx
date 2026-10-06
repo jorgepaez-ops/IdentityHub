@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { LoadingSkeleton } from './LoadingSkeleton'
 import { ThemeToggle } from './ThemeToggle'
 import { Toast } from './Toast'
-import { initializeTheme } from './theme'
+import { initializeTheme, resetThemeForTests } from './theme'
 
 function ToastHarness({ onClose }: { onClose: () => void }) {
   const [message, setMessage] = useState('Invitación reenviada a beto@example.test.')
@@ -13,6 +13,7 @@ function ToastHarness({ onClose }: { onClose: () => void }) {
 
 describe('visual system feedback', () => {
   afterEach(() => {
+    resetThemeForTests()
     vi.useRealTimers()
     vi.unstubAllGlobals()
     window.localStorage.clear()

@@ -5,7 +5,7 @@ import { accessFor } from './access'
 import { Shell } from './Shell'
 import { ThemeToggle } from './ThemeToggle'
 import { Toast } from './Toast'
-import { initializeTheme } from './theme'
+import { initializeTheme, resetThemeForTests } from './theme'
 
 function ToastHarness({ onClose }: { onClose: () => void }) {
   const [message, setMessage] = useState('Movimiento M-2043 aprobado.')
@@ -17,6 +17,7 @@ const senior = accessFor(['movimientos.registrar', 'movimientos.ver_todos', 'mov
 
 describe('visual system of Contabilidad', () => {
   afterEach(() => {
+    resetThemeForTests()
     vi.useRealTimers()
     vi.unstubAllGlobals()
     window.localStorage.clear()

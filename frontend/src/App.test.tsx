@@ -247,6 +247,36 @@ describe('authentication routes', () => {
     expect(document.querySelector('main#main-content')).toBeInTheDocument()
   })
 
+  it('TestRF015_ElDestinoDelEnlaceParaSaltarPuedeRecibirElFocoEnRutasPublicasYLogin', async () => {
+    window.history.replaceState({}, '', '/forgot-password')
+    const { unmount } = render(<App />)
+    await screen.findByRole('heading', { name: 'Restablecer contraseña' })
+    const publicMain = document.querySelector<HTMLElement>('main#main-content')
+    expect(publicMain).toHaveAttribute('tabindex', '-1')
+    fireEvent.click(screen.getByRole('link', { name: 'Saltar al contenido' }))
+    publicMain?.focus()
+    expect(publicMain).toHaveFocus()
+    unmount()
+
+    window.history.replaceState({}, '', '/login')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json(401, { title: 'Unauthorized', status: 401 })))
+    render(<App />)
+    await screen.findByLabelText('Correo electrónico')
+    const loginMain = document.querySelector<HTMLElement>('main#main-content')
+    expect(loginMain).toHaveAttribute('tabindex', '-1')
+    loginMain?.focus()
+    expect(loginMain).toHaveFocus()
+  })
+
+  it('TestRF015_ElpantallaDeRestauracionExponeUnDestinoEnfocableParaElEnlaceDeSalto', () => {
+    window.history.replaceState({}, '', '/login')
+    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => undefined)))
+    render(<App />)
+    const restoringMain = document.querySelector<HTMLElement>('main#main-content')
+    expect(screen.getByText('Validando tu sesión…')).toBeInTheDocument()
+    expect(restoringMain).toHaveAttribute('tabindex', '-1')
+  })
+
   it('TestRF007_LogsOutLocallyWhenRemoteLogoutFails', async () => {
     vi.stubGlobal('fetch', vi.fn()
       .mockResolvedValueOnce(json(401, { title: 'Unauthorized', status: 401 }))

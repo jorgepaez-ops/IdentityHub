@@ -6,7 +6,7 @@ import { DownloadIcon } from '../../components/icons'
 import { type AuditEvent, type AuditLogQuery, getUser, listAuditLog } from '../../api/client'
 import { csvFileName, downloadCsv, toCsv } from '../csv'
 import { formatDate } from '../format'
-import { AUDIT_PARAM, FAILED_SIGN_IN_ACTION, LAST_24H, Problems, isAuthFailure } from './shared'
+import { AUDIT_PARAM, FAILED_SIGN_IN_ACTION, LAST_24H, MFA_CODE_REJECTED_ACTION, Problems, isAuthFailure } from './shared'
 
 const PAGE_SIZE = 50
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -20,7 +20,7 @@ const NO_FILTERS: Filters = { action: '', actorId: '', since: '' }
 // The API takes one action per query, so each shortcut sets exactly one action.
 const ACTION_SHORTCUTS = [
   { label: 'Inicios fallidos', action: FAILED_SIGN_IN_ACTION },
-  { label: 'Códigos MFA rechazados', action: 'mfa_code_rejected' },
+  { label: 'Códigos MFA rechazados', action: MFA_CODE_REJECTED_ACTION },
   { label: 'Cambios de roles', action: 'role_changed' },
 ] as const
 
