@@ -150,12 +150,24 @@ describe('console home', () => {
     }
   })
 
-  it('TestRF010_LeavesTheFailedSignInsTileUnlinkedUntilTheAuditPageReadsFilters', async () => {
+  it('TestRF011_LinksTheFailedSignInsTileToTheFilteredAuditLog', async () => {
     goTo('/inicio')
-    homeApi()
+    const api = homeApi()
     render(<App />)
     await within(await screen.findByRole('group', { name: 'Activos' })).findByText('7')
-    expect(within(tile('Inicios de sesión fallidos (24 h)')).queryByRole('link')).not.toBeInTheDocument()
+    const link = within(tile('Inicios de sesión fallidos (24 h)')).getByRole('link', { name: 'Inicios de sesión fallidos (24 h)' })
+    expect(link).toHaveAttribute('href', '/auditoria?accion=login_failed&desde=24h')
+    fireEvent.click(link)
+    expect(await screen.findByRole('heading', { name: 'Auditoría' })).toBeInTheDocument()
+    expect(window.location.pathname + window.location.search).toBe('/auditoria?accion=login_failed&desde=24h')
+    const call = await waitFor(() => {
+      const found = api.calls.filter((item) => item.key === 'GET /api/v1/admin/audit-log').at(-1)
+      expect(new URL(found?.url ?? '', 'http://localhost').searchParams.get('limit')).toBe('50')
+      return found
+    })
+    const params = new URL(call?.url ?? '', 'http://localhost').searchParams
+    expect(params.get('action')).toBe('login_failed')
+    expect(params.has('since')).toBe(true)
   })
 
   it('TestRF010_OpensTheFilteredDirectoryFromAHomeTile', async () => {

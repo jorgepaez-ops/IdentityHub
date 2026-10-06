@@ -74,3 +74,10 @@ export const STATUS_FILTER_LABEL: Record<AdminUser['status'] | 'all', string> = 
 }
 export const parseStatusFilter = (value: string | null): AdminUser['status'] | null =>
   STATUS_FILTERS.find((option) => option !== null && option === value) ?? null
+
+// Audit log filters live in the URL as ?accion=, ?actor= and ?desde=. `desde=24h` is a relative window resolved
+// when the query is sent, so a link (like the home tile) never goes stale.
+export const AUDIT_PARAM = { action: 'accion', actor: 'actor', since: 'desde' } as const
+export const LAST_24H = '24h'
+export const FAILED_SIGN_IN_ACTION = 'login_failed'
+export const AUDIT_FAILED_SIGN_IN_PATH = `/auditoria?${AUDIT_PARAM.action}=${FAILED_SIGN_IN_ACTION}&${AUDIT_PARAM.since}=${LAST_24H}`

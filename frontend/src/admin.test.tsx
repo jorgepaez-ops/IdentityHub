@@ -78,7 +78,7 @@ describe('admin page unmount safety', () => {
       'GET /api/v1/admin/audit-log': () => late.promise,
       'POST /api/v1/auth/refresh': () => problem(401),
     })
-    const view = render(<AuditLogPage onSessionEnded={onSessionEnded} />)
+    const view = render(<MemoryRouter><AuditLogPage onSessionEnded={onSessionEnded} /></MemoryRouter>)
     await waitFor(() => expect(api.calls).toHaveLength(1))
     view.unmount()
     await act(async () => { late.resolve(problem(401)) })
@@ -521,7 +521,7 @@ describe('audit log', () => {
     await screen.findByText('login_failed')
     expect(screen.getByText(/onerror=alert\(1\)/)).toBeInTheDocument()
     expect(document.querySelector('img')).toBeNull()
-    expect(screen.getByText(/"roles":\["user","contabilidad.senior"\]/)).toBeInTheDocument()
+    expect(screen.getByText('user, contabilidad.senior')).toBeInTheDocument()
   })
 
   it('TestRF011_FiltersByActionActorAndSince', async () => {

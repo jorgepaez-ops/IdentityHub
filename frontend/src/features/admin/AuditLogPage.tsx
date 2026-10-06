@@ -1,51 +1,149 @@
-import { FormEvent, useEffect, useRef, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { LoadingSkeleton } from '../../components/LoadingSkeleton'
-import { type AuditEvent, type AuditLogQuery, listAuditLog } from '../../api/client'
+import { type AuditEvent, type AuditLogQuery, getUser, listAuditLog } from '../../api/client'
 import { formatDate } from '../format'
-import { Problems, isAuthFailure } from './shared'
+import { AUDIT_PARAM, FAILED_SIGN_IN_ACTION, LAST_24H, Problems, isAuthFailure } from './shared'
 
 const PAGE_SIZE = 50
+const DAY_MS = 24 * 60 * 60 * 1000
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const LOCAL_DATETIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/
 const short = (id: string) => id.slice(0, 8)
 
 type Filters = { action: string; actorId: string; since: string }
 const NO_FILTERS: Filters = { action: '', actorId: '', since: '' }
 
-function toQuery(filters: Filters): AuditLogQuery {
+// The API takes one action per query, so each shortcut sets exactly one action.
+const ACTION_SHORTCUTS = [
+  { label: 'Inicios fallidos', action: FAILED_SIGN_IN_ACTION },
+  { label: 'Códigos MFA rechazados', action: 'mfa_code_rejected' },
+  { label: 'Cambios de roles', action: 'role_changed' },
+] as const
+
+// Invalid values in a hand-edited URL are ignored instead of reaching the API.
+function readFilters(params: URLSearchParams): Filters {
+  const actorId = params.get(AUDIT_PARAM.actor) ?? ''
+  const since = params.get(AUDIT_PARAM.since) ?? ''
+  const validSince = since === LAST_24H || (LOCAL_DATETIME.test(since) && !Number.isNaN(new Date(since).getTime()))
   return {
-    ...(filters.action ? { action: filters.action } : {}),
-    ...(filters.actorId ? { actorId: filters.actorId } : {}),
-    ...(filters.since ? { since: new Date(filters.since).toISOString() } : {}),
+    action: (params.get(AUDIT_PARAM.action) ?? '').slice(0, 100),
+    actorId: UUID.test(actorId) ? actorId : '',
+    since: validSince ? since : '',
   }
 }
 
-function metadataText(event: AuditEvent): string | null {
-  const metadata = event.metadata ?? {}
-  return Object.keys(metadata).length === 0 ? null : JSON.stringify(metadata)
+function writeFilters(filters: Filters): URLSearchParams {
+  const params = new URLSearchParams()
+  if (filters.action) params.set(AUDIT_PARAM.action, filters.action)
+  if (filters.actorId) params.set(AUDIT_PARAM.actor, filters.actorId)
+  if (filters.since) params.set(AUDIT_PARAM.since, filters.since)
+  return params
+}
+
+function toQuery(filters: Filters): AuditLogQuery {
+  const since = filters.since === LAST_24H ? new Date(Date.now() - DAY_MS) : filters.since ? new Date(filters.since) : null
+  return {
+    ...(filters.action ? { action: filters.action } : {}),
+    ...(filters.actorId ? { actorId: filters.actorId } : {}),
+    ...(since ? { since: since.toISOString() } : {}),
+  }
+}
+
+const MAX_DEPTH = 4
+function stringify(value: unknown): string {
+  if (typeof value === 'string') return value
+  try {
+    return JSON.stringify(value) ?? String(value)
+  } catch {
+    return String(value)
+  }
+}
+
+// Flattens nested objects into dotted keys; arrays of scalars are joined, anything deeper is stringified safely.
+function metadataEntries(value: unknown, prefix = '', depth = 0): [string, string][] {
+  if (value !== null && typeof value === 'object' && !Array.isArray(value) && depth < MAX_DEPTH) {
+    const entries = Object.entries(value as Record<string, unknown>)
+    return entries.flatMap(([key, inner]) => metadataEntries(inner, prefix ? `${prefix}.${key}` : key, depth + 1))
+  }
+  if (Array.isArray(value) && value.every((item) => item === null || typeof item !== 'object')) return [[prefix, value.map(String).join(', ')]]
+  return [[prefix, stringify(value)]]
+}
+
+function MetadataList({ metadata }: { metadata: AuditEvent['metadata'] }) {
+  const entries = Object.keys(metadata ?? {}).length === 0 ? [] : metadataEntries(metadata)
+  if (entries.length === 0) return <span className="muted">—</span>
+  return (
+    <details>
+      <summary>Ver</summary>
+      <dl className="metadata-list">
+        {entries.map(([key, text]) => <div className="metadata-pair" key={key}><dt>{key}</dt><dd>{text}</dd></div>)}
+      </dl>
+    </details>
+  )
+}
+
+// Resolves each distinct actor id on screen to an email once per page load. It never blocks the table:
+// until a lookup settles (or when it fails, e.g. a deleted account) the short id is shown.
+function useActorEmails(events: AuditEvent[] | null): Record<string, string> {
+  const [emails, setEmails] = useState<Record<string, string>>({})
+  const requested = useRef(new Set<string>())
+  const mounted = useRef(true)
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
+  useEffect(() => {
+    const ids = new Set((events ?? []).flatMap((item) => (item.actorUserId ? [item.actorUserId] : [])))
+    for (const id of ids) {
+      if (requested.current.has(id)) continue
+      requested.current.add(id)
+      void getUser(id).then(
+        (user) => {
+          if (mounted.current) setEmails((current) => ({ ...current, [id]: user.email }))
+        },
+        () => undefined,
+      )
+    }
+  }, [events])
+  return emails
 }
 
 export function AuditLogPage({ onSessionEnded }: { onSessionEnded: () => void }) {
-  const [draft, setDraft] = useState<Filters>(NO_FILTERS)
-  const [applied, setApplied] = useState<Filters>(NO_FILTERS)
+  const [params, setParams] = useSearchParams()
+  const paramsKey = params.toString()
+  const applied = useMemo(() => readFilters(new URLSearchParams(paramsKey)), [paramsKey])
+  const [draft, setDraft] = useState<Filters>(applied)
   const [events, setEvents] = useState<AuditEvent[] | null>(null)
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [filterError, setFilterError] = useState<string | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
   const generation = useRef(0)
+  // The query sent for the first page is reused for "Cargar más", so a relative window never shifts mid-pagination.
+  const query = useRef<AuditLogQuery>({})
+  const actorEmails = useActorEmails(events)
 
   useEffect(() => () => {
     generation.current += 1
   }, [])
 
+  // The URL is the source of truth: the form mirrors it whenever it changes (shortcuts, back/forward, clear).
+  useEffect(() => {
+    setDraft({ ...applied, since: applied.since === LAST_24H ? '' : applied.since })
+  }, [applied])
+
   useEffect(() => {
     const mine = ++generation.current
+    query.current = toQuery(applied)
     setError(null)
     setNextCursor(null)
     setLoadingMore(false)
     void (async () => {
       try {
-        const page = await listAuditLog({ limit: PAGE_SIZE, ...toQuery(applied) })
+        const page = await listAuditLog({ limit: PAGE_SIZE, ...query.current })
         if (mine !== generation.current) return
         setEvents(page.items)
         setNextCursor(page.nextCursor ?? null)
@@ -57,29 +155,34 @@ export function AuditLogPage({ onSessionEnded }: { onSessionEnded: () => void })
     })()
   }, [applied, onSessionEnded])
 
+  // Changing any filter rewrites the URL (replace, like the user status filter); the effect above then reloads from the first page.
+  const apply = (next: Filters) => setParams(writeFilters(next), { replace: true })
+
   const filter = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    const next = { action: draft.action.trim(), actorId: draft.actorId.trim(), since: draft.since }
+    const next = { action: draft.action.trim(), actorId: draft.actorId.trim(), since: draft.since || (applied.since === LAST_24H ? LAST_24H : '') }
     if (next.actorId && !UUID.test(next.actorId)) {
       setFilterError('El ID del actor debe ser un UUID.')
       return
     }
     setFilterError(null)
-    setApplied(next)
+    apply(next)
   }
 
   const clear = () => {
-    setDraft(NO_FILTERS)
     setFilterError(null)
-    setApplied(NO_FILTERS)
+    apply(NO_FILTERS)
   }
+
+  const toggleAction = (action: string) => apply({ ...applied, action: applied.action === action ? '' : action })
+  const toggleLast24h = () => apply({ ...applied, since: applied.since === LAST_24H ? '' : LAST_24H })
 
   const loadMore = async () => {
     if (!nextCursor) return
     const mine = generation.current
     setLoadingMore(true)
     try {
-      const page = await listAuditLog({ limit: PAGE_SIZE, cursor: nextCursor, ...toQuery(applied) })
+      const page = await listAuditLog({ limit: PAGE_SIZE, cursor: nextCursor, ...query.current })
       if (mine !== generation.current) return
       setEvents((current) => [...(current ?? []), ...page.items])
       setNextCursor(page.nextCursor ?? null)
@@ -109,6 +212,12 @@ export function AuditLogPage({ onSessionEnded }: { onSessionEnded: () => void })
             <button className="secondary-button fit" onClick={clear} type="button">Limpiar</button>
           </div>
         </form>
+        <div className="filter-group" role="group" aria-label="Atajos de filtro">
+          {ACTION_SHORTCUTS.map((item) => (
+            <button key={item.action} className="filter-button" type="button" aria-pressed={applied.action === item.action} onClick={() => toggleAction(item.action)}>{item.label}</button>
+          ))}
+          <button className="filter-button" type="button" aria-pressed={applied.since === LAST_24H} onClick={toggleLast24h}>Últimas 24 h</button>
+        </div>
         {filterError && <Problems messages={[filterError]} />}
         {error && <Problems messages={[error]} />}
         {events === null && !error && <LoadingSkeleton label="Cargando auditoría…" />}
@@ -121,11 +230,19 @@ export function AuditLogPage({ onSessionEnded }: { onSessionEnded: () => void })
               </thead>
               <tbody>
                 {events.map((event) => {
-                  const metadata = metadataText(event)
+                  const actorId = event.actorUserId
+                  const email = actorId ? actorEmails[actorId] : undefined
                   return (
                     <tr key={event.id}>
                       <td>{formatDate(event.createdAt)}</td>
-                      <td>{event.actorUserId ? <span className="mono" title={event.actorUserId}>{short(event.actorUserId)}</span> : <span className="muted">Sistema</span>}</td>
+                      <td>
+                        {actorId ? (
+                          <div className="actor-cell">
+                            {email ? <span title={actorId}>{email}</span> : <span className="mono" title={actorId}>{short(actorId)}</span>}
+                            <button className="link-button" type="button" aria-label={`Filtrar por este actor: ${email ?? short(actorId)}`} onClick={() => apply({ ...applied, actorId })}>Filtrar por este actor</button>
+                          </div>
+                        ) : <span className="muted">Sistema</span>}
+                      </td>
                       <td><code>{event.action}</code></td>
                       <td>
                         {event.resourceType && event.resourceId
@@ -133,7 +250,7 @@ export function AuditLogPage({ onSessionEnded }: { onSessionEnded: () => void })
                           : event.resourceType ?? <span className="muted">—</span>}
                       </td>
                       <td>{event.ip ?? <span className="muted">—</span>}</td>
-                      <td>{metadata ? <details><summary>Ver</summary><pre className="metadata">{metadata}</pre></details> : <span className="muted">—</span>}</td>
+                      <td><MetadataList metadata={event.metadata} /></td>
                     </tr>
                   )
                 })}

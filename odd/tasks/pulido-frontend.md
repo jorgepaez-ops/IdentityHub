@@ -132,8 +132,20 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
   línea al tamaño de ícono (afectaría los gráficos); ahora se limita a `svg.icon`. Para P9 quedan dos
   sugerencias: `tabIndex=-1` en `main#main-content` de las páginas públicas (ya anotada) y reiniciar el
   estado de módulo de `theme.ts` en el `afterEach` de las pruebas para que no dependan del orden.
-- [ ] **P5 — Auditoría.** Atajos de filtro, actor resuelto a correo (`getUser`), metadatos legibles y
+- [x] **P5 — Auditoría.** Atajos de filtro, actor resuelto a correo (`getUser`), metadatos legibles y
   «filtrar por este actor».
+  Ruta: delegada (Sonnet; Codex sin cuota), revisión de Claude. Evidencia (2026-10-06): filtros en la URL
+  (`?accion=`, `?actor=`, `?desde=`, con `desde=24h` relativo para que los enlaces no caduquen; valores
+  inválidos se ignoran; cada cambio reinicia el cursor); atajos `aria-pressed` «Inicios fallidos»,
+  «Códigos MFA rechazados», «Cambios de roles» y «Últimas 24 h»; actor resuelto a correo con `getUser`
+  una vez por id y sin bloquear la tabla (id corto si falla o el usuario no existe, «Sistema» si es nulo);
+  metadatos como `dl` con claves anidadas en notación de puntos; «Filtrar por este actor» por fila; la
+  tarjeta de fallidos del inicio enlaza a `/auditoria?accion=login_failed&desde=24h`. RED: 13 pruebas
+  fallaban sin el cambio. vitest 221/221, typecheck y lint limpios, `make e2e` 52/52. Límites conocidos:
+  la API acepta una sola acción por consulta, así que la tarjeta del inicio suma `login_failed` y
+  `mfa_code_rejected` pero su enlace filtra solo `login_failed`; «Cambios de roles» cubre `role_changed`
+  (no `role_created`/`role_updated`/`role_deleted` de roles de aplicación); un objeto anidado vacío en
+  los metadatos no muestra clave.
 - [ ] **P6 — Contabilidad: resumen.** Más datos de ejemplo, gráficos SVG (por estado, por categoría,
   línea de tiempo) y actividad reciente.
 - [ ] **P7 — Contabilidad: movimientos.** Búsqueda, filtros, orden, categoría al registrar,
@@ -163,7 +175,7 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
 
 | Tareas | Hechas |
 |---|---|
-| P1 a P10 (10) | 4 (P1 a P4) |
+| P1 a P10 (10) | 5 (P1 a P5) |
 
 ## Entrega
 
@@ -173,4 +185,4 @@ notas). Commits por unidad de trabajo; un PR al final con confirmación del usua
 
 ## Siguiente paso
 
-P5 (auditoría: atajos de filtro, actor como correo, metadatos legibles).
+P6 (Contabilidad: resumen con más datos de ejemplo y gráficos SVG).

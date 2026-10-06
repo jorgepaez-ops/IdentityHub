@@ -176,6 +176,7 @@ function withQuery(path: string, query: Record<string, string | number | undefin
 }
 
 export const listUsers = (query: ListUsersQuery = {}) => authenticatedRequest<UserPage>(withQuery('/api/v1/admin/users', query))
+export const getUser = (userId: string) => authenticatedRequest<AdminUser>(`/api/v1/admin/users/${encodeURIComponent(userId)}`)
 export const createUser = (input: CreateUserRequest) =>
   authenticatedRequest<AdminUser>('/api/v1/admin/users', { method: 'POST', body: JSON.stringify(input) })
 export const updateUser = (userId: string, input: UpdateUserRequest) =>

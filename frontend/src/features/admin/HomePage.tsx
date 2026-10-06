@@ -4,7 +4,7 @@ import { LoadingSkeleton } from '../../components/LoadingSkeleton'
 import { AuditIcon, ShieldIcon, UsersIcon } from '../../components/icons'
 import { type AuditEvent, type UserStatus, listAuditLog, listUsers } from '../../api/client'
 import { formatDate } from '../format'
-import { Problems, STATUS_PARAM, isAuthFailure } from './shared'
+import { AUDIT_FAILED_SIGN_IN_PATH, FAILED_SIGN_IN_ACTION, Problems, STATUS_PARAM, isAuthFailure } from './shared'
 
 // D3: the API has no totals endpoint, so a count is exact up to one full page and "N+" beyond it.
 const COUNT_PAGE = 100
@@ -23,7 +23,7 @@ type Count = { value: number; more: boolean }
 type Snapshot = { users: Record<UserStatus, Count>; failedSignIns: Count; recent: AuditEvent[] }
 
 // A rejected MFA code is a failed sign-in too (specs/01-requirements.md), but the audit log records it as its own action.
-const FAILED_SIGN_IN_ACTIONS = ['login_failed', 'mfa_code_rejected'] as const
+const FAILED_SIGN_IN_ACTIONS = [FAILED_SIGN_IN_ACTION, 'mfa_code_rejected'] as const
 const STATUS_TONE: Record<UserStatus, string> = { active: 'ok', pending_verification: 'warn', locked: 'danger', disabled: 'danger' }
 
 const countOf = (page: { items: unknown[]; nextCursor?: string | null }): Count => ({ value: page.items.length, more: Boolean(page.nextCursor) })
@@ -84,7 +84,7 @@ export function HomePage({ onSessionEnded }: { onSessionEnded: () => void }) {
         <>
           <div className="stat-grid" aria-label="Indicadores">
             {STATUS_ORDER.map((status) => <StatTile key={status} label={STATUS_TILE_LABEL[status]} count={snapshot.users[status]} tone={STATUS_TONE[status]} to={`/usuarios?${STATUS_PARAM}=${status}`} />)}
-            <StatTile label="Inicios de sesión fallidos (24 h)" count={snapshot.failedSignIns} tone={snapshot.failedSignIns.value > 0 ? 'danger' : 'ok'} />
+            <StatTile label="Inicios de sesión fallidos (24 h)" count={snapshot.failedSignIns} tone={snapshot.failedSignIns.value > 0 ? 'danger' : 'ok'} to={AUDIT_FAILED_SIGN_IN_PATH} />
           </div>
           <div className="home-grid">
             <section className="panel" aria-labelledby="home-activity-title">

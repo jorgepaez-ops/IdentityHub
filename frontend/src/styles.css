@@ -170,7 +170,12 @@ select { width: 100%; padding: .7rem .75rem; color: var(--ink); background: var(
 .filter-form label { margin-top: .5rem; }
 .filter-actions { display: flex; gap: .65rem; }
 .filter-actions .primary-button, .filter-actions .secondary-button { margin-top: .5rem; }
-.metadata { max-width: 24rem; margin: .35rem 0 0; font-family: var(--mono); font-size: .75rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.metadata-list { display: grid; grid-template-columns: max-content 1fr; gap: .2rem .75rem; max-width: 26rem; margin: .35rem 0 0; font-size: .75rem; }
+.metadata-list dt { color: var(--muted); font-family: var(--mono); }
+.metadata-list dd { margin: 0; font-family: var(--mono); overflow-wrap: anywhere; }
+.link-button { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-size: .75rem; font-weight: 600; cursor: pointer; }
+.link-button:hover { text-decoration: underline; }
+.actor-cell { display: flex; flex-direction: column; align-items: flex-start; gap: .15rem; }
 @media (max-width: 760px) { .rail-brand + nav { flex-wrap: wrap; } }
 .role-section { margin-top: 1.25rem; }
 .role-grid th[scope="col"] { white-space: nowrap; text-transform: none; }
