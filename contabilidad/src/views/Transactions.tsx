@@ -1,5 +1,6 @@
 import { FormEvent, useState } from 'react'
 import type { Access } from '../access'
+import { CheckIcon, CloseIcon } from '../icons'
 import { STATUS_LABEL, formatCop, visibleMovements, type Movement } from '../ledger'
 
 interface Props {
@@ -40,9 +41,9 @@ export function TransactionsView({ access, movements, onDecide, onRegister }: Pr
         </form>
       )}
       <div className="card table-card">
-        <table>
+        <table aria-label="Movimientos del periodo">
           <thead>
-            <tr><th>Folio</th><th>Descripción</th><th className="num">Monto</th><th>Estado</th><th>Acciones</th></tr>
+            <tr><th scope="col">Folio</th><th scope="col">Descripción</th><th scope="col" className="num">Monto</th><th scope="col">Estado</th><th scope="col">Acciones</th></tr>
           </thead>
           <tbody>
             {rows.map((movement) => (
@@ -54,8 +55,8 @@ export function TransactionsView({ access, movements, onDecide, onRegister }: Pr
                 <td>
                   {movement.status === 'pending' && access.canApprove && (
                     <span className="actions">
-                      <button className="small-button ok" type="button" aria-label={`Aprobar ${movement.id}`} onClick={() => onDecide(movement.id, 'approved')}>Aprobar</button>
-                      <button className="small-button danger" type="button" aria-label={`Rechazar ${movement.id}`} onClick={() => onDecide(movement.id, 'rejected')}>Rechazar</button>
+                      <button className="small-button ok" type="button" aria-label={`Aprobar ${movement.id}`} onClick={() => onDecide(movement.id, 'approved')}><CheckIcon />Aprobar</button>
+                      <button className="small-button danger" type="button" aria-label={`Rechazar ${movement.id}`} onClick={() => onDecide(movement.id, 'rejected')}><CloseIcon />Rechazar</button>
                     </span>
                   )}
                   {movement.status === 'pending' && !access.canApprove && <span className="muted">esperando aprobación</span>}

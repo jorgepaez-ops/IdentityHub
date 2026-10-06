@@ -1,4 +1,5 @@
 import type { Access } from '../access'
+import { LockIcon } from '../icons'
 import { LAST_CLOSE, USERS_WITH_ACCESS, countOf, formatCop, totalOf, visibleMovements, type Movement } from '../ledger'
 
 function Stat({ label, value, note }: { label: string; value: string; note?: string }) {
@@ -17,7 +18,7 @@ export function SummaryView({ access, movements }: { access: Access; movements: 
     return (
       <section aria-labelledby="view-title">
         <h1 id="view-title">Resumen</h1>
-        <div className="card locked-card">Requiere el permiso reportes.ver</div>
+        <div className="card locked-card"><LockIcon aria-hidden="true" /><span>Requiere el permiso reportes.ver</span></div>
       </section>
     )
   }

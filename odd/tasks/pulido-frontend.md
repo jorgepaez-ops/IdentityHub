@@ -69,7 +69,16 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
   error en la grilla de roles retira el aviso de éxito y «Nuevo rol» también lo retira; los avisos
   llevan un id, así que el mismo texto dos veces reinicia el temporizador. vitest 172/172, lint y
   typecheck limpios, `make e2e` 52/52.
-- [ ] **P2 — Sistema visual de Contabilidad.** Lo mismo con su identidad cálida; el aviso se cierra solo.
+- [x] **P2 — Sistema visual de Contabilidad.** Lo mismo con su identidad cálida; el aviso se cierra solo.
+  Ruta: delegada (Sonnet; Codex sin cuota), revisión de Claude. Evidencia (2026-10-06): fuentes
+  `@fontsource` (Plex Sans/Mono, Fraunces), íconos SVG (candado SVG con nombre «Bloqueado»), favicon,
+  tema con `data-theme` y almacenamiento protegido, foco visible, enlace para saltar al contenido, tabla
+  con nombre y `scope`, `Toast` con cierre automático y reinicio por id (el aviso anterior nunca se
+  cerraba), estilos cálidos (tarjetas con barra de acento, estados con punto de color, botones con
+  ícono). RED: 8 pruebas TestRF021_ nuevas fallaban sin los módulos; GREEN: vitest 71/71 (63 previas),
+  typecheck y lint limpios, build con 4 woff2, `make e2e` 52/52. Revisión de Claude: capturas de resumen
+  y transacciones revisadas; un «+ +» en el botón de registrar era de una versión intermedia (el código
+  final no tiene ícono ahí). Sin verificar a ojo: modo oscuro y móvil (P10).
 - [ ] **P3 — Inicio de la consola.** Ruta `/inicio` con indicadores (usuarios por estado, inicios
   fallidos en 24 h, actividad reciente) y accesos directos; los administradores aterrizan ahí.
 - [ ] **P4 — Usuarios.** Filtro por estado con el parámetro `status` existente y tarjetas clicables.
@@ -104,7 +113,7 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
 
 | Tareas | Hechas |
 |---|---|
-| P1 a P10 (10) | 1 (P1) |
+| P1 a P10 (10) | 2 (P1 y P2) |
 
 ## Entrega
 
@@ -114,4 +123,4 @@ notas). Commits por unidad de trabajo; un PR al final con confirmación del usua
 
 ## Siguiente paso
 
-P2 (sistema visual de Contabilidad). Codex sin cuota hasta las 15:13; respaldo: Sonnet.
+P3 (inicio de la consola).
