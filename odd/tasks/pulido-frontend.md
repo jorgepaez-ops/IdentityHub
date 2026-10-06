@@ -102,6 +102,11 @@ cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `rut
   manejador de auditoría de la prueba devuelve la lista reciente a la consulta `mfa_code_rejected` (enrutar
   esa acción a una lista vacía por defecto), y el aviso de error pide reintentar sin ofrecer un botón;
   además, un fallo en una de las siete consultas oculta todos los indicadores.
+  Revisión nativa de la rama completa (desde `6c8bc11`, 45 archivos, 1421 líneas, 1 lente): **aprobada**
+  y acusada. Aviso nuevo para P9: `initializeTheme` escribe `data-theme` al arrancar aunque el usuario no
+  haya elegido tema, así que el Hub y Contabilidad ya no siguen en vivo el cambio de modo oscuro del
+  sistema (solo al recargar). Corregir: sin elección guardada, no fijar `data-theme` o escuchar
+  `matchMedia`.
 - [ ] **P4 — Usuarios.** Filtro por estado con el parámetro `status` existente y tarjetas clicables.
 - [ ] **P5 — Auditoría.** Atajos de filtro, actor resuelto a correo (`getUser`), metadatos legibles y
   «filtrar por este actor».
