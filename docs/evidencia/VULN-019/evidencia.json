@@ -17,23 +17,36 @@
     "observacion": "Se escanean las imágenes por nombre, tal como las declara deploy/docker-compose.yml. Cuentas brutas resueltas el 2026-09-20."
   },
   "remediacion": {
-    "tarea": "T30",
-    "commit": "824be7d (parcial: solo postgres/rabbitmq)",
+    "tarea": "T30 y T16",
+    "commit": "824be7d (T30: postgres y rabbitmq) y 14047c7 (T16: mailpit, migrate, prometheus, loki, alloy y grafana)",
     "ficha": "security/findings/VULN-019-imagenes-base-antiguas-compose.md"
   },
   "despues": {
-    "commit": "2ee59e2565a68b05be74b46a2c498f69d5eb17ce",
+    "commit": "14047c703b0afc869abbfe79c130541bd8f44166",
     "workflow": "Escaneo de la línea base",
-    "run_id": "36329751647",
-    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36329751647",
-    "captura": "informe Desktop, seccion VULN-019 despues (T38; Discrepancia 8)",
+    "run_id": "37471823657",
+    "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/37471823657",
+    "captura": null,
     "hallazgos": [
-      "Trivy HIGH/CRITICAL (run 36329751647, misma metodología que el antes): postgres@sha256:efedf359 (16-bookworm) 115, de ellos 22 con parche, todos stdlib de Go en gosu; rabbitmq@sha256:ddc75301 (4-management) 0; axllent/mailpit:v1.20 69; migrate/migrate:v4.17.0 65; prom/prometheus:v2.51.0 112; grafana/loki:2.9.4 59; grafana/alloy:v1.0.0 79; grafana/grafana:10.4.0 126",
-      "Trivy image (local, T30) sobre rabbitmq:4-management: Total 0 (HIGH: 0, CRITICAL: 0)",
-      "Trivy image (local, T30) sobre postgres:16-bookworm: 0 en el sistema operativo; 1 HIGH en gosu (binario empaquetado por la imagen oficial, fuera de nuestro control) y 1 en un certificado de relleno de Debian",
-      "axllent/mailpit, migrate/migrate y las 4 imágenes de observabilidad siguen sin actualizar, fuera de alcance de T30"
+      "Trivy HIGH/CRITICAL (run 37471823657, misma metodología que el antes): postgres@sha256:efedf359 117 (51 con parche); rabbitmq@sha256:ddc75301 2; axllent/mailpit@sha256:b68349e3 (v1.31.4) 0; migrate/migrate@sha256:76cc2074 (v4.20.1) 6; prom/prometheus@sha256:efd719c9 (v3.15.0) 2; grafana/loki@sha256:1107dd52 (3.7.8) 0; grafana/alloy@sha256:2aa2099a (v1.20.1) 2; grafana/grafana@sha256:b28bae15 (13.2.3) 8",
+      "Total de las 8 imágenes del compose: 710 (antes) → 625 (T38) → 137 (T16)"
     ],
-    "observacion": "T38: baseline-scan.yml lanzado por workflow_dispatch con ref=v0.1.0-hardened (tag sobre el merge del PR #3 en main), job 108649306649, paso \"Trivy sobre las imágenes base\". Cuenta todos los HIGH/CRITICAL, sin --ignore-unfixed, igual que el run 35534898422: postgres 197 → 115, rabbitmq 3 → 0. De los 115 de postgres, 93 son paquetes del sistema operativo sin parche publicado; la medición local de T30 contaba solo hallazgos con parche, de ahí su \"0 en el sistema operativo\". Los 22 con parche están en stdlib de Go dentro de gosu (T30 registró 1, con el mismo digest): avisos nuevos en la base de datos, fuera de nuestro control. Remediación parcial: el resto de imágenes del compose sigue abierto. Total de las 8 imágenes del compose: 710 → 625 (−85, todo por postgres y rabbitmq; las otras 6 sin cambios de tag ni de recuento). Capturas confirmadas por el usuario (Claude Desktop, 2026-09-27; el informe lo registra como Discrepancia 8: remediación parcial, no cerrada); sin secretos que recortar.",
-    "artefacto": "security/evidence/actions-36329751647/README.md"
+    "observacion": "T16: baseline-scan.yml lanzado por workflow_dispatch con ref=14047c703b0afc869abbfe79c130541bd8f44166, job 112296994694, paso \"Trivy sobre las imágenes base\". Las 8 imágenes del compose quedan actualizadas y fijadas por digest. Residual no corregible desde el proyecto: binarios Go del proveedor (migrate, grafana), openssl de Ubuntu sin imagen corregida (alloy, rabbitmq), probable falso positivo de seudoversión en prometheus (CVE-2026-42154) y paquetes del sistema de postgres. Detalle en el artefacto. La captura queda en null hasta que el usuario confirme la sección del informe de Claude Desktop.",
+    "artefacto": "security/evidence/actions-37471823657/README.md",
+    "parcial_T38": {
+      "commit": "2ee59e2565a68b05be74b46a2c498f69d5eb17ce",
+      "workflow": "Escaneo de la línea base",
+      "run_id": "36329751647",
+      "run_url": "https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36329751647",
+      "captura": "informe Desktop, seccion VULN-019 despues (T38; Discrepancia 8)",
+      "hallazgos": [
+        "Trivy HIGH/CRITICAL (run 36329751647, misma metodología que el antes): postgres@sha256:efedf359 (16-bookworm) 115, de ellos 22 con parche, todos stdlib de Go en gosu; rabbitmq@sha256:ddc75301 (4-management) 0; axllent/mailpit:v1.20 69; migrate/migrate:v4.17.0 65; prom/prometheus:v2.51.0 112; grafana/loki:2.9.4 59; grafana/alloy:v1.0.0 79; grafana/grafana:10.4.0 126",
+        "Trivy image (local, T30) sobre rabbitmq:4-management: Total 0 (HIGH: 0, CRITICAL: 0)",
+        "Trivy image (local, T30) sobre postgres:16-bookworm: 0 en el sistema operativo; 1 HIGH en gosu (binario empaquetado por la imagen oficial, fuera de nuestro control) y 1 en un certificado de relleno de Debian",
+        "axllent/mailpit, migrate/migrate y las 4 imágenes de observabilidad siguen sin actualizar, fuera de alcance de T30"
+      ],
+      "observacion": "T38: baseline-scan.yml lanzado por workflow_dispatch con ref=v0.1.0-hardened (tag sobre el merge del PR #3 en main), job 108649306649, paso \"Trivy sobre las imágenes base\". Cuenta todos los HIGH/CRITICAL, sin --ignore-unfixed, igual que el run 35534898422: postgres 197 → 115, rabbitmq 3 → 0. De los 115 de postgres, 93 son paquetes del sistema operativo sin parche publicado; la medición local de T30 contaba solo hallazgos con parche, de ahí su \"0 en el sistema operativo\". Los 22 con parche están en stdlib de Go dentro de gosu (T30 registró 1, con el mismo digest): avisos nuevos en la base de datos, fuera de nuestro control. Remediación parcial: el resto de imágenes del compose sigue abierto. Total de las 8 imágenes del compose: 710 → 625 (−85, todo por postgres y rabbitmq; las otras 6 sin cambios de tag ni de recuento). Capturas confirmadas por el usuario (Claude Desktop, 2026-09-27; el informe lo registra como Discrepancia 8: remediación parcial, no cerrada); sin secretos que recortar.",
+      "artefacto": "security/evidence/actions-36329751647/README.md"
+    }
   }
 }

@@ -463,7 +463,23 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
 
 ## Fase 4 — Publicación y entrega
 
-- [ ] **T16 — VULN-019.** Actualizar las imágenes restantes del compose.
+- [x] **T16 — VULN-019.** Actualizar las imágenes restantes del compose.
+  Ruta: delegada (Sonnet: necesita red y Docker), revisión de Claude. Evidencia (2026-10-06): commit
+  `14047c7`, `mailpit` v1.31.4, `migrate` v4.20.1, `prometheus` v3.15.0, `loki` 3.7.8, `alloy` v1.20.1 y
+  `grafana` 13.2.3, cada una por digest de su índice multiarquitectura (Claude comprobó los 6 digests
+  contra sus tags con `docker buildx imagetools`); también la imagen de mailpit en Terraform.
+  `deploy/observability/*` sin cambios. Verificación (Sonnet): `docker compose config` con y sin
+  observabilidad, `make up-obs` sano, migrate con salida 0, `/readyz` 200, Prometheus con api, worker,
+  rabbitmq y prometheus `up` (Claude lo repitió), Grafana 13.2.3 con sus dos fuentes de datos y el
+  dashboard, Loki con logs del api vía Alloy, `make e2e` 52/52, `terraform fmt -check` y `validate`.
+  RED no aplica (cambio de imágenes): la prueba es el escaneo antes/después.
+  Evidencia «después»: run `baseline-scan` 37471823657 (`workflow_dispatch`, `ref=14047c7`), total de
+  las 8 imágenes 710 → 137 (`mailpit` y `loki` 0); residual de proveedor detallado en
+  `security/evidence/actions-37471823657/README.md`; ficha, `evidencia.json` y README raíz al día
+  (28 fichas remediadas). Pendiente: capturas de Claude Desktop (`captura` en null hasta confirmarlas).
+  Revisión nativa (`review-dad3dc9c349c9821`, medio, 26 líneas, 1 lente): **aprobada**; avisos
+  informativos R3-001 a R3-005 (cambios de versión mayor sin prueba en el candidato, E2E con el nuevo
+  mailpit, digests multiarquitectura), todos cubiertos por la verificación anterior.
 - [ ] **T17 — Docker Hub.** Workflow de release en tag `vX.Y.Z`: imágenes con `vX.Y.Z` y `latest`,
   SBOM con Syft y firma con Cosign (ADR 0011, Q1).
 - [ ] **T18 — Manual de usuario con capturas** (incluye la grilla de roles).
@@ -479,13 +495,13 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
 | 1 — Documentación, UML e integración | T1 a T6 (6) | 6 (T1 a T6) — fase cerrada |
 | 2 — IaC de referencia | T7 a T10 (4) | 4 (T7 a T10) — fase cerrada |
 | 3 — Grilla de roles configurable | T11 a T15 (5) | 5 (T11 a T15) — fase cerrada |
-| 4 — Publicación y entrega | T16 a T21 (6) | 0 |
-| **Total** | **21** | **15** (T1 a T15) |
+| 4 — Publicación y entrega | T16 a T21 (6) | 1 (T16) |
+| **Total** | **21** | **16** (T1 a T16) |
 
 ## Siguiente paso
 
-**2026-10-06.** Fases 1 a 3 cerradas y en main (PR #11, merge `8b4a18a`, CI 21/21). Siguiente:
-fase 4 desde T16.
+**2026-10-06.** Fases 1 a 3 cerradas y en main (PR #11, merge `8b4a18a`, CI 21/21). T16 hecha
+(VULN-019 remediado; faltan las capturas de Desktop del run 37471823657). Siguiente: T17 (Docker Hub).
 Codex: cuota diaria limitada; Sonnet como respaldo.
 
 ## Cambios de spec propuestos

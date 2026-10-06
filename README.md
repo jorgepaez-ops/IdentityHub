@@ -67,7 +67,7 @@ El compose real vive en `deploy/` y el de la raíz lo incluye, de modo que un cl
 ## 7. Seguridad y evidencia DevSecOps
 
 - [Informe de seguridad](docs/security-report.html): la versión publicada se conserva como artefacto privado de claude.ai; el enlace no se incluye en el repositorio.
-- [Fichas de vulnerabilidades](security/findings/): 29 fichas, de VULN-001 a VULN-029; 27 remediadas, VULN-019 con remediación parcial y VULN-028 como riesgo aceptado hasta 2026-12-25.
+- [Fichas de vulnerabilidades](security/findings/): 29 fichas, de VULN-001 a VULN-029; 28 remediadas y VULN-028 como riesgo aceptado hasta 2026-12-25.
 - [Evidencia por vulnerabilidad](docs/evidencia/): archivos `evidencia.json` por hallazgo; la [evidencia cruda de escáneres](security/evidence/) se conserva por ejecución.
 - [Modelo de amenazas](specs/05-security/threat-model.md): riesgos y mitigaciones por componente.
 - [ADR 0007](specs/adr/0007-linea-base-vulnerable-deliberada.md): explica la línea base vulnerable deliberada. El tag `v0.0.0-vuln-baseline` nunca debe desplegarse; `v0.1.0-hardened` representa el estado remediado.

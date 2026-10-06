@@ -3,15 +3,15 @@
 | | |
 |---|---|
 | **Severidad** | CRITICAL y HIGH |
-| **Estado** | remediado parcialmente: solo `postgres` y `rabbitmq`; el resto sigue abierto |
+| **Estado** | remediado: las 8 imágenes del compose actualizadas y fijadas por digest (T30 y T16); queda un residual de proveedor no corregible desde el proyecto |
 | **Detectado por** | Trivy image sobre las imágenes del compose (baseline-scan) |
 | **Componente** | `deploy/docker-compose.yml` (imágenes declaradas) |
 | **Amenaza** | AM-009 (dependencia comprometida en la cadena de suministro) |
 | **Sembrada** | sí |
 | **Evidencia antes** | `docs/evidencia/VULN-019/evidencia.json` — informe Desktop §3 VULN-019 |
-| **Commit de remediación** | `824be7d` (T30, solo `postgres` y `rabbitmq`; el resto sigue abierto) |
-| **Evidencia después** | `docs/evidencia/VULN-019/evidencia.json` y `security/evidence/actions-36329751647/README.md` (T38, run sobre `v0.1.0-hardened`, sin `--ignore-unfixed` como el antes: `postgres` 197 → 115, de ellos 22 con parche, todos `stdlib` de Go en gosu, fuera de nuestro control; `rabbitmq` 3 → 0; Mailpit, migrate y las 4 imágenes de observabilidad sin cambios, siguen abiertas/fuera de alcance T30. La medición local de T30 —`postgres:16-bookworm` 0 en SO, 1 HIGH en gosu— contaba solo hallazgos con parche; total de las 8 imágenes del compose 710 → 625) — informe Desktop, seccion VULN-019 despues (T38; Discrepancia 8) |
-| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35534898422 / https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36329751647 (`baseline-scan.yml` por `workflow_dispatch` con `ref=v0.1.0-hardened`, T38); `ci.yml` no escanea las imágenes de infraestructura del compose |
+| **Commit de remediación** | `824be7d` (T30: `postgres` y `rabbitmq`) y `14047c7` (T16: `mailpit`, `migrate`, `prometheus`, `loki`, `alloy` y `grafana`) |
+| **Evidencia después** | `security/evidence/actions-37471823657/README.md` (T16, run sobre `14047c7`: total de las 8 imágenes 710 → 137; `mailpit` y `loki` 0, `prometheus` 2, `alloy` 2, `migrate` 6, `grafana` 8, todos en binarios o paquetes del proveedor) — informe Desktop, sección VULN-019 después (T16), pendiente. Antes, parcial de T30: `docs/evidencia/VULN-019/evidencia.json` y `security/evidence/actions-36329751647/README.md` (T38, run sobre `v0.1.0-hardened`, sin `--ignore-unfixed` como el antes: `postgres` 197 → 115, de ellos 22 con parche, todos `stdlib` de Go en gosu, fuera de nuestro control; `rabbitmq` 3 → 0; Mailpit, migrate y las 4 imágenes de observabilidad sin cambios, siguen abiertas/fuera de alcance T30. La medición local de T30 —`postgres:16-bookworm` 0 en SO, 1 HIGH en gosu— contaba solo hallazgos con parche; total de las 8 imágenes del compose 710 → 625) — informe Desktop, seccion VULN-019 despues (T38; Discrepancia 8) |
+| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/35534898422 / https://github.com/jorgepaez-ops/IdentityHub/actions/runs/37471823657 (T16, `workflow_dispatch` con `ref=14047c7`); parcial de T38: https://github.com/jorgepaez-ops/IdentityHub/actions/runs/36329751647 (`baseline-scan.yml` por `workflow_dispatch` con `ref=v0.1.0-hardened`, T38); `ci.yml` no escanea las imágenes de infraestructura del compose |
 
 ## Evidencia
 
@@ -34,3 +34,10 @@ que trae Debian — ninguno de los dos lo puede corregir este proyecto.
 `axllent/mailpit`, `migrate/migrate` y las cuatro imágenes de observabilidad (`prometheus`, `loki`,
 `alloy`, `grafana`) **siguen sin actualizar**: no estaban en el alcance de T30 y quedan abiertas
 para una tarea futura.
+
+T16 completa la remediación: `axllent/mailpit` v1.31.4, `migrate/migrate` v4.20.1, `prom/prometheus`
+v3.15.0, `grafana/loki` 3.7.8, `grafana/alloy` v1.20.1 y `grafana/grafana` 13.2.3, cada una fijada por el
+digest de su índice multiarquitectura. La configuración de observabilidad funciona sin cambios (métricas
+de Prometheus, logs de Alloy a Loki, fuentes de datos de Grafana) y la suite E2E pasa contra el stack
+actualizado. El residual (137 HIGH/CRITICAL en las 8 imágenes, frente a 710) está en binarios Go y
+paquetes que empaqueta cada proveedor; se detalla en `security/evidence/actions-37471823657/README.md`.
