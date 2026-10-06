@@ -21,7 +21,7 @@ Las fronteras señalan dónde cambia la confianza: del navegador a Nginx, de Ngi
 
 ## Registro STRIDE
 
-`Mitigated` indica que la contramedida descrita en el modelo fuente está implementada en el repositorio. `Open` marca las cuatro amenazas cuya contramedida falta o está incompleta (AM-008, AM-009, AM-019 y AM-022); cada fila dice qué falta y qué tarea de la semana 4 lo cierra.
+`Mitigated` indica que la contramedida descrita en el modelo fuente está implementada en el repositorio. `Open` marca las tres amenazas cuya contramedida falta o está incompleta (AM-008, AM-009 y AM-022); cada fila dice qué falta y qué tarea de la semana 4 lo cierra.
 
 | Amenaza | Elemento del DFD | Categoría | Estado | Contramedida | Evidencia/especificación |
 |---|---|---|---|---|---|
@@ -44,7 +44,7 @@ Las fronteras señalan dónde cambia la confianza: del navegador a Nginx, de Ngi
 | AM-016 | Evento de notificación | Information disclosure | Mitigated | Token de 24 h y un uso; broker interno y worker sin registrar cuerpo. | [`threat-model.md`](../../specs/05-security/threat-model.md) — RF-002 |
 | AM-017 (DoS) | Solicitud y sesión de autenticación | Denial of service | Mitigated | `limit_req` antes de API y Argon2id calibrado a ~250 ms. | [`threat-model.md`](../../specs/05-security/threat-model.md) — RNF-010 |
 | AM-018 | HTTP interno: `/api` | Denial of service | Mitigated | `client_max_body_size 1m` y `http.MaxBytesReader`. | [`threat-model.md`](../../specs/05-security/threat-model.md) |
-| AM-019 | Cola y DLQ | Denial of service | Open | Alerta de Grafana sobre DLQ > 10 y runbook de purga. Parcial: el panel 'Profundidad de la DLQ' existe en Grafana, pero no hay regla de alerta versionada ni runbook de purga. | [`threat-model.md`](../../specs/05-security/threat-model.md) — RNF-007 |
+| AM-019 | Cola y DLQ | Denial of service | Mitigated | Regla de alerta de Grafana versionada (`deploy/observability/grafana/alerting/dlq.yml`) que se dispara con cualquier mensaje en `notifications.dlq` durante 2 min (umbral más estricto que el > 10 original: un mensaje ya es un correo perdido) y runbook de atención y purga. | [`runbooks/dlq-notificaciones.md`](../runbooks/dlq-notificaciones.md) — RNF-007 |
 | AM-020 | Artefacto de despliegue | Elevation of privilege | Mitigated | Usuario no-root, capacidades eliminadas, raíz de solo lectura y base distroless. | [`threat-model.md`](../../specs/05-security/threat-model.md) — RNF-008 |
 | AM-021 | HTTP interno: `/api` | Elevation of privilege | Mitigated | Autorización por ruta comprobada del lado del servidor. | [`threat-model.md`](../../specs/05-security/threat-model.md) — RF-009 |
 | AM-022 | Imagen firmada por digest | Elevation of privilege | Open | Permisos mínimos por job y OIDC keyless. Parcial: permisos mínimos por job en ci.yml; la publicación con OIDC keyless en el registry llega con T17. | [`threat-model.md`](../../specs/05-security/threat-model.md) — RNF-006 |

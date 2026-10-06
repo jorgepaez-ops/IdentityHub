@@ -182,7 +182,7 @@ func (s *Server) handleBindingError(w http.ResponseWriter, r *http.Request, err 
 		writeUnauthorized(w)
 		return
 	}
-	writeProblem(w, http.StatusBadRequest, "invalid-request", "Bad Request", "The request could not be processed.")
+	writeProblem(w, http.StatusBadRequest, "invalid-request", titleBadRequest, "The request could not be processed.")
 }
 
 func (s *Server) ListAuditLog(w http.ResponseWriter, r *http.Request, params ListAuditLogParams) {

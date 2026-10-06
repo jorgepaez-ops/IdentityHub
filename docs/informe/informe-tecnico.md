@@ -135,6 +135,21 @@ flowchart LR
     F4 -.-> ART
 ```
 
+## Pulido del frontend
+
+Una rama final (`feat/pulido-frontend`) revisó la interfaz de las dos aplicaciones sin cambiar el contrato de la API. Lo entregado, con las capturas regeneradas en el [manual de usuario](../manuales/usuario.md):
+
+- **Sistema visual común** en el Hub y en Contabilidad. Las fuentes se empaquetan con la aplicación y se sirven desde el propio origen, de modo que la CSP no necesita abrirse a un CDN. El tema sigue la preferencia del sistema (claro u oscuro) y hay un selector manual; el contraste, el foco visible, los roles y las etiquetas ARIA se revisaron en ambos temas y a 390 px de ancho.
+- **Inicio de la consola.** Un administrador aterriza en **Inicio**, con indicadores de usuarios activos, pendientes, bloqueados y deshabilitados, los inicios fallidos de las últimas 24 horas y la actividad reciente. La API no entrega totales exactos, así que cada tarjeta cuenta hasta una página de 100 resultados y muestra «100+» cuando hay más (y hasta «200+» en los inicios fallidos, que suman dos consultas); si una consulta falla, solo esa tarjeta muestra el aviso y **Reintentar**.
+- **Filtros en la URL.** La búsqueda, el estado, la categoría y el orden de las tablas viven en la dirección, de modo que se pueden compartir, recargar y recorrer con el botón Atrás; el directorio y la auditoría ofrecen atajos (por ejemplo, **Cambios de roles**).
+- **Exportación CSV** de las filas visibles de Contabilidad y del directorio del Hub (con BOM UTF-8, CRLF y montos numéricos). Las celdas de texto que empiezan con `=`, `+`, `-`, `@`, tabulador o retorno de carro se neutralizan anteponiendo una comilla simple, para evitar la inyección de fórmulas al abrir el archivo en una hoja de cálculo; los números no se tocan, así que los montos negativos siguen siendo numéricos.
+- **Gráficos del Resumen de Contabilidad** (dona por estado, barras por categoría y columnas por mes) dibujados a mano en SVG, sin biblioteca de gráficos, con una tabla equivalente tras el enlace **Ver datos de...** para quien no los pueda ver.
+- **Diálogo de confirmación** accesible antes de aprobar o rechazar un movimiento en Contabilidad (foco atrapado en el diálogo, Escape cancela, el foco inicial está en **Cancelar**; al cancelar vuelve al botón que lo abrió y, al confirmar, a la tabla, porque la fila ya no tiene ese botón).
+
+![Inicio de la consola del Hub.](../manuales/img/usuario/administrador-22-inicio.png)
+
+![Resumen de Contabilidad con los tres gráficos.](../manuales/img/usuario/contabilidad-15-resumen-graficos.png)
+
 ## Arquitectura de referencia en la nube (AWS, sin apply)
 
 El enunciado pide despliegue con IaC en Terraform o Ansible. Como no hay presupuesto para una nube de pago, el equipo describió la producción como una **arquitectura de referencia** (ADR 0012) implementada en Terraform en `infraestructura/terraform/` (red, grupos de seguridad, ALB, ECS Fargate, RDS, Secrets Manager, KMS, logs, descubrimiento de servicios y DNS, TLS y WAF). El código pasa `terraform validate` y Checkov en CI, pero **no se aplica** en ninguna nube ni en LocalStack (decisión D8).
@@ -238,7 +253,7 @@ Las 23 amenazas se reparten así: 6 de suplantación (Spoofing), 4 de manipulaci
 | Information disclosure | AM-016 | Enlace de invitación interceptado | Token de 24 h y un solo uso; el worker no registra el cuerpo | Mitigated |
 | Denial of service | AM-017 | Argon2id como amplificador de carga | `limit_req` antes de la API y Argon2id calibrado a unos 250 ms | Mitigated |
 | Denial of service | AM-018 | Cuerpos enormes | `client_max_body_size 1m` y `http.MaxBytesReader` | Mitigated |
-| Denial of service | AM-019 | Cola de notificaciones saturada | Existe el panel de DLQ en Grafana | **Open** (parcial) |
+| Denial of service | AM-019 | Cola de notificaciones saturada | Regla de alerta de Grafana versionada (`deploy/observability/grafana/alerting/dlq.yml`) y runbook (`docs/runbooks/dlq-notificaciones.md`) | Mitigated |
 | Elevation of privilege | AM-020 | Contenedor comprometido | Usuario no root, capacidades eliminadas, raíz de solo lectura, base distroless | Mitigated |
 | Elevation of privilege | AM-021 | Acceso a rutas administrativas | Autorización por ruta comprobada en el servidor | Mitigated |
 | Elevation of privilege | AM-022 | Permisos excesivos del pipeline | Permisos mínimos por job y OIDC keyless | **Open** (parcial) |
@@ -247,11 +262,11 @@ Nota de transparencia: la especificación original repite el id AM-017 para dos 
 
 ## Amenazas que siguen abiertas y por qué
 
-Cuatro amenazas permanecen *Open*, y todas dependen de una misma tarea pendiente:
+Tres amenazas permanecen *Open*, y todas dependen de una misma tarea pendiente:
 
 - **AM-008 (firma de imágenes) y AM-022 (OIDC keyless):** requieren el workflow de publicación (`cd.yml`), la firma con Cosign y el OIDC hacia Docker Hub. Hoy las imágenes solo se construyen y escanean en CI. Es la tarea T17, pospuesta al final de la fase 4 hasta que el usuario decida la cuenta, el namespace y el token de Docker Hub (pregunta Q1). Lo que sí está implementado de AM-022: permisos mínimos por job (`permissions: contents: read` por defecto en `ci.yml`).
 - **AM-009 (cadena de suministro):** osv-scanner, govulncheck, npm audit y lockfiles están activos en CI y el riesgo de VULN-028 se aceptó formalmente; falta el SBOM CycloneDX por imagen, que también llega con T17.
-- **AM-019 (DLQ):** el panel «Profundidad de la DLQ» existe en Grafana, pero no hay una regla de alerta versionada ni un runbook de purga. Ninguna tarea del plan actual lo cubre, y se declara como trabajo futuro.
+AM-019 (DLQ) quedó mitigada: además del panel «Profundidad de la DLQ», hay una regla de alerta aprovisionada (`deploy/observability/grafana/alerting/dlq.yml`, se dispara con cualquier mensaje en la cola durante 2 minutos y también si faltan las métricas del broker) y un runbook de atención y purga (`docs/runbooks/dlq-notificaciones.md`). Se probó publicando un mensaje a `identity.dlx`: la regla pasó por inactive, pending y firing, y volvió a inactive al vaciar la cola.
 
 # Implementación del Pipeline
 
@@ -397,7 +412,7 @@ El enunciado pide Bandit, que es un analizador de Python. Como el backend es Go,
 | `use-of-md5` | `backend/internal/api/legacy_auth.go:54` | WARNING | VULN-002 |
 | `math-random-used` | `backend/internal/api/legacy_auth.go:30` | WARNING | VULN-004 |
 | `hardcoded-jwt-key` | `backend/internal/api/legacy_auth.go:121` | WARNING | VULN-001 |
-| `request-host-used` (Nginx) | `frontend/nginx/default.conf:61` y `:75` | WARNING | Informativo |
+| `request-host-used` (Nginx) | `frontend/nginx/default.conf:61` y `:75` | WARNING | Informativo (corregido después, ver «Endurecimiento adicional de la rama de pulido») |
 | `run-shell-injection` | `.github/workflows/baseline-scan.yml:132` | ERROR | Del workflow de la línea base |
 | `github-actions-mutable-action-tag` | 40 ocurrencias en los workflows | WARNING | Informativo |
 
@@ -447,6 +462,17 @@ Estados: **Resuelto** (remediado con commit y evidencia), **Aceptado** (riesgo a
 
 Resumen: de los 31 hallazgos, 30 están resueltos y 1 (VULN-028) mantiene un riesgo residual aceptado con fecha de expiración. Ningún hallazgo quedó sin ficha y ningún gate se debilitó para lograr un verde. VULN-030 y VULN-031 amplían el rango pedido (001 a 029) porque ZAP, ya integrado como gate, los encontró después.
 
+## Endurecimiento adicional de la rama de pulido
+
+Además de la interfaz, la rama cerró las alertas de *code scanning* que quedaban en `main` y reforzó la postura del repositorio:
+
+- **Acciones de GitHub fijadas por SHA**, con Dependabot para actualizarlas; con ello desaparecieron las alertas `github-actions-mutable-action-tag` de Semgrep.
+- **Diagramas regenerados sin JavaScript.** Los tres HTML de `docs/diagramas/` pasaron de unos 800 KB a 12-16 KB, con SVG en línea, sin `<script>` ni atributos `on*`; con ello se cerraron las alertas de CodeQL que señalaban el JavaScript incrustado de la herramienta de dibujo.
+- **Imagen `web` con nginx parcheado.** Un nuevo digest de `stable-alpine` (nginx 1.30.5) corrige libpng, nghttp2 y pcre2, y Trivy sobre la imagen pasó de 3 hallazgos a 0.
+- **Cabecera Host hacia la API fija.** Nginx envía el nombre del bloque `server` (`$server_name`) y no la cabecera Host del cliente, que quien llama controla (regla `request-host-used` de Semgrep); la API no lee esa cabecera.
+- **Checkov filtrado en el SARIF.** Las 27 alertas de Checkov eran omisiones ya justificadas en línea (`#checkov:skip`); GitHub las mostraba aunque llevaran `suppressions`, así que CI las filtra con `jq` antes de subir el SARIF. El gate no cambia, y el filtro no oculta un fallo de Checkov.
+- **Alertas abiertas conocidas.** El `README.md` tiene una sección con las alertas que siguen abiertas y su justificación: GO-2026-5932 (riesgo aceptado de VULN-028) y `tzdata` en las imágenes distroless, a la espera de un nuevo digest de la base.
+
 # Monitoreo y Observabilidad
 
 ## Stack y cómo se activa
@@ -464,7 +490,7 @@ Se activa con `make up-obs` y las credenciales de Grafana viven en `.env` (`GRAF
 
 ## Dashboard «Identity Hub — Seguridad»
 
-El dashboard aprovisionado (`deploy/observability/grafana/dashboards/seguridad.json`) tiene cinco paneles: intentos de inicio de sesión por resultado, reusos de refresh token detectados, profundidad de la DLQ de RabbitMQ, latencia p95 por ruta y eventos publicados frente a consumidos. Los paneles se alinean con amenazas del modelo: fuerza bruta (AM-001), reuso de refresh token (AM-002) y cola saturada (AM-019).
+El dashboard aprovisionado (`deploy/observability/grafana/dashboards/seguridad.json`) tiene cinco paneles: intentos de inicio de sesión por resultado, reusos de refresh token detectados, profundidad de la DLQ de RabbitMQ, latencia p95 por ruta y eventos publicados frente a consumidos. Los paneles se alinean con amenazas del modelo: fuerza bruta (AM-001), reuso de refresh token (AM-002) y cola saturada (AM-019); esta última cuenta además con la regla de alerta `deploy/observability/grafana/alerting/dlq.yml` y el runbook `docs/runbooks/dlq-notificaciones.md`.
 
 ![Dashboard de Grafana «Identity Hub — Seguridad» tras la ejecución de la suite E2E: intentos de inicio de sesión por resultado, reusos de refresh token detectados, profundidad de la DLQ, latencia p95 por ruta y eventos publicados frente a consumidos, todos con datos.](img/grafana-dashboard-seguridad.png)
 
@@ -490,7 +516,7 @@ La página de objetivos de Prometheus confirma que la API, el worker, RabbitMQ y
 
 ## Alcance de la observabilidad
 
-Falco, que el enunciado menciona para la detección de comportamiento anómalo en tiempo de ejecución, quedó **fuera del alcance** salvo que sobrara tiempo: es el único faltante del bonus de observabilidad. Tampoco hay una regla de alerta versionada para la DLQ (AM-019); el panel existe y recibe datos, pero no la alerta ni el runbook.
+Falco, que el enunciado menciona para la detección de comportamiento anómalo en tiempo de ejecución, quedó **fuera del alcance** salvo que sobrara tiempo: es el único faltante del bonus de observabilidad. La DLQ (AM-019) sí tiene alerta versionada y runbook (`deploy/observability/grafana/alerting/dlq.yml`, `docs/runbooks/dlq-notificaciones.md`).
 
 # Conclusiones
 
@@ -507,13 +533,21 @@ Falco, que el enunciado menciona para la detección de comportamiento anómalo e
 
 - **Docker Hub pendiente (T17).** Las imágenes aún no están publicadas, no hay SBOM ni firma Cosign, y por eso permanecen abiertas AM-008, AM-009 y AM-022 y no se ha ejecutado el Compose de producción con imágenes reales. Es una entrega obligatoria del enunciado y la siguiente prioridad.
 - **El stack Go no tiene validación escrita del docente** (Q4 abierta), y el enunciado sugería Python o Node.js.
-- **Observabilidad parcial:** sin Falco y sin regla de alerta ni runbook para la DLQ (AM-019).
+- **Observabilidad parcial:** sin Falco; la DLQ (AM-019) ya tiene alerta y runbook.
 - **La nube es solo una referencia:** el Terraform no se aplica; el worker envía SMTP sin autenticación ni TLS, por lo que SES real exigiría cambiar código; los hosts `*.localhost` y el cliente OAuth (`contabilidad`) están fijos en el código.
 - **Un solo cliente OAuth y sin OpenID Connect:** la guía de integración de terceros enumera lo que falta (registro dinámico, refresh tokens para aplicaciones, cierre de sesión único, revocación).
 - **Sin outbox transaccional** (ADR 0006): la publicación al broker usa *publisher confirms*, pero no hay garantía transaccional conjunta entre la base de datos y el broker; el outbox es trabajo futuro deliberado.
 - **Riesgo aceptado vigente:** VULN-028 (GO-2026-5932) hasta el 2026-12-25; debe revisarse antes de esa fecha.
 - **El video de 10 a 15 minutos (T20) y el cierre (T21)** aún no se han completado.
 - **El badge de cobertura** del README sigue pendiente de un servicio que publique el resultado.
+
+## Diferencias conocidas entre especificación y código
+
+La revisión de la rama de pulido encontró tres diferencias entre lo que dice la especificación (o la documentación de despliegue) y lo que hace el código. Se declaran aquí y se dejan como trabajo futuro; no se cambió el backend para cerrarlas.
+
+- **No hay purga de cuentas sin verificar a las 24 h.** `specs/02-domain-model.md` la describe, pero ningún proceso la ejecuta: una invitación vencida deja la cuenta pendiente hasta que un administrador la reenvíe o la elimine.
+- **Un bloqueo puesto por un administrador no vence.** El bloqueo automático por fallos sí tiene fecha (`locked_until`); el manual la deja vacía y la cuenta sigue bloqueada hasta que alguien la desbloquea.
+- **El worker recibe `DATABASE_URL` pero no la usa.** El worker solo consume la cola y envía SMTP; `despliegue-aws.md` dibuja una flecha Worker a RDS que el código no necesita, y la variable sobra.
 
 ## Lecciones aprendidas
 
@@ -530,7 +564,8 @@ Falco, que el enunciado menciona para la detección de comportamiento anómalo e
 1. **Publicar en Docker Hub (T17):** workflow de release en el tag `vX.Y.Z` con etiquetas `vX.Y.Z` y `latest`, SBOM con Syft y firma con Cosign (ADR 0011); con ello se cierran AM-008, AM-009 y AM-022. Propuesta: repositorios `api`, `worker` y `web`, environment protegido `dockerhub`, tag de prueba `v0.9.0` y `v1.0.0` en el cierre.
 2. **Cierre de la entrega (T20 y T21):** guion del video de 10 a 15 minutos, bitácora, matriz de trazabilidad, informe de seguridad final, tag de versión y PR.
 3. Corregir la codificación de los correos del worker y afinar la regla de Gitleaks que cruza saltos de línea.
-4. **Alerta y runbook de la DLQ** en Grafana (AM-019) y, si hay tiempo, **Falco** para detección en ejecución.
+4. **Falco** para detección en ejecución, si hay tiempo (la alerta y el runbook de la DLQ, AM-019, ya están hechos).
+   Y resolver las diferencias entre especificación y código de la sección «Diferencias conocidas entre especificación y código» (purga de cuentas sin verificar, bloqueo manual sin vencimiento, `DATABASE_URL` del worker).
 5. **Soporte SMTP autenticado con STARTTLS** en el worker y hosts configurables, para poder aplicar de verdad la arquitectura de AWS.
 6. Evolucionar la integración de terceros: clientes OAuth en base de datos, OpenID Connect, refresh tokens por cliente, introspección y revocación; y reemplazar la publicación directa por un **outbox transaccional**.
 7. Funciones diferidas en la matriz: claves de servicio (RF-018) y exportación del audit log (RF-019).
@@ -660,14 +695,14 @@ La sustentación debe presentar una historia distinta de la autenticación. La e
 
 | # | Quién | Acción | Resultado |
 |---|---|---|---|
-| 1 | Administrador | Entra a la consola con contraseña y código por correo | Llega a **Usuarios** |
+| 1 | Administrador | Entra a la consola con contraseña y código por correo | Llega a **Inicio** |
 | 2 | Administrador | En **Roles**, **Nuevo rol de Contabilidad**: escribe `contabilidad.auditor` y marca solo `reportes.ver` y `movimientos.ver_todos` | El formulario refleja exactamente dos permisos |
 | 3 | Administrador | Pulsa **Crear rol** | La grilla muestra la fila con esas dos casillas marcadas |
 | 4 | Administrador | En **Usuarios**, edita al empleado y marca `contabilidad.auditor` | **Cambios guardados** |
 | 5 | Administrador | Vuelve a **Roles** | El rol queda con **Eliminar** deshabilitado y **Asignado a 1 usuario** |
 | 6 | Empleado | Abre Contabilidad, pulsa **Continuar con Identity Hub** e inicia sesión con código por correo | Vuelve a Contabilidad con el rol `contabilidad.auditor` |
 | 7 | Empleado | Mira el **Resumen** | Ve los totales de toda la organización |
-| 8 | Empleado | Abre **Transacciones** | Ve los seis movimientos; no hay **Registrar**, **Aprobar** ni **Rechazar**; **Cierre contable** tiene candado |
+| 8 | Empleado | Abre **Transacciones** | Ve todos los movimientos (no solo los suyos), que puede buscar y filtrar; no hay **Registrar**, **Aprobar** ni **Rechazar**; **Cierre contable** tiene candado |
 | 9 | Administrador | Consulta **Auditoría** filtrando por `role_created` | Queda el rastro de quién creó el rol y cuándo |
 
 ![Resumen del auditor en Contabilidad.](../manuales/img/usuario/contabilidad-03-auditor-resumen.png)

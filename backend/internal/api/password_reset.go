@@ -10,7 +10,7 @@ import (
 
 func (s *Server) requestPasswordReset(w http.ResponseWriter, r *http.Request) {
 	if s.passwordReset == nil {
-		writeProblem(w, http.StatusServiceUnavailable, "password-reset-unavailable", "Service Unavailable", "Password reset is temporarily unavailable.")
+		writeProblem(w, http.StatusServiceUnavailable, "password-reset-unavailable", titleServiceUnavailable, "Password reset is temporarily unavailable.")
 		return
 	}
 	var request EmailRequest
@@ -29,7 +29,7 @@ func (s *Server) requestPasswordReset(w http.ResponseWriter, r *http.Request) {
 }
 func (s *Server) confirmPasswordReset(w http.ResponseWriter, r *http.Request) {
 	if s.passwordReset == nil {
-		writeProblem(w, http.StatusServiceUnavailable, "password-reset-unavailable", "Service Unavailable", "Password reset is temporarily unavailable.")
+		writeProblem(w, http.StatusServiceUnavailable, "password-reset-unavailable", titleServiceUnavailable, "Password reset is temporarily unavailable.")
 		return
 	}
 	var request PasswordResetConfirmRequest
@@ -51,6 +51,6 @@ func (s *Server) confirmPasswordReset(w http.ResponseWriter, r *http.Request) {
 	case errors.Is(err, passwordreset.ErrTokenInvalid):
 		writeProblem(w, http.StatusGone, "password-reset-token-unavailable", "Gone", "The password reset token is no longer available.")
 	default:
-		writeProblem(w, http.StatusInternalServerError, "password-reset-failed", "Internal Server Error", "The password could not be reset.")
+		writeProblem(w, http.StatusInternalServerError, "password-reset-failed", titleInternalServerError, "The password could not be reset.")
 	}
 }

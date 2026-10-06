@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from './App'
+import { MemoryRouter } from 'react-router-dom'
 import { UsersPage } from './features/admin/UsersPage'
 import { AuditLogPage } from './features/admin/AuditLogPage'
 import { resetSessionForTests } from './api/client'
@@ -63,7 +64,7 @@ describe('admin page unmount safety', () => {
       'GET /api/v1/admin/users': () => late.promise,
       'POST /api/v1/auth/refresh': () => problem(401),
     })
-    const view = render(<UsersPage currentUserId="admin-id" onSessionEnded={onSessionEnded} />)
+    const view = render(<MemoryRouter><UsersPage currentUserId="admin-id" onSessionEnded={onSessionEnded} /></MemoryRouter>)
     await waitFor(() => expect(api.calls).toHaveLength(1))
     view.unmount()
     await act(async () => { late.resolve(problem(401)) })
@@ -77,7 +78,7 @@ describe('admin page unmount safety', () => {
       'GET /api/v1/admin/audit-log': () => late.promise,
       'POST /api/v1/auth/refresh': () => problem(401),
     })
-    const view = render(<AuditLogPage onSessionEnded={onSessionEnded} />)
+    const view = render(<MemoryRouter><AuditLogPage onSessionEnded={onSessionEnded} /></MemoryRouter>)
     await waitFor(() => expect(api.calls).toHaveLength(1))
     view.unmount()
     await act(async () => { late.resolve(problem(401)) })
@@ -92,7 +93,7 @@ describe('admin page unmount safety', () => {
       'POST /api/v1/admin/users/beto-id/invitation': () => late.promise,
       'POST /api/v1/auth/refresh': () => problem(401),
     })
-    const view = render(<UsersPage currentUserId="admin-id" onSessionEnded={onSessionEnded} />)
+    const view = render(<MemoryRouter><UsersPage currentUserId="admin-id" onSessionEnded={onSessionEnded} /></MemoryRouter>)
     const resend = await screen.findByRole('button', { name: 'Reenviar invitación a Beto Ruiz' })
     fireEvent.click(resend)
     await waitFor(() => expect(api.calls.some((call) => call.key === 'POST /api/v1/admin/users/beto-id/invitation')).toBe(true))
@@ -435,6 +436,29 @@ describe('resend invitation', () => {
     expect(api.calls.some((c) => c.key === 'POST /api/v1/admin/users/beto-id/invitation')).toBe(true)
   })
 
+  it('TestRF001_ResendingTwiceShowsTheSameToastAndRestartsItsTimer', async () => {
+    await openUsers({ 'POST /api/v1/admin/users/beto-id/invitation': () => json(204) })
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      const message = 'Invitación reenviada a beto@example.test.'
+      // Testing Library's waitFor/findBy drain with setTimeout, which would hang under fake timers.
+      const flush = () => act(async () => { await vi.advanceTimersByTimeAsync(0) })
+      resend('Beto Ruiz')
+      await flush()
+      expect(screen.getByRole('status')).toHaveTextContent(message)
+      act(() => { vi.advanceTimersByTime(3000) })
+      expect(screen.getByRole('button', { name: 'Reenviar invitación a Beto Ruiz' })).toBeEnabled()
+      resend('Beto Ruiz')
+      await flush()
+      act(() => { vi.advanceTimersByTime(3000) })
+      expect(screen.getByRole('status')).toHaveTextContent(message)
+      act(() => { vi.advanceTimersByTime(2000) })
+      expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('TestRF001_KeepsResendCompletionAfterReloadingTheDirectory', async () => {
     const invitation = deferred<Response>()
     const api = await openUsers({ 'POST /api/v1/admin/users/beto-id/invitation': () => invitation.promise })
@@ -497,7 +521,7 @@ describe('audit log', () => {
     await screen.findByText('login_failed')
     expect(screen.getByText(/onerror=alert\(1\)/)).toBeInTheDocument()
     expect(document.querySelector('img')).toBeNull()
-    expect(screen.getByText(/"roles":\["user","contabilidad.senior"\]/)).toBeInTheDocument()
+    expect(screen.getByText('user, contabilidad.senior')).toBeInTheDocument()
   })
 
   it('TestRF011_FiltersByActionActorAndSince', async () => {
@@ -520,7 +544,7 @@ describe('audit log', () => {
     type('Actor (ID)', 'no-es-uuid')
     fireEvent.click(screen.getByRole('button', { name: 'Filtrar' }))
     expect(await screen.findByText('El ID del actor debe ser un UUID.')).toBeInTheDocument()
-    expect(api.calls.length).toBe(before)
+    expect(api.calls).toHaveLength(before)
   })
 
   it('TestRF011_ClearsTheFilters', async () => {

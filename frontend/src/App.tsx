@@ -1,13 +1,18 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react'
-import { BrowserRouter, Link, NavLink, Navigate, Route, Routes, useNavigate, useSearchParams } from 'react-router-dom'
+import { BrowserRouter, Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { LoadingSkeleton } from './components/LoadingSkeleton'
+import { ThemeToggle } from './components/ThemeToggle'
+import { AccountIcon, AuditIcon, HomeIcon, LogoutIcon, ShieldIcon, UsersIcon } from './components/icons'
 import { safeContinueTarget } from './features/account/continueTarget'
 import { redirectTo } from './navigation'
 import { MyAccountPage } from './features/account/MyAccountPage'
 import { AuditLogPage } from './features/admin/AuditLogPage'
+import { HomePage } from './features/admin/HomePage'
 import { RolesPage } from './features/admin/RolesPage'
 import { UsersPage } from './features/admin/UsersPage'
 import { AcceptInvitationPage, ForgotPasswordPage, ResetPasswordPage } from './features/account/PublicPages'
 import { ApiProblemError, clearSession, type CurrentUser, type MfaChallenge, getCurrentUser, login, logout, refreshSession, resendMfaCode, verifyMfa } from './api/client'
+import { fieldValue } from './formData'
 
 type ErrorStep = 'credentials' | 'verify' | 'resend'
 
@@ -28,7 +33,7 @@ function messageFor(error: unknown, step: ErrorStep = 'credentials') {
   }
 }
 
-function LoginPage({ onAuthenticated }: { onAuthenticated: (user: CurrentUser) => void }) {
+function LoginPage({ onAuthenticated }: Readonly<{ onAuthenticated: (user: CurrentUser) => void }>) {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   // RF-020: set when an OAuth client sent the user here (ADR 0009).
@@ -47,7 +52,8 @@ function LoginPage({ onAuthenticated }: { onAuthenticated: (user: CurrentUser) =
     setNotice(null)
     setCanStartOver(false)
     try {
-      setChallenge(await login({ email: String(data.get('email')), password: String(data.get('password')) }))
+      // Reads the typed password from the form; not a hardcoded secret.
+      setChallenge(await login({ email: fieldValue(data, 'email'), password: fieldValue(data, 'password') })) // gitleaks:allow
     } catch (reason) {
       setError(messageFor(reason))
     } finally {
@@ -58,7 +64,7 @@ function LoginPage({ onAuthenticated }: { onAuthenticated: (user: CurrentUser) =
   const verify = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!challenge) return
-    const code = String(new FormData(event.currentTarget).get('code'))
+    const code = fieldValue(new FormData(event.currentTarget), 'code')
     setPending(true)
     setError(null)
     setNotice(null)
@@ -75,7 +81,7 @@ function LoginPage({ onAuthenticated }: { onAuthenticated: (user: CurrentUser) =
       }
       const user = await getCurrentUser()
       onAuthenticated(user)
-      navigate(user.roles.includes('admin') ? '/usuarios' : '/me', { replace: true })
+      navigate(user.roles.includes('admin') ? '/inicio' : '/me', { replace: true })
     } catch (reason) {
       if (mfaVerified) {
         clearSession()
@@ -115,7 +121,7 @@ function LoginPage({ onAuthenticated }: { onAuthenticated: (user: CurrentUser) =
   }
 
   return (
-    <main className="login-page">
+    <main className="login-page" id="main-content" tabIndex={-1}>
       <section className="login-card" aria-labelledby="login-title">
         <div className="brand-mark" aria-hidden="true">IH</div>
         <h1 id="login-title">Identity Hub</h1>
@@ -150,10 +156,10 @@ function LoginPage({ onAuthenticated }: { onAuthenticated: (user: CurrentUser) =
   )
 }
 
-function AppShell({ user, onLogout, onUserChange, onSessionEnded }: { user: CurrentUser; onLogout: () => Promise<void>; onUserChange: (user: CurrentUser) => void; onSessionEnded: () => void }) {
+function AppShell({ user, onLogout, onUserChange, onSessionEnded }: Readonly<{ user: CurrentUser; onLogout: () => Promise<void>; onUserChange: (user: CurrentUser) => void; onSessionEnded: () => void }>) {
   const navigate = useNavigate()
   const isAdmin = user.roles.includes('admin')
-  const home = isAdmin ? '/usuarios' : '/me'
+  const home = isAdmin ? '/inicio' : '/me'
   const closeSession = async () => {
     try {
       await onLogout()
@@ -166,18 +172,20 @@ function AppShell({ user, onLogout, onUserChange, onSessionEnded }: { user: Curr
   return (
     <div className="app-shell">
       <aside className="left-rail">
-        <div className="rail-brand"><span className="small-mark">IH</span><span>Identity Hub<small>Proveedor de identidad</small></span></div>
+        <div className="rail-brand"><span className="small-mark" aria-hidden="true">IH</span><span>Identity Hub<small>Proveedor de identidad</small></span></div>
         <nav aria-label="Navegación principal">
-          {isAdmin && <NavLink to="/usuarios">Usuarios</NavLink>}
-          {isAdmin && <NavLink to="/roles">Roles</NavLink>}
-          {isAdmin && <NavLink to="/auditoria">Auditoría</NavLink>}
-          <NavLink to="/me">Mi cuenta</NavLink>
+          {isAdmin && <NavLink to="/inicio"><HomeIcon />Inicio</NavLink>}
+          {isAdmin && <NavLink to="/usuarios"><UsersIcon />Usuarios</NavLink>}
+          {isAdmin && <NavLink to="/roles"><ShieldIcon />Roles</NavLink>}
+          {isAdmin && <NavLink to="/auditoria"><AuditIcon />Auditoría</NavLink>}
+          <NavLink to="/me"><AccountIcon />Mi cuenta</NavLink>
         </nav>
         <div className="connected-apps"><strong>Aplicaciones conectadas</strong><a href="http://contabilidad.localhost:8080">Contabilidad</a></div>
-        <button className="logout-button" onClick={() => void closeSession()} type="button">Cerrar sesión</button>
+        <div className="rail-actions"><ThemeToggle /><button className="logout-button" onClick={() => void closeSession()} type="button"><LogoutIcon />Cerrar sesión</button></div>
       </aside>
-      <main className="app-content">
+      <main className="app-content" id="main-content" tabIndex={-1}>
         <Routes>
+          <Route path="/inicio" element={isAdmin ? <HomePage onSessionEnded={onSessionEnded} /> : <Navigate to="/me" replace />} />
           <Route path="/usuarios" element={isAdmin ? <UsersPage currentUserId={user.id} onSessionEnded={onSessionEnded} /> : <Navigate to="/me" replace />} />
           <Route path="/roles" element={isAdmin ? <RolesPage currentRoles={user.roles} onSessionEnded={onSessionEnded} /> : <Navigate to="/me" replace />} />
           <Route path="/auditoria" element={isAdmin ? <AuditLogPage onSessionEnded={onSessionEnded} /> : <Navigate to="/me" replace />} />
@@ -194,10 +202,26 @@ function AppShell({ user, onLogout, onUserChange, onSessionEnded }: { user: Curr
 const hasContinueTarget = () => safeContinueTarget(new URLSearchParams(window.location.search).get('continue')) !== null
 
 function AppRoutes() {
+  const location = useLocation()
   const [user, setUser] = useState<CurrentUser | null>(null)
   const [restoring, setRestoring] = useState(true)
   // Stable identity: admin pages list it as an effect dependency.
   const endSession = useCallback(() => { clearSession(); setUser(null) }, [])
+
+  useEffect(() => {
+    const titles: Record<string, string> = {
+      '/login': 'Iniciar sesión',
+      '/forgot-password': 'Restablecer contraseña',
+      '/password-reset': 'Nueva contraseña',
+      '/invitations/accept': 'Activar cuenta',
+      '/inicio': 'Inicio',
+      '/usuarios': 'Usuarios',
+      '/roles': 'Roles y permisos',
+      '/auditoria': 'Auditoría',
+      '/me': 'Mi cuenta',
+    }
+    document.title = `${titles[location.pathname] ?? 'Identity Hub'} · Identity Hub`
+  }, [location.pathname])
 
   useEffect(() => {
     let active = true
@@ -215,19 +239,19 @@ function AppRoutes() {
     return () => { active = false }
   }, [])
 
-  if (restoring) return <main className="login-page"><p className="muted">Validando…</p></main>
+  if (restoring) return <main className="login-page" id="main-content" tabIndex={-1}><section className="login-card restoring-card" aria-busy="true"><span className="brand-mark" aria-hidden="true">IH</span><h1>Identity Hub</h1><p className="muted">Validando tu sesión…</p><LoadingSkeleton rows={2} label="Cargando sesión…" /></section></main>
 
   return (
     <Routes>
       <Route path="/invitations/accept" element={<AcceptInvitationPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/password-reset" element={<ResetPasswordPage />} />
-      <Route path="/login" element={user && !hasContinueTarget() ? <Navigate to={user.roles.includes('admin') ? '/usuarios' : '/me'} replace /> : <LoginPage onAuthenticated={setUser} />} />
+      <Route path="/login" element={user && !hasContinueTarget() ? <Navigate to={user.roles.includes('admin') ? '/inicio' : '/me'} replace /> : <LoginPage onAuthenticated={setUser} />} />
       <Route path="/*" element={user ? <AppShell user={user} onLogout={async () => { try { await logout() } finally { setUser(null) } }} onUserChange={setUser} onSessionEnded={endSession} /> : <Navigate to="/login" replace />} />
     </Routes>
   )
 }
 
 export function App() {
-  return <BrowserRouter><AppRoutes /></BrowserRouter>
+  return <><a className="skip-link" href="#main-content">Saltar al contenido</a><BrowserRouter><AppRoutes /></BrowserRouter></>
 }

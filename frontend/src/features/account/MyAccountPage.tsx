@@ -3,15 +3,17 @@ import { ApiProblemError, type CurrentUser, type Session, listSessions, revokeSe
 import { formatDate } from '../format'
 import { describeUserAgent } from './userAgent'
 import { problemMessages } from './PublicPages'
+import { chipTone } from '../admin/shared'
+import { fieldValue } from '../../formData'
 
 
-function ProfileCard({ user, onUserChange }: { user: CurrentUser; onUserChange: (user: CurrentUser) => void }) {
+function ProfileCard({ user, onUserChange }: Readonly<{ user: CurrentUser; onUserChange: (user: CurrentUser) => void }>) {
   const [pending, setPending] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [problems, setProblems] = useState<string[]>([])
   const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    const displayName = String(new FormData(event.currentTarget).get('displayName')).trim()
+    const displayName = fieldValue(new FormData(event.currentTarget), 'displayName').trim()
     setNotice(null)
     if (displayName === '') {
       setProblems(['El nombre para mostrar no puede estar vacío.'])
@@ -40,7 +42,7 @@ function ProfileCard({ user, onUserChange }: { user: CurrentUser; onUserChange: 
         <input id="profile-email" value={user.email} readOnly />
         <p className="field-label" id="roles-label">Roles</p>
         <ul className="chips" aria-labelledby="roles-label">
-          {user.roles.map((role) => <li className={`chip chip-${role === 'admin' ? 'accent' : role === 'contabilidad.senior' ? 'warn' : 'neutral'}`} key={role}>{role}</li>)}
+          {user.roles.map((role) => <li className={`chip chip-${chipTone(role)}`} key={role}>{role}</li>)}
         </ul>
         <button className="primary-button fit" disabled={pending} type="submit">{pending ? 'Guardando…' : 'Guardar cambios'}</button>
       </form>
@@ -48,7 +50,7 @@ function ProfileCard({ user, onUserChange }: { user: CurrentUser; onUserChange: 
   )
 }
 
-function SessionsCard({ onSessionEnded }: { onSessionEnded: () => void }) {
+function SessionsCard({ onSessionEnded }: Readonly<{ onSessionEnded: () => void }>) {
   const [sessions, setSessions] = useState<Session[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -112,11 +114,11 @@ function SessionsCard({ onSessionEnded }: { onSessionEnded: () => void }) {
   )
 }
 
-export function MyAccountPage({ user, onUserChange, onSessionEnded }: {
+export function MyAccountPage({ user, onUserChange, onSessionEnded }: Readonly<{
   user: CurrentUser
   onUserChange: (user: CurrentUser) => void
   onSessionEnded: () => void
-}) {
+}>) {
   return (
     <section>
       <h1>Mi cuenta</h1>

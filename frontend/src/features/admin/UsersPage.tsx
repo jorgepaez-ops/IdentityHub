@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { LoadingSkeleton } from '../../components/LoadingSkeleton'
+import { Toast } from '../../components/Toast'
+import { DownloadIcon, SearchIcon, UsersIcon } from '../../components/icons'
 import { type AdminUser, listUsers, resendInvitation } from '../../api/client'
+import { csvFileName, downloadCsv, toCsv } from '../csv'
 import { formatDate } from '../format'
 import { type DrawerTarget, UserDrawer } from './UserDrawer'
-import { Problems, RoleChips, StatusPill, adminProblems, initialsOf, isAuthFailure } from './shared'
+import { Problems, RoleChips, StatusPill, adminProblems, initialsOf, isAuthFailure, parseStatusFilter, STATUS_FILTERS, STATUS_FILTER_LABEL, STATUS_LABEL, STATUS_PARAM } from './shared'
 
 const PAGE_SIZE = 100
 const SEARCH_DELAY_MS = 250
-const TOAST_MS = 6000
 
 const RESEND_COPY: Record<number, string> = {
   403: 'No tienes permiso para reenviar invitaciones.',
@@ -14,7 +18,7 @@ const RESEND_COPY: Record<number, string> = {
   409: 'La cuenta ya no está pendiente: no hace falta reenviar la invitación.',
 }
 
-function StatTile({ label, value }: { label: string; value: number }) {
+function StatTile({ label, value }: Readonly<{ label: string; value: number }>) {
   return (
     <div className="stat-tile" role="group" aria-label={label}>
       <strong>{value}</strong>
@@ -23,15 +27,23 @@ function StatTile({ label, value }: { label: string; value: number }) {
   )
 }
 
-export function UsersPage({ currentUserId, onSessionEnded }: { currentUserId: string; onSessionEnded: () => void }) {
+function emptyMessage(search: string, status: AdminUser['status'] | null): string {
+  if (search) return 'No hay usuarios que coincidan con la búsqueda.'
+  if (status) return 'No hay usuarios con este estado.'
+  return 'Todavía no hay usuarios.'
+}
+
+export function UsersPage({ currentUserId, onSessionEnded }: Readonly<{ currentUserId: string; onSessionEnded: () => void }>) {
   const [users, setUsers] = useState<AdminUser[] | null>(null)
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [appliedSearch, setAppliedSearch] = useState('')
+  const [params, setParams] = useSearchParams()
+  const status = parseStatusFilter(params.get(STATUS_PARAM))
   const [loadingMore, setLoadingMore] = useState(false)
   const [drawer, setDrawer] = useState<DrawerTarget | null>(null)
-  const [toast, setToast] = useState<string | null>(null)
+  const [toast, setToast] = useState<{ text: string; id: number } | null>(null)
   const [resending, setResending] = useState<string | null>(null)
   const generation = useRef(0)
   const mounted = useRef(true)
@@ -46,14 +58,8 @@ export function UsersPage({ currentUserId, onSessionEnded }: { currentUserId: st
     }
   }, [])
   const opener = useRef<HTMLElement | null>(null)
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  const showToast = useCallback((message: string) => {
-    setToast(message)
-    if (toastTimer.current) clearTimeout(toastTimer.current)
-    toastTimer.current = setTimeout(() => setToast(null), TOAST_MS)
-  }, [])
-  useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current) }, [])
+  // The id remounts the toast, so the same message shown twice restarts its timer.
+  const showToast = useCallback((text: string) => setToast((current) => ({ text, id: (current?.id ?? 0) + 1 })), [])
 
   useEffect(() => {
     const timer = setTimeout(() => setAppliedSearch(search.trim()), SEARCH_DELAY_MS)
@@ -68,7 +74,7 @@ export function UsersPage({ currentUserId, onSessionEnded }: { currentUserId: st
     setLoadingMore(false)
     void (async () => {
       try {
-        const page = await listUsers({ limit: PAGE_SIZE, ...(appliedSearch ? { q: appliedSearch } : {}) })
+        const page = await listUsers({ limit: PAGE_SIZE, ...(appliedSearch ? { q: appliedSearch } : {}), ...(status ? { status } : {}) })
         if (!current()) return
         setUsers(page.items)
         setNextCursor(page.nextCursor ?? null)
@@ -78,14 +84,14 @@ export function UsersPage({ currentUserId, onSessionEnded }: { currentUserId: st
         else setLoadError('No fue posible cargar el directorio. Inténtalo de nuevo.')
       }
     })()
-  }, [appliedSearch, onSessionEnded])
+  }, [appliedSearch, status, onSessionEnded])
 
   const loadMore = async () => {
     if (!nextCursor) return
     const mine = generation.current
     setLoadingMore(true)
     try {
-      const page = await listUsers({ limit: PAGE_SIZE, cursor: nextCursor, ...(appliedSearch ? { q: appliedSearch } : {}) })
+      const page = await listUsers({ limit: PAGE_SIZE, cursor: nextCursor, ...(appliedSearch ? { q: appliedSearch } : {}), ...(status ? { status } : {}) })
       if (mine !== generation.current) return
       setUsers((current) => [...(current ?? []), ...page.items])
       setNextCursor(page.nextCursor ?? null)
@@ -131,7 +137,24 @@ export function UsersPage({ currentUserId, onSessionEnded }: { currentUserId: st
     }
   }
 
+  // The status lives in the URL so a reload or a shared link keeps it; "all" removes the parameter.
+  const chooseStatus = (next: AdminUser['status'] | null) => {
+    setParams((current) => {
+      const updated = new URLSearchParams(current)
+      if (next) updated.set(STATUS_PARAM, next)
+      else updated.delete(STATUS_PARAM)
+      return updated
+    }, { replace: true })
+  }
+
   const list = users ?? []
+  // Exports what is loaded (the filtered pages the table shows): fetching every page would contradict D3.
+  const exportUsers = () => {
+    const header = ['Correo', 'Nombre', 'Estado', 'Roles', 'MFA', 'Último acceso', 'Creado']
+    const rows = list.map((user) => [user.email, user.displayName, STATUS_LABEL[user.status], user.roles.join('; '), user.mfaEnabled ? 'Sí' : 'No', user.lastLoginAt, user.createdAt])
+    downloadCsv(csvFileName('usuarios'), toCsv(header, rows))
+    showToast(`Exportados ${rows.length} registros`)
+  }
   const count = (status: AdminUser['status']) => list.filter((user) => user.status === status).length
 
   return (
@@ -141,25 +164,39 @@ export function UsersPage({ currentUserId, onSessionEnded }: { currentUserId: st
           <h1>Usuarios</h1>
           <p className="muted">Cuentas del Hub, sus roles y el estado de cada invitación.</p>
         </div>
-        <button className="primary-button fit" onClick={() => openDrawer({ mode: 'create' })} type="button">Nuevo usuario</button>
+        <button className="primary-button fit" onClick={() => openDrawer({ mode: 'create' })} type="button"><UsersIcon />Nuevo usuario</button>
       </div>
-      <div className="stat-grid">
-        <StatTile label="Usuarios activos" value={count('active')} />
-        <StatTile label="Cuentas bloqueadas" value={count('locked')} />
-        <StatTile label="Invitaciones pendientes" value={count('pending_verification')} />
-      </div>
-      {nextCursor && <p className="hint">Los totales cuentan solo los usuarios cargados; hay más en el directorio.</p>}
+      {/* These counts come from the loaded list, so under a status filter they would report zeros for the other states. */}
+      {status === null && (
+        <>
+          <div className="stat-grid">
+            <StatTile label="Usuarios activos" value={count('active')} />
+            <StatTile label="Cuentas bloqueadas" value={count('locked')} />
+            <StatTile label="Invitaciones pendientes" value={count('pending_verification')} />
+          </div>
+          {nextCursor && <p className="hint">Los totales cuentan solo los usuarios cargados; hay más en el directorio.</p>}
+        </>
+      )}
       <section className="panel directory" aria-labelledby="directory-title">
         <div className="panel-header">
           <h2 id="directory-title">Directorio</h2>
           <div className="search-field">
             <label htmlFor="user-search">Buscar por correo o nombre</label>
-            <input id="user-search" type="search" value={search} maxLength={200} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar…" />
+            <div className="input-with-icon"><SearchIcon /><input id="user-search" type="search" value={search} maxLength={200} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar…" /></div>
           </div>
         </div>
+        <div className="filter-group" role="group" aria-label="Filtrar por estado">
+          {STATUS_FILTERS.map((option) => (
+            <button key={option ?? 'all'} className="filter-button" type="button" aria-pressed={status === option} onClick={() => chooseStatus(option)}>{STATUS_FILTER_LABEL[option ?? 'all']}</button>
+          ))}
+        </div>
+        <div className="export-row">
+          <button className="secondary-button fit" type="button" disabled={list.length === 0} onClick={exportUsers}><DownloadIcon />Exportar CSV</button>
+          {nextCursor && list.length > 0 && <p className="hint">Exporta los {list.length} cargados; carga más para incluir el resto.</p>}
+        </div>
         {loadError && <Problems messages={[loadError]} />}
-        {users === null && !loadError && <p className="muted">Cargando…</p>}
-        {users !== null && list.length === 0 && <p className="muted">{appliedSearch ? 'No hay usuarios que coincidan con la búsqueda.' : 'Todavía no hay usuarios.'}</p>}
+        {users === null && !loadError && <LoadingSkeleton label="Cargando usuarios…" />}
+        {users !== null && list.length === 0 && <p className="muted">{emptyMessage(appliedSearch, status)}</p>}
         {list.length > 0 && (
           <div className="table-scroll">
             <table className="data-table" aria-label="Directorio">
@@ -195,7 +232,7 @@ export function UsersPage({ currentUserId, onSessionEnded }: { currentUserId: st
         {nextCursor && <button className="secondary-button fit" disabled={loadingMore} onClick={() => void loadMore()} type="button">{loadingMore ? 'Cargando…' : 'Cargar más'}</button>}
       </section>
       {drawer && <UserDrawer target={drawer} currentUserId={currentUserId} onClose={closeDrawer} onSaved={saved} onSessionEnded={onSessionEnded} />}
-      {toast && <div className="toast" role="status">{toast}</div>}
+      {toast && <Toast key={toast.id} message={toast.text} onClose={() => setToast(null)} />}
     </section>
   )
 }

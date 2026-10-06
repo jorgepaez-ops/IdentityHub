@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { accessFor } from './access'
+import { AppearanceProvider } from './AppearanceProvider'
 import { beginLogin, completeCallback, type CallbackError, type Session } from './auth/flow'
 import { CLOCK_LEEWAY_SECONDS } from './auth/jwt'
 import { CALLBACK_PATH } from './config'
@@ -20,6 +21,14 @@ const CALLBACK_MESSAGES: Record<CallbackMessageKind, string> = {
 }
 
 export function App() {
+  return (
+    <AppearanceProvider>
+      <AppContent />
+    </AppearanceProvider>
+  )
+}
+
+function AppContent() {
   const returning = window.location.pathname === CALLBACK_PATH
   const [login, setLogin] = useState<LoginState>(returning ? { kind: 'validating' } : { kind: 'idle' })
   // The access token lives only in this component's memory: never in storage.

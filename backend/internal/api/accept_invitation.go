@@ -14,7 +14,7 @@ import (
 // behavior for the same reason (AM-004-style non-enumeration).
 func (s *Server) acceptInvitation(w http.ResponseWriter, r *http.Request) {
 	if s.invitationAccept == nil {
-		writeProblem(w, http.StatusServiceUnavailable, "invitation-acceptance-unavailable", "Service Unavailable", "Invitation acceptance is temporarily unavailable.")
+		writeProblem(w, http.StatusServiceUnavailable, "invitation-acceptance-unavailable", titleServiceUnavailable, "Invitation acceptance is temporarily unavailable.")
 		return
 	}
 	var request InvitationAcceptRequest
@@ -43,8 +43,8 @@ func (s *Server) acceptInvitation(w http.ResponseWriter, r *http.Request) {
 		// to avoid revealing which token state was observed.
 		writeProblem(w, http.StatusGone, "invitation-token-unavailable", "Gone", "The invitation token is no longer available.")
 	case errors.Is(err, invitation.ErrPublish):
-		writeProblem(w, http.StatusServiceUnavailable, "event-unavailable", "Service Unavailable", "Invitation acceptance is temporarily unavailable.")
+		writeProblem(w, http.StatusServiceUnavailable, "event-unavailable", titleServiceUnavailable, "Invitation acceptance is temporarily unavailable.")
 	default:
-		writeProblem(w, http.StatusInternalServerError, "invitation-acceptance-failed", "Internal Server Error", "The invitation could not be accepted.")
+		writeProblem(w, http.StatusInternalServerError, "invitation-acceptance-failed", titleInternalServerError, "The invitation could not be accepted.")
 	}
 }

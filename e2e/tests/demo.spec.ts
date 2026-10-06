@@ -22,6 +22,8 @@ test('DEMO Guion de la demo en vivo: alta, invitación, MFA, SSO y vistas por ro
     await test.step('1. El admin entra a la consola del Hub con MFA', async () => {
       await adminPage.goto(`${hubUrl}/login`)
       await browserLoginWithMfa(adminPage, admin.email, strongPassword)
+      await expect(adminPage.getByRole('heading', { name: 'Inicio' })).toBeVisible()
+      await adminPage.getByRole('link', { name: 'Usuarios', exact: true }).first().click()
       await expect(adminPage.getByRole('heading', { name: 'Usuarios' })).toBeVisible()
     })
 

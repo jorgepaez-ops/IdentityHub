@@ -11,6 +11,11 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+const (
+	problemProfileLoadFailed = "profile-load-failed"
+	detailProfileLoadFailed  = "Profile could not be loaded."
+)
+
 type currentUserRepository interface {
 	GetUserByID(context.Context, uuid.UUID) (store.User, error)
 	ListRolesForUser(context.Context, uuid.UUID) ([]string, error)
@@ -60,17 +65,17 @@ func (s *Server) updateCurrentUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s.currentUsers == nil {
-		writeProblem(w, http.StatusServiceUnavailable, "profile-unavailable", "Service Unavailable", "Profile is temporarily unavailable.")
+		writeProblem(w, http.StatusServiceUnavailable, "profile-unavailable", titleServiceUnavailable, "Profile is temporarily unavailable.")
 		return
 	}
 	user, err := s.currentUsers.UpdateDisplayName(r.Context(), userID, *request.DisplayName)
 	if err != nil {
-		writeProblem(w, http.StatusInternalServerError, "profile-update-failed", "Internal Server Error", "Profile could not be updated.")
+		writeProblem(w, http.StatusInternalServerError, "profile-update-failed", titleInternalServerError, "Profile could not be updated.")
 		return
 	}
 	roles, err := s.currentUsers.ListRolesForUser(r.Context(), userID)
 	if err != nil {
-		writeProblem(w, http.StatusInternalServerError, "profile-load-failed", "Internal Server Error", "Profile could not be loaded.")
+		writeProblem(w, http.StatusInternalServerError, problemProfileLoadFailed, titleInternalServerError, detailProfileLoadFailed)
 		return
 	}
 	writeJSON(w, http.StatusOK, apiUser(user, roles))
@@ -78,17 +83,17 @@ func (s *Server) updateCurrentUser(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) loadCurrentUser(ctx context.Context, userID uuid.UUID, w http.ResponseWriter) (store.User, []string, bool) {
 	if s.currentUsers == nil {
-		writeProblem(w, http.StatusServiceUnavailable, "profile-unavailable", "Service Unavailable", "Profile is temporarily unavailable.")
+		writeProblem(w, http.StatusServiceUnavailable, "profile-unavailable", titleServiceUnavailable, "Profile is temporarily unavailable.")
 		return store.User{}, nil, false
 	}
 	user, err := s.currentUsers.GetUserByID(ctx, userID)
 	if err != nil {
-		writeProblem(w, http.StatusInternalServerError, "profile-load-failed", "Internal Server Error", "Profile could not be loaded.")
+		writeProblem(w, http.StatusInternalServerError, problemProfileLoadFailed, titleInternalServerError, detailProfileLoadFailed)
 		return store.User{}, nil, false
 	}
 	roles, err := s.currentUsers.ListRolesForUser(ctx, userID)
 	if err != nil {
-		writeProblem(w, http.StatusInternalServerError, "profile-load-failed", "Internal Server Error", "Profile could not be loaded.")
+		writeProblem(w, http.StatusInternalServerError, problemProfileLoadFailed, titleInternalServerError, detailProfileLoadFailed)
 		return store.User{}, nil, false
 	}
 	return user, roles, true

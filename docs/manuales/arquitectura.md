@@ -72,4 +72,7 @@ El README documenta la elección técnica de Go y sus razones para el proyecto. 
 - [Componentes](../diagramas/uml/componentes.md)
 - [Despliegue local](../diagramas/uml/despliegue.md)
 - [Secuencia de login con MFA](../diagramas/uml/secuencia-login-mfa.md)
+- [Secuencia del SSO con PKCE](../diagramas/uml/secuencia-sso-pkce.md)
+- [Estados de la cuenta de usuario](../diagramas/uml/estados-usuario.md)
+- Vistas de conjunto en HTML con SVG en línea, sin JavaScript y con el tema del sistema: [arquitectura](../diagramas/01-arquitectura.html), [flujo SSO](../diagramas/02-flujo-sso.html) y [ciclo de vida del usuario](../diagramas/03-ciclo-de-vida-usuario.html)
 - [Modelo Threat Dragon: DFD nivel 0 y 1](../threat-model/README.md)

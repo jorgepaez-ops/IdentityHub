@@ -99,7 +99,7 @@ func TestRNF005_LoginSecurityPublisherBuildsCompleteNotification(t *testing.T) {
 	if len(publisher.events) != 1 || publisher.events[0].routingKey != events.TypeAccountLocked {
 		t.Fatalf("published events = %#v", publisher.events)
 	}
-	message, ok := publisher.events[0].body.(accountLockedNotification)
+	message, ok := publisher.events[0].body.(events.AccountLocked)
 	if !ok {
 		t.Fatalf("message type = %T", publisher.events[0].body)
 	}

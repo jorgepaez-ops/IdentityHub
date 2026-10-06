@@ -1,0 +1,389 @@
+# pulido-frontend — Apariencia y funciones del Hub y de Contabilidad, más cierre de deudas menores
+
+## Objetivo
+
+Que la consola del Hub y Contabilidad se vean y se sientan como productos terminados para la demo, el
+video y la sustentación, sin tocar el backend, y cerrar las deudas menores anotadas en
+`odd/tasks/idp-semana-4.md`.
+
+## Problema y motivo
+
+La base es sólida (tokens CSS, modo oscuro por sistema, tablas accesibles, estados vacíos en el Hub),
+pero las dos aplicaciones se ven básicas: las fuentes declaradas (IBM Plex, Space Grotesk, Fraunces)
+nunca se cargan, no hay íconos ni favicon, el Hub no tiene página de inicio, la auditoría muestra UUID y
+JSON crudos, y Contabilidad son seis filas fijas sin gráficos, filtros ni exportación (su aviso nunca se
+cierra). Exploración del 2026-10-06 (agente de solo lectura) con evidencia `ruta:línea`.
+
+## Decisiones (2026-10-06, con el usuario)
+
+- **D1 · Dirección visual:** refinar la identidad de cada aplicación. Hub sobrio y corporativo (azul,
+  IBM Plex Sans/Mono, Space Grotesk en títulos); Contabilidad cálida (tonos tierra, Fraunces en títulos).
+  Dos estilos distintos refuerzan en la demo que son aplicaciones separadas unidas por SSO.
+- **D2 · Alcance:** apariencia y funciones en ambas aplicaciones, más las deudas menores.
+- **D3 · Sin backend:** todo con la API actual (OpenAPI vigente). Los indicadores que exigen totales
+  exactos se muestran como «100+» cuando hay más páginas; un endpoint de estadísticas queda como trabajo
+  futuro.
+
+## Restricciones
+
+- CSP (`frontend/nginx/default.conf`): `style-src 'self'`, `font-src 'self'`, `img-src 'self' data:`.
+  Fuentes incluidas en el bundle (woff2, licencia OFL), sin CDN; gráficos en SVG hecho a mano con
+  clases, sin librerías que inyecten `<style>`.
+- AGENTS.md: tipos de API desde `schema.d.ts`, sin `dangerouslySetInnerHTML`, sin tokens en
+  `localStorage`, `lint` sin avisos, `typecheck` y `test` en verde, cada cambio de comportamiento con su
+  prueba `TestRF0xx_`.
+- E2E: conservar IDs (`#email`, `#password`, `#mfa-code`, `#new-password`, `#password-confirmation`),
+  nombres accesibles y encabezados que usan las pruebas, y una sola región `role="status"` visible a la
+  vez. `make e2e` debe seguir en 52/52.
+- Codex no tiene red ni Docker: descargas de fuentes, E2E, capturas e informe los cierra Claude.
+- Repo en iCloud: binarios generados en una carpeta temporal y copiados de una vez.
+- Tamaño orientativo por tarea: ~400 líneas (heurística).
+
+## Criterios de aceptación
+
+1. Fuentes, íconos, favicon y selector de tema visibles en ambas aplicaciones.
+2. La consola abre en una página de inicio con indicadores reales de la API.
+3. Contabilidad muestra gráficos, filtros, búsqueda, orden y exportación, con avisos que se cierran.
+4. Accesibilidad: foco visible global, enlace para saltar al contenido, tablas con nombre y `scope`.
+5. Deudas menores cerradas o justificadas una por una.
+6. `make e2e` 52/52 (o más), vitest, lint y typecheck en verde; capturas, manual e informe regenerados.
+
+## Tareas
+
+- [x] **P1 — Sistema visual del Hub.** Fuentes woff2 incluidas, íconos SVG en línea, favicon, selector de
+  tema (`data-theme`), foco visible global, enlace para saltar al contenido, componente de aviso con
+  cierre y esqueletos de carga.
+  Ruta: delegada (Codex; se quedó sin cuota al final de su verificación), cierre de Claude. Evidencia
+  (2026-10-06): fuentes `@fontsource` (IBM Plex Sans/Mono, Space Grotesk; también Fraunces y Plex para
+  Contabilidad, instaladas por Claude con red; `npm audit` 0), `fonts.css`, íconos SVG, favicon,
+  `ThemeToggle` con `data-theme`, foco visible, enlace para saltar al contenido, `Toast` con cierre
+  automático y `LoadingSkeleton`. Claude corrigió dos defectos: la prueba del cierre automático avanzaba
+  el reloj fuera de `act()`, y el `Toast` reiniciaba el temporizador cada vez que el padre pasaba un
+  callback nuevo (no se cerraba mientras se escribía en la búsqueda): ahora el callback vive en un ref;
+  prueba nueva que falla con la versión anterior. Verificación: typecheck y lint limpios, vitest 171/171,
+  build con los woff2 emitidos, `make e2e` 52/52, vista previa de capturas revisada (`CAPTURAS_OUT`,
+  variable nueva del script para no tocar las imágenes del manual). iCloud creó 224 copias « N» durante
+  la edición (43 idénticas, 181 versiones intermedias): movidas fuera del repo, sin borrar.
+  Commit `6ad0e55`. Revisión nativa (medio, 548 líneas, 1 lente): **aprobada**. Corregido después: el tema
+  usa el del sistema si `localStorage` lanza excepción (prueba nueva, RED con el código anterior); un
+  error en la grilla de roles retira el aviso de éxito y «Nuevo rol» también lo retira; los avisos
+  llevan un id, así que el mismo texto dos veces reinicia el temporizador. vitest 172/172, lint y
+  typecheck limpios, `make e2e` 52/52.
+- [x] **P2 — Sistema visual de Contabilidad.** Lo mismo con su identidad cálida; el aviso se cierra solo.
+  Ruta: delegada (Sonnet; Codex sin cuota), revisión de Claude. Evidencia (2026-10-06): fuentes
+  `@fontsource` (Plex Sans/Mono, Fraunces), íconos SVG (candado SVG con nombre «Bloqueado»), favicon,
+  tema con `data-theme` y almacenamiento protegido, foco visible, enlace para saltar al contenido, tabla
+  con nombre y `scope`, `Toast` con cierre automático y reinicio por id (el aviso anterior nunca se
+  cerraba), estilos cálidos (tarjetas con barra de acento, estados con punto de color, botones con
+  ícono). RED: 8 pruebas TestRF021_ nuevas fallaban sin los módulos; GREEN: vitest 71/71 (63 previas),
+  typecheck y lint limpios, build con 4 woff2, `make e2e` 52/52. Revisión de Claude: capturas de resumen
+  y transacciones revisadas; un «+ +» en el botón de registrar era de una versión intermedia (el código
+  final no tiene ícono ahí). Sin verificar a ojo: modo oscuro y móvil (P10).
+  Commit `3cc9604`. Revisión nativa (medio, 432 líneas, P1 y P2, 1 lente): **aprobada** con avisos de
+  cobertura; cerrados con pruebas (Sonnet): mismo texto dos veces reinicia el aviso en Contabilidad,
+  usuarios y roles; un error y «Nuevo rol» retiran el aviso de éxito; almacenamiento bloqueado usa el
+  tema del sistema y el botón sigue alternando. Cada prueba falla al revertir su comportamiento. vitest
+  Hub 176/176 y Contabilidad 72/72, lint y typecheck limpios.
+- [x] **P3 — Inicio de la consola.** Ruta `/inicio` con indicadores (usuarios por estado, inicios
+  fallidos en 24 h, actividad reciente) y accesos directos; los administradores aterrizan ahí.
+  Ruta: delegada (Sonnet; Codex sin cuota hasta las 15:13), revisión y corrección de Claude. Evidencia
+  (2026-10-06): `HomePage.tsx` con cuatro tarjetas por estado, fallidos en 24 h, últimos 10 eventos y
+  accesos directos; conteos «N+» con `limit` 100 (D3); aterrizaje de admin en `/inicio` (comodín,
+  `/login` y tras MFA); no administradores a `/me`. RED: 11 de 13 pruebas nuevas fallaban sin la página.
+  Revisión de Claude: los fallidos solo contaban `login_failed`, pero el backend registra el código MFA
+  rechazado como `mfa_code_rejected` y el requisito lo cuenta como fallo; se suman ambas acciones
+  (prueba `TestRF011_CountsRejectedMfaCodesAsFailedSignIns`, RED observado antes del cambio) y el
+  ternario anidado del tono pasó a un mapa. vitest 190/190, typecheck y lint limpios, `make e2e` 52/52
+  (corrido por Sonnet antes de la corrección, que solo añade una consulta). E2E ajustadas:
+  `roles-y-permisos` y `demo` esperan «Inicio» tras el login. Límite conocido: siete consultas por
+  visita y la ventana de 24 h usa el reloj del navegador.
+  Commit `13cbcc4`. Revisión nativa (medio, 471 líneas, P3 más `47e88aa`, 1 lente de fiabilidad):
+  **aprobada** y acusada. Dos sugerencias no bloqueantes quedan como trabajo posterior (P9): el
+  manejador de auditoría de la prueba devuelve la lista reciente a la consulta `mfa_code_rejected` (enrutar
+  esa acción a una lista vacía por defecto), y el aviso de error pide reintentar sin ofrecer un botón;
+  además, un fallo en una de las siete consultas oculta todos los indicadores.
+  Revisión nativa de la rama completa (desde `6c8bc11`, 45 archivos, 1421 líneas, 1 lente): **aprobada**
+  y acusada. Aviso nuevo para P9: `initializeTheme` escribe `data-theme` al arrancar aunque el usuario no
+  haya elegido tema, así que el Hub y Contabilidad ya no siguen en vivo el cambio de modo oscuro del
+  sistema (solo al recargar). **Corregido** (con el usuario, antes de P4; delegado a Sonnet, revisado por
+  Claude): `subscribeToSystemTheme` escucha `matchMedia` mientras no haya elección guardada ni clic en la
+  página; `initializeTheme` y `ThemeToggle` se suscriben. RED: 2 de 4 pruebas nuevas por app fallaban;
+  GREEN: vitest Hub 194/194 y Contabilidad 76/76, typecheck y lint limpios. Tercera revisión nativa de
+  la rama (aprobada y acusada) dejó otra sugerencia para P9: en login, páginas públicas y pantalla de
+  restauración, `main#main-content` no tiene `tabIndex=-1`, así que el enlace para saltar puede no mover
+  el foco.
+- [x] **P4 — Usuarios.** Filtro por estado con el parámetro `status` existente y tarjetas clicables.
+  Ruta: delegada (Sonnet; Codex sin cuota), revisión y corrección de Claude. Evidencia (2026-10-06):
+  grupo «Filtrar por estado» con botones `aria-pressed` (Todos, Activos, Pendientes, Bloqueados,
+  Deshabilitados) que envía `status` a la API también en «Cargar más», reinicia el cursor, se combina con
+  la búsqueda y vive en la URL como `?estado=` (valores desconocidos se ignoran); las tarjetas de estado
+  del inicio enlazan a `/usuarios?estado=…` (la de fallidos queda sin enlace hasta P5, porque la
+  auditoría aún no lee filtros de la URL). La prueba de inicio ya no cuenta la actividad reciente como
+  `mfa_code_rejected` (sugerencia de la revisión de P3). RED: 11 pruebas fallaban sin el cambio.
+  Revisión de Claude: bajo un filtro, las tarjetas de Usuarios (que cuentan la lista cargada) mostraban
+  ceros falsos para los demás estados; ahora se ocultan mientras hay filtro (prueba nueva, RED observado),
+  y el ternario anidado del estado vacío pasó a una función. vitest 207/207, typecheck y lint limpios,
+  `make e2e` 52/52 (corrido por Sonnet antes de la corrección, que no toca flujos de E2E).
+  Commit `c8059d7`. Revisión nativa del tramo tema + P4 (medio, 14 archivos, 518 líneas, 1 lente):
+  **aprobada** y acusada. Su sugerencia se atendió: prueba de que la página sigue al sistema sin el botón
+  de tema montado (pantallas públicas), en ambas apps; falla al quitar la suscripción de
+  `initializeTheme`. vitest Hub 208/208 y Contabilidad 77/77, lint y typecheck limpios.
+  Cuarta revisión nativa de la rama (aprobada y acusada): la regla global `svg` del Hub achicaba todo SVG en
+  línea al tamaño de ícono (afectaría los gráficos); ahora se limita a `svg.icon`. Para P9 quedan dos
+  sugerencias: `tabIndex=-1` en `main#main-content` de las páginas públicas (ya anotada) y reiniciar el
+  estado de módulo de `theme.ts` en el `afterEach` de las pruebas para que no dependan del orden.
+- [x] **P5 — Auditoría.** Atajos de filtro, actor resuelto a correo (`getUser`), metadatos legibles y
+  «filtrar por este actor».
+  Ruta: delegada (Sonnet; Codex sin cuota), revisión de Claude. Evidencia (2026-10-06): filtros en la URL
+  (`?accion=`, `?actor=`, `?desde=`, con `desde=24h` relativo para que los enlaces no caduquen; valores
+  inválidos se ignoran; cada cambio reinicia el cursor); atajos `aria-pressed` «Inicios fallidos»,
+  «Códigos MFA rechazados», «Cambios de roles» y «Últimas 24 h»; actor resuelto a correo con `getUser`
+  una vez por id y sin bloquear la tabla (id corto si falla o el usuario no existe, «Sistema» si es nulo);
+  metadatos como `dl` con claves anidadas en notación de puntos; «Filtrar por este actor» por fila; la
+  tarjeta de fallidos del inicio enlaza a `/auditoria?accion=login_failed&desde=24h`. RED: 13 pruebas
+  fallaban sin el cambio. vitest 221/221, typecheck y lint limpios, `make e2e` 52/52. Límites conocidos:
+  la API acepta una sola acción por consulta, así que la tarjeta del inicio suma `login_failed` y
+  `mfa_code_rejected` pero su enlace filtra solo `login_failed`; «Cambios de roles» cubre `role_changed`
+  (no `role_created`/`role_updated`/`role_deleted` de roles de aplicación); un objeto anidado vacío en
+  los metadatos no muestra clave.
+  Commit `41fef8c`. La revisión de la rama completa ya no cabe en el contexto del revisor
+  (`lens_context_budget_exceeded`, 2325 líneas): desde aquí se revisa por tramos. Revisión nativa de P5
+  (medio, 9 archivos, 401 líneas, 1 lente): **aprobada** y acusada, con dos avisos y una sugerencia
+  corregidos por Claude con pruebas (RED observado en las tres primeras): claves de metadatos que
+  colisionan al aplanarse (`a.b` literal y `a: { b }`) ya no repiten la clave de React; los atajos y
+  «Filtrar por este actor» limpian el error del actor; volver a pulsar «Filtrar» sin cambios recarga
+  (recalcula la ventana de 24 h). Al probar este último se encontró una doble petición cuando el filtro sí
+  cambiaba; ahora solo se fuerza la recarga si la URL no cambia, y en ese caso también se limpia el error
+  (prueba añadida después del arreglo, sin RED observado). vitest 225/225, typecheck y lint limpios.
+- [x] **P6 — Contabilidad: resumen.** Más datos de ejemplo, gráficos SVG (por estado, por categoría,
+  línea de tiempo) y actividad reciente.
+  Ruta: delegada (Sonnet; Codex sin cuota), revisión y corrección de Claude. Evidencia (2026-10-06):
+  47 movimientos deterministas (abril a septiembre de 2026, 7 categorías; folios `M-1xxx` por debajo del
+  contador, así que los nuevos siguen en `M-2047` y las E2E con `M-2041`…`M-2046` no cambian);
+  `aggregate.ts` con totales por estado, categoría y mes (meses vacíos en cero) y actividad reciente;
+  tres gráficos SVG hechos a mano (dona por estado, barras por categoría, columnas por mes), cada uno
+  `figure` con `figcaption`, `svg` con `role="img"` y `aria-label` resumido, y tabla alternativa en
+  `details`; sin estilos en línea ni clase `icon`. Las tarjetas «del mes» cuentan solo el periodo abierto
+  (`inOpenPeriod`, desde `2026-09-01`); los gráficos, todo el historial. RED: los módulos nuevos no
+  existían. Revisión de Claude: el cierre de septiembre contaba todo el historial (38 aprobados en vez de
+  5); ahora usa `inOpenPeriod` (prueba `TestRF021_ClosingCountsOnlyTheOpenPeriod`, RED observado). vitest
+  96/96, typecheck, lint y build limpios, `make e2e` 52/52 (corrido por Sonnet antes de la corrección del
+  cierre, que ninguna E2E afirma). Sin verificar a ojo: modo oscuro y móvil (P10).
+  Commit `d5f7b19`. Revisión nativa de P6 (medio, 14 archivos, 571 líneas, 1 lente): **aprobada** y
+  acusada. Aviso corregido por Claude: `totalsByMonth` entraba en un ciclo infinito con una fecha mal
+  formada (RED observado: el proceso de pruebas murió por memoria agotada); ahora solo recorre claves
+  `YYYY-MM` válidas. Sugerencia aceptada como límite de la demo: el periodo abierto es una constante
+  (`2026-09-01`) sin límite superior, así que un movimiento nuevo (fechado con el reloj real, octubre)
+  cuenta en el cierre de septiembre y no cambia tras cerrar. vitest 97/97, typecheck y lint limpios.
+- [x] **P7 — Contabilidad: movimientos.** Búsqueda, filtros, orden, categoría al registrar,
+  confirmación antes de aprobar o rechazar, estado vacío, tabla accesible.
+  Ruta: delegada (Sonnet; Codex sin cuota), revisión de Claude. Evidencia (2026-10-06): búsqueda por
+  folio, descripción o categoría sin distinguir mayúsculas ni tildes; filtros por estado y categoría;
+  orden por fecha, folio y monto con `aria-sort` (por defecto, más reciente primero); categoría
+  obligatoria al registrar (`KNOWN_CATEGORIES`, adiós «Sin categoría»); `ConfirmDialog` modal
+  (`role="dialog"`, `aria-modal`, foco inicial en «Cancelar», Tab atrapado, Escape y clic fuera cancelan)
+  que nombra folio y monto; estado vacío con «Limpiar filtros»; columna «Fecha» propia; conteo de
+  resultados en `aria-live` sin crear otra región `role="status"`. RED: 24 de 25 pruebas nuevas
+  fallaban. vitest 123/123, typecheck, lint y build limpios, `make e2e` 52/52 (ninguna E2E pulsa
+  Aprobar/Rechazar, así que no hubo que tocarlas).
+  Commit `59061d0`. Revisión nativa de P7 (medio, 10 archivos, 576 líneas, 1 lente): **aprobada** y
+  acusada. Corregido por Claude con pruebas (RED observado en las dos primeras): tras confirmar, el botón
+  que abrió el diálogo desaparece y el foco caía al `body`; ahora va a la tabla (`tabIndex=-1`), también
+  cuando el disparador era el `body` (Safari no enfoca botones al hacer clic). Confirmar ya no decide un
+  movimiento que dejó de estar pendiente mientras el diálogo estaba abierto. El cierre por clic en el
+  fondo ya funcionaba y ahora tiene prueba. Queda como sugerencia menor: la prueba de orden por monto
+  solo verifica el primer folio. vitest 126/126, typecheck, lint y build limpios.
+- [x] **P8 — Exportar CSV** en usuarios, auditoría y movimientos.
+  Ruta: delegada (Sonnet; Codex sin cuota), revisión de Claude. Evidencia (2026-10-06): `csv.ts` puro e
+  idéntico en ambas apps (RFC 4180, CRLF, BOM UTF-8 para Excel, comilla simple delante de celdas de texto
+  que empiezan con `= + - @` tab o CR según OWASP; los números se escriben tal cual, así que los montos
+  negativos siguen siendo numéricos); descarga por `Blob` + `<a download>` con URL revocada, sin `data:`
+  ni cambios de CSP; botón «Exportar CSV» con ícono, deshabilitado sin filas. Usuarios (7 columnas) y
+  Auditoría (7 columnas; actor como correo resuelto, id o «Sistema»; metadatos `k=v; …`) exportan lo
+  cargado bajo los filtros actuales, con la nota «Exporta los N cargados; carga más para incluir el resto»
+  cuando hay más páginas (D3: no se piden todas). Contabilidad exporta las filas visibles tras búsqueda,
+  filtros y orden. RED: 9 pruebas de interfaz del Hub y 3 de Contabilidad fallaban. Revisión de Claude:
+  BOM como `\uFEFF` y sin ternario anidado. vitest Hub 248/248 y Contabilidad 143/143, typecheck y lint
+  limpios, build de Contabilidad, `make e2e` 52/52 (Sonnet). Sin probar la descarga en un navegador
+  real (P10). Commit `9b86e1c`. Revisión nativa de P8 (medio, 14 archivos, 586 líneas, 1 lente):
+  **aprobada** y acusada; su sugerencia se aplicó: la URL del `Blob` se revoca a los 30 s y no de
+  inmediato, porque algunos navegadores inician la descarga de forma asíncrona (prueba con relojes
+  falsos: no se revoca al segundo, sí a los 31).
+- [ ] **P9 — Deudas menores.** Avisos de SonarCloud de las fases 3 y 4, sugerencias pendientes de las
+  revisiones nativas (correos, refresh, informe, capturas) y alerta de Grafana más runbook para la DLQ
+  (AM-019).
+  Ampliada (2026-10-06, con el usuario) con las 120 alertas abiertas de code scanning en `main`:
+  - 50 de Semgrep (`github-actions-mutable-action-tag`): fijar las acciones por SHA con el tag como
+    comentario.
+  - 33 de CodeQL (`js/remote-property-injection`), todas en los HTML de `docs/diagramas/` (biblioteca
+    minificada embebida). Decisión del usuario (2026-10-06): **regenerar los tres diagramas actualizados**
+    (grilla de roles, observabilidad, producción simulada, referencia AWS) con el mismo estilo visual,
+    como HTML estático con SVG en línea y sin bibliotecas JavaScript de terceros; además, agregar los UML
+    formales de secuencia del SSO con PKCE y de estados del ciclo de vida del usuario en
+    `docs/diagramas/uml/` para el informe técnico.
+  - 6 de Trivy (libpng y nghttp2 en `web`, tzdata en `api`/`worker`, x/crypto en `api` ligado a
+    VULN-028, AWS-0089 en Terraform): actualizar imágenes base si hay versión corregida.
+  - 27 de Checkov (omisiones ya justificadas en el código) y 4 de Semgrep (`request-host-used` en nginx).
+  - Lo que no se pueda corregir se documenta en `README.md`, sección «Alertas abiertas conocidas», con
+    motivo y justificación, para la exposición.
+  Subtareas (2026-10-06, todas delegadas a Sonnet por decisión del usuario, una a la vez):
+  - [x] **P9a — Sugerencias pendientes del frontend:** reintentar y fallo parcial en Inicio, `tabIndex=-1`
+    del destino del enlace para saltar en páginas públicas, reinicio del estado de `theme.ts` en las
+    pruebas, orden por monto con aserción completa, constante para `mfa_code_rejected`.
+    Evidencia (2026-10-06, Sonnet, revisión de Claude): Inicio carga tres grupos con `Promise.allSettled`
+    (error en línea por grupo, «Reintentar», un 401 en cualquiera cierra la sesión); `tabIndex=-1` en
+    `main#main-content` de login, restauración y páginas públicas (Contabilidad no tiene enlace para
+    saltar fuera del `Shell`, que ya lo tenía); `resetThemeForTests()` en el `afterEach` de ambas suites;
+    orden por monto con la lista completa y desempate por folio; `MFA_CODE_REJECTED_ACTION`. RED: 5
+    pruebas. vitest Hub 253/253 y Contabilidad 143/143, typecheck y lint limpios, `make e2e` 52/52.
+  - [x] **P9b — Acciones de GitHub fijadas por SHA** (50 alertas de Semgrep), con el tag como comentario.
+    Evidencia (2026-10-06, Sonnet con red, revisión de Claude): las 50 referencias de los tres workflows
+    van a SHA de 40 caracteres con `# vX.Y.Z`, dentro de su mayor actual (único cambio real:
+    `hadolint-action` v3.1.0 → v3.5.0); `trivy-action` v0.36.0 verificado contra el incidente de 2026
+    (tag anotado firmado, commit firmado en `master`, release inmutable); `.github/dependabot.yml` semanal
+    para `github-actions`. `actionlint` sin hallazgos y YAML válido. Claude verificó por su cuenta los SHA
+    de `checkout` y `trivy-action` con `gh api` y que no queda ningún `uses:` sin fijar. El efecto en CI se
+    ve en el próximo push.
+  Revisión nativa de P9a + P9b (riesgo alto por la CI, 17 archivos, 348 líneas, 4 lentes en paralelo):
+  **aprobada** y acusada, sin hallazgos en la CI. Sugerencias sobre Inicio: `Promise.allSettled` hacía
+  esperar a todos los grupos por el más lento y el esqueleto por grupo nunca se veía; ahora cada grupo se
+  muestra al resolverse (prueba con una respuesta que nunca llega, RED observado) y los grupos aún en
+  carga muestran texto, no otra región `role="status"`. Queda como menor: la prueba del enlace para
+  saltar enfoca el destino a mano (jsdom no mueve el foco al navegar a un fragmento). vitest Hub 254/254.
+  - [x] **P9c — Diagramas regenerados** sin bibliotecas JavaScript (33 alertas de CodeQL) y UML de
+    secuencia del SSO con PKCE y de estados del usuario en `docs/diagramas/uml/`.
+    Evidencia (2026-10-06, Sonnet, revisión visual de Claude en claro y oscuro): los tres HTML de
+    `docs/diagramas/` pasan de ~800 KB a 12–16 KB, con SVG en línea, sin `<script>`, sin atributos `on*`
+    y sin fuentes externas; el tema sigue `prefers-color-scheme`. Arquitectura con Contabilidad como SPA
+    cliente SSO, observabilidad real (Prometheus, Alloy, Loki, Grafana), `migrate`, Mailpit y tabla
+    desarrollo / producción simulada / AWS; flujo SSO completo (PKCE S256, rama sin `hub_session` con MFA,
+    canje con CORS, claims del JWT, JWKS); ciclo de vida con las transiciones reales y los roles como
+    anotación. Nuevos `uml/secuencia-sso-pkce.md` y `uml/estados-usuario.md` (Mermaid validado con
+    `mermaid-cli`), enlazados en `docs/README.md`. Diferencias con la especificación halladas (fuera de
+    alcance, backend): la purga de cuentas sin verificar a las 24 h de `specs/02-domain-model.md` no
+    existe en el código; un bloqueo puesto a mano por un admin no vence (`locked_until` vacío); el worker
+    no usa la base aunque recibe `DATABASE_URL` (y `despliegue-aws.md` dibuja Worker→RDS). Para P10:
+    añadir los dos UML nuevos a la lista de `docs/manuales/arquitectura.md` (líneas 71–74).
+    Revisión nativa del tramo `1688db9`..`f56b9a9` (arreglo de Inicio + diagramas): autorizada por el
+    usuario, pero rechazada con `lens_context_budget_exceeded` (45.299 líneas, casi todas el borrado de
+    los HTML de archify); sin registro creado. La herramienta revisa hasta HEAD, así que no se pudo
+    aislar el arreglo de Inicio: queda **sin revisión nativa**, cubierto por su prueba (RED observado) y
+    la revisión visual de Claude. El siguiente tramo parte de `f56b9a9`.
+  - [x] **P9d — Imágenes base y alertas de infraestructura:** Trivy (6), Checkov (27), Semgrep de nginx
+    (4) y sección «Alertas abiertas conocidas» en `README.md`.
+    Evidencia (2026-10-06, Sonnet, revisión de Claude): 120 alertas abiertas en `main` al
+    empezar (50 Semgrep acciones y 33 CodeQL, ya cubiertas por P9b/P9c); las de P9d: Trivy 6, Checkov 27,
+    Semgrep nginx 4. `web`: nuevo digest de `stable-alpine` (nginx 1.30.5) corrige libpng, nghttp2 y
+    pcre2, así que se retiró la capa `apk upgrade pcre2`; Trivy sobre la imagen 3 → 0. tzdata (`api`,
+    `worker`): sin digest de distroless con 2026c todavía, queda. x/crypto GO-2026-5932: sin versión
+    corregida, ya es riesgo aceptado de VULN-028 (osv-scanner.toml), no se tocó Go. Nginx: la cabecera
+    Host hacia la API usa el nombre del bloque `server` y no la cabecera Host del cliente (la API no la
+    lee); Semgrep local 0 hallazgos. Terraform: `#trivy:ignore:AWS-0089` con motivo (bucket destino de
+    logs, igual que CKV_AWS_18); `terraform fmt`/`validate` bien. Checkov: las 27 llevaban `suppressions`
+    en el SARIF; GitHub las muestra igual, así que `ci.yml` las filtra con `jq` antes de subir (el gate
+    no cambia). README: sección «Alertas abiertas conocidas». `make e2e` 52/52. Claude verificó que el backend
+    no lee la cabecera Host de la petición (único `.Host` en `notify.go`, sobre una URL de configuración).
+    Pendiente de CI: el filtro `jq` de Checkov solo se probó localmente; se ve en el próximo push.
+    Hallazgo fuera de alcance (sin id): `make scan-image` y `make scan-config` fijan Trivy 0.56.2 mientras
+    CI usa una versión mucho más nueva, así que el escaneo local puede no coincidir con CI; decidir en qué
+    tarea se alinea.
+    Commit `4339a00`. Revisión nativa de P9d (riesgo alto, 6 archivos, 68 líneas, 4 lentes): **aprobada**
+    y acusada. Corregido por Claude: el paso `jq` no tapa un fallo de Checkov (sale sin hacer nada si no
+    hay SARIF) y tolera `results` nulo o `runs` vacío (probado con SARIF de ejemplo); su comentario ya no
+    sugiere que el gate cambió. Aviso aceptado con evidencia: la API recibe ahora un Host fijo; el backend
+    no lo lee (búsqueda de `.Host`) y `make e2e` 52/52 cubre el SSO completo.
+  - [x] **P9e — Deudas de fases 3 y 4:** avisos de SonarCloud, sugerencias de las revisiones nativas
+    (correos, refresh, informe, capturas) y alerta de Grafana con runbook para la DLQ (AM-019).
+    Evidencia (2026-10-06, Sonnet, revisión de Claude): AM-019 con regla
+    aprovisionada `deploy/observability/grafana/alerting/dlq.yml` (se dispara con la DLQ > 0 durante 2 min),
+    uid fijo de la fuente Prometheus (con `deleteDatasources` para bases de Grafana ya creadas) y runbook
+    `docs/runbooks/dlq-notificaciones.md`; probada con un mensaje publicado a `identity.dlx`: inactive,
+    pending, firing y de nuevo inactive tras vaciar la cola. SonarCloud (3321 abiertas en main; 3108 en
+    `docs/diagramas`, ya regeneradas por P9c): constantes de títulos y detalles de problemas (S1192),
+    `Readonly<>` en props (S6759), helper `fieldValue` (S6551), aserciones de Storage (S5906), ternarios
+    anidados, `replaceAll`/`codePointAt`. Quedan sin hacer: complejidad cognitiva (S3776), roles ARIA a
+    elementos nativos (S6819), nombres de interfaces de un método (S8196), claves por índice (S6479) y
+    los avisos de `.github`, `e2e`, `scripts`, `db` y `security` (fuera de la superficie permitida).
+    Lo no hecho queda **justificado o diferido**, no abierto: S3776 pide una tarea por función
+    (`login.go` 32, `admin.go` 33, `mfa.go` 21, `config.go` 20); S6819 usa roles ARIA válidos; S8196
+    sigue la convención hexagonal (`Repository`); S1135 en `events_test.go` es un falso positivo («todo»).
+    Pasan a P10: el JSON del modelo de amenazas, `informe-tecnico.md` y `guion.md` aún dicen AM-019
+    «Open». Commits `bcfda55` (alerta), `3dcb0e2` (backend) y `cb63cf0` (frontend; dos líneas que leen la
+    contraseña tecleada llevan `gitleaks:allow`, falsos positivos de la regla propia). Verificación de
+    Claude: `go build`, `go test`, `golangci-lint` 0, Hub 255/255 y Contabilidad 144/144.
+    Revisión nativa de P9e (riesgo alto, 65 archivos, 687 líneas, 4 lentes): **aprobada** y acusada.
+    Corregido por Claude: la alerta usa `noDataState: Alerting` (sin métricas del broker tampoco se sabe
+    si salen correos), `runbook_url` absoluto y descripción sin el «3 intentos» fijo; el comentario de las
+    métricas vuelve a documentar su bloque `var`. Aviso descartado con evidencia: `events.AccountLocked`
+    tiene la misma forma JSON que el struct que reemplazó. Queda como sugerencia: sin verificación
+    automática de que la regla y el uid de la fuente resuelven (solo la prueba manual).
+- [x] **P10 — Documentación y evidencia.** Ajustes de E2E si hacen falta, capturas regeneradas,
+  manual de usuario e informe técnico actualizados.
+  Pendientes detectados (2026-10-06): en `docs/manuales/integracion-terceros.md` §2.3, la fila «Roles»
+  dice que el catálogo está fijo en `roles.go` con los roles de Contabilidad; desde ADR 0013 solo `admin`
+  y `user` viven en código y los roles de aplicación son datos que se crean en la grilla. En
+  `docs/manuales/usuario.md`, aclarar al inicio que hay dos roles de sistema (`admin`, `user`) y roles de
+  aplicación ilimitados creados en **Roles** (la tabla de la sección 1 lista perfiles, no roles, y se
+  presta a leer «solo dos roles»); actualizar también el aterrizaje en **Inicio** (§3, dice «Usuarios»).
+  - [x] **P10a — Capturas, manual de usuario y comprobaciones visuales** (Sonnet, revisión de Claude,
+    2026-10-06). `capturas.ts` aterriza en Inicio, elige categoría y confirma la aprobación;
+    `actionTimeout` de 30 s para que un elemento ausente no cuelgue 900 s. 7 capturas nuevas (Inicio,
+    filtro de estado, atajo y metadatos de auditoría, gráficos, filtros de movimientos, diálogo) y 48
+    regeneradas; el manual referencia las 55 y ninguna sobra. Manual: Inicio y «100+», filtros y CSV,
+    auditoría, gráficos y confirmación, selector de tema y un recuadro inicial que aclara dos roles de
+    sistema frente a roles de aplicación ilimitados. Modo oscuro y 390 px revisados en 24 capturas:
+    tres defectos de CSS corregidos (metadatos que se salían de la tabla, desplazamiento lateral de la
+    página en Usuarios por un `.sr-only` fuera del contenedor, folios partidos). Descarga real de CSV en
+    Chromium: BOM, CRLF, encabezados y montos numéricos correctos. Verificación: `make capturas` limpio
+    (sin roles de prueba restantes), `make e2e` 52/52, vitest Hub 255/255 y Contabilidad 144/144. Los
+    conteos de Inicio en las capturas reflejan cuentas de E2E en la base local (100+ deshabilitados).
+  - P10b (Sonnet, 2026-10-06, pendiente de revisión de Claude): documentación técnica alineada.
+    `integracion-terceros.md` §2.3 (fila Roles: solo `admin`/`user` en código; una segunda aplicación
+    exige una migración que siembre aplicación y permisos); `arquitectura.md` lista los dos UML nuevos y
+    las tres vistas HTML (SVG estático); AM-019 `Mitigated` en `identity-hub.json` (JSON válido), informe
+    y `guion.md`, con regla `dlq.yml` y runbook; informe con secciones «Pulido del frontend»,
+    «Endurecimiento adicional de la rama de pulido» y «Diferencias conocidas entre especificación y
+    código» (tres, como trabajo futuro); Inicio en lugar de Usuarios en informe, `guion-demo.md` y
+    `video/guion.md`; PDF regenerado con `make informe` (47 páginas; está ignorado por git).
+
+- [x] **P11 — Código propio de Contabilidad (puerta de SonarCloud del PR #13).** La puerta falló por
+  duplicación (17,2 %, umbral 3 %) por copias idénticas de `theme.ts` y `csv.ts` (con sus pruebas) entre
+  el Hub y Contabilidad, más CSS repetido en los tres diagramas. Decisión del usuario (2026-10-06):
+  Contabilidad representa una aplicación real de un tercero, así que su código debe ser propio; no se
+  baja la puerta ni se añaden exclusiones, ni se disfrazan copias. Contabilidad pasa a un tema con
+  proveedor y hook de React y a un exportador de movimientos propio del dominio, con pruebas propias;
+  los diagramas comparten `docs/diagramas/diagramas.css`. El fallo de fiabilidad (S2871, `sort()` sin
+  comparador en `aggregate.ts`) ya se corrigió en `fd5703a`.
+  Evidencia (2026-10-06, Sonnet, revisión de Claude): Contabilidad usa `AppearanceProvider`/`useAppearance`
+  (reductor con preferencia fijada; escucha de `matchMedia` solo mientras no hay elección;
+  `paintFirstFrame()` evita el destello inicial) y `exportMovements.ts` (tabla de columnas tipada a
+  `Movement`, un solo `encodeField`, neutralización solo en texto libre, BOM, CRLF, revocación a 30 s).
+  También se reescribieron con diseño propio el atrapado de foco de `ConfirmDialog` y pruebas que
+  repetían la estructura del Hub. Se borraron `contabilidad/src/theme.ts`, `csv.ts` y `csv.test.ts`. Los
+  diagramas enlazan `diagramas.css` (capturas antes y después idénticas píxel a píxel, sin `<script>`).
+  `jscpd` (10 líneas, 50 tokens): ningún clon entre las apps; quedan 7 dentro de `frontend/src/App.test.tsx`
+  (0,67 %). vitest Contabilidad 147/147 y Hub 255/255 sin cambios, lint, typecheck y build limpios,
+  `make e2e` 52/52. RED del exportador observado (módulo inexistente); el proveedor de tema se escribió
+  antes que sus pruebas, cubiertas por las pruebas de comportamiento existentes.
+  Revisión nativa: el tramo desde `cb63cf0` (90 archivos, con las 55 capturas) no cupo en el contexto
+  del revisor; se revisó el tramo desde `79ac26e` (P10b, `sort()` y P11; 27 archivos, 983 líneas):
+  **aprobado** y acusado. Sugerencias aplicadas por Claude: un monto no finito se exporta como celda
+  vacía (prueba nueva, RED observado) y la prueba de neutralización compara el campo exacto en vez de un
+  `replace` sin efecto. Quedan sin revisión nativa la corrección de la alerta de la DLQ (`c8761ad`), el
+  CSS móvil (`37a83a9`) y el manual con capturas (`79ac26e`), cubiertos por sus verificaciones.
+
+## Progreso
+
+| Tareas | Hechas |
+|---|---|
+| P1 a P11 (11) | 11 (P1 a P11) |
+
+## Entrega
+
+Rama `feat/pulido-frontend` (sale de `feat/idp-semana-4`, que ya está en `main` salvo dos commits de
+notas). Commits por unidad de trabajo; un PR al final con confirmación del usuario. Pronóstico: más de
+400 líneas en total, una tarea por commit.
+
+## Siguiente paso
+
+Feature completo. Siguiente: PR de `feat/pulido-frontend` a `main`, con confirmación del usuario (estrategia `ask-on-risk`, un PR al final).

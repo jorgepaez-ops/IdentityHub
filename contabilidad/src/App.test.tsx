@@ -127,8 +127,8 @@ describe('callback screen', () => {
 
   it('TestRF020_NothingStoredInBrowserStorageAfterSignIn', async () => {
     await signInAs(['contabilidad.senior'])
-    expect(localStorage.length).toBe(0)
-    expect(sessionStorage.length).toBe(0)
+    expect(localStorage).toHaveLength(0)
+    expect(sessionStorage).toHaveLength(0)
   })
 
   it('TestRF020_ExpiredTokenGoesBackToAuthorizeWithoutRefreshToken', async () => {
@@ -240,9 +240,11 @@ describe('analyst role', () => {
     fireEvent.click(screen.getByRole('button', { name: '+ Registrar movimiento' }))
     fireEvent.change(screen.getByLabelText('Descripción'), { target: { value: 'Taxi aeropuerto' } })
     fireEvent.change(screen.getByLabelText('Monto'), { target: { value: '85000' } })
+    fireEvent.change(screen.getByLabelText('Categoría'), { target: { value: 'Viáticos' } })
     fireEvent.click(screen.getByRole('button', { name: 'Registrar' }))
     const row = rowOf('M-2047')
     expect(within(row).getByText('Taxi aeropuerto')).toBeInTheDocument()
+    expect(within(row).getByText('Viáticos')).toBeInTheDocument()
     expect(within(row).getByText('Pendiente')).toBeInTheDocument()
   })
 })
@@ -255,10 +257,22 @@ describe('senior role', () => {
     for (const folio of ['M-2041', 'M-2042', 'M-2043', 'M-2044', 'M-2045', 'M-2046']) expect(screen.getByText(folio)).toBeInTheDocument()
     expect(within(rowOf('M-2043')).getByText('Pendiente')).toBeInTheDocument()
     fireEvent.click(within(rowOf('M-2043')).getByRole('button', { name: /Aprobar/ }))
+    expect(within(rowOf('M-2043')).getByText('Pendiente')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar aprobación' }))
     expect(within(rowOf('M-2043')).getByText('Aprobado')).toBeInTheDocument()
     expect(within(rowOf('M-2043')).queryByRole('button', { name: /Aprobar/ })).not.toBeInTheDocument()
     fireEvent.click(within(rowOf('M-2044')).getByRole('button', { name: /Rechazar/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar rechazo' }))
     expect(within(rowOf('M-2044')).getByText('Rechazado')).toBeInTheDocument()
+  })
+
+  it('TestRF021_SeniorCancellingTheConfirmationLeavesTheMovementPending', () => {
+    goTo('Transacciones')
+    fireEvent.click(within(rowOf('M-2043')).getByRole('button', { name: /Aprobar/ }))
+    expect(screen.getByRole('dialog')).toHaveTextContent('M-2043')
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+    expect(within(rowOf('M-2043')).getByText('Pendiente')).toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 
   it('TestRF009_SeniorCanOpenClosingAndCloseTheMonth', () => {
@@ -341,8 +355,8 @@ describe('logout', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cerrar sesión' }))
     expect(screen.getByRole('button', { name: 'Continuar con Identity Hub' })).toBeInTheDocument()
     expect(screen.queryByText('M-2041')).not.toBeInTheDocument()
-    expect(localStorage.length).toBe(0)
-    expect(sessionStorage.length).toBe(0)
+    expect(localStorage).toHaveLength(0)
+    expect(sessionStorage).toHaveLength(0)
     // A user that signed out does not reach the ledger by going back: a new login is required.
     await act(async () => { await Promise.resolve() })
     expect(screen.queryByRole('navigation', { name: 'Secciones' })).not.toBeInTheDocument()

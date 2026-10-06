@@ -1,4 +1,6 @@
 import { FormEvent, useCallback, useEffect, useId, useRef, useState } from 'react'
+import { LoadingSkeleton } from '../../components/LoadingSkeleton'
+import { Toast } from '../../components/Toast'
 import {
   ApiProblemError, type Application, type ApplicationRole,
   createApplicationRole, deleteApplicationRole, listApplications, updateApplicationRole,
@@ -29,14 +31,14 @@ const users = (count: number) => (count === 1 ? '1 usuario' : `${count} usuarios
 
 type Report = { onProblems: (messages: string[]) => void; onSessionEnded: () => void }
 
-function RoleRow({ application, role, held, report, onUpdated, onDeleted }: {
+function RoleRow({ application, role, held, report, onUpdated, onDeleted }: Readonly<{
   application: Application
   role: ApplicationRole
   held: boolean
   report: Report
   onUpdated: (role: ApplicationRole) => void
   onDeleted: (role: ApplicationRole) => void
-}) {
+}>) {
   const [keys, setKeys] = useState<Set<string>>(() => new Set(role.permissionKeys))
   const [description, setDescription] = useState(role.description)
   const [confirming, setConfirming] = useState(false)
@@ -117,12 +119,12 @@ function RoleRow({ application, role, held, report, onUpdated, onDeleted }: {
   )
 }
 
-function NewRoleForm({ application, report, onCreated, onCancel }: {
+function NewRoleForm({ application, report, onCreated, onCancel }: Readonly<{
   application: Application
   report: Report
   onCreated: (role: ApplicationRole) => void
   onCancel: () => void
-}) {
+}>) {
   const prefix = `${application.clientId}.`
   const ids = useId()
   const [name, setName] = useState(prefix)
@@ -181,15 +183,15 @@ function NewRoleForm({ application, report, onCreated, onCancel }: {
   )
 }
 
-function ApplicationSection({ application, currentRoles, onSessionEnded }: { application: Application; currentRoles: readonly string[]; onSessionEnded: () => void }) {
+function ApplicationSection({ application, currentRoles, onSessionEnded, onNotice }: Readonly<{ application: Application; currentRoles: readonly string[]; onSessionEnded: () => void; onNotice: (message: string | null) => void }>) {
   const titleId = useId()
   // System roles (admin, user) are never edited here; only the application's own roles.
   const [roles, setRoles] = useState<ApplicationRole[]>(() => application.roles.filter((role) => !role.system))
   const [problems, setProblems] = useState<string[]>([])
-  const [notice, setNotice] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const report: Report = {
-    onProblems: (messages) => { setProblems(messages); if (messages.length > 0) setNotice(null) },
+    // An error replaces any success notice, so the two never contradict each other on screen.
+    onProblems: (messages) => { setProblems(messages); if (messages.length > 0) onNotice(null) },
     onSessionEnded,
   }
 
@@ -200,10 +202,9 @@ function ApplicationSection({ application, currentRoles, onSessionEnded }: { app
           <h2 id={titleId}>{application.name}</h2>
           <p className="muted">Aplicación <span className="mono">{application.clientId}</span>. Un cambio de permisos rige desde el siguiente token (hasta 15 minutos).</p>
         </div>
-        {!creating && <button className="primary-button fit" onClick={() => { setCreating(true); setNotice(null) }} type="button">Nuevo rol de {application.name}</button>}
+        {!creating && <button className="primary-button fit" onClick={() => { setCreating(true); onNotice(null) }} type="button">Nuevo rol de {application.name}</button>}
       </div>
       <Problems messages={problems} />
-      {notice && <div className="success-box" role="status"><p>{notice}</p></div>}
       {roles.length === 0 ? <p className="muted">Esta aplicación todavía no tiene roles configurables.</p> : (
         <div className="table-scroll">
           <table className="data-table role-grid" aria-label={`Permisos de roles de ${application.name}`}>
@@ -223,8 +224,8 @@ function ApplicationSection({ application, currentRoles, onSessionEnded }: { app
                   role={role}
                   held={currentRoles.includes(role.name)}
                   report={report}
-                  onUpdated={(updated) => { setRoles((current) => current.map((item) => (item.id === updated.id ? updated : item))); setNotice(`Rol ${updated.name} guardado.`) }}
-                  onDeleted={(removed) => { setRoles((current) => current.filter((item) => item.id !== removed.id)); setNotice(`Rol ${removed.name} eliminado.`) }}
+                  onUpdated={(updated) => { setRoles((current) => current.map((item) => (item.id === updated.id ? updated : item))); onNotice(`Rol ${updated.name} guardado.`) }}
+                  onDeleted={(removed) => { setRoles((current) => current.filter((item) => item.id !== removed.id)); onNotice(`Rol ${removed.name} eliminado.`) }}
                 />
               ))}
             </tbody>
@@ -241,16 +242,18 @@ function ApplicationSection({ application, currentRoles, onSessionEnded }: { app
           application={application}
           report={report}
           onCancel={() => { setCreating(false); setProblems([]) }}
-          onCreated={(created) => { setRoles((current) => [...current, created]); setCreating(false); setNotice(`Rol ${created.name} creado.`) }}
+          onCreated={(created) => { setRoles((current) => [...current, created]); setCreating(false); onNotice(`Rol ${created.name} creado.`) }}
         />
       )}
     </section>
   )
 }
 
-export function RolesPage({ currentRoles, onSessionEnded }: { currentRoles: readonly string[]; onSessionEnded: () => void }) {
+export function RolesPage({ currentRoles, onSessionEnded }: Readonly<{ currentRoles: readonly string[]; onSessionEnded: () => void }>) {
   const [applications, setApplications] = useState<Application[] | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<{ text: string; id: number } | null>(null)
+  const showNotice = useCallback((text: string | null) => setNotice((current) => (text === null ? null : { text, id: (current?.id ?? 0) + 1 })), [])
   const active = useRef(true)
 
   const load = useCallback(async () => {
@@ -279,9 +282,10 @@ export function RolesPage({ currentRoles, onSessionEnded }: { currentRoles: read
         </div>
       </div>
       {loadError && <Problems messages={[loadError]} />}
-      {applications === null && !loadError && <p className="muted">Cargando…</p>}
+      {applications === null && !loadError && <LoadingSkeleton label="Cargando roles…" />}
       {applications?.length === 0 && <p className="muted">No hay aplicaciones conectadas.</p>}
-      {applications?.map((application) => <ApplicationSection application={application} currentRoles={currentRoles} key={application.id} onSessionEnded={onSessionEnded} />)}
+      {applications?.map((application) => <ApplicationSection application={application} currentRoles={currentRoles} key={application.id} onSessionEnded={onSessionEnded} onNotice={showNotice} />)}
+      {notice && <Toast key={notice.id} message={notice.text} onClose={() => setNotice(null)} />}
     </section>
   )
 }

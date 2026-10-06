@@ -8,6 +8,19 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+// Label values of the result dimension, shared by the code that increments the
+// counters so a typo cannot create a silent new series.
+const (
+	ResultSucceeded   = "succeeded"
+	ResultFailed      = "failed"
+	ResultLocked      = "locked"
+	ResultMFARequired = "mfa_required"
+	ResultPublished   = "published"
+	ResultDelivered   = "delivered"
+	ResultDuplicate   = "duplicate"
+	ResultMalformed   = "malformed"
+)
+
 // Métricas del dominio de seguridad. Son las que alimentan el panel de Grafana
 // descrito en RNF-007; las de proceso y runtime las aporta el colector por
 // defecto de client_golang.

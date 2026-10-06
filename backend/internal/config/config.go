@@ -101,10 +101,10 @@ func Load() (*Config, error) {
 		}
 		return n
 	}
-	passwordNum := func(key, def string, max int) int {
+	passwordNum := func(key, def string, upperBound int) int {
 		n := num(key, def)
-		if n <= 0 || n > max {
-			problems = append(problems, fmt.Sprintf("%s debe estar entre 1 y %d", key, max))
+		if n <= 0 || n > upperBound {
+			problems = append(problems, fmt.Sprintf("%s debe estar entre 1 y %d", key, upperBound))
 		}
 		return n
 	}

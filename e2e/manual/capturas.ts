@@ -21,7 +21,10 @@ import { purgeRole, roleCount } from '../support/roles'
  * message body (which carries codes and links) is never opened, only the message list is shown.
  */
 
-const OUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../docs/manuales/img/usuario')
+// CAPTURAS_OUT writes a preview elsewhere without touching the manual's images.
+const OUT = process.env.CAPTURAS_OUT
+  ? path.resolve(process.env.CAPTURAS_OUT)
+  : path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../docs/manuales/img/usuario')
 const VIEWPORT = { width: 1280, height: 800 }
 // Shots are staged outside the repository and copied in one pass at the end: the repo lives in a
 // synced folder (iCloud), which renames files that are deleted and rewritten while it syncs.
@@ -45,7 +48,7 @@ const mala = 'incorrecta'
 async function shot(
   page: Page,
   name: string,
-  options: { mask?: Locator[]; viewport?: { width: number; height: number }; widen?: boolean } = {},
+  options: { mask?: Locator[]; viewport?: { width: number; height: number }; widen?: boolean; full?: boolean } = {},
 ): Promise<void> {
   if (options.viewport) await page.setViewportSize(options.viewport)
   // The console caps its content at 74 rem, so the five-column role grid scrolls sideways at 1280 px;
@@ -56,6 +59,7 @@ async function shot(
     await page.screenshot({
       path: path.join(STAGE, `${name}.png`),
       animations: 'disabled',
+      fullPage: options.full,
       caret: 'hide',
       mask: options.mask,
       maskColor: '#c9d1d9',
@@ -142,10 +146,11 @@ test('Capturas del manual de usuario', async ({ browser }) => {
     await test.step('Administrador: ingresa a la consola', async () => {
       await adminPage.goto(`${hubUrl}/login`)
       await browserLoginWithMfa(adminPage, admin.email, strongPassword)
-      await expect(adminPage.getByRole('heading', { name: 'Usuarios' })).toBeVisible()
+      await expect(adminPage.getByRole('heading', { name: 'Inicio' })).toBeVisible()
     })
 
     await test.step('Administrador: invita a un empleado', async () => {
+      await adminPage.getByRole('link', { name: 'Usuarios', exact: true }).click()
       await adminPage.getByRole('button', { name: 'Nuevo usuario' }).click()
       const drawer = adminPage.getByRole('dialog', { name: 'Nuevo usuario' })
       await drawer.getByLabel('Nombre para mostrar').fill(employeeName)
@@ -286,6 +291,17 @@ test('Capturas del manual de usuario', async ({ browser }) => {
       await expect(adminPage.getByRole('status')).toContainText(`Invitación reenviada a ${pendingEmail}.`)
       await shot(adminPage, 'administrador-05-invitacion-reenviada')
 
+      // Status filter (kept in the URL) and the CSV export button, on this run's accounts only.
+      await adminPage.getByRole('group', { name: 'Filtrar por estado' }).getByRole('button', { name: 'Bloqueados' }).click()
+      await expect(adminPage).toHaveURL(/estado=locked/)
+      await expect(adminPage.getByRole('table', { name: 'Directorio' }).getByRole('row')).toHaveCount(2)
+      await expect(adminPage.getByRole('button', { name: 'Exportar CSV' })).toBeEnabled()
+      // Let the resend toast fade so it does not cover the corner of the shot.
+      await expect(adminPage.getByRole('status')).toHaveCount(0, { timeout: 10_000 })
+      await shot(adminPage, 'administrador-19-usuarios-filtro-estado')
+      await adminPage.getByRole('group', { name: 'Filtrar por estado' }).getByRole('button', { name: 'Todos' }).click()
+      await expect(adminPage).not.toHaveURL(/estado=/)
+
       // Let the previous toast fade (6 s) so it does not cover the drawer shot.
       await expect(adminPage.getByRole('status')).toHaveCount(0, { timeout: 10_000 })
       await adminPage.getByLabel('Buscar por correo o nombre').fill(lockedEmail)
@@ -367,10 +383,35 @@ test('Capturas del manual de usuario', async ({ browser }) => {
       await shot(adminPage, 'administrador-17-auditoria')
       const log = adminPage.getByRole('table', { name: 'Registro de auditoría' })
       await adminPage.getByLabel('Acción').fill('role_created')
-      await adminPage.getByRole('button', { name: 'Filtrar' }).click()
+      await adminPage.getByRole('button', { name: 'Filtrar', exact: true }).click()
       await expect(log.getByText('role_created').first()).toBeVisible()
       await expect(log.getByText('login_failed')).toHaveCount(0)
       await shot(adminPage, 'administrador-18-auditoria-filtrada')
+
+      // Shortcut and readable metadata: role changes carry the previous and new role lists.
+      await adminPage.getByRole('button', { name: 'Limpiar' }).click()
+      await adminPage.getByRole('group', { name: 'Atajos de filtro' }).getByRole('button', { name: 'Cambios de roles' }).click()
+      await expect(log.getByText('role_changed').first()).toBeVisible()
+      // The list reloads after the click: wait until rows of other actions are gone.
+      await expect(log.getByText('role_deleted')).toHaveCount(0)
+      await expect(log.getByText(admin.email).first()).toBeVisible()
+      await shot(adminPage, 'administrador-20-auditoria-atajo')
+
+      // role_updated carries the permission changes as metadata: open one row's details.
+      await adminPage.getByLabel('Acción').fill('role_updated')
+      await adminPage.getByRole('button', { name: 'Filtrar', exact: true }).click()
+      await expect(log.getByText('role_changed')).toHaveCount(0)
+      await expect(log.getByText('role_updated').first()).toBeVisible()
+      await log.locator('summary', { hasText: 'Ver' }).first().click()
+      await expect(log.locator('dl.metadata-list').first()).toBeVisible()
+      await shot(adminPage, 'administrador-21-auditoria-metadatos')
+
+      // The home page last, so its indicators already reflect this run's failed sign-ins.
+      await adminPage.getByRole('link', { name: 'Inicio', exact: true }).click()
+      await expect(adminPage.getByRole('heading', { name: 'Inicio' })).toBeVisible()
+      await expect(adminPage.getByRole('group', { name: 'Activos' })).toBeVisible()
+      await expect(adminPage.getByRole('list', { name: 'Actividad reciente' })).toBeVisible()
+      await shot(adminPage, 'administrador-22-inicio', { full: true })
     })
 
     await test.step('Contabilidad: auditor (historia de usuario)', async () => {
@@ -383,10 +424,17 @@ test('Capturas del manual de usuario', async ({ browser }) => {
       await expect(side.page.getByRole('heading', { name: 'Resumen' })).toBeVisible()
       await expect(side.page.getByText('Aprobado del mes')).toBeVisible()
       await shot(side.page, 'contabilidad-03-auditor-resumen')
+      await expect(side.page.getByRole('figure').first()).toBeVisible()
+      await shot(side.page, 'contabilidad-15-resumen-graficos', { full: true })
       await side.page.getByRole('button', { name: 'Transacciones' }).click()
       await expect(side.page.getByText('M-2046', { exact: true })).toBeVisible()
       await expect(side.page.getByRole('button', { name: '+ Registrar movimiento' })).toHaveCount(0)
       await shot(side.page, 'contabilidad-04-auditor-transacciones')
+      await side.page.getByLabel('Buscar').fill('nómina')
+      await side.page.getByLabel('Filtrar por estado').selectOption('approved')
+      await side.page.getByRole('button', { name: /^Monto/ }).click()
+      await expect(side.page.getByRole('table', { name: 'Movimientos del periodo' })).toBeVisible()
+      await shot(side.page, 'contabilidad-16-transacciones-filtros')
       await side.page.getByRole('button', { name: 'Cerrar sesión' }).click()
       await expect(side.page.getByRole('button', { name: 'Continuar con Identity Hub' })).toBeVisible()
     })
@@ -404,6 +452,7 @@ test('Capturas del manual de usuario', async ({ browser }) => {
       await side.page.getByRole('button', { name: '+ Registrar movimiento' }).click()
       await side.page.getByLabel('Descripción').fill('Compra de útiles de oficina')
       await side.page.getByLabel('Monto').fill('185000')
+      await side.page.getByLabel('Categoría', { exact: true }).selectOption('Servicios')
       await shot(side.page, 'contabilidad-07-analista-registrar')
       await side.page.getByRole('button', { name: 'Registrar', exact: true }).click()
       await expect(side.page.getByRole('status')).toContainText('Movimiento registrado')
@@ -421,6 +470,9 @@ test('Capturas del manual de usuario', async ({ browser }) => {
       await expect(side.page.getByRole('button', { name: 'Aprobar M-2043' })).toBeVisible()
       await shot(side.page, 'contabilidad-10-senior-transacciones')
       await side.page.getByRole('button', { name: 'Aprobar M-2043' }).click()
+      await expect(side.page.getByRole('dialog', { name: /Aprobar movimiento M-2043/ })).toBeVisible()
+      await shot(side.page, 'contabilidad-17-confirmar-aprobacion')
+      await side.page.getByRole('button', { name: 'Confirmar aprobación' }).click()
       await expect(side.page.getByRole('status')).toContainText('Movimiento M-2043 aprobado.')
       await shot(side.page, 'contabilidad-11-senior-aprobado')
       await side.page.getByRole('button', { name: /Cierre contable/ }).click()

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from './App'
 import { resetSessionForTests } from './api/client'
@@ -93,6 +93,60 @@ describe('role grid', () => {
     expect(await screen.findByText('Rol contabilidad.revisor creado.')).toBeInTheDocument()
     expect(sent(api, `POST ${appPath}`)).toEqual({ name: 'contabilidad.revisor', description: 'Revisa', permissionKeys: ['reportes.ver'] })
     expect(box('reportes.ver', 'contabilidad.revisor')).toBeChecked()
+  })
+
+  it('TestRF021_UnErrorPosteriorQuitaElAvisoDeExito', async () => {
+    let calls = 0
+    await openRoles({
+      [`PATCH ${appPath}/${auditorId}`]: (payload) => (++calls === 1
+        ? json(200, { ...applicationsFixture()[0]!.roles[2], ...(payload as object) })
+        : problem(403, { detail: 'admins cannot change a role they hold' })),
+    })
+    fireEvent.click(box('cierre.ejecutar', 'contabilidad.auditor'))
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar contabilidad.auditor' }))
+    expect(await screen.findByText('Rol contabilidad.auditor guardado.')).toBeInTheDocument()
+    fireEvent.click(box('movimientos.registrar', 'contabilidad.auditor'))
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar contabilidad.auditor' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('admins cannot change a role they hold')
+    expect(screen.queryByText('Rol contabilidad.auditor guardado.')).not.toBeInTheDocument()
+  })
+
+  it('TestRF021_AbrirElFormularioDeNuevoRolQuitaElAvisoDeExito', async () => {
+    await openRoles({
+      [`PATCH ${appPath}/${auditorId}`]: (payload) => json(200, { ...applicationsFixture()[0]!.roles[2], ...(payload as object) }),
+    })
+    fireEvent.click(box('cierre.ejecutar', 'contabilidad.auditor'))
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar contabilidad.auditor' }))
+    expect(await screen.findByText('Rol contabilidad.auditor guardado.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Nuevo rol de Contabilidad' }))
+    expect(screen.queryByText('Rol contabilidad.auditor guardado.')).not.toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+
+  it('TestRF021_UnMismoAvisoDeExitoRepetidoReiniciaElTemporizador', async () => {
+    await openRoles({
+      [`PATCH ${appPath}/${auditorId}`]: (payload) => json(200, { ...applicationsFixture()[0]!.roles[2], ...(payload as object) }),
+    })
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      const saved = 'Rol contabilidad.auditor guardado.'
+      // Testing Library's waitFor/findBy drain with setTimeout, which would hang under fake timers.
+      const saveOnce = async (permission: string) => {
+        fireEvent.click(box(permission, 'contabilidad.auditor'))
+        fireEvent.click(screen.getByRole('button', { name: 'Guardar contabilidad.auditor' }))
+        await act(async () => { await vi.advanceTimersByTimeAsync(0) })
+        expect(screen.getByRole('status')).toHaveTextContent(saved)
+      }
+      await saveOnce('cierre.ejecutar')
+      act(() => { vi.advanceTimersByTime(3000) })
+      await saveOnce('movimientos.registrar')
+      act(() => { vi.advanceTimersByTime(3000) })
+      expect(screen.getByRole('status')).toHaveTextContent(saved)
+      act(() => { vi.advanceTimersByTime(2000) })
+      expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('TestRF021_EliminarRolAsignadoQuedaDeshabilitadoConExplicacion', async () => {

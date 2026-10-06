@@ -20,7 +20,7 @@ const sessionCookieMaxAge = 0
 // maps it to the same 401 response as an invalid or reused token below.
 func (s *Server) RefreshSession(w http.ResponseWriter, r *http.Request, params RefreshSessionParams) {
 	if s.refresh == nil {
-		writeProblem(w, http.StatusServiceUnavailable, "refresh-unavailable", "Service Unavailable", "Refresh is temporarily unavailable.")
+		writeProblem(w, http.StatusServiceUnavailable, "refresh-unavailable", titleServiceUnavailable, "Refresh is temporarily unavailable.")
 		return
 	}
 	result, err := s.refresh.Refresh(r.Context(), refresh.Input{RefreshToken: params.RefreshToken, IP: requestClientIP(r), UserAgent: optionalRequestUserAgent(r)})
@@ -30,7 +30,7 @@ func (s *Server) RefreshSession(w http.ResponseWriter, r *http.Request, params R
 			writeUnauthorized(w)
 			return
 		}
-		writeProblem(w, http.StatusInternalServerError, "refresh-failed", "Internal Server Error", "The session could not be refreshed.")
+		writeProblem(w, http.StatusInternalServerError, "refresh-failed", titleInternalServerError, "The session could not be refreshed.")
 		return
 	}
 	http.SetCookie(w, refreshCookie(result.RefreshToken, sessionCookieMaxAge))

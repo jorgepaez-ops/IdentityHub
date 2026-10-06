@@ -5,8 +5,10 @@ Esta guía explica cómo usar Identity Hub y la aplicación conectada Contabilid
 | Si usted es... | Lea | Qué hace |
 |---|---|---|
 | Empleado | [sección 2](#2-empleado) | Activa su cuenta, inicia sesión con código por correo, recupera su contraseña y gestiona su perfil y sesiones. |
-| Administrador | [sección 3](#3-administrador-consola-del-hub) | Invita y administra usuarios, configura roles y permisos, consulta la auditoría. |
-| Usuario de Contabilidad | [sección 4](#4-contabilidad-sso-con-identity-hub) | Entra a Contabilidad con su cuenta del Hub y ve lo que su rol permite. |
+| Administrador | [sección 3](#3-administrador-consola-del-hub) | Ve el resumen del Hub, invita y administra usuarios, configura roles y permisos, consulta y exporta la auditoría. |
+| Usuario de Contabilidad | [sección 4](#4-contabilidad-sso-con-identity-hub) | Entra a Contabilidad con su cuenta del Hub, ve gráficos y movimientos, y actúa según lo que su rol permite. |
+
+> **Perfiles y roles no son lo mismo.** La tabla de arriba lista *perfiles de lector* de este manual (qué sección le toca leer a cada persona), no roles del sistema. Identity Hub tiene exactamente **dos roles de sistema**, `admin` y `user`, fijos en el código y que nadie edita desde la consola. Además existen los **roles de aplicación** (por ejemplo `contabilidad.senior`, `contabilidad.analista` o el `contabilidad.auditor` de la historia de la sección 5): los crea un administrador **sin límite** en **Roles**, eligiendo qué permisos lleva cada uno ([sección 3.4](#34-roles-y-permisos)). Una misma persona puede tener `user` y varios roles de aplicación a la vez.
 
 La [sección 5](#5-historia-de-usuario-para-la-sustentación) cuenta de punta a punta la historia del auditor, pensada para la sustentación.
 
@@ -27,6 +29,7 @@ Para levantar el stack, vea la [guía de desarrollo](../guia-desarrollo.md) o ej
 - **Se usa contraseña y un código de seis dígitos que llega por correo electrónico** ([ADR 0010](../../specs/adr/0010-mfa-por-codigo-enviado-por-correo.md)). No hay código QR, ni aplicación autenticadora, ni claves que "enrolar": la verificación en dos pasos es el correo.
 - **No existe el registro público.** Las cuentas las crea un administrador, que envía una invitación al correo de la persona.
 - La contraseña debe tener entre 12 y 128 caracteres.
+- **Tema claro u oscuro.** Tanto el Hub como Contabilidad siguen el tema de su sistema operativo y cambian solos si usted cambia el del sistema. El botón de sol o luna (**Cambiar a tema oscuro** / **Cambiar a tema claro**) permite elegir uno a mano; esa elección se recuerda en el navegador y deja de seguir al sistema. Las capturas de este manual usan el tema claro.
 - Las capturas de este manual se generaron con cuentas de prueba (`...@example.test`) y datos de ejemplo. Ninguna muestra contraseñas, códigos ni enlaces de invitación o de restablecimiento.
 
 ### 1.3 Cómo regenerar las capturas
@@ -35,10 +38,10 @@ Las imágenes de [`img/usuario/`](img/usuario/) las produce un script que maneja
 
 ```bash
 make up          # si el stack no está levantado
-make capturas    # escribe docs/manuales/img/usuario/*.png (48 imágenes, ~30 s)
+make capturas    # escribe docs/manuales/img/usuario/*.png (55 imágenes, ~1 min)
 ```
 
-El script ([`e2e/manual/capturas.ts`](../../e2e/manual/capturas.ts)) no forma parte de `make e2e` ni de la matriz de trazabilidad. Crea sus propias cuentas de prueba (que quedan deshabilitadas al terminar) y los roles `contabilidad.auditor` y `contabilidad.temporal`, que elimina al final. Si alguno de esos roles ya existe, se detiene sin tocarlo.
+El script ([`e2e/manual/capturas.ts`](../../e2e/manual/capturas.ts)) no forma parte de `make e2e` ni de la matriz de trazabilidad. Crea sus propias cuentas de prueba (que quedan deshabilitadas al terminar) y los roles `contabilidad.auditor` y `contabilidad.temporal`, que elimina al final. Si alguno de esos roles ya existe, se detiene sin tocarlo. Con la variable `CAPTURAS_OUT=<carpeta>` escribe las imágenes en otra carpeta, para previsualizarlas sin tocar las del manual.
 
 ---
 
@@ -84,7 +87,7 @@ Si el enlace está incompleto, venció o ya se usó, la pantalla lo dice (**La i
 
 5. Un código incorrecto o vencido muestra **El código no es válido o el desafío expiró.** con el botón **Volver a iniciar sesión**.
 
-6. Al verificar, entra a **Mi cuenta** (los administradores entran a **Usuarios**).
+6. Al verificar, entra a **Mi cuenta** (los administradores entran a **Inicio**).
 
 ### 2.3 Mi cuenta: perfil y sesiones
 
@@ -139,9 +142,22 @@ En el menú lateral, pulse **Cerrar sesión**: vuelve al formulario de inicio de
 
 ## 3. Administrador (consola del Hub)
 
-Los administradores ven en el menú lateral cuatro entradas: **Usuarios**, **Roles**, **Auditoría** y **Mi cuenta**. Las tres primeras solo existen para el rol `admin`; un empleado que escriba esas direcciones es devuelto a **Mi cuenta**. Inicie sesión como se explica en la sección 2.2: entrará directamente a **Usuarios**.
+Los administradores ven en el menú lateral cinco entradas: **Inicio**, **Usuarios**, **Roles**, **Auditoría** y **Mi cuenta**. Las cuatro primeras solo existen para el rol `admin`; un empleado que escriba esas direcciones es devuelto a **Mi cuenta**. Inicie sesión como se explica en la sección 2.2: entrará directamente a **Inicio**.
 
-### 3.1 Directorio de usuarios y búsqueda
+### 3.0 Inicio
+
+**Inicio** resume el estado del Hub con los datos actuales de la API:
+
+- **Indicadores de usuarios**: **Activos**, **Pendientes**, **Bloqueados** y **Deshabilitados**. Cada tarjeta es un enlace: lleva al directorio ya filtrado por ese estado (sección 3.1).
+- **Inicios de sesión fallidos (24 h)**: suma las contraseñas incorrectas y los códigos de verificación rechazados de las últimas 24 horas. La tarjeta se marca en rojo si hay alguno y lleva a la auditoría con el atajo **Inicios fallidos** y **Últimas 24 h** (sección 3.6).
+- **Actividad reciente**: las diez últimas acciones del registro de auditoría.
+- **Accesos directos** a **Usuarios**, **Roles** y **Auditoría**.
+
+![Inicio de la consola con los indicadores, la actividad reciente y los accesos directos](img/usuario/administrador-22-inicio.png)
+
+**Qué significa «100+».** La API no entrega totales exactos, así que cada indicador cuenta hasta una página de 100 resultados. Si hay más, la tarjeta muestra **100+** (por ejemplo, «100+» usuarios activos) en lugar de un número exacto. La tarjeta de inicios fallidos suma dos consultas (contraseñas y códigos rechazados), por lo que puede llegar a mostrar **200+**. Si una de las tres consultas falla, solo su parte de la página muestra un aviso y el botón **Reintentar**; las demás siguen visibles.
+
+### 3.1 Directorio de usuarios, filtro por estado y exportación
 
 **Usuarios** muestra tres indicadores (**Usuarios activos**, **Cuentas bloqueadas**, **Invitaciones pendientes**) y el **Directorio**: nombre, correo, estado (**Activo**, **Pendiente**, **Bloqueado**, **Deshabilitado**), roles y último acceso. Los indicadores cuentan solo los usuarios cargados; si hay más, aparece **Cargar más**.
 
@@ -152,6 +168,12 @@ Los administradores ven en el menú lateral cuatro entradas: **Usuarios**, **Rol
 Para buscar, escriba en **Buscar por correo o nombre**; la lista se filtra mientras escribe.
 
 ![Búsqueda de un usuario por correo](img/usuario/administrador-04-busqueda.png)
+
+**Filtrar por estado.** Sobre la tabla, el grupo **Filtrar por estado** ofrece **Todos**, **Activos**, **Pendientes**, **Bloqueados** y **Deshabilitados**. El filtro se combina con la búsqueda, también rige al pulsar **Cargar más** y queda guardado en la dirección de la página (`?estado=locked`, por ejemplo): al recargar o compartir el enlace se conserva. **Todos** quita el filtro. Mientras hay un filtro activo se ocultan los tres indicadores de arriba, porque contarían solo la lista filtrada.
+
+**Exportar CSV.** El botón **Exportar CSV** descarga el directorio con siete columnas (correo, nombre, estado, roles, MFA, último acceso y creado). **Incluye solo los usuarios cargados** que cumplen el filtro y la búsqueda actuales: si hay más páginas, un aviso lo indica (**Exporta los N cargados; carga más para incluir el resto**); pulse **Cargar más** antes de exportar para incluirlos. El archivo usa codificación UTF-8 con marca BOM, de modo que Excel muestra bien las tildes, y está deshabilitado cuando no hay filas.
+
+![Directorio filtrado por estado Bloqueados, con el botón Exportar CSV](img/usuario/administrador-19-usuarios-filtro-estado.png)
 
 ### 3.2 Invitar a un usuario
 
@@ -229,19 +251,31 @@ Cada creación, cambio y eliminación de un rol queda registrado en la auditorí
 
 ### 3.6 Registro de auditoría
 
-**Auditoría** lista los eventos de seguridad del Hub, del más reciente al más antiguo. Es de solo lectura. Cada fila muestra fecha, actor, acción (por ejemplo `login_failed`, `account_locked`, `employee_created`, `invitation_resent`, `role_created`, `role_updated`, `role_deleted`, `role_changed`), recurso, IP y metadatos (**Ver** despliega el detalle).
+**Auditoría** lista los eventos de seguridad del Hub, del más reciente al más antiguo. Es de solo lectura. Cada fila muestra fecha, actor, acción (por ejemplo `login_failed`, `account_locked`, `employee_created`, `invitation_resent`, `role_created`, `role_updated`, `role_deleted`, `role_changed`), recurso, IP y metadatos. El **actor** aparece como **correo electrónico** (al pasar el cursor se ve su identificador); si no se puede resolver, se muestra un identificador corto, y las acciones del propio sistema dicen **Sistema**.
 
 ![Registro de auditoría](img/usuario/administrador-17-auditoria.png)
 
-Para acotar, use los filtros **Acción** (nombre exacto de la acción), **Actor (ID)** (un UUID) y **Desde** (fecha y hora), y pulse **Filtrar**; **Limpiar** los quita. **Cargar más** trae eventos anteriores.
+**Filtros.** Use **Acción** (nombre exacto de la acción), **Actor (ID)** (un UUID) y **Desde** (fecha y hora), y pulse **Filtrar**; **Limpiar** los quita. **Cargar más** trae eventos anteriores. Los filtros viven en la dirección de la página, así que se conservan al recargar.
 
 ![Auditoría filtrada por la acción role_created](img/usuario/administrador-18-auditoria-filtrada.png)
+
+**Atajos.** Bajo los filtros, el grupo **Atajos de filtro** aplica de un clic las consultas más comunes: **Inicios fallidos**, **Códigos MFA rechazados**, **Cambios de roles** y **Últimas 24 h**. Un atajo de acción y **Últimas 24 h** se pueden combinar; pulsar de nuevo un atajo activo lo quita.
+
+![Auditoría con el atajo Cambios de roles activo y el actor como correo](img/usuario/administrador-20-auditoria-atajo.png)
+
+**Filtrar por este actor.** Bajo el correo de cada fila, este botón rellena el filtro **Actor (ID)** con esa persona y deja solo sus eventos.
+
+**Metadatos legibles.** En la columna **Metadatos**, **Ver** despliega el detalle como una lista de clave y valor (por ejemplo `roleName`, `permissionKeys`; los datos anidados se escriben con puntos). Un guion indica que el evento no tiene metadatos.
+
+![Fila de auditoría con sus metadatos desplegados](img/usuario/administrador-21-auditoria-metadatos.png)
+
+**Exportar CSV.** Igual que en Usuarios, **Exportar CSV** descarga los eventos **cargados** bajo los filtros actuales (siete columnas: fecha, acción, actor, tipo e ID de recurso, IP y metadatos, con el actor como correo y los metadatos como `clave=valor; ...`). Si hay más páginas, un aviso lo indica; pulse **Cargar más** antes de exportar para incluir el resto.
 
 ---
 
 ## 4. Contabilidad (SSO con Identity Hub)
 
-Contabilidad no tiene usuarios ni contraseñas propias: delega el inicio de sesión en el Hub ([guía de integración](integracion-terceros.md)). Los movimientos que muestra son **datos de ejemplo** que viven en el navegador: se reinician al recargar la página.
+Contabilidad no tiene usuarios ni contraseñas propias: delega el inicio de sesión en el Hub ([guía de integración](integracion-terceros.md)). Los movimientos que muestra son **datos de ejemplo** (47 movimientos entre abril y septiembre de 2026) que viven en el navegador: se reinician al recargar la página. Igual que el Hub, Contabilidad sigue el tema claro u oscuro del sistema y tiene su propio botón de tema en la barra superior.
 
 ### 4.1 Entrar
 
@@ -262,7 +296,7 @@ La barra superior muestra su rol y un identificador corto de su cuenta; la nota 
 | | `contabilidad.senior` | `contabilidad.analista` | Auditor (`reportes.ver` + `movimientos.ver_todos`) | Sin rol de Contabilidad |
 |---|---|---|---|---|
 | Etiqueta en la barra | Contador senior | Analista contable | Nombre del rol | Pantalla "Sin acceso" |
-| Resumen | Sí, de toda la organización | Sí, solo sus movimientos | Sí, de toda la organización | No |
+| Resumen (con gráficos) | Sí, de toda la organización | Sí, solo sus movimientos | Sí, de toda la organización | No |
 | Transacciones | Todas | Solo las suyas | Todas | No |
 | Registrar movimiento | Sí | Sí | No | No |
 | Aprobar o rechazar | Sí | No | No | No |
@@ -276,11 +310,11 @@ Ve solo sus propios movimientos y el **Resumen** con **Mis aprobados**, **Mis pe
 
 ![Resumen del analista](img/usuario/contabilidad-05-analista-resumen.png)
 
-En **Transacciones** solo aparecen sus movimientos; los pendientes dicen **esperando aprobación**.
+En **Transacciones** solo aparecen sus movimientos; los pendientes dicen **esperando aprobación**. Para buscar, filtrar, ordenar y exportar vea la [sección 4.8](#48-buscar-filtrar-ordenar-y-exportar-movimientos).
 
 ![Transacciones del analista](img/usuario/contabilidad-06-analista-transacciones.png)
 
-**Registrar un movimiento:** pulse **+ Registrar movimiento**, escriba la descripción y el monto y pulse **Registrar**.
+**Registrar un movimiento:** pulse **+ Registrar movimiento**, escriba la descripción y el monto, elija una **Categoría** de la lista (es obligatoria: Arriendo, Impuestos, Nómina, Proveedores, Servicios, Ventas o Viáticos) y pulse **Registrar**.
 
 ![Formulario para registrar un movimiento](img/usuario/contabilidad-07-analista-registrar.png)
 
@@ -290,7 +324,7 @@ Aparece **Movimiento registrado, queda pendiente de aprobación.** y el movimien
 
 ### 4.4 Contador senior
 
-Ve el **Resumen** de toda la organización (**Aprobado del mes**, **Pendiente de aprobación**, **Cerrado hasta**, **Usuarios con acceso**) y todas las transacciones.
+Ve el **Resumen** de toda la organización (**Aprobado del mes**, **Pendiente de aprobación**, **Cerrado hasta**, **Usuarios con acceso**) y todas las transacciones. Las cuatro tarjetas cuentan solo el periodo abierto; los gráficos de abajo cubren todo el historial de ejemplo (sección 4.8).
 
 ![Resumen del contador senior](img/usuario/contabilidad-09-senior-resumen.png)
 
@@ -298,7 +332,11 @@ En **Transacciones**, los movimientos pendientes muestran **Aprobar** y **Rechaz
 
 ![Transacciones del senior con Aprobar y Rechazar](img/usuario/contabilidad-10-senior-transacciones.png)
 
-Al decidir aparece, por ejemplo, **Movimiento M-2043 aprobado.** y el estado cambia.
+Ambos botones abren primero un **cuadro de confirmación** que nombra el folio y el monto («Vas a aprobar el movimiento M-2043 por $ 480.000. Esta decisión queda registrada.»). El foco empieza en **Cancelar**, de modo que pulsar Intro por error no decide nada; **Escape** o un clic fuera del cuadro también cancelan. Para continuar pulse **Confirmar aprobación** (o **Confirmar rechazo**).
+
+![Cuadro de confirmación para aprobar el movimiento M-2043](img/usuario/contabilidad-17-confirmar-aprobacion.png)
+
+Al confirmar aparece, por ejemplo, **Movimiento M-2043 aprobado.** y el estado cambia.
 
 ![Movimiento aprobado](img/usuario/contabilidad-11-senior-aprobado.png)
 
@@ -324,6 +362,23 @@ Si su cuenta se autenticó pero no tiene ningún rol `contabilidad.*`, Contabili
 
 Pulse **Cerrar sesión** en la barra superior (o en la pantalla "Sin acceso"): Contabilidad olvida su credencial y vuelve a la pantalla de inicio (captura de la sección 4.1). Esto no cierra su sesión del Hub; para eso use **Cerrar sesión** en el Hub.
 
+### 4.8 Buscar, filtrar, ordenar y exportar movimientos
+
+**Gráficos del Resumen.** Quien tiene el permiso `reportes.ver` ve tres gráficos bajo las tarjetas: **Monto por estado de aprobación** (dona con el total de movimientos al centro), **Monto acumulado por categoría** (barras) y **Evolución mensual del monto registrado** (columnas). Cada uno trae un enlace **Ver datos de...** que despliega los mismos valores en una tabla, y debajo aparece la **Actividad reciente**. Un analista ve los gráficos solo con sus propios movimientos.
+
+![Resumen con los tres gráficos y la actividad reciente](img/usuario/contabilidad-15-resumen-graficos.png)
+
+**Buscar, filtrar y ordenar.** En **Transacciones**:
+
+- **Buscar** acepta folio, descripción o categoría, sin distinguir mayúsculas ni tildes.
+- **Filtrar por estado** (**Todos**, **Pendiente**, **Aprobado**, **Rechazado**) y **Filtrar por categoría** se combinan con la búsqueda.
+- Los encabezados **Fecha**, **Folio** y **Monto** ordenan la tabla; pulse de nuevo para invertir el sentido (la flecha indica el orden activo). Por defecto se muestra lo más reciente primero.
+- Bajo los filtros, un contador dice cuántos movimientos coinciden. Si ninguno coincide, el botón **Limpiar filtros** los quita.
+
+![Transacciones con búsqueda, filtro de estado y orden por monto](img/usuario/contabilidad-16-transacciones-filtros.png)
+
+**Exportar CSV.** El botón **Exportar CSV** descarga exactamente las filas que ve en pantalla (con la búsqueda, los filtros y el orden aplicados) en seis columnas: folio, fecha, descripción, categoría, monto y estado. Los montos van como números, el archivo usa UTF-8 con marca BOM para que Excel muestre las tildes, y el botón se deshabilita si no hay filas.
+
 ---
 
 ## 5. Historia de usuario para la sustentación
@@ -334,15 +389,15 @@ Esta historia es distinta de la autenticación: muestra la administración de pe
 
 | # | Quién | Acción | Resultado | Captura |
 |---|---|---|---|---|
-| 1 | Administrador | Entra a la consola con contraseña y código por correo. | Llega a **Usuarios**. | [directorio](img/usuario/administrador-01-directorio.png) |
+| 1 | Administrador | Entra a la consola con contraseña y código por correo. | Llega a **Inicio**. | [inicio](img/usuario/administrador-22-inicio.png), [directorio](img/usuario/administrador-01-directorio.png) |
 | 2 | Administrador | En **Roles**, pulsa **Nuevo rol de Contabilidad**, escribe `contabilidad.auditor` y marca solo `reportes.ver` y `movimientos.ver_todos`. | El formulario refleja exactamente dos permisos. | [nuevo rol](img/usuario/administrador-08-nuevo-rol.png) |
 | 3 | Administrador | Pulsa **Crear rol**. | La grilla muestra la fila del auditor con esas dos casillas marcadas y `cierre.ejecutar`, `movimientos.aprobar` y `movimientos.registrar` sin marcar. | [rol creado](img/usuario/administrador-09-rol-creado.png) |
 | 4 | Administrador | En **Usuarios**, edita al empleado y marca `contabilidad.auditor`. | **Cambios guardados.** | [asignar](img/usuario/administrador-14-asignar-rol.png), [guardado](img/usuario/administrador-15-rol-asignado.png) |
 | 5 | Administrador | Vuelve a **Roles**. | El rol queda con **Eliminar** deshabilitado y **Asignado a 1 usuario**. | [rol asignado](img/usuario/administrador-16-rol-asignado-sin-eliminar.png) |
 | 6 | Empleado | Abre Contabilidad y pulsa **Continuar con Identity Hub**; inicia sesión con código por correo. | Vuelve a Contabilidad con el rol `contabilidad.auditor`. | [inicio](img/usuario/contabilidad-01-inicio.png), [login](img/usuario/contabilidad-02-login-hub.png) |
 | 7 | Empleado | Mira el **Resumen**. | Ve los totales de toda la organización; el menú indica **Tu rol permite: ver todos los movimientos, ver el resumen.** | [resumen](img/usuario/contabilidad-03-auditor-resumen.png) |
-| 8 | Empleado | Abre **Transacciones**. | Ve los seis movimientos, no solo los suyos; no hay **Registrar**, **Aprobar** ni **Rechazar**; los pendientes dicen **esperando aprobación**. **Cierre contable** tiene candado. | [transacciones](img/usuario/contabilidad-04-auditor-transacciones.png) |
-| 9 | Administrador | Consulta **Auditoría** filtrando por `role_created`. | Queda el rastro de quién creó el rol y cuándo. | [auditoría](img/usuario/administrador-18-auditoria-filtrada.png) |
+| 8 | Empleado | Abre **Transacciones**. | Ve todos los movimientos (47 de ejemplo), no solo los suyos, y puede buscarlos y filtrarlos ([captura](img/usuario/contabilidad-16-transacciones-filtros.png)); no hay **Registrar**, **Aprobar** ni **Rechazar**; los pendientes dicen **esperando aprobación**. **Cierre contable** tiene candado. | [transacciones](img/usuario/contabilidad-04-auditor-transacciones.png) |
+| 9 | Administrador | Consulta **Auditoría** filtrando por `role_created` (o con el atajo **Cambios de roles**). | Queda el rastro de quién (con su correo) creó el rol y cuándo. | [auditoría](img/usuario/administrador-18-auditoria-filtrada.png), [atajo](img/usuario/administrador-20-auditoria-atajo.png) |
 
 ![Resumen del auditor en Contabilidad](img/usuario/contabilidad-03-auditor-resumen.png)
 
@@ -360,3 +415,5 @@ Qué demuestra esta historia ([criterio de aceptación 2 de la semana 4](../../o
 | El rol nuevo no aparece en Contabilidad | El cambio rige desde el siguiente token (hasta 15 minutos): cierre sesión en Contabilidad y vuelva a entrar. |
 | **Sin acceso a Contabilidad** | La cuenta no tiene un rol `contabilidad.*`; pídalo a un administrador (3.5). |
 | No puedo eliminar un rol | Tiene usuarios asignados (3.4): quite la asignación primero. |
+| El CSV exportado trae menos filas de las esperadas | Solo incluye lo cargado en pantalla (usuarios y auditoría) o lo visible tras filtros (movimientos); pulse **Cargar más** y vuelva a exportar (3.1, 3.6, 4.8). |
+| Un indicador de Inicio dice **100+** | Es un conteo con tope de 100 por consulta; para el detalle abra el directorio o la auditoría desde la tarjeta (3.0). |

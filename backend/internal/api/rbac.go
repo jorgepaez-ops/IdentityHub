@@ -24,12 +24,12 @@ func RequireRole(repository roleRepository, requiredRole string) func(http.Handl
 				return
 			}
 			if repository == nil {
-				writeProblem(w, http.StatusServiceUnavailable, "authorization-unavailable", "Service Unavailable", "Authorization is temporarily unavailable.")
+				writeProblem(w, http.StatusServiceUnavailable, "authorization-unavailable", titleServiceUnavailable, "Authorization is temporarily unavailable.")
 				return
 			}
 			user, err := repository.GetUserByID(r.Context(), userID)
 			if err != nil {
-				writeProblem(w, http.StatusInternalServerError, "authorization-load-failed", "Internal Server Error", "Authorization could not be verified.")
+				writeProblem(w, http.StatusInternalServerError, "authorization-load-failed", titleInternalServerError, "Authorization could not be verified.")
 				return
 			}
 			if user.Status != "active" {
@@ -38,7 +38,7 @@ func RequireRole(repository roleRepository, requiredRole string) func(http.Handl
 			}
 			roles, err := repository.ListRolesForUser(r.Context(), userID)
 			if err != nil {
-				writeProblem(w, http.StatusInternalServerError, "authorization-load-failed", "Internal Server Error", "Authorization could not be verified.")
+				writeProblem(w, http.StatusInternalServerError, "authorization-load-failed", titleInternalServerError, "Authorization could not be verified.")
 				return
 			}
 			for _, role := range roles {

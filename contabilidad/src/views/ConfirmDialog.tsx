@@ -1,0 +1,71 @@
+import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode } from 'react'
+
+interface Props {
+  title: string
+  children: ReactNode
+  confirmLabel: string
+  tone: 'ok' | 'danger'
+  onConfirm: () => void
+  onCancel: () => void
+  /** Where focus goes when the trigger no longer exists (a decided row loses its buttons). */
+  fallbackFocus?: () => void
+}
+
+const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+/** The element Tab must jump to when it would leave the dialog, or undefined when the browser may move on its own. */
+function tabWrapTarget(items: HTMLElement[], current: Element | null, backwards: boolean): HTMLElement | undefined {
+  if (items.length === 0) return undefined
+  const edge = backwards ? 0 : items.length - 1
+  return items[edge] === current ? items[items.length - 1 - edge] : undefined
+}
+
+/** Small modal confirmation: focus moves in on open, Tab stays inside, Escape cancels and focus returns to the trigger. */
+export function ConfirmDialog({ title, children, confirmLabel, tone, onConfirm, onCancel, fallbackFocus }: Readonly<Props>) {
+  const titleId = useId()
+  const bodyId = useId()
+  const dialog = useRef<HTMLDivElement>(null)
+  const cancel = useRef<HTMLButtonElement>(null)
+
+  const fallback = useRef(fallbackFocus)
+  fallback.current = fallbackFocus
+
+  useEffect(() => {
+    // Safari does not focus a clicked button, so the active element can be the body: treat that as no trigger.
+    const active = document.activeElement
+    const trigger = active instanceof HTMLElement && active !== document.body ? active : null
+    // Cancel is the safe default focus: pressing Enter right away never decides a movement.
+    cancel.current?.focus()
+    return () => {
+      if (trigger?.isConnected) trigger.focus()
+      else fallback.current?.()
+    }
+  }, [])
+
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Escape') {
+      event.stopPropagation()
+      onCancel()
+      return
+    }
+    if (event.key !== 'Tab' || !dialog.current) return
+    const items = [...dialog.current.querySelectorAll<HTMLElement>(FOCUSABLE)]
+    const wrapTo = tabWrapTarget(items, document.activeElement, event.shiftKey)
+    if (!wrapTo) return
+    event.preventDefault()
+    wrapTo.focus()
+  }
+
+  return (
+    <div className="dialog-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onCancel() }}>
+      <div className="dialog card" ref={dialog} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={bodyId} onKeyDown={onKeyDown}>
+        <h2 id={titleId}>{title}</h2>
+        <p id={bodyId}>{children}</p>
+        <div className="dialog-actions">
+          <button className="secondary-button" type="button" ref={cancel} onClick={onCancel}>Cancelar</button>
+          <button className={`primary-button ${tone}`} type="button" onClick={onConfirm}>{confirmLabel}</button>
+        </div>
+      </div>
+    </div>
+  )
+}

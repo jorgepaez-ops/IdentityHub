@@ -29,7 +29,7 @@ describe('authentication routes', () => {
     fireEvent.change(screen.getByLabelText('Código de verificación'), { target: { value: '123456' } })
     fireEvent.click(screen.getByRole('button', { name: 'Verificar' }))
 
-    expect(await screen.findByRole('heading', { name: 'Usuarios' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Inicio' })).toBeInTheDocument()
   })
 
   it('TestRF013_RoutesMemberAfterMfaVerification', async () => {
@@ -211,7 +211,7 @@ describe('authentication routes', () => {
 
     render(<App />)
 
-    expect(await screen.findByRole('heading', { name: 'Usuarios' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Inicio' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Iniciar sesión' })).not.toBeInTheDocument()
   })
 
@@ -233,8 +233,48 @@ describe('authentication routes', () => {
 
     render(<App />)
 
-    // The link renders before the redirect to /usuarios settles; wait for the route, not the node.
-    await waitFor(() => expect(screen.getByRole('link', { name: 'Usuarios' })).toHaveClass('active'))
+    // The link renders before the redirect to /inicio settles; wait for the route, not the node.
+    await waitFor(() => expect(screen.getByRole('link', { name: 'Inicio' })).toHaveClass('active'))
+  })
+
+  it('TestRF015_ExponeElDestinoDelEnlaceParaSaltarAlContenidoEnRutasPublicas', async () => {
+    window.history.replaceState({}, '', '/forgot-password')
+
+    render(<App />)
+
+    await screen.findByRole('heading', { name: 'Restablecer contraseña' })
+    expect(screen.getByRole('link', { name: 'Saltar al contenido' })).toHaveAttribute('href', '#main-content')
+    expect(document.querySelector('main#main-content')).toBeInTheDocument()
+  })
+
+  it('TestRF015_ElDestinoDelEnlaceParaSaltarPuedeRecibirElFocoEnRutasPublicasYLogin', async () => {
+    window.history.replaceState({}, '', '/forgot-password')
+    const { unmount } = render(<App />)
+    await screen.findByRole('heading', { name: 'Restablecer contraseña' })
+    const publicMain = document.querySelector<HTMLElement>('main#main-content')
+    expect(publicMain).toHaveAttribute('tabindex', '-1')
+    fireEvent.click(screen.getByRole('link', { name: 'Saltar al contenido' }))
+    publicMain?.focus()
+    expect(publicMain).toHaveFocus()
+    unmount()
+
+    window.history.replaceState({}, '', '/login')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json(401, { title: 'Unauthorized', status: 401 })))
+    render(<App />)
+    await screen.findByLabelText('Correo electrónico')
+    const loginMain = document.querySelector<HTMLElement>('main#main-content')
+    expect(loginMain).toHaveAttribute('tabindex', '-1')
+    loginMain?.focus()
+    expect(loginMain).toHaveFocus()
+  })
+
+  it('TestRF015_ElpantallaDeRestauracionExponeUnDestinoEnfocableParaElEnlaceDeSalto', () => {
+    window.history.replaceState({}, '', '/login')
+    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => undefined)))
+    render(<App />)
+    const restoringMain = document.querySelector<HTMLElement>('main#main-content')
+    expect(screen.getByText('Validando tu sesión…')).toBeInTheDocument()
+    expect(restoringMain).toHaveAttribute('tabindex', '-1')
   })
 
   it('TestRF007_LogsOutLocallyWhenRemoteLogoutFails', async () => {
@@ -253,7 +293,7 @@ describe('authentication routes', () => {
     await screen.findByLabelText('Código de verificación')
     fireEvent.change(screen.getByLabelText('Código de verificación'), { target: { value: '123456' } })
     fireEvent.click(screen.getByRole('button', { name: 'Verificar' }))
-    await screen.findByRole('heading', { name: 'Usuarios' })
+    await screen.findByRole('heading', { name: 'Inicio' })
     fireEvent.click(screen.getByRole('button', { name: 'Cerrar sesión' }))
 
     expect(await screen.findByRole('button', { name: 'Iniciar sesión' })).toBeInTheDocument()

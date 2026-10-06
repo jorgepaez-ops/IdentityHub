@@ -9,9 +9,10 @@ export const DIRECTORY_ROLE_DESCRIPTION: Record<string, string> = {
   user: 'Rol base de toda cuenta: acceso a Mi cuenta.',
 }
 
-const chipTone = (role: string) => (role === 'admin' ? 'accent' : role === 'contabilidad.senior' ? 'warn' : 'neutral')
+const TONE_BY_ROLE = new Map([['admin', 'accent'], ['contabilidad.senior', 'warn']])
+export const chipTone = (role: string) => TONE_BY_ROLE.get(role) ?? 'neutral'
 
-export function RoleChips({ roles }: { roles: readonly string[] }) {
+export function RoleChips({ roles }: Readonly<{ roles: readonly string[] }>) {
   return (
     <ul className="chips" aria-label="Roles">
       {roles.map((role) => <li className={`chip chip-${chipTone(role)}`} key={role}>{role}</li>)}
@@ -27,7 +28,7 @@ export const STATUS_LABEL: Record<AdminUser['status'], string> = {
 }
 const statusTone: Record<AdminUser['status'], string> = { active: 'ok', locked: 'danger', disabled: 'danger', pending_verification: 'warn' }
 
-export function StatusPill({ status }: { status: AdminUser['status'] }) {
+export function StatusPill({ status }: Readonly<{ status: AdminUser['status'] }>) {
   return <span className={`pill pill-${statusTone[status]}`}>{STATUS_LABEL[status]}</span>
 }
 
@@ -57,7 +58,28 @@ export function adminProblems(reason: unknown, byStatus: Record<number, string>,
   return [byStatus[reason.status] ?? fallback]
 }
 
-export function Problems({ messages }: { messages: string[] }) {
+export function Problems({ messages }: Readonly<{ messages: string[] }>) {
   if (messages.length === 0) return null
   return <div className="error-box" role="alert">{messages.map((message, index) => <p key={index}>{message}</p>)}</div>
 }
+
+// Directory status filter: `null` is "all" and sends no `status` parameter. It is mirrored in the URL as ?estado=.
+export const STATUS_PARAM = 'estado'
+export const STATUS_FILTERS: (AdminUser['status'] | null)[] = [null, 'active', 'pending_verification', 'locked', 'disabled']
+export const STATUS_FILTER_LABEL: Record<AdminUser['status'] | 'all', string> = {
+  all: 'Todos',
+  active: 'Activos',
+  pending_verification: 'Pendientes',
+  locked: 'Bloqueados',
+  disabled: 'Deshabilitados',
+}
+export const parseStatusFilter = (value: string | null): AdminUser['status'] | null =>
+  STATUS_FILTERS.find((option) => option !== null && option === value) ?? null
+
+// Audit log filters live in the URL as ?accion=, ?actor= and ?desde=. `desde=24h` is a relative window resolved
+// when the query is sent, so a link (like the home tile) never goes stale.
+export const AUDIT_PARAM = { action: 'accion', actor: 'actor', since: 'desde' } as const
+export const LAST_24H = '24h'
+export const FAILED_SIGN_IN_ACTION = 'login_failed'
+export const MFA_CODE_REJECTED_ACTION = 'mfa_code_rejected'
+export const AUDIT_FAILED_SIGN_IN_PATH = `/auditoria?${AUDIT_PARAM.action}=${FAILED_SIGN_IN_ACTION}&${AUDIT_PARAM.since}=${LAST_24H}`

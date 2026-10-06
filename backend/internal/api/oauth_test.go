@@ -121,7 +121,7 @@ func TestRF020_CORSSeLimitaATokenYJWKS(t *testing.T) {
 		request.Header.Set("Origin", client.Origin)
 		response := httptest.NewRecorder()
 		server.Routes().ServeHTTP(response, request)
-		if got := response.Header().Get("Access-Control-Allow-Origin") == client.Origin; got != testCase.want {
+		if (response.Header().Get("Access-Control-Allow-Origin") == client.Origin) != testCase.want {
 			t.Fatalf("path=%s cors=%q", testCase.path, response.Header().Get("Access-Control-Allow-Origin"))
 		}
 		if response.Header().Get("Access-Control-Allow-Credentials") != "" {

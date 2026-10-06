@@ -28,7 +28,7 @@ test('RF-021 Admin crea auditor de Contabilidad con capacidades acotadas', async
     await test.step('El admin crea el rol en la grilla de la consola', async () => {
       await adminPage.goto(`${hubUrl}/login`)
       await browserLoginWithMfa(adminPage, admin.email, strongPassword)
-      await expect(adminPage.getByRole('heading', { name: 'Usuarios' })).toBeVisible()
+      await expect(adminPage.getByRole('heading', { name: 'Inicio' })).toBeVisible()
       await adminPage.getByRole('link', { name: 'Roles', exact: true }).click()
       await expect(adminPage.getByRole('heading', { name: 'Roles y permisos' })).toBeVisible()
       await adminPage.getByRole('button', { name: 'Nuevo rol de Contabilidad' }).click()

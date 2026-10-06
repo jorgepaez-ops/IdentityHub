@@ -151,7 +151,7 @@ func TestRNF005_PublishFallaAlSerializarSinNecesitarBroker(t *testing.T) {
 }
 
 func TestRNF007_PublishCuentaFalloDeSerializacion(t *testing.T) {
-	metric := observability.EventsPublished.WithLabelValues(TypeUserRegistered, "failed")
+	metric := observability.EventsPublished.WithLabelValues(TypeUserRegistered, observability.ResultFailed)
 	before := testutil.ToFloat64(metric)
 
 	err := (&Broker{}).Publish(context.Background(), TypeUserRegistered, make(chan int))
@@ -188,21 +188,21 @@ func TestRNF007_PublishCuentaResultadosConfirmadosYFallidos(t *testing.T) {
 		publish eventPublisher
 		result  string
 	}{
-		{name: "serialización", event: make(chan int), result: "failed"},
-		{name: "publicación", event: NewEnvelope(routingKey, ""), publish: publisherStub{err: errors.New("broker unavailable")}, result: "failed"},
-		{name: "espera de confirmación", event: NewEnvelope(routingKey, ""), publish: publisherStub{confirmation: confirmationStub{err: errors.New("confirmation timeout")}}, result: "failed"},
-		{name: "nack", event: NewEnvelope(routingKey, ""), publish: publisherStub{confirmation: confirmationStub{}}, result: "failed"},
-		{name: "confirmación", event: NewEnvelope(routingKey, ""), publish: publisherStub{confirmation: confirmationStub{confirmed: true}}, result: "published"},
+		{name: "serialización", event: make(chan int), result: observability.ResultFailed},
+		{name: "publicación", event: NewEnvelope(routingKey, ""), publish: publisherStub{err: errors.New("broker unavailable")}, result: observability.ResultFailed},
+		{name: "espera de confirmación", event: NewEnvelope(routingKey, ""), publish: publisherStub{confirmation: confirmationStub{err: errors.New("confirmation timeout")}}, result: observability.ResultFailed},
+		{name: "nack", event: NewEnvelope(routingKey, ""), publish: publisherStub{confirmation: confirmationStub{}}, result: observability.ResultFailed},
+		{name: "confirmación", event: NewEnvelope(routingKey, ""), publish: publisherStub{confirmation: confirmationStub{confirmed: true}}, result: observability.ResultPublished},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			metric := observability.EventsPublished.WithLabelValues(routingKey, testCase.result)
 			before := testutil.ToFloat64(metric)
 
 			err := (&Broker{publisher: testCase.publish}).Publish(context.Background(), routingKey, testCase.event)
-			if testCase.result == "published" && err != nil {
+			if testCase.result == observability.ResultPublished && err != nil {
 				t.Fatalf("Publish() error = %v", err)
 			}
-			if testCase.result == "failed" && err == nil {
+			if testCase.result == observability.ResultFailed && err == nil {
 				t.Fatal("Publish() = nil error; se esperaba un fallo")
 			}
 			if got := testutil.ToFloat64(metric); got != before+1 {

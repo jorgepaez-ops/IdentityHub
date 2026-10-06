@@ -83,8 +83,8 @@ describe('completeCallback: code exchange and token handling', () => {
     expect(exchange?.init?.method).toBe('POST')
     expect(exchange?.init?.credentials).toBe('omit')
     // The token lives only in memory: nothing may remain in either storage.
-    expect(localStorage.length).toBe(0)
-    expect(sessionStorage.length).toBe(0)
+    expect(localStorage).toHaveLength(0)
+    expect(sessionStorage).toHaveLength(0)
     expect(JSON.stringify({ ...localStorage, ...sessionStorage })).not.toContain(session.accessToken)
     // code and state are gone from the address bar (and so from history and Referer).
     expect(window.location.search).toBe('')
@@ -98,7 +98,7 @@ describe('completeCallback: code exchange and token handling', () => {
     await expect(completeCallback(window.location.search)).rejects.toMatchObject({ kind: 'state' })
     expect(calls).toHaveLength(0)
     expect(window.location.search).toBe('')
-    expect(sessionStorage.length).toBe(0)
+    expect(sessionStorage).toHaveLength(0)
   })
 
   it('TestRF020_CallbackRejectsWhenNoFlowWasStarted', async () => {
@@ -126,7 +126,7 @@ describe('completeCallback: code exchange and token handling', () => {
     const { state } = await startedFlow()
     stubHub({ token: () => jsonResponse(400, { title: 'Bad Request' }) })
     await expect(completeCallback(`?code=bad&state=${state}`)).rejects.toMatchObject({ kind: 'exchange' })
-    expect(sessionStorage.length).toBe(0)
+    expect(sessionStorage).toHaveLength(0)
   })
 
   it('TestRF020_CallbackRejectsTokenWithWrongIssuerFromTokenEndpoint', async () => {

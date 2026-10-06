@@ -11,7 +11,7 @@ const defaultAuditLogLimit = 25
 
 func (s *Server) listAuditLog(w http.ResponseWriter, r *http.Request, params ListAuditLogParams) {
 	if s.auditLog == nil {
-		writeProblem(w, http.StatusServiceUnavailable, "audit-log-unavailable", "Service Unavailable", "Audit log is temporarily unavailable.")
+		writeProblem(w, http.StatusServiceUnavailable, "audit-log-unavailable", titleServiceUnavailable, "Audit log is temporarily unavailable.")
 		return
 	}
 	limit := defaultAuditLogLimit
@@ -37,7 +37,7 @@ func (s *Server) listAuditLog(w http.ResponseWriter, r *http.Request, params Lis
 		Action: actionValue(params.Action), ActorID: params.ActorId, Since: params.Since, Cursor: cursor, Limit: limit + 1,
 	})
 	if err != nil {
-		writeProblem(w, http.StatusInternalServerError, "audit-log-load-failed", "Internal Server Error", "Audit log could not be loaded.")
+		writeProblem(w, http.StatusInternalServerError, "audit-log-load-failed", titleInternalServerError, "Audit log could not be loaded.")
 		return
 	}
 	page := AuditLogPage{Items: make([]AuditEvent, 0, len(events))}

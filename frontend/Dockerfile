@@ -39,18 +39,15 @@ RUN npm run build
 # ── Imagen final ──────────────────────────────────────────────────────────
 # nginxinc/nginx-unprivileged:stable-alpine — corre como uid 101 por defecto y ya
 # escucha en el puerto 8080 que usa este proyecto, sin cambiar nada más.
-FROM nginxinc/nginx-unprivileged@sha256:ed04ec1ff34502c339ee5c3ae3f855442398edc1d05591e2b98981dcbbd20b1e AS web
+FROM nginxinc/nginx-unprivileged@sha256:15c994d10d6d78658721c3bcafff14cb281fba2a4bdf9d5ba92c416a472516e3 AS web
 
 COPY frontend/nginx/default.conf /etc/nginx/conf.d/default.conf
 COPY frontend/nginx/security-headers.conf /etc/nginx/security-headers.conf
 COPY --from=builder /app/dist /usr/share/nginx/html
 COPY --from=contabilidad-builder /app/dist /usr/share/nginx/contabilidad
 
-# CVE-2026-103111 (HIGH): la base fijada trae pcre2 10.48-r0 y upstream todavía no
-# publicó una imagen con 10.49. Se actualiza solo ese paquete (decisión del
-# usuario, 2026-10-02); retirar esta capa cuando el digest de la base ya lo incluya.
-USER 0
-RUN apk upgrade --no-cache pcre2
+# P9d (2026-10-06): este digest de stable-alpine ya trae pcre2 10.49, libpng 1.6.59 y
+# nghttp2 1.70; se retiró la capa "apk upgrade pcre2" (CVE-2026-103111) que parchaba la base anterior.
 
 EXPOSE 8080
 

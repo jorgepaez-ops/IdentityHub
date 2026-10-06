@@ -9,9 +9,15 @@ import (
 	"github.com/jorgepaez/identity-hub/internal/observability"
 )
 
+const (
+	problemMFAUnavailable = "mfa-unavailable"
+	detailMFAUnavailable  = "MFA is temporarily unavailable."
+	msgMustNotBeEmpty     = "must not be empty"
+)
+
 func (s *Server) verifyMfa(w http.ResponseWriter, r *http.Request) {
 	if s.mfa == nil || s.mfaRefreshTTL <= 0 {
-		writeProblem(w, http.StatusServiceUnavailable, "mfa-unavailable", "Service Unavailable", "MFA is temporarily unavailable.")
+		writeProblem(w, http.StatusServiceUnavailable, problemMFAUnavailable, titleServiceUnavailable, detailMFAUnavailable)
 		return
 	}
 	var request MfaVerifyRequest
@@ -22,11 +28,11 @@ func (s *Server) verifyMfa(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if request.MfaToken == "" {
-		writeValidationProblem(w, "mfaToken", "must not be empty")
+		writeValidationProblem(w, "mfaToken", msgMustNotBeEmpty)
 		return
 	}
 	if request.Code == "" {
-		writeValidationProblem(w, "code", "must not be empty")
+		writeValidationProblem(w, "code", msgMustNotBeEmpty)
 		return
 	}
 	result, err := s.mfa.Verify(r.Context(), mfa.VerifyInput{
@@ -42,19 +48,19 @@ func (s *Server) verifyMfa(w http.ResponseWriter, r *http.Request) {
 			http.SetCookie(w, hubSessionCookie(result.HubSessionToken, int(s.hubSessionTTL.Seconds())))
 		}
 		writeJSON(w, http.StatusOK, TokenPair{AccessToken: result.AccessToken, TokenType: TokenPairTokenType(result.TokenType), ExpiresIn: result.ExpiresIn})
-		observability.LoginAttempts.WithLabelValues("succeeded").Inc()
+		observability.LoginAttempts.WithLabelValues(observability.ResultSucceeded).Inc()
 		return
 	}
 	if errors.Is(err, mfa.ErrChallengeInvalid) || errors.Is(err, mfa.ErrCodeInvalid) {
 		writeUnauthorized(w)
 		return
 	}
-	writeProblem(w, http.StatusInternalServerError, "mfa-verify-failed", "Internal Server Error", "The MFA challenge could not be verified.")
+	writeProblem(w, http.StatusInternalServerError, "mfa-verify-failed", titleInternalServerError, "The MFA challenge could not be verified.")
 }
 
 func (s *Server) resendMfaCode(w http.ResponseWriter, r *http.Request) {
 	if s.mfa == nil {
-		writeProblem(w, http.StatusServiceUnavailable, "mfa-unavailable", "Service Unavailable", "MFA is temporarily unavailable.")
+		writeProblem(w, http.StatusServiceUnavailable, problemMFAUnavailable, titleServiceUnavailable, detailMFAUnavailable)
 		return
 	}
 	var request MfaResendRequest
@@ -65,7 +71,7 @@ func (s *Server) resendMfaCode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if request.MfaToken == "" {
-		writeValidationProblem(w, "mfaToken", "must not be empty")
+		writeValidationProblem(w, "mfaToken", msgMustNotBeEmpty)
 		return
 	}
 	err := s.mfa.Resend(r.Context(), request.MfaToken)
@@ -77,8 +83,8 @@ func (s *Server) resendMfaCode(w http.ResponseWriter, r *http.Request) {
 	case errors.Is(err, mfa.ErrChallengeInvalid):
 		writeUnauthorized(w)
 	case errors.Is(err, mfa.ErrDeliveryUnavailable):
-		writeProblem(w, http.StatusServiceUnavailable, "mfa-delivery-unavailable", "Service Unavailable", "The verification code could not be sent. Please try again.")
+		writeProblem(w, http.StatusServiceUnavailable, "mfa-delivery-unavailable", titleServiceUnavailable, "The verification code could not be sent. Please try again.")
 	default:
-		writeProblem(w, http.StatusInternalServerError, "mfa-resend-failed", "Internal Server Error", "The MFA code could not be resent.")
+		writeProblem(w, http.StatusInternalServerError, "mfa-resend-failed", titleInternalServerError, "The MFA code could not be resent.")
 	}
 }
