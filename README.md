@@ -82,6 +82,8 @@ Estado de las alertas de code scanning en `main` una vez integradas las correcci
 | Trivy | GO-2026-5932 | `golang.org/x/crypto` v0.56.0 en la imagen `api` | El aviso cubre el paquete `openpgp` y sus subpaquetes, que no tiene versión corregida; el módulo sigue haciendo falta para Argon2id (ADR 0004) | VULN-028, riesgo aceptado hasta 2026-12-25 (`backend/osv-scanner.toml`): ningún paquete propio ni dependencia importa `openpgp`; osv-scanner y govulncheck lo marcan no alcanzable |
 | Trivy | DLA-4792-1 | `tzdata` 2026b en las imágenes `api` y `worker` (base `distroless/static-debian12`) | Debian publicó 2026c, pero la imagen distroless fijada todavía no lo incluye; severidad sin clasificar (UNKNOWN) | Solo son datos de zonas horarias. Se actualizará el digest de la base cuando upstream la reconstruya (el escaneo semanal lo detecta) |
 
+Falsos positivos de secretos en SonarCloud (2026-10-07): `security/evidence/**` se excluye del análisis con `.sonarcloud.properties` porque son salidas almacenadas de los escáneres, conservadas como evidencia "antes" (VULN-001), no código; y el ejemplo literal del comentario de `.gitleaks.toml` (regla `secrets:S2068`) se reescribió sin un valor con forma de credencial. Justificación: los valores son sembrados, nunca reales ni reutilizados (confirmado por el responsable el 2026-10-06).
+
 Las 27 alertas de Checkov eran omisiones ya justificadas en línea (`#checkov:skip=ID:motivo`): CI deja de subirlas a code scanning (se filtran del SARIF) pero la justificación sigue en el código y el gate sigue activo. La de Trivy AWS-0089 (bucket de logs del ALB sin logging propio) lleva `#trivy:ignore:AWS-0089` por el mismo motivo que `CKV_AWS_18`.
 
 ## 8. Gestión del proyecto y trazabilidad
