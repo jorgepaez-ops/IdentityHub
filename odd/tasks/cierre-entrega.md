@@ -36,7 +36,15 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
     `gocognit`, 21 en Sonar); pruebas con Postgres real 0 omitidas, 80,8 %; `./internal/api/` y
     `./internal/auth/...` ok; `go vet`, `gofmt` y `golangci-lint` limpios. `Issue` (23) y `Resend` (21)
     superan 15 en `gocognit` pero Sonar no los marcó: fuera de alcance.
-  - [ ] C1d `config.go` · [ ] C1e `rbac.go`
+    Commit `156895f`. Revisión nativa: riesgo alto, concedida, 4 lentes, aprobada y acusada
+    (`review-04145e4b6b15b1ae`), sin sugerencias.
+  - [x] C1d `config.go` — los cierres de `load` pasan a `problemCollector` (métodos `required`, `optional`,
+    `duration`, `integer`, `boundedInteger`, `positiveInteger`, `positiveDuration`) y la carga se divide en
+    `loadServerSecrets`, `loadPasswordConfig` y `loadBootstrapAdminEmail`, con el mismo orden de mensajes.
+    Ruta: delegado (Sonnet, junto con C1e), revisado por Opus. Evidencia: `load` sale del top 5 de
+    `gocognit` (antes 25; 23 en Sonar); `./internal/config/` 95,0 %, `./internal/api/` y `./cmd/...` ok,
+    0 omitidas; `go vet`, `gofmt` y `golangci-lint` limpios.
+  - [ ] C1e `rbac.go`
 - [ ] **C2 — Tag `vX.Y.Z` y release** con el PDF del informe adjunto (`make informe`; el PDF no se
   versiona). En vivo frente al equipo (T21 de `idp-semana-4.md`).
 - [ ] **C3 — Docker Hub (T17 de `idp-semana-4.md`).** Workflow de release en el tag: imágenes con `vX.Y.Z`
@@ -63,4 +71,4 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
 
 ## Siguiente paso
 
-C1d, `config.go`.
+C1e, `rbac.go`.

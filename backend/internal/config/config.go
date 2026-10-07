@@ -84,126 +84,159 @@ func LoadWorker() (*Config, error) {
 	return load(false)
 }
 
-func load(requireDatabase bool) (*Config, error) {
-	var problems []string
+// problemCollector accumulates every configuration problem, in the order the
+// variables are read, so load can report them all at once.
+type problemCollector struct {
+	problems []string
+}
 
-	req := func(key string) string {
-		v := strings.TrimSpace(os.Getenv(key))
-		if v == "" {
-			problems = append(problems, fmt.Sprintf("falta la variable obligatoria %s", key))
-		}
+func (c *problemCollector) add(format string, args ...any) {
+	c.problems = append(c.problems, fmt.Sprintf(format, args...))
+}
+
+// required reads a trimmed variable and records a problem when it is empty.
+func (c *problemCollector) required(key string) string {
+	v := strings.TrimSpace(os.Getenv(key))
+	if v == "" {
+		c.add("falta la variable obligatoria %s", key)
+	}
+	return v
+}
+
+// optional reads a trimmed variable and falls back to def when it is empty.
+func (c *problemCollector) optional(key, def string) string {
+	if v := strings.TrimSpace(os.Getenv(key)); v != "" {
 		return v
 	}
-	opt := func(key, def string) string {
-		if v := strings.TrimSpace(os.Getenv(key)); v != "" {
-			return v
-		}
-		return def
-	}
-	dur := func(key, def string) time.Duration {
-		d, err := time.ParseDuration(opt(key, def))
-		if err != nil {
-			problems = append(problems, fmt.Sprintf("%s no es una duración válida: %v", key, err))
-		}
-		return d
-	}
-	num := func(key, def string) int {
-		n, err := strconv.Atoi(opt(key, def))
-		if err != nil {
-			problems = append(problems, fmt.Sprintf("%s no es un entero válido: %v", key, err))
-		}
-		return n
-	}
-	passwordNum := func(key, def string, upperBound int) int {
-		n := num(key, def)
-		if n <= 0 || n > upperBound {
-			problems = append(problems, fmt.Sprintf("%s debe estar entre 1 y %d", key, upperBound))
-		}
-		return n
-	}
-	positiveNum := func(key, def string) int {
-		n := num(key, def)
-		if n <= 0 {
-			problems = append(problems, fmt.Sprintf("%s debe ser mayor que 0", key))
-		}
-		return n
-	}
-	positiveDuration := func(key, def string) time.Duration {
-		d := dur(key, def)
-		if d <= 0 {
-			problems = append(problems, fmt.Sprintf("%s debe ser una duración mayor que 0", key))
-		}
-		return d
-	}
+	return def
+}
 
-	// The worker does not read DATABASE_URL at all, even if the environment sets it.
-	databaseURL := ""
-	if requireDatabase {
-		databaseURL = req("DATABASE_URL")
+func (c *problemCollector) duration(key, def string) time.Duration {
+	d, err := time.ParseDuration(c.optional(key, def))
+	if err != nil {
+		c.add("%s no es una duración válida: %v", key, err)
 	}
+	return d
+}
 
-	// Likewise the worker never reads JWT_SIGNING_KEY, even if the environment sets it.
-	jwtSigningKey := ""
-	if requireDatabase {
-		jwtSigningKey = req("JWT_SIGNING_KEY")
-		if decoded, err := base64.StdEncoding.DecodeString(jwtSigningKey); err != nil || len(decoded) != 32 {
-			problems = append(problems, "JWT_SIGNING_KEY debe ser una semilla Ed25519 en base64 de 32 bytes")
-		}
+func (c *problemCollector) integer(key, def string) int {
+	n, err := strconv.Atoi(c.optional(key, def))
+	if err != nil {
+		c.add("%s no es un entero válido: %v", key, err)
 	}
+	return n
+}
 
-	passwordMemory := passwordNum("ARGON2_MEMORY_KIB", "65536", int(^uint32(0)))
-	passwordIterations := passwordNum("ARGON2_ITERATIONS", "3", int(^uint32(0)))
-	passwordParallelism := passwordNum("ARGON2_PARALLELISM", "2", 255)
-	passwordConcurrency := passwordNum("ARGON2_CONCURRENCY", "4", int(^uint(0)>>1))
-	trustedProxies := parseTrustedProxies(os.Getenv("TRUSTED_PROXIES"), &problems)
-	bootstrapAdminEmail := strings.TrimSpace(os.Getenv("BOOTSTRAP_ADMIN_EMAIL"))
-	if bootstrapAdminEmail != "" {
-		parsed, err := mail.ParseAddress(bootstrapAdminEmail)
-		if err != nil || parsed.Address != bootstrapAdminEmail {
-			problems = append(problems, "BOOTSTRAP_ADMIN_EMAIL debe ser un correo válido cuando está definido")
-		}
+// boundedInteger records a problem unless the value is in 1..upperBound.
+func (c *problemCollector) boundedInteger(key, def string, upperBound int) int {
+	n := c.integer(key, def)
+	if n <= 0 || n > upperBound {
+		c.add("%s debe estar entre 1 y %d", key, upperBound)
 	}
+	return n
+}
+
+func (c *problemCollector) positiveInteger(key, def string) int {
+	n := c.integer(key, def)
+	if n <= 0 {
+		c.add("%s debe ser mayor que 0", key)
+	}
+	return n
+}
+
+func (c *problemCollector) positiveDuration(key, def string) time.Duration {
+	d := c.duration(key, def)
+	if d <= 0 {
+		c.add("%s debe ser una duración mayor que 0", key)
+	}
+	return d
+}
+
+func load(requireDatabase bool) (*Config, error) {
+	c := &problemCollector{}
+
+	databaseURL, jwtSigningKey := loadServerSecrets(c, requireDatabase)
+	argon2 := loadPasswordConfig(c)
+	trustedProxies := parseTrustedProxies(os.Getenv("TRUSTED_PROXIES"), &c.problems)
+	bootstrapAdminEmail := loadBootstrapAdminEmail(c)
 
 	cfg := &Config{
-		Port:                    num("API_PORT", "8081"),
-		LogLevel:                opt("LOG_LEVEL", "info"),
-		Version:                 opt("APP_VERSION", "dev"),
+		Port:                    c.integer("API_PORT", "8081"),
+		LogLevel:                c.optional("LOG_LEVEL", "info"),
+		Version:                 c.optional("APP_VERSION", "dev"),
 		DatabaseURL:             Secret(databaseURL),
-		RabbitURL:               Secret(req("RABBITMQ_URL")),
-		SMTPHost:                opt("SMTP_HOST", "mailpit"),
-		SMTPPort:                num("SMTP_PORT", "1025"),
-		SMTPFrom:                opt("SMTP_FROM", "no-reply@identity.local"),
-		PublicBaseURL:           opt("PUBLIC_BASE_URL", "http://identityhub.localhost:8080"),
+		RabbitURL:               Secret(c.required("RABBITMQ_URL")),
+		SMTPHost:                c.optional("SMTP_HOST", "mailpit"),
+		SMTPPort:                c.integer("SMTP_PORT", "1025"),
+		SMTPFrom:                c.optional("SMTP_FROM", "no-reply@identity.local"),
+		PublicBaseURL:           c.optional("PUBLIC_BASE_URL", "http://identityhub.localhost:8080"),
 		JWTSigningKey:           Secret(jwtSigningKey),
-		JWTIssuer:               opt("JWT_ISSUER", "http://identityhub.localhost:8080"),
-		JWTAudience:             opt("JWT_AUDIENCE", "identity-hub"),
-		AccessTTL:               dur("JWT_ACCESS_TTL", "15m"),
-		RefreshTTL:              dur("JWT_REFRESH_TTL", "720h"),
-		HubSessionTTL:           positiveDuration("HUB_SESSION_TTL", "720h"),
+		JWTIssuer:               c.optional("JWT_ISSUER", "http://identityhub.localhost:8080"),
+		JWTAudience:             c.optional("JWT_AUDIENCE", "identity-hub"),
+		AccessTTL:               c.duration("JWT_ACCESS_TTL", "15m"),
+		RefreshTTL:              c.duration("JWT_REFRESH_TTL", "720h"),
+		HubSessionTTL:           c.positiveDuration("HUB_SESSION_TTL", "720h"),
 		OAuthClientID:           OAuthClientID,
 		OAuthRedirectURI:        OAuthRedirectURI,
 		OAuthClientOrigin:       OAuthClientOrigin,
-		LoginAccountMaxFailures: positiveNum("LOGIN_ACCOUNT_MAX_FAILURES", "5"),
-		LoginIPMaxFailures:      positiveNum("LOGIN_IP_MAX_FAILURES", "20"),
-		LoginFailureWindow:      positiveDuration("LOGIN_FAILURE_WINDOW", "15m"),
-		LoginLockoutDuration:    positiveDuration("LOGIN_LOCKOUT_DURATION", "15m"),
+		LoginAccountMaxFailures: c.positiveInteger("LOGIN_ACCOUNT_MAX_FAILURES", "5"),
+		LoginIPMaxFailures:      c.positiveInteger("LOGIN_IP_MAX_FAILURES", "20"),
+		LoginFailureWindow:      c.positiveDuration("LOGIN_FAILURE_WINDOW", "15m"),
+		LoginLockoutDuration:    c.positiveDuration("LOGIN_LOCKOUT_DURATION", "15m"),
 		TrustedProxies:          trustedProxies,
 		BootstrapAdminEmail:     bootstrapAdminEmail,
-		Argon2: PasswordConfig{
-			MemoryKiB:   boundedUint32(passwordMemory),
-			Iterations:  boundedUint32(passwordIterations),
-			Parallelism: boundedUint8(passwordParallelism),
-			Concurrency: passwordConcurrency,
-		},
+		Argon2:                  argon2,
 	}
 
-	if len(problems) > 0 {
-		return nil, fmt.Errorf("configuración inválida:\n  - %s", strings.Join(problems, "\n  - "))
+	if len(c.problems) > 0 {
+		return nil, fmt.Errorf("configuración inválida:\n  - %s", strings.Join(c.problems, "\n  - "))
 	}
 	return cfg, nil
 }
 
-// boundedUint32 and boundedUint8 narrow values that passwordNum has already
+// loadServerSecrets reads DATABASE_URL and JWT_SIGNING_KEY. The worker
+// (requireDatabase false) never reads either, even if the environment sets them.
+func loadServerSecrets(c *problemCollector, requireDatabase bool) (databaseURL, jwtSigningKey string) {
+	if !requireDatabase {
+		return "", ""
+	}
+	databaseURL = c.required("DATABASE_URL")
+	jwtSigningKey = c.required("JWT_SIGNING_KEY")
+	if decoded, err := base64.StdEncoding.DecodeString(jwtSigningKey); err != nil || len(decoded) != 32 {
+		c.add("JWT_SIGNING_KEY debe ser una semilla Ed25519 en base64 de 32 bytes")
+	}
+	return databaseURL, jwtSigningKey
+}
+
+// loadPasswordConfig reads and validates the Argon2 parameters.
+func loadPasswordConfig(c *problemCollector) PasswordConfig {
+	memory := c.boundedInteger("ARGON2_MEMORY_KIB", "65536", int(^uint32(0)))
+	iterations := c.boundedInteger("ARGON2_ITERATIONS", "3", int(^uint32(0)))
+	parallelism := c.boundedInteger("ARGON2_PARALLELISM", "2", 255)
+	concurrency := c.boundedInteger("ARGON2_CONCURRENCY", "4", int(^uint(0)>>1))
+	return PasswordConfig{
+		MemoryKiB:   boundedUint32(memory),
+		Iterations:  boundedUint32(iterations),
+		Parallelism: boundedUint8(parallelism),
+		Concurrency: concurrency,
+	}
+}
+
+// loadBootstrapAdminEmail reads the optional bootstrap admin address and
+// records a problem when it is defined but not a plain valid email.
+func loadBootstrapAdminEmail(c *problemCollector) string {
+	email := strings.TrimSpace(os.Getenv("BOOTSTRAP_ADMIN_EMAIL"))
+	if email == "" {
+		return email
+	}
+	parsed, err := mail.ParseAddress(email)
+	if err != nil || parsed.Address != email {
+		c.add("BOOTSTRAP_ADMIN_EMAIL debe ser un correo válido cuando está definido")
+	}
+	return email
+}
+
+// boundedUint32 and boundedUint8 narrow values that boundedInteger has already
 // validated; the explicit range check makes the conversion safe on its own.
 func boundedUint32(n int) uint32 {
 	if n < 0 || n > math.MaxUint32 {
