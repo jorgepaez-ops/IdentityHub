@@ -147,6 +147,10 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
     lentes): lote A **aprobado** (`review-763db682c5cd9269`, 2 sugerencias), lote B **aprobado**
     (`review-5bc1a743cfbc8ddb`, 1 sugerencia), lote C **aprobado** (`review-c3cce3fa9e198d96`, 1 sugerencia en
     `testdb.go:88-104`). Todas acusadas.
+  - Corrección de CI tras el primer run del PR #21 (`c6b86d2`): `tools/doc.go` (el análisis de llamadas de osv-scanner
+    necesitaba un paquete en `tools/`) y `sonar.cpd.exclusions` para `gen.go` y la salida de sqlc (la duplicación
+    del código generado tumbaba la puerta de calidad). PR #21 fusionado (`0941fdc`); en `main`, SonarCloud con 0
+    vulnerabilidades abiertas (antes 20) y puerta aprobada.
   - Cierre de D (2026-10-07): `make up` con las imágenes de la rama y `make e2e`: 52/52 en verde. Entrega en un PR
     nuevo desde `chore/hallazgos-y-sonar` (el PR #20 se fusionó antes, `3d0de78`, por decisión del usuario).
 
