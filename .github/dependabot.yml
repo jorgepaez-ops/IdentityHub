@@ -6,6 +6,13 @@ updates:
       interval: "weekly"
     commit-message:
       prefix: "chore(ci)"
+    # Las sub-acciones de CodeQL (init, autobuild, analyze, upload-sarif) deben
+    # usar la misma versión: con init en v4 y autobuild en v3 el job falla
+    # ("Loaded a configuration file for version 4.x, but running version 3.x").
+    groups:
+      codeql-action:
+        patterns:
+          - "github/codeql-action*"
 
   # Herramientas de desarrollo y escaneo fijadas en tools/go.mod (oapi-codegen,
   # sqlc, govulncheck, gosec). Se instalan sin @versión: go.sum las verifica.
