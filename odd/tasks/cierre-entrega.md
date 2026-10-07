@@ -57,10 +57,20 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
   `mfa.Resend` (21), `notify.Render` (20), `passwordreset.Confirm` (19), `invitation.Accept` (17),
   `oauth.Exchange` (16), `invitationresend.Resend` (16) y `testdb.New` (17), más el generado `gen.go`.
   Sonar no los marcó (cuenta los cierres de transacción con menos peso). Decidir si se atienden.
-- [ ] **C2 — Tag `vX.Y.Z` y release** con el PDF del informe adjunto (`make informe`; el PDF no se
-  versiona). En vivo frente al equipo (T21 de `idp-semana-4.md`).
-- [ ] **C3 — Docker Hub (T17 de `idp-semana-4.md`).** Workflow de release en el tag: imágenes con `vX.Y.Z`
-  y `latest`. En vivo.
+- **Orden invertido (decisión del usuario, 2026-10-07):** C3 va antes que C2. Motivo: no existe workflow de
+  release (solo `ci.yml`, `baseline-scan.yml` y `scheduled-scan.yml`); si `v1.0.0` saliera antes de C3, ese
+  tag nunca tendría imágenes en Docker Hub y C3 obligaría a un `v1.0.1`. Con el orden nuevo, un solo `v1.0.0`
+  publica en vivo el release con el PDF y las imágenes. **Revisarlo con el equipo en la sesión en vivo.**
+- [ ] **C3 — Docker Hub (T17 de `idp-semana-4.md`).** Workflow de release en el tag `vX.Y.Z`: imágenes `api`,
+  `worker` y `web` con `vX.Y.Z` y `latest`, SBOM con Syft y firma con Cosign (ADR 0011), environment
+  protegido `dockerhub`. Requiere Q1: namespace y token de Docker Hub del usuario. Se prueba con el tag
+  `v0.9.0` (y se borra o se deja marcado como prueba) antes de `v1.0.0`.
+- [ ] **C2 — Tag `v1.0.0` y release** con el PDF del informe adjunto (`make informe`; el PDF no se
+  versiona). En vivo frente al equipo (T21 de `idp-semana-4.md`). Requiere el merge del PR #20.
+  Pasos: (1) merge del PR #20 y `main` local al día con CI en verde; (2) `make informe` y revisión del PDF;
+  (3) notas del release revisadas por el usuario; (4) en vivo: `git tag -a v1.0.0` sobre el merge,
+  `git push origin v1.0.0` (dispara el workflow de C3), `gh release create v1.0.0` con el PDF adjunto;
+  (5) evidencia: URL del release y de las imágenes en Docker Hub, en T17, T21 y aquí.
 
 ## Deuda menor (no bloquea la entrega; decidir cuál se atiende)
 
@@ -83,4 +93,7 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
 
 ## Siguiente paso
 
-Decidir el hallazgo fuera de alcance de C1; luego C2.
+Merge del PR #20 (usuario) y Q1 (credenciales de Docker Hub); luego C3 con `v0.9.0` de prueba y, en vivo, C2
+con `v1.0.0`. Pendientes fuera de C1-C3: grabar el video (Q3) y decidir los hallazgos sueltos sin tarea
+(regla de gitleaks con `\s*`, Trivy 0.56.2 local frente a CI, estilo inline bloqueado por la CSP en
+`/invitations/accept`, complejidad fuera de alcance de C1).
