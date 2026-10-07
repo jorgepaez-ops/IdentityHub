@@ -1,0 +1,13 @@
+# Riesgo aceptado — herramientas de desarrollo y escaneo (tools/go.mod).
+#
+# GO-2026-5932 (golang.org/x/crypto/openpgp y subpaquetes) no tiene versión
+# corregida: es un aviso del paquete completo, no de una versión concreta. Llega
+# como dependencia indirecta de las herramientas fijadas en este módulo
+# (oapi-codegen, sqlc, govulncheck, gosec). Esas herramientas solo se usan en
+# desarrollo y en CI; nunca se incluyen en una imagen ni se ejecutan en
+# producción, y osv-scanner lo marca no invocado. Misma decisión y misma fecha de
+# revisión que backend/osv-scanner.toml (VULN-028).
+[[IgnoredVulns]]
+id = "GO-2026-5932"
+ignoreUntil = 2026-12-25
+reason = "VULN-028: golang.org/x/crypto/openpgp sin versión corregida; dependencia indirecta de herramientas de desarrollo (oapi-codegen, sqlc, govulncheck, gosec) que no se distribuyen en ninguna imagen; osv-scanner lo marca no invocado. Riesgo aceptado, revisar en la fecha de expiracion."

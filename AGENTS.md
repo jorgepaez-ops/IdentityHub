@@ -48,7 +48,7 @@ e2e/tests/      vacío; Playwright llega en la semana 3
 | Formato Go | `make fmt` (gofmt) |
 | Validar OpenAPI | `python3 -m openapi_spec_validator specs/03-api/openapi.yaml` (`pip install openapi-spec-validator==0.7.1`) |
 | Trazabilidad | `python3 scripts/traceability.py` (escribe `specs/07-traceability.md`) · `--check` (falla si está desactualizada) |
-| Gate de deriva local | `make gen` regenera `gen.go` (oapi-codegen **v2.5.1**), `schema.d.ts` (openapi-typescript 6.7.6), el código de sqlc (**v1.31.1**, exige Go 1.26 para compilarse) y la matriz. No uses versiones más nuevas de oapi-codegen: obligan a subir `go` y mueven `x/text` |
+| Gate de deriva local | `make gen` regenera `gen.go` (oapi-codegen **v2.7.1**, fijado en `tools/go.mod`), `schema.d.ts` (openapi-typescript 6.7.6), el código de sqlc (**v1.31.1**, exige Go 1.26 para compilarse) y la matriz. Instala los generadores desde `tools/` (`go -C tools install <paquete>`, sin `@versión`) en lugar de `@latest`: `tools/go.sum` fija las versiones |
 | Tipos del cliente TS | `cd frontend && npm run gen:api` (script existente; requiere `npm install`) |
 | Escaneos locales | `make scan` · `scan-secrets` · `scan-deps` · `scan-config` · `scan-image` (todos terminan con `\|\| true`: leer la salida, no el exit code) |
 | BD | `make migrate` · `make psql` |

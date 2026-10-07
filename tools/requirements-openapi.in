@@ -1,0 +1,3 @@
+# Dependencia directa del validador del contrato OpenAPI (job 1 de ci.yml).
+# Regenerar el archivo con hashes: ver la cabecera de requirements-openapi.txt.
+openapi-spec-validator==0.7.1
