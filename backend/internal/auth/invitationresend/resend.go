@@ -52,39 +52,65 @@ func New(repository Repository, publisher Publisher, random io.Reader, now func(
 }
 func (s *Service) Resend(ctx context.Context, input Input) error {
 	return s.repository.WithinInvitationResendTransaction(ctx, func(writer store.InvitationResendWriter) error {
-		user, err := writer.GetUserByIDForUpdate(ctx, input.UserID)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return ErrNotFound
-		}
+		user, err := loadPendingUser(ctx, writer, input.UserID)
 		if err != nil {
-			return fmt.Errorf("load invitation account: %w", err)
+			return err
 		}
-		if user.Status != "pending_verification" {
-			return ErrAccountNotPending
+		raw, expiresAt, err := s.replaceToken(ctx, writer, user.ID)
+		if err != nil {
+			return err
 		}
-		if err := writer.InvalidateInvitationTokens(ctx, user.ID); err != nil {
-			return fmt.Errorf("invalidate old invitation tokens: %w", err)
-		}
-		raw := make([]byte, 32)
-		if _, err := io.ReadFull(s.random, raw); err != nil {
-			return fmt.Errorf("generate replacement invitation token: %w", err)
-		}
-		hash := sha256.Sum256(raw)
-		expiresAt := s.now().UTC().Add(invitationTTL)
-		if err := writer.CreateInvitationToken(ctx, store.CreateInvitationTokenParams{UserID: user.ID, TokenHash: hash[:], ExpiresAt: expiresAt}); err != nil {
-			return fmt.Errorf("persist replacement invitation token: %w", err)
-		}
-		resourceType, resourceID := "user", user.ID.String()
-		if _, err := writer.InsertAuditEvent(ctx, store.InsertAuditEventParams{ActorUserID: &input.ActorUserID, Action: "invitation_resent", ResourceType: &resourceType, ResourceID: &resourceID, IP: input.IP, UserAgent: input.UserAgent, Metadata: []byte(`{}`)}); err != nil {
-			return fmt.Errorf("record invitation resend audit: %w", err)
-		}
-		event := events.UserInvited{Envelope: events.NewEnvelope(events.TypeUserInvited, "")}
-		event.Data.UserID, event.Data.Email, event.Data.DisplayName, event.Data.InvitationToken, event.Data.ExpiresAt = user.ID, user.Email, user.DisplayName, base64.RawURLEncoding.EncodeToString(raw), expiresAt
-		if err := s.publisher.Publish(ctx, events.TypeUserInvited, event); err != nil {
-			return fmt.Errorf("%w: %w", ErrPublish, err)
-		}
-		return nil
+		return s.auditAndPublish(ctx, writer, input, user, raw, expiresAt)
 	})
+}
+
+// loadPendingUser locks the account and requires it to still be pending
+// verification.
+func loadPendingUser(ctx context.Context, writer store.InvitationResendWriter, userID uuid.UUID) (store.User, error) {
+	user, err := writer.GetUserByIDForUpdate(ctx, userID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return store.User{}, ErrNotFound
+	}
+	if err != nil {
+		return store.User{}, fmt.Errorf("load invitation account: %w", err)
+	}
+	if user.Status != "pending_verification" {
+		return store.User{}, ErrAccountNotPending
+	}
+	return user, nil
+}
+
+// replaceToken invalidates the old tokens and persists a new one, returning the
+// raw token bytes and its expiry.
+func (s *Service) replaceToken(ctx context.Context, writer store.InvitationResendWriter, userID uuid.UUID) ([]byte, time.Time, error) {
+	if err := writer.InvalidateInvitationTokens(ctx, userID); err != nil {
+		return nil, time.Time{}, fmt.Errorf("invalidate old invitation tokens: %w", err)
+	}
+	raw := make([]byte, 32)
+	if _, err := io.ReadFull(s.random, raw); err != nil {
+		return nil, time.Time{}, fmt.Errorf("generate replacement invitation token: %w", err)
+	}
+	hash := sha256.Sum256(raw)
+	expiresAt := s.now().UTC().Add(invitationTTL)
+	if err := writer.CreateInvitationToken(ctx, store.CreateInvitationTokenParams{UserID: userID, TokenHash: hash[:], ExpiresAt: expiresAt}); err != nil {
+		return nil, time.Time{}, fmt.Errorf("persist replacement invitation token: %w", err)
+	}
+	return raw, expiresAt, nil
+}
+
+// auditAndPublish records the resend audit event and publishes the
+// replacement invitation.
+func (s *Service) auditAndPublish(ctx context.Context, writer store.InvitationResendWriter, input Input, user store.User, raw []byte, expiresAt time.Time) error {
+	resourceType, resourceID := "user", user.ID.String()
+	if _, err := writer.InsertAuditEvent(ctx, store.InsertAuditEventParams{ActorUserID: &input.ActorUserID, Action: "invitation_resent", ResourceType: &resourceType, ResourceID: &resourceID, IP: input.IP, UserAgent: input.UserAgent, Metadata: []byte(`{}`)}); err != nil {
+		return fmt.Errorf("record invitation resend audit: %w", err)
+	}
+	event := events.UserInvited{Envelope: events.NewEnvelope(events.TypeUserInvited, "")}
+	event.Data.UserID, event.Data.Email, event.Data.DisplayName, event.Data.InvitationToken, event.Data.ExpiresAt = user.ID, user.Email, user.DisplayName, base64.RawURLEncoding.EncodeToString(raw), expiresAt
+	if err := s.publisher.Publish(ctx, events.TypeUserInvited, event); err != nil {
+		return fmt.Errorf("%w: %w", ErrPublish, err)
+	}
+	return nil
 }
 
 type Resender interface {
