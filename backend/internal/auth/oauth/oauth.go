@@ -123,7 +123,7 @@ func (s *Service) Authorize(ctx context.Context, userID uuid.UUID, input Authori
 }
 
 func (s *Service) Exchange(ctx context.Context, input ExchangeInput) (ExchangeResult, error) {
-	if input.ClientID != s.client.ID || input.RedirectURI != s.client.RedirectURI || input.Code == "" || input.CodeVerifier == "" {
+	if !s.validExchangeInput(input) {
 		return ExchangeResult{}, ErrAuthorizationCodeInvalid
 	}
 	raw, err := base64.RawURLEncoding.DecodeString(input.Code)
@@ -132,47 +132,79 @@ func (s *Service) Exchange(ctx context.Context, input ExchangeInput) (ExchangeRe
 	}
 	hash := sha256.Sum256(raw)
 	now := s.now().UTC()
-	challenge := sha256.Sum256([]byte(input.CodeVerifier))
-	encoded := base64.RawURLEncoding.EncodeToString(challenge[:])
-	var result ExchangeResult
-	var domainErr error
+	encoded := pkceS256Challenge(input.CodeVerifier)
+	var outcome exchangeOutcome
 	err = s.repository.WithinAuthorizationCodeTransaction(ctx, func(writer ExchangeWriter) error {
-		code, exchangeErr := writer.ExchangeAuthorizationCode(ctx, hash[:], input.ClientID, input.RedirectURI, encoded, now)
-		switch {
-		case errors.Is(exchangeErr, ErrAuthorizationCodeReused):
-			if auditErr := writer.InsertAuditEvent(ctx, AuditEvent{ActorUserID: code.UserID, Action: "authorization_code_reused"}); auditErr != nil {
-				return fmt.Errorf("audit reused authorization code: %w", auditErr)
-			}
-			domainErr = ErrAuthorizationCodeInvalid
-			return nil
-		case errors.Is(exchangeErr, ErrAuthorizationCodeInvalid):
-			domainErr = ErrAuthorizationCodeInvalid
-			return nil
-		case exchangeErr != nil:
-			return fmt.Errorf("exchange authorization code: %w", exchangeErr)
-		}
-		userRoles, rolesErr := writer.ListRolesForUser(ctx, code.UserID)
-		if rolesErr != nil {
-			return fmt.Errorf("list application roles: %w", rolesErr)
-		}
-		if auditErr := writer.InsertAuditEvent(ctx, AuditEvent{ActorUserID: code.UserID, Action: "authorization_code_exchanged"}); auditErr != nil {
-			return fmt.Errorf("audit authorization code exchange: %w", auditErr)
-		}
-		applicationRoles := roles.ForApplication(userRoles, s.client.ID)
-		permissions, permissionsErr := writer.ListPermissionKeysForRolesAndApplication(ctx, applicationRoles, s.client.ID)
-		if permissionsErr != nil {
-			return fmt.Errorf("list application permissions: %w", permissionsErr)
-		}
-		result = ExchangeResult{UserID: code.UserID, Roles: applicationRoles, Permissions: permissions}
-		return nil
+		var txErr error
+		outcome, txErr = s.exchangeCode(ctx, writer, hash[:], input, encoded, now)
+		return txErr
 	})
 	if err != nil {
 		return ExchangeResult{}, err
 	}
-	if domainErr != nil {
-		return ExchangeResult{}, domainErr
+	if outcome.domainErr != nil {
+		return ExchangeResult{}, outcome.domainErr
 	}
-	return result, nil
+	return outcome.result, nil
+}
+
+// exchangeOutcome carries what the exchange transaction decided: either a
+// result or a domain error that must still commit the transaction.
+type exchangeOutcome struct {
+	result    ExchangeResult
+	domainErr error
+}
+
+// validExchangeInput reports whether the request names the trusted client and
+// redirect URI and carries both a code and a PKCE verifier.
+func (s *Service) validExchangeInput(input ExchangeInput) bool {
+	return input.ClientID == s.client.ID && input.RedirectURI == s.client.RedirectURI && input.Code != "" && input.CodeVerifier != ""
+}
+
+// pkceS256Challenge derives the S256 PKCE challenge of a verifier.
+func pkceS256Challenge(verifier string) string {
+	challenge := sha256.Sum256([]byte(verifier))
+	return base64.RawURLEncoding.EncodeToString(challenge[:])
+}
+
+// exchangeCode runs inside the transaction: it consumes the code (auditing
+// reuse) and, on success, builds the result for the user.
+func (s *Service) exchangeCode(ctx context.Context, writer ExchangeWriter, hash []byte, input ExchangeInput, encoded string, now time.Time) (exchangeOutcome, error) {
+	code, exchangeErr := writer.ExchangeAuthorizationCode(ctx, hash, input.ClientID, input.RedirectURI, encoded, now)
+	switch {
+	case errors.Is(exchangeErr, ErrAuthorizationCodeReused):
+		if auditErr := writer.InsertAuditEvent(ctx, AuditEvent{ActorUserID: code.UserID, Action: "authorization_code_reused"}); auditErr != nil {
+			return exchangeOutcome{}, fmt.Errorf("audit reused authorization code: %w", auditErr)
+		}
+		return exchangeOutcome{domainErr: ErrAuthorizationCodeInvalid}, nil
+	case errors.Is(exchangeErr, ErrAuthorizationCodeInvalid):
+		return exchangeOutcome{domainErr: ErrAuthorizationCodeInvalid}, nil
+	case exchangeErr != nil:
+		return exchangeOutcome{}, fmt.Errorf("exchange authorization code: %w", exchangeErr)
+	}
+	result, err := s.exchangeResult(ctx, writer, code.UserID)
+	if err != nil {
+		return exchangeOutcome{}, err
+	}
+	return exchangeOutcome{result: result}, nil
+}
+
+// exchangeResult looks up the user's application roles and permissions and
+// audits the successful exchange.
+func (s *Service) exchangeResult(ctx context.Context, writer ExchangeWriter, userID uuid.UUID) (ExchangeResult, error) {
+	userRoles, rolesErr := writer.ListRolesForUser(ctx, userID)
+	if rolesErr != nil {
+		return ExchangeResult{}, fmt.Errorf("list application roles: %w", rolesErr)
+	}
+	if auditErr := writer.InsertAuditEvent(ctx, AuditEvent{ActorUserID: userID, Action: "authorization_code_exchanged"}); auditErr != nil {
+		return ExchangeResult{}, fmt.Errorf("audit authorization code exchange: %w", auditErr)
+	}
+	applicationRoles := roles.ForApplication(userRoles, s.client.ID)
+	permissions, permissionsErr := writer.ListPermissionKeysForRolesAndApplication(ctx, applicationRoles, s.client.ID)
+	if permissionsErr != nil {
+		return ExchangeResult{}, fmt.Errorf("list application permissions: %w", permissionsErr)
+	}
+	return ExchangeResult{UserID: userID, Roles: applicationRoles, Permissions: permissions}, nil
 }
 
 // ValidateAuthorizeInput is the one validation source used by both the HTTP
