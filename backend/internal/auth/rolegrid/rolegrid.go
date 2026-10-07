@@ -196,47 +196,63 @@ func (s *Service) Update(ctx context.Context, input UpdateInput) (Role, error) {
 	}
 	var result Role
 	err := s.repository.WithinRoleGridTransaction(ctx, func(w Writer) error {
-		role, err := w.GetApplicationRoleForUpdate(ctx, input.ApplicationID, input.RoleID)
-		if err != nil {
-			return err
-		}
-		if role.System {
-			return ErrSystemRole
-		}
-		if input.Description != nil && utf8.RuneCountInString(*input.Description) > MaxDescriptionLength {
-			return ErrInvalidDescription
-		}
-		if input.PermissionKeys != nil {
-			// Control 2: nobody widens (or narrows) the privileges of a role they hold themselves.
-			held, err := w.ActorHoldsApplicationRole(ctx, input.ActorUserID, role.ID)
-			if err != nil {
-				return fmt.Errorf("check actor role: %w", err)
-			}
-			if held {
-				return ErrSelfPermissionChange
-			}
-			keys, err := validatePermissions(ctx, w, input.ApplicationID, *input.PermissionKeys)
-			if err != nil {
-				return err
-			}
-			if err := w.ReplaceApplicationRolePermissions(ctx, role.ID, input.ApplicationID, keys); err != nil {
-				return fmt.Errorf("set role permissions: %w", err)
-			}
-			role.PermissionKeys = keys
-		}
-		if input.Description != nil {
-			if err := w.UpdateApplicationRoleDescription(ctx, role.ID, *input.Description); err != nil {
-				return fmt.Errorf("update role description: %w", err)
-			}
-			role.Description = *input.Description
-		}
-		if err := w.InsertRoleGridAuditEvent(ctx, auditEvent(ActionRoleUpdated, input.ActorUserID, role, input.IP, input.UserAgent)); err != nil {
-			return fmt.Errorf("audit role update: %w", err)
-		}
-		result = role
-		return nil
+		var err error
+		result, err = updateWithinTransaction(ctx, w, input)
+		return err
 	})
 	return result, err
+}
+
+// updateWithinTransaction applies the requested changes to a locked, non-system
+// role and records the audit event.
+func updateWithinTransaction(ctx context.Context, w Writer, input UpdateInput) (Role, error) {
+	role, err := w.GetApplicationRoleForUpdate(ctx, input.ApplicationID, input.RoleID)
+	if err != nil {
+		return Role{}, err
+	}
+	if role.System {
+		return Role{}, ErrSystemRole
+	}
+	if input.Description != nil && utf8.RuneCountInString(*input.Description) > MaxDescriptionLength {
+		return Role{}, ErrInvalidDescription
+	}
+	if input.PermissionKeys != nil {
+		if err := replaceRolePermissions(ctx, w, input, &role); err != nil {
+			return Role{}, err
+		}
+	}
+	if input.Description != nil {
+		if err := w.UpdateApplicationRoleDescription(ctx, role.ID, *input.Description); err != nil {
+			return Role{}, fmt.Errorf("update role description: %w", err)
+		}
+		role.Description = *input.Description
+	}
+	if err := w.InsertRoleGridAuditEvent(ctx, auditEvent(ActionRoleUpdated, input.ActorUserID, role, input.IP, input.UserAgent)); err != nil {
+		return Role{}, fmt.Errorf("audit role update: %w", err)
+	}
+	return role, nil
+}
+
+// replaceRolePermissions swaps the permission set of role unless the actor
+// holds that role, and updates role.PermissionKeys with the stored keys.
+func replaceRolePermissions(ctx context.Context, w Writer, input UpdateInput, role *Role) error {
+	// Control 2: nobody widens (or narrows) the privileges of a role they hold themselves.
+	held, err := w.ActorHoldsApplicationRole(ctx, input.ActorUserID, role.ID)
+	if err != nil {
+		return fmt.Errorf("check actor role: %w", err)
+	}
+	if held {
+		return ErrSelfPermissionChange
+	}
+	keys, err := validatePermissions(ctx, w, input.ApplicationID, *input.PermissionKeys)
+	if err != nil {
+		return err
+	}
+	if err := w.ReplaceApplicationRolePermissions(ctx, role.ID, input.ApplicationID, keys); err != nil {
+		return fmt.Errorf("set role permissions: %w", err)
+	}
+	role.PermissionKeys = keys
+	return nil
 }
 
 func (s *Service) Delete(ctx context.Context, input DeleteInput) error {
