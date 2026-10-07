@@ -44,7 +44,17 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
     Ruta: delegado (Sonnet, junto con C1e), revisado por Opus. Evidencia: `load` sale del top 5 de
     `gocognit` (antes 25; 23 en Sonar); `./internal/config/` 95,0 %, `./internal/api/` y `./cmd/...` ok,
     0 omitidas; `go vet`, `gofmt` y `golangci-lint` limpios.
-  - [ ] C1e `rbac.go`
+    Commit `ef43a75`. Evaluación nativa: riesgo medio, bajo el presupuesto; queda pendiente en el corte y se
+    revisa junto con C1e.
+  - [x] C1e `rbac.go` — `RequireRole` delega en `authorizeRole` (devuelve `nil` o la respuesta de error),
+    con `writeAuthorizationLoadFailed` y `hasRole`. Ruta: delegado (Sonnet, junto con C1d), revisado por Opus.
+    Evidencia: `authorizeRole` 6 y `RequireRole` 3 en `gocognit` (antes 22; 16 en Sonar); `./internal/api/`
+    81,9 %, 0 omitidas; `go vet`, `gofmt` y `golangci-lint` limpios.
+- **Hallazgo fuera de alcance (C1):** `gocognit -over 15` marca además, en producción, `bootstrap.Ensure` (46),
+  `rolegrid.Update` (31), `refresh.Refresh` (31), `employee.CreateEmployee` (30), `mfa.Issue` (23),
+  `mfa.Resend` (21), `notify.Render` (20), `passwordreset.Confirm` (19), `invitation.Accept` (17),
+  `oauth.Exchange` (16), `invitationresend.Resend` (16) y `testdb.New` (17), más el generado `gen.go`.
+  Sonar no los marcó (cuenta los cierres de transacción con menos peso). Decidir si se atienden.
 - [ ] **C2 — Tag `vX.Y.Z` y release** con el PDF del informe adjunto (`make informe`; el PDF no se
   versiona). En vivo frente al equipo (T21 de `idp-semana-4.md`).
 - [ ] **C3 — Docker Hub (T17 de `idp-semana-4.md`).** Workflow de release en el tag: imágenes con `vX.Y.Z`
@@ -71,4 +81,4 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
 
 ## Siguiente paso
 
-C1e, `rbac.go`.
+Decidir el hallazgo fuera de alcance de C1; luego C2.
