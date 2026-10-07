@@ -217,112 +217,170 @@ func New(repository Repository, publisher Publisher, random io.Reader, now func(
 	return &Service{repository: repository, publisher: publisher, random: random, now: now, lockout: lockout.Default()}
 }
 
+// verifyOutcome is what the verification transaction leaves behind for the
+// code after commit: the session on success, the domain error to report even
+// though the transaction committed (wrong code), and the account-locked event
+// to publish once the lock is durable.
+type verifyOutcome struct {
+	result          Result
+	verificationErr error
+	lockEvent       *events.AccountLocked
+}
+
+// decodeVerifyInput validates the request before any database work: the token
+// must decode and the code must be exactly codeDigits decimal digits. It
+// returns the raw token bytes.
+func decodeVerifyInput(input VerifyInput) ([]byte, error) {
+	raw, err := base64.RawURLEncoding.DecodeString(input.Token)
+	if err != nil {
+		return nil, ErrChallengeInvalid
+	}
+	if len(input.Code) != codeDigits {
+		return nil, ErrCodeInvalid
+	}
+	for _, c := range input.Code {
+		if c < '0' || c > '9' {
+			return nil, ErrCodeInvalid
+		}
+	}
+	return raw, nil
+}
+
 func (s *Service) Verify(ctx context.Context, input VerifyInput) (Result, error) {
 	if s.repository == nil || s.publisher == nil || s.tokens == nil || s.refreshTTL <= 0 || !s.lockout.Valid() {
 		return Result{}, fmt.Errorf("mfa service is unavailable")
 	}
-	raw, err := base64.RawURLEncoding.DecodeString(input.Token)
+	raw, err := decodeVerifyInput(input)
 	if err != nil {
-		return Result{}, ErrChallengeInvalid
-	}
-	if len(input.Code) != codeDigits {
-		return Result{}, ErrCodeInvalid
-	}
-	for _, c := range input.Code {
-		if c < '0' || c > '9' {
-			return Result{}, ErrCodeInvalid
-		}
+		return Result{}, err
 	}
 	tokenHash := sha256.Sum256(raw)
 	codeHash := hashCode(raw, input.Code)
-	var result Result
-	var verificationErr error
-	var lockEvent *events.AccountLocked
+	var outcome verifyOutcome
 	err = s.repository.WithinMFATransaction(ctx, func(w Writer) error {
-		challenge, err := w.GetChallengeForUpdate(ctx, tokenHash[:])
-		if err != nil {
-			return challengeLookupError(err)
-		}
-		now := s.now()
-		if challenge.Used || !now.Before(challenge.ExpiresAt) || challenge.AttemptsLeft <= 0 {
-			return ErrChallengeInvalid
-		}
-		// A locked or otherwise inactive account no longer verifies open challenges.
-		if challenge.User.Status != StatusActive {
-			return ErrChallengeInvalid
-		}
-		if subtle.ConstantTimeCompare(challenge.CodeHash, codeHash) != 1 {
-			lockEvent, err = s.rejectCode(ctx, w, challenge, input, now)
-			if err != nil {
-				return err
-			}
-			// Returning the domain error from this callback would roll back the
-			// decrement, audit and lock. Commit them, then expose it after the transaction.
-			verificationErr = ErrCodeInvalid
-			return nil
-		}
-		if err := w.ConsumeChallenge(ctx, challenge.ID); err != nil {
-			return fmt.Errorf("consume mfa challenge: %w", err)
-		}
-		userRoles, err := w.ListRolesForUser(ctx, challenge.User.ID)
-		if err != nil {
-			return fmt.Errorf("list mfa user roles: %w", err)
-		}
-		familyID := uuid.New()
-		access, err := s.tokens.IssueForSession(challenge.User.ID.String(), roles.Directory(userRoles), familyID.String())
-		if err != nil {
-			return fmt.Errorf("issue mfa access token: %w", err)
-		}
-		refreshRaw := make([]byte, 32)
-		if _, err := io.ReadFull(s.random, refreshRaw); err != nil {
-			return fmt.Errorf("generate mfa refresh token: %w", err)
-		}
-		refreshHash := sha256.Sum256(refreshRaw)
-		if err := w.CreateRefreshToken(ctx, RefreshToken{UserID: challenge.User.ID, TokenHash: refreshHash[:], FamilyID: familyID, IP: input.IP, UserAgent: input.UserAgent, ExpiresAt: now.Add(s.refreshTTL)}); err != nil {
-			return fmt.Errorf("create mfa refresh token: %w", err)
-		}
-		var hubSessionToken string
-		if s.hubSessionTTL > 0 {
-			hubRaw := make([]byte, 32)
-			if _, err := io.ReadFull(s.random, hubRaw); err != nil {
-				return fmt.Errorf("generate hub session token: %w", err)
-			}
-			hubHash := sha256.Sum256(hubRaw)
-			if err := w.CreateHubSession(ctx, HubSession{UserID: challenge.User.ID, TokenHash: hubHash[:], FamilyID: familyID, ExpiresAt: now.Add(s.hubSessionTTL)}); err != nil {
-				return fmt.Errorf("create hub session: %w", err)
-			}
-			hubSessionToken = base64.RawURLEncoding.EncodeToString(hubRaw)
-		}
-		// The login only succeeds here, once the second factor is proven (D11).
-		if err := w.UpdateLastLogin(ctx, challenge.User.ID); err != nil {
-			return fmt.Errorf("update last login: %w", err)
-		}
-		for _, action := range []string{"mfa_code_accepted", "login_succeeded"} {
-			if err := w.InsertAuditEvent(ctx, AuditEvent{ActorUserID: challenge.User.ID, Action: action, IP: input.IP, UserAgent: input.UserAgent}); err != nil {
-				return fmt.Errorf("audit %s: %w", action, err)
-			}
-		}
-		result = Result{AccessToken: access, RefreshToken: base64.RawURLEncoding.EncodeToString(refreshRaw), HubSessionToken: hubSessionToken, TokenType: "Bearer", ExpiresIn: token.AccessTokenExpiresIn}
-		return nil
+		return s.verifyChallenge(ctx, w, tokenHash[:], codeHash, input, &outcome)
 	})
 	if err != nil {
 		return Result{}, err
 	}
-	if lockEvent != nil {
-		if err := s.publisher.Publish(ctx, events.TypeAccountLocked, *lockEvent); err != nil {
+	return s.finishVerify(ctx, outcome)
+}
+
+// verifyChallenge runs inside the verification transaction: it loads and
+// checks the challenge, then either rejects the code or issues the session,
+// recording the result in outcome.
+func (s *Service) verifyChallenge(ctx context.Context, w Writer, tokenHash, codeHash []byte, input VerifyInput, outcome *verifyOutcome) error {
+	challenge, err := w.GetChallengeForUpdate(ctx, tokenHash)
+	if err != nil {
+		return challengeLookupError(err)
+	}
+	now := s.now()
+	if challenge.Used || !now.Before(challenge.ExpiresAt) || challenge.AttemptsLeft <= 0 {
+		return ErrChallengeInvalid
+	}
+	// A locked or otherwise inactive account no longer verifies open challenges.
+	if challenge.User.Status != StatusActive {
+		return ErrChallengeInvalid
+	}
+	if subtle.ConstantTimeCompare(challenge.CodeHash, codeHash) != 1 {
+		outcome.lockEvent, err = s.rejectCode(ctx, w, challenge, input, now)
+		if err != nil {
+			return err
+		}
+		// Returning the domain error from this callback would roll back the
+		// decrement, audit and lock. Commit them, then expose it after the transaction.
+		outcome.verificationErr = ErrCodeInvalid
+		return nil
+	}
+	outcome.result, err = s.issueSession(ctx, w, challenge, input, now)
+	return err
+}
+
+// issueSession consumes the proven challenge and creates the session: access
+// and refresh tokens, the optional hub session, the last-login stamp and the
+// audit trail. Random bytes are read refresh first, then hub.
+func (s *Service) issueSession(ctx context.Context, w Writer, challenge StoredChallenge, input VerifyInput, now time.Time) (Result, error) {
+	if err := w.ConsumeChallenge(ctx, challenge.ID); err != nil {
+		return Result{}, fmt.Errorf("consume mfa challenge: %w", err)
+	}
+	userRoles, err := w.ListRolesForUser(ctx, challenge.User.ID)
+	if err != nil {
+		return Result{}, fmt.Errorf("list mfa user roles: %w", err)
+	}
+	familyID := uuid.New()
+	access, err := s.tokens.IssueForSession(challenge.User.ID.String(), roles.Directory(userRoles), familyID.String())
+	if err != nil {
+		return Result{}, fmt.Errorf("issue mfa access token: %w", err)
+	}
+	refreshToken, err := s.createRefreshToken(ctx, w, challenge.User.ID, familyID, input, now)
+	if err != nil {
+		return Result{}, err
+	}
+	hubSessionToken, err := s.createHubSession(ctx, w, challenge.User.ID, familyID, now)
+	if err != nil {
+		return Result{}, err
+	}
+	// The login only succeeds here, once the second factor is proven (D11).
+	if err := w.UpdateLastLogin(ctx, challenge.User.ID); err != nil {
+		return Result{}, fmt.Errorf("update last login: %w", err)
+	}
+	for _, action := range []string{"mfa_code_accepted", "login_succeeded"} {
+		if err := w.InsertAuditEvent(ctx, AuditEvent{ActorUserID: challenge.User.ID, Action: action, IP: input.IP, UserAgent: input.UserAgent}); err != nil {
+			return Result{}, fmt.Errorf("audit %s: %w", action, err)
+		}
+	}
+	return Result{AccessToken: access, RefreshToken: refreshToken, HubSessionToken: hubSessionToken, TokenType: "Bearer", ExpiresIn: token.AccessTokenExpiresIn}, nil
+}
+
+// createRefreshToken stores a new refresh token for the family and returns its
+// encoded value.
+func (s *Service) createRefreshToken(ctx context.Context, w Writer, userID, familyID uuid.UUID, input VerifyInput, now time.Time) (string, error) {
+	refreshRaw := make([]byte, 32)
+	if _, err := io.ReadFull(s.random, refreshRaw); err != nil {
+		return "", fmt.Errorf("generate mfa refresh token: %w", err)
+	}
+	refreshHash := sha256.Sum256(refreshRaw)
+	if err := w.CreateRefreshToken(ctx, RefreshToken{UserID: userID, TokenHash: refreshHash[:], FamilyID: familyID, IP: input.IP, UserAgent: input.UserAgent, ExpiresAt: now.Add(s.refreshTTL)}); err != nil {
+		return "", fmt.Errorf("create mfa refresh token: %w", err)
+	}
+	return base64.RawURLEncoding.EncodeToString(refreshRaw), nil
+}
+
+// createHubSession stores a hub session for the family and returns its encoded
+// token, or an empty token when hub sessions are disabled.
+func (s *Service) createHubSession(ctx context.Context, w Writer, userID, familyID uuid.UUID, now time.Time) (string, error) {
+	if s.hubSessionTTL <= 0 {
+		return "", nil
+	}
+	hubRaw := make([]byte, 32)
+	if _, err := io.ReadFull(s.random, hubRaw); err != nil {
+		return "", fmt.Errorf("generate hub session token: %w", err)
+	}
+	hubHash := sha256.Sum256(hubRaw)
+	if err := w.CreateHubSession(ctx, HubSession{UserID: userID, TokenHash: hubHash[:], FamilyID: familyID, ExpiresAt: now.Add(s.hubSessionTTL)}); err != nil {
+		return "", fmt.Errorf("create hub session: %w", err)
+	}
+	return base64.RawURLEncoding.EncodeToString(hubRaw), nil
+}
+
+// finishVerify runs after the transaction commits: it publishes the lock event
+// if any, then reports the domain error or the session.
+func (s *Service) finishVerify(ctx context.Context, outcome verifyOutcome) (Result, error) {
+	if outcome.lockEvent != nil {
+		if err := s.publisher.Publish(ctx, events.TypeAccountLocked, *outcome.lockEvent); err != nil {
 			// The lock is already committed and audited; the client still gets
 			// the 401, so the failed notification is logged here (same shape as
 			// the login publisher) and joined the way login.Service does.
 			if s.logger != nil {
-				s.logger.Warn("security event could not be published", "event_type", events.TypeAccountLocked, "user_id", lockEvent.Data.UserID, "error", err)
+				s.logger.Warn("security event could not be published", "event_type", events.TypeAccountLocked, "user_id", outcome.lockEvent.Data.UserID, "error", err)
 			}
-			return Result{}, errors.Join(verificationErr, fmt.Errorf("publish account locked event: %w", err))
+			return Result{}, errors.Join(outcome.verificationErr, fmt.Errorf("publish account locked event: %w", err))
 		}
 	}
-	if verificationErr != nil {
-		return Result{}, verificationErr
+	if outcome.verificationErr != nil {
+		return Result{}, outcome.verificationErr
 	}
-	return result, nil
+	return outcome.result, nil
 }
 
 // rejectCode spends one attempt and records the wrong code as an account

@@ -28,8 +28,15 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
     `applyStatusChange` y `applyRoleChange`. Ruta: delegado (Codex rechazó `gpt-6.1-sol` por la cuenta;
     el usuario eligió Sonnet), revisado por Opus. Evidencia: `gocognit` máximo 8 (antes 33 en Sonar);
     pruebas del paquete con Postgres real 0 omitidas, 85,4 %; `./internal/api/` ok; `go vet`, `gofmt` y
-    `golangci-lint` limpios.
-  - [ ] C1c `mfa.go` · [ ] C1d `config.go` · [ ] C1e `rbac.go`
+    `golangci-lint` limpios. Commit `5aa27f9`. Revisión nativa: riesgo alto, concedida, 4 lentes, aprobada
+    y acusada (`review-90987d64715a5523`); 1 sugerencia no bloqueante (R2-001, legibilidad, `admin.go:130-132`).
+  - [x] C1c `mfa.go` — `Verify` extraído en `decodeVerifyInput`, `verifyChallenge`, `issueSession`,
+    `createRefreshToken`, `createHubSession` y `finishVerify` (resultado en `verifyOutcome`). Ruta: delegado
+    (Sonnet), revisado por Opus. Evidencia: `gocognit` de `Verify` 4 y máximo 9 en los nuevos (antes 53 con
+    `gocognit`, 21 en Sonar); pruebas con Postgres real 0 omitidas, 80,8 %; `./internal/api/` y
+    `./internal/auth/...` ok; `go vet`, `gofmt` y `golangci-lint` limpios. `Issue` (23) y `Resend` (21)
+    superan 15 en `gocognit` pero Sonar no los marcó: fuera de alcance.
+  - [ ] C1d `config.go` · [ ] C1e `rbac.go`
 - [ ] **C2 — Tag `vX.Y.Z` y release** con el PDF del informe adjunto (`make informe`; el PDF no se
   versiona). En vivo frente al equipo (T21 de `idp-semana-4.md`).
 - [ ] **C3 — Docker Hub (T17 de `idp-semana-4.md`).** Workflow de release en el tag: imágenes con `vX.Y.Z`
@@ -56,4 +63,4 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
 
 ## Siguiente paso
 
-C1c, `mfa.go`.
+C1d, `config.go`.
