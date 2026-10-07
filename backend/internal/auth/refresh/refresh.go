@@ -128,74 +128,102 @@ func (s *Service) Refresh(ctx context.Context, input Input) (Result, error) {
 		return Result{}, fmt.Errorf("generate refresh token: %w", err)
 	}
 	nextHash := sha256.Sum256(raw)
-	var result Result
-	var event *SecurityEvent
-	var refreshErr error
+	var outcome refreshOutcome
 	err := s.repository.WithinRefreshTransaction(ctx, func(writer Writer) error {
-		presentedHash, err := hashRefreshToken(input.RefreshToken)
-		if err != nil {
-			return ErrInvalidRefreshToken
-		}
-		rotation, err := writer.RotateRefreshToken(ctx, presentedHash, RefreshToken{
-			TokenHash: nextHash[:], IP: input.IP, UserAgent: input.UserAgent, ExpiresAt: s.now().Add(s.refreshTTL),
-		})
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return ErrInvalidRefreshToken
-			}
-			return fmt.Errorf("rotate refresh token: %w", err)
-		}
-		switch rotation.Status {
-		case RotationSucceeded:
-			userRoles, err := writer.ListRolesForUser(ctx, rotation.UserID)
-			if err != nil {
-				return fmt.Errorf("list user roles: %w", err)
-			}
-			// The refresh cookie renews the Hub console's own directory-scoped
-			// token (D8, RF-009): an application role must not reappear here.
-			accessToken, err := s.tokens.IssueForSession(rotation.UserID.String(), roles.Directory(userRoles), rotation.FamilyID.String())
-			if err != nil {
-				return fmt.Errorf("issue access token: %w", err)
-			}
-			result = Result{AccessToken: accessToken, RefreshToken: base64.RawURLEncoding.EncodeToString(raw), TokenType: "Bearer", ExpiresIn: token.AccessTokenExpiresIn}
-			return nil
-		case RotationReused:
-			revokedCount, err := writer.RevokeRefreshFamily(ctx, rotation.FamilyID)
-			if err != nil {
-				return fmt.Errorf("revoke refresh family: %w", err)
-			}
-			if err := writer.InsertAuditEvent(ctx, AuditEvent{ActorUserID: &rotation.UserID, Action: "refresh_reuse_detected", Reason: "rotated_token_presented", IP: input.IP, UserAgent: input.UserAgent}); err != nil {
-				return fmt.Errorf("record refresh reuse audit: %w", err)
-			}
-			event = &SecurityEvent{Type: "security.refresh_reuse_detected", UserID: rotation.UserID, FamilyID: rotation.FamilyID, RevokedCount: revokedCount, IP: input.IP}
-			// Returning an error here would roll back the revocation and audit.
-			refreshErr = ErrRefreshReuse
-			return nil
-		default:
-			return ErrInvalidRefreshToken
-		}
+		var err error
+		outcome, err = s.rotateWithinTransaction(ctx, writer, input, raw, nextHash)
+		return err
 	})
 	if err != nil {
 		return Result{}, err
 	}
-	if event != nil {
+	return s.finishAfterCommit(ctx, outcome)
+}
+
+// refreshOutcome carries what the rotation transaction decided: the issued
+// result, or a reuse event plus the error to return once it has committed.
+type refreshOutcome struct {
+	result     Result
+	event      *SecurityEvent
+	refreshErr error
+}
+
+// rotateWithinTransaction rotates the presented token and either issues the
+// new session or, on reuse, revokes the whole family and audits it.
+func (s *Service) rotateWithinTransaction(ctx context.Context, writer Writer, input Input, raw []byte, nextHash [sha256.Size]byte) (refreshOutcome, error) {
+	presentedHash, err := hashRefreshToken(input.RefreshToken)
+	if err != nil {
+		return refreshOutcome{}, ErrInvalidRefreshToken
+	}
+	rotation, err := writer.RotateRefreshToken(ctx, presentedHash, RefreshToken{
+		TokenHash: nextHash[:], IP: input.IP, UserAgent: input.UserAgent, ExpiresAt: s.now().Add(s.refreshTTL),
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return refreshOutcome{}, ErrInvalidRefreshToken
+		}
+		return refreshOutcome{}, fmt.Errorf("rotate refresh token: %w", err)
+	}
+	switch rotation.Status {
+	case RotationSucceeded:
+		return s.issueRotatedSession(ctx, writer, rotation, raw)
+	case RotationReused:
+		return s.handleReuse(ctx, writer, rotation, input)
+	default:
+		return refreshOutcome{}, ErrInvalidRefreshToken
+	}
+}
+
+// issueRotatedSession issues the access token for a successful rotation.
+func (s *Service) issueRotatedSession(ctx context.Context, writer Writer, rotation Rotation, raw []byte) (refreshOutcome, error) {
+	userRoles, err := writer.ListRolesForUser(ctx, rotation.UserID)
+	if err != nil {
+		return refreshOutcome{}, fmt.Errorf("list user roles: %w", err)
+	}
+	// The refresh cookie renews the Hub console's own directory-scoped
+	// token (D8, RF-009): an application role must not reappear here.
+	accessToken, err := s.tokens.IssueForSession(rotation.UserID.String(), roles.Directory(userRoles), rotation.FamilyID.String())
+	if err != nil {
+		return refreshOutcome{}, fmt.Errorf("issue access token: %w", err)
+	}
+	return refreshOutcome{result: Result{AccessToken: accessToken, RefreshToken: base64.RawURLEncoding.EncodeToString(raw), TokenType: "Bearer", ExpiresIn: token.AccessTokenExpiresIn}}, nil
+}
+
+// handleReuse revokes the whole family and audits the reuse of a rotated token.
+func (s *Service) handleReuse(ctx context.Context, writer Writer, rotation Rotation, input Input) (refreshOutcome, error) {
+	revokedCount, err := writer.RevokeRefreshFamily(ctx, rotation.FamilyID)
+	if err != nil {
+		return refreshOutcome{}, fmt.Errorf("revoke refresh family: %w", err)
+	}
+	if err := writer.InsertAuditEvent(ctx, AuditEvent{ActorUserID: &rotation.UserID, Action: "refresh_reuse_detected", Reason: "rotated_token_presented", IP: input.IP, UserAgent: input.UserAgent}); err != nil {
+		return refreshOutcome{}, fmt.Errorf("record refresh reuse audit: %w", err)
+	}
+	event := &SecurityEvent{Type: "security.refresh_reuse_detected", UserID: rotation.UserID, FamilyID: rotation.FamilyID, RevokedCount: revokedCount, IP: input.IP}
+	// Returning an error here would roll back the revocation and audit.
+	return refreshOutcome{event: event, refreshErr: ErrRefreshReuse}, nil
+}
+
+// finishAfterCommit counts and publishes a committed reuse event and maps the
+// outcome to the caller's result.
+func (s *Service) finishAfterCommit(ctx context.Context, outcome refreshOutcome) (Result, error) {
+	if outcome.event != nil {
 		// Counted only after the revocation committed, so a rolled-back or retried
 		// transaction never inflates the dashboard.
 		observability.RefreshReuseDetected.Inc()
 	}
-	if event != nil && s.publisher != nil {
-		if err := s.publisher.PublishSecurityEvent(ctx, *event); err != nil {
+	if outcome.event != nil && s.publisher != nil {
+		if err := s.publisher.PublishSecurityEvent(ctx, *outcome.event); err != nil {
 			// The family was already revoked and audited inside the committed
 			// transaction; a notification failure must not mask that reuse
 			// was detected, or the client would keep an already-revoked
 			// cookie and the caller would see a misleading 500 instead of 401.
-			return Result{}, errors.Join(refreshErr, fmt.Errorf("publish refresh reuse event: %w", err))
+			return Result{}, errors.Join(outcome.refreshErr, fmt.Errorf("publish refresh reuse event: %w", err))
 		}
 	}
-	if refreshErr != nil {
-		return Result{}, refreshErr
+	if outcome.refreshErr != nil {
+		return Result{}, outcome.refreshErr
 	}
-	return result, nil
+	return outcome.result, nil
 }
 
 // hashRefreshToken decodes the base64url token carried in the cookie back to
