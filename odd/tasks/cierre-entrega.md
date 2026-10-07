@@ -83,8 +83,17 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
   - [x] D2 — Trivy local frente a CI: **ya resuelto antes de esta sesión**. `Makefile:189` fija
     `aquasec/trivy:0.70.0` por digest, la misma versión que `trivy-action` v0.36.0 en CI. La nota de
     `pulido-frontend.md` estaba desactualizada.
-  - [ ] D3 — Estilo inline bloqueado por la CSP en `/invitations/accept` (visto en WebKit): encontrar qué lo
+  - [x] D3 — Estilo inline bloqueado por la CSP en `/invitations/accept` (visto en WebKit): encontrar qué lo
     inyecta y corregirlo sin relajar la CSP.
+    Resultado: **no es un defecto de la aplicación.** Exploración (Sonnet, solo lectura): `frontend/src` no crea
+    `<style>`, no usa `insertRule`, `cssText` ni `style={{}}`; el build tiene un solo `<link rel="stylesheet">` y
+    ningún CSS inyectado en tiempo de ejecución; no hay rutas perezosas. Prueba en tiempo de ejecución (Opus,
+    2026-10-07, stack con `make up`): Playwright WebKit y Chromium sobre `/login`, `/invitations/accept` y
+    `/password/reset`, enfocando y llenando la contraseña: 0 `<style>`, 0 atributos `style`, 0 eventos
+    `securitypolicyviolation`. Explicación más probable: el autocompletado «Contraseña segura» de Safari en campos
+    `autocomplete="new-password"`, que inyecta su propio estilo y la CSP bloquea; Playwright WebKit no lo tiene,
+    así que no se reproduce. No se relaja la CSP ni se quita `new-password` (empeoraría los gestores de
+    contraseñas). Se documenta como ruido del navegador.
   - [x] D4 — 11 falsos positivos de secretos en Sonar: `.sonarcloud.properties` con
     `sonar.exclusions=security/evidence/**` (salidas de escáneres conservadas como evidencia del «antes»,
     no código; `sonar.issue.ignore.*` no está soportado en análisis automático) y el ejemplo de
