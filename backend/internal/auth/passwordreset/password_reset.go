@@ -89,16 +89,34 @@ func (s *Service) Request(ctx context.Context, email string) error {
 	})
 }
 
-func (s *Service) Confirm(ctx context.Context, token, newPassword string) error {
+// decodeConfirmInput validates the request before any database work, in this
+// order: the token is present, the password length is within policy and the
+// token decodes. It returns the raw token bytes.
+func decodeConfirmInput(token, newPassword string) ([]byte, error) {
 	if strings.TrimSpace(token) == "" {
-		return ErrTokenRequired
+		return nil, ErrTokenRequired
 	}
 	if n := utf8.RuneCountInString(newPassword); n < password.AccountPasswordMinRunes || n > password.AccountPasswordMaxRunes {
-		return &InvalidInputError{Field: "password", Detail: fmt.Sprintf("must contain %d to %d characters", password.AccountPasswordMinRunes, password.AccountPasswordMaxRunes)}
+		return nil, &InvalidInputError{Field: "password", Detail: fmt.Sprintf("must contain %d to %d characters", password.AccountPasswordMinRunes, password.AccountPasswordMaxRunes)}
 	}
 	raw, err := base64.RawURLEncoding.DecodeString(token)
 	if err != nil {
-		return ErrTokenInvalid
+		return nil, ErrTokenInvalid
+	}
+	return raw, nil
+}
+
+// confirmOutcome is what the confirmation transaction leaves behind for the
+// alert published after commit.
+type confirmOutcome struct {
+	user     store.User
+	unlocked bool
+}
+
+func (s *Service) Confirm(ctx context.Context, token, newPassword string) error {
+	raw, err := decodeConfirmInput(token, newPassword)
+	if err != nil {
+		return err
 	}
 	tokenHash := sha256.Sum256(raw)
 	usable, err := s.repository.PasswordResetTokenIsUsable(ctx, tokenHash[:])
@@ -112,53 +130,65 @@ func (s *Service) Confirm(ctx context.Context, token, newPassword string) error 
 	if err != nil {
 		return fmt.Errorf("hash password: %w", err)
 	}
-	var user store.User
-	var unlocked bool
+	var outcome confirmOutcome
 	if err := s.repository.WithinPasswordResetConfirmationTransaction(ctx, func(writer store.PasswordResetConfirmationWriter) error {
-		var err error
-		user, unlocked, err = writer.ConsumePasswordResetTokenAndRevokeSessions(ctx, store.ConsumePasswordResetTokenParams{TokenHash: tokenHash[:], PasswordHash: passwordHash})
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return ErrTokenInvalid
-			}
-			return fmt.Errorf("consume password reset token: %w", err)
-		}
-		// D13: every completed reset is audited, with whether it also lifted
-		// an RF-017 lockout, regardless of the account's previous status.
-		metadata, err := json.Marshal(struct {
-			Unlocked bool `json:"unlocked"`
-		}{Unlocked: unlocked})
-		if err != nil {
-			return fmt.Errorf("marshal password reset completed metadata: %w", err)
-		}
-		resourceType, resourceID := "user", user.ID.String()
-		if _, err := writer.InsertAuditEvent(ctx, store.InsertAuditEventParams{
-			ActorUserID: &user.ID,
-			// Must remain identical to the literal in the CountLoginFailuresByAccount
-			// query (db/queries/audit.sql): the D13 reset boundary depends on it.
-			Action:       "password_reset_completed",
-			ResourceType: &resourceType,
-			ResourceID:   &resourceID,
-			Metadata:     metadata,
-		}); err != nil {
-			return fmt.Errorf("record password reset completed audit: %w", err)
-		}
-		return nil
+		return s.consumeReset(ctx, writer, tokenHash[:], passwordHash, &outcome)
 	}); err != nil {
 		return err
 	}
-	// D14: deliver this alert for every completed reset, not just when D13
-	// also unlocks the account. It contains no credential material.
-	// D16: it goes out only after the commit. The reset is already durable, so
-	// a broker failure is logged and the caller still gets success: failing
-	// here would block account recovery (including the D13 unlock) on the
-	// broker, and a retry would find the token consumed.
+	s.publishResetCompleted(ctx, outcome)
+	return nil
+}
+
+// consumeReset runs inside the confirmation transaction: it consumes the token,
+// revokes the sessions and audits the completed reset, recording the user and
+// the unlock flag in outcome.
+func (s *Service) consumeReset(ctx context.Context, writer store.PasswordResetConfirmationWriter, tokenHash []byte, passwordHash string, outcome *confirmOutcome) error {
+	var err error
+	outcome.user, outcome.unlocked, err = writer.ConsumePasswordResetTokenAndRevokeSessions(ctx, store.ConsumePasswordResetTokenParams{TokenHash: tokenHash, PasswordHash: passwordHash})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrTokenInvalid
+		}
+		return fmt.Errorf("consume password reset token: %w", err)
+	}
+	// D13: every completed reset is audited, with whether it also lifted
+	// an RF-017 lockout, regardless of the account's previous status.
+	metadata, err := json.Marshal(struct {
+		Unlocked bool `json:"unlocked"`
+	}{Unlocked: outcome.unlocked})
+	if err != nil {
+		return fmt.Errorf("marshal password reset completed metadata: %w", err)
+	}
+	resourceType, resourceID := "user", outcome.user.ID.String()
+	if _, err := writer.InsertAuditEvent(ctx, store.InsertAuditEventParams{
+		ActorUserID: &outcome.user.ID,
+		// Must remain identical to the literal in the CountLoginFailuresByAccount
+		// query (db/queries/audit.sql): the D13 reset boundary depends on it.
+		Action:       "password_reset_completed",
+		ResourceType: &resourceType,
+		ResourceID:   &resourceID,
+		Metadata:     metadata,
+	}); err != nil {
+		return fmt.Errorf("record password reset completed audit: %w", err)
+	}
+	return nil
+}
+
+// publishResetCompleted sends the completed-reset alert after the commit.
+// D14: deliver this alert for every completed reset, not just when D13
+// also unlocks the account. It contains no credential material.
+// D16: it goes out only after the commit. The reset is already durable, so
+// a broker failure is logged and the caller still gets success: failing
+// here would block account recovery (including the D13 unlock) on the
+// broker, and a retry would find the token consumed.
+func (s *Service) publishResetCompleted(ctx context.Context, outcome confirmOutcome) {
+	user := outcome.user
 	event := events.PasswordResetCompleted{Envelope: events.NewEnvelope(events.TypePasswordResetCompleted, "")}
-	event.Data.UserID, event.Data.Email, event.Data.DisplayName, event.Data.Unlocked = user.ID, user.Email, user.DisplayName, unlocked
+	event.Data.UserID, event.Data.Email, event.Data.DisplayName, event.Data.Unlocked = user.ID, user.Email, user.DisplayName, outcome.unlocked
 	if err := s.publisher.Publish(ctx, events.TypePasswordResetCompleted, event); err != nil && s.logger != nil {
 		s.logger.Error("password reset completed alert could not be published", "event_type", events.TypePasswordResetCompleted, "user_id", user.ID, "error", err)
 	}
-	return nil
 }
 
 type InvalidInputError struct{ Field, Detail string }
