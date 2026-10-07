@@ -125,103 +125,183 @@ func New(repository Repository, policies ...LockoutConfig) *Service {
 	return &Service{repository: repository, lockout: policy, now: time.Now}
 }
 
+// loginOutcome carries what the login transaction decided: the authentication
+// error to report (nil on success), the account-locked event to publish after
+// commit, and the user to issue the MFA challenge for.
+type loginOutcome struct {
+	authenticationErr error
+	lockEvent         *SecurityEvent
+	mfaUser           mfa.User
+}
+
 func (s *Service) Login(ctx context.Context, input Input) (Result, error) {
 	if s.repository == nil || s.mfa == nil || !s.lockout.Valid() {
 		return Result{}, fmt.Errorf("login service is unavailable")
 	}
-	var authenticationErr error
-	var lockEvent *SecurityEvent
-	var mfaUser mfa.User
+	var outcome loginOutcome
 	err := s.repository.WithinLoginTransaction(ctx, func(writer Writer) error {
-		now := s.now()
-		if input.IP != nil {
-			failures, err := writer.CountLoginFailuresByIP(ctx, *input.IP, now.Add(-s.lockout.FailureWindow))
-			if err != nil {
-				return fmt.Errorf("count login failures by IP: %w", err)
-			}
-			if failures >= int64(s.lockout.IPMaxFailures) {
-				authenticationErr = ErrIPRateLimited
-				return nil
-			}
-		}
-
-		user, err := writer.GetLoginUserByEmail(ctx, input.Email)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				decoyErr := password.VerifyDecoy(input.Password)
-				var invalidPasswordErr *password.InvalidPasswordError
-				if decoyErr != nil && !errors.As(decoyErr, &invalidPasswordErr) {
-					return fmt.Errorf("verify decoy password: %w", decoyErr)
-				}
-				if err := s.recordFailure(ctx, writer, nil, input, "invalid_credentials"); err != nil {
-					return err
-				}
-				authenticationErr = ErrInvalidCredentials
-				return nil
-			}
-			return fmt.Errorf("get login user: %w", err)
-		}
-		if user.Status == StatusLocked {
-			if user.LockedUntil == nil || now.Before(*user.LockedUntil) {
-				authenticationErr = ErrAccountLocked
-				return nil
-			}
-			if err := writer.UnlockLoginUser(ctx, user.ID); err != nil {
-				return fmt.Errorf("unlock expired login lock: %w", err)
-			}
-			user.Status = StatusActive
-			user.LockedUntil = nil
-		}
-
-		valid, err := password.Verify(input.Password, user.PasswordHash)
-		var invalidPasswordErr *password.InvalidPasswordError
-		if err != nil && !errors.As(err, &invalidPasswordErr) {
-			return fmt.Errorf("verify password: %w", err)
-		}
-		if !valid || user.Status != StatusActive {
-			lock, err := s.recordAccountFailure(ctx, writer, user, input, "invalid_credentials", now)
-			if err != nil {
-				return err
-			}
-			if lock.Locked {
-				lockEvent = &SecurityEvent{Type: "security.account_locked", UserID: user.ID, IP: input.IP, LockedUntil: lock.LockedUntil, FailedAttempts: lock.FailedAttempts}
-			}
-			authenticationErr = ErrInvalidCredentials
-			return nil
-		}
-		// Success bookkeeping (audit, last_login_at) waits for the MFA code (D11);
-		// only the transparent rehash belongs to the password step.
-		if password.NeedsRehash(user.PasswordHash) {
-			updatedHash, err := password.Hash(input.Password)
-			if err != nil {
-				return fmt.Errorf("rehash password: %w", err)
-			}
-			if err := writer.UpdatePasswordHash(ctx, user.ID, updatedHash); err != nil {
-				return fmt.Errorf("update password hash: %w", err)
-			}
-		}
-		mfaUser = mfa.User{ID: user.ID, Email: user.Email, DisplayName: user.DisplayName}
-		return nil
+		return s.authenticate(ctx, writer, input, s.now(), &outcome)
 	})
 	if err != nil {
 		return Result{}, err
 	}
-	if lockEvent != nil && s.publisher != nil {
-		if err := s.publisher.PublishSecurityEvent(ctx, *lockEvent); err != nil {
-			// The lock is already committed and audited inside the transaction
-			// above; a notification failure must not be silently dropped, so it
-			// surfaces the same way refresh.Service does for reuse detection.
-			return Result{}, errors.Join(authenticationErr, fmt.Errorf("publish account locked event: %w", err))
-		}
+	if err := s.publishLockEvent(ctx, outcome); err != nil {
+		return Result{}, err
 	}
-	if authenticationErr != nil {
-		return Result{}, authenticationErr
+	if outcome.authenticationErr != nil {
+		return Result{}, outcome.authenticationErr
 	}
-	challenge, err := s.mfa.Issue(ctx, mfaUser)
+	challenge, err := s.mfa.Issue(ctx, outcome.mfaUser)
 	if err != nil {
 		return Result{}, fmt.Errorf("issue mfa challenge: %w", err)
 	}
 	return Result{MfaToken: challenge.Token, ExpiresIn: challenge.ExpiresIn}, nil
+}
+
+// authenticate runs every step of the password check inside the login
+// transaction and records the decision in outcome. A nil return with
+// outcome.authenticationErr set means a rejection that must still commit.
+func (s *Service) authenticate(ctx context.Context, writer Writer, input Input, now time.Time, outcome *loginOutcome) error {
+	limited, err := s.ipRateLimited(ctx, writer, input, now)
+	if err != nil {
+		return err
+	}
+	if limited {
+		outcome.authenticationErr = ErrIPRateLimited
+		return nil
+	}
+
+	user, err := writer.GetLoginUserByEmail(ctx, input.Email)
+	if err != nil {
+		return s.rejectUnknownUser(ctx, writer, input, err, outcome)
+	}
+	locked, err := s.resolveLock(ctx, writer, &user, now)
+	if err != nil {
+		return err
+	}
+	if locked {
+		outcome.authenticationErr = ErrAccountLocked
+		return nil
+	}
+
+	valid, err := password.Verify(input.Password, user.PasswordHash)
+	if err := tolerateInvalidPassword(err); err != nil {
+		return fmt.Errorf("verify password: %w", err)
+	}
+	if !valid || user.Status != StatusActive {
+		return s.rejectKnownUser(ctx, writer, user, input, now, outcome)
+	}
+	if err := s.rehashIfNeeded(ctx, writer, user, input.Password); err != nil {
+		return err
+	}
+	outcome.mfaUser = mfa.User{ID: user.ID, Email: user.Email, DisplayName: user.DisplayName}
+	return nil
+}
+
+// tolerateInvalidPassword drops password.InvalidPasswordError (a verification
+// verdict, not a failure) and returns any other error unchanged.
+func tolerateInvalidPassword(err error) error {
+	var invalidPasswordErr *password.InvalidPasswordError
+	if err != nil && !errors.As(err, &invalidPasswordErr) {
+		return err
+	}
+	return nil
+}
+
+// ipRateLimited reports whether the source IP reached its failure limit within
+// the sliding window. Requests without an IP are never IP-limited.
+func (s *Service) ipRateLimited(ctx context.Context, writer Writer, input Input, now time.Time) (bool, error) {
+	if input.IP == nil {
+		return false, nil
+	}
+	failures, err := writer.CountLoginFailuresByIP(ctx, *input.IP, now.Add(-s.lockout.FailureWindow))
+	if err != nil {
+		return false, fmt.Errorf("count login failures by IP: %w", err)
+	}
+	return failures >= int64(s.lockout.IPMaxFailures), nil
+}
+
+// rejectUnknownUser handles a failed user lookup. For an unknown email it
+// verifies a decoy password (equalizing timing against account enumeration),
+// audits the failure and reports invalid credentials; any other lookup error
+// aborts the transaction.
+func (s *Service) rejectUnknownUser(ctx context.Context, writer Writer, input Input, lookupErr error, outcome *loginOutcome) error {
+	if !errors.Is(lookupErr, pgx.ErrNoRows) {
+		return fmt.Errorf("get login user: %w", lookupErr)
+	}
+	if err := tolerateInvalidPassword(password.VerifyDecoy(input.Password)); err != nil {
+		return fmt.Errorf("verify decoy password: %w", err)
+	}
+	if err := s.recordFailure(ctx, writer, nil, input, "invalid_credentials"); err != nil {
+		return err
+	}
+	outcome.authenticationErr = ErrInvalidCredentials
+	return nil
+}
+
+// resolveLock reports whether the account is still locked (permanently when
+// LockedUntil is nil). An expired lock is released and user is updated to the
+// active state so the password check can proceed.
+func (s *Service) resolveLock(ctx context.Context, writer Writer, user *User, now time.Time) (bool, error) {
+	if user.Status != StatusLocked {
+		return false, nil
+	}
+	if user.LockedUntil == nil || now.Before(*user.LockedUntil) {
+		return true, nil
+	}
+	if err := writer.UnlockLoginUser(ctx, user.ID); err != nil {
+		return false, fmt.Errorf("unlock expired login lock: %w", err)
+	}
+	user.Status = StatusActive
+	user.LockedUntil = nil
+	return false, nil
+}
+
+// rejectKnownUser records the failed attempt for an existing account and, when
+// it just locked the account, stages the security.account_locked event to be
+// published after the transaction commits.
+func (s *Service) rejectKnownUser(ctx context.Context, writer Writer, user User, input Input, now time.Time, outcome *loginOutcome) error {
+	lock, err := s.recordAccountFailure(ctx, writer, user, input, "invalid_credentials", now)
+	if err != nil {
+		return err
+	}
+	if lock.Locked {
+		outcome.lockEvent = &SecurityEvent{Type: "security.account_locked", UserID: user.ID, IP: input.IP, LockedUntil: lock.LockedUntil, FailedAttempts: lock.FailedAttempts}
+	}
+	outcome.authenticationErr = ErrInvalidCredentials
+	return nil
+}
+
+// rehashIfNeeded transparently upgrades an outdated password hash. Success
+// bookkeeping (audit, last_login_at) waits for the MFA code (D11); only the
+// rehash belongs to the password step.
+func (s *Service) rehashIfNeeded(ctx context.Context, writer Writer, user User, plaintext string) error {
+	if !password.NeedsRehash(user.PasswordHash) {
+		return nil
+	}
+	updatedHash, err := password.Hash(plaintext)
+	if err != nil {
+		return fmt.Errorf("rehash password: %w", err)
+	}
+	if err := writer.UpdatePasswordHash(ctx, user.ID, updatedHash); err != nil {
+		return fmt.Errorf("update password hash: %w", err)
+	}
+	return nil
+}
+
+// publishLockEvent notifies the broker once the transaction has committed. A
+// publish failure is joined with the authentication error instead of dropped.
+func (s *Service) publishLockEvent(ctx context.Context, outcome loginOutcome) error {
+	if outcome.lockEvent == nil || s.publisher == nil {
+		return nil
+	}
+	if err := s.publisher.PublishSecurityEvent(ctx, *outcome.lockEvent); err != nil {
+		// The lock is already committed and audited inside the transaction
+		// above; a notification failure must not be silently dropped, so it
+		// surfaces the same way refresh.Service does for reuse detection.
+		return errors.Join(outcome.authenticationErr, fmt.Errorf("publish account locked event: %w", err))
+	}
+	return nil
 }
 
 // recordAccountFailure records the failed attempt and, once it reaches the

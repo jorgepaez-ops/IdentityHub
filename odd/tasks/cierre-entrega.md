@@ -16,6 +16,12 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
   `backend/internal/config/config.go:87` (23), `backend/internal/auth/mfa/mfa.go:220` (21),
   `backend/internal/api/rbac.go:18` (16). Opcional: `frontend/src/features/admin/UserDrawer.tsx:97`
   (18) y `contabilidad/src/auth/flow.ts:54` (16). Las pruebas y los scripts quedan como están.
+  - [x] C1a `login.go` — `Login` extraído en `authenticate`, `ipRateLimited`, `rejectUnknownUser`,
+    `resolveLock`, `rejectKnownUser`, `rehashIfNeeded`, `publishLockEvent` y `tolerateInvalidPassword`.
+    Ruta: delegado (Codex sin capacidad → Sonnet), revisado por Opus. Evidencia: `gocognit` máximo 9
+    (antes 60 con `gocognit`, 32 en Sonar); `go test` del paquete con Postgres real 0 omitidas, 80,4 %;
+    `go vet`, `gofmt` y `golangci-lint` limpios.
+  - [ ] C1b `admin.go` · [ ] C1c `mfa.go` · [ ] C1d `config.go` · [ ] C1e `rbac.go`
 - [ ] **C2 — Tag `vX.Y.Z` y release** con el PDF del informe adjunto (`make informe`; el PDF no se
   versiona). En vivo frente al equipo (T21 de `idp-semana-4.md`).
 - [ ] **C3 — Docker Hub (T17 de `idp-semana-4.md`).** Workflow de release en el tag: imágenes con `vX.Y.Z`
@@ -42,4 +48,4 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
 
 ## Siguiente paso
 
-C1, empezando por `login.go`.
+C1b, `admin.go`.
