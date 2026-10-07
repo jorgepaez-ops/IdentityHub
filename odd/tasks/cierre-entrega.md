@@ -72,6 +72,52 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
   `git push origin v1.0.0` (dispara el workflow de C3), `gh release create v1.0.0` con el PDF adjunto;
   (5) evidencia: URL del release y de las imágenes en Docker Hub, en T17, T21 y aquí.
 
+- [ ] **D — Hallazgos sueltos y deuda de Sonar (decisión del usuario, 2026-10-07: «soluciona el 4 y 5 y luego
+  merge del PR20»).** Van en la rama del PR #20 antes del merge; el PR crece por encima de ~400 líneas por
+  decisión explícita del usuario (excepción a `ask-on-risk`). Ejecutor: Sonnet; revisión de Opus; un commit por
+  tarea y evaluación nativa por commit.
+  - [x] D1 — Regla `contrasena-en-variable-de-entorno` de `.gitleaks.toml`: `\s*` tras `[:=]` → `[ \t]*`, para
+    que no cruce saltos de línea. Comprobar que sigue detectando los secretos sembrados de la línea base.
+    Evidencia: gitleaks v8.24.3 sobre `v0.0.0-vuln-baseline`: 11 hallazgos con la regla vieja y con la nueva,
+    mismos (regla, archivo, línea); árbol actual 62 → 61 (desaparece el falso positivo multilínea). Commit `a7494bc`.
+  - [x] D2 — Trivy local frente a CI: **ya resuelto antes de esta sesión**. `Makefile:189` fija
+    `aquasec/trivy:0.70.0` por digest, la misma versión que `trivy-action` v0.36.0 en CI. La nota de
+    `pulido-frontend.md` estaba desactualizada.
+  - [ ] D3 — Estilo inline bloqueado por la CSP en `/invitations/accept` (visto en WebKit): encontrar qué lo
+    inyecta y corregirlo sin relajar la CSP.
+  - [x] D4 — 11 falsos positivos de secretos en Sonar: `.sonarcloud.properties` con
+    `sonar.exclusions=security/evidence/**` (salidas de escáneres conservadas como evidencia del «antes»,
+    no código; `sonar.issue.ignore.*` no está soportado en análisis automático) y el ejemplo de
+    `.gitleaks.toml:8` sin la contraseña literal. Documentarlo en «Alertas abiertas conocidas» del `README.md`.
+    Commits `a7494bc` (ejemplo de `.gitleaks.toml`) y `cb9caa0` (`.sonarcloud.properties` y `README.md`). El cierre
+    real en SonarCloud se confirma tras el análisis de `main` después del merge.
+  - [x] D5 — 9 alertas reales de cadena de suministro en workflows: `go install …@latest`/`@vX` (S8545) por
+    herramientas fijadas con `go.sum`; `pip install` (S8541) con hashes y `--only-binary :all:`;
+    `npm install --no-package-lock` (S8543) por `npm ci --ignore-scripts`; `npm install --package-lock-only`
+    (S6505) con `--ignore-scripts`. Sin cambiar qué analiza `baseline-scan.yml` (la línea base con Go 1.22).
+    Hallazgo al revisar (Opus): el módulo `tools/` hacía fallar el paso osv-scanner de CI (`--recursive`):
+    stdlib de `go 1.26.2`, `grpc` 1.83.1, kin-openapi 0.133.0 y GO-2026-6016 en oapi-codegen v2.5.1
+    (inyección de código desde `servers[].description` de una spec no confiable; riesgo real bajo aquí, pero
+    alcanzable). **Decisión del usuario (2026-10-07): subir oapi-codegen a v2.7.1** (kin-openapi 0.144.0,
+    regenerar `gen.go`); solo x/crypto GO-2026-5932, sin versión corregida, queda ignorado con fecha y motivo
+    en `tools/osv-scanner.toml`, igual que en `backend/`.
+    Evidencia (commit `8f57c76`): `tools/go.mod` (go 1.26.8; oapi-codegen v2.7.1, sqlc v1.31.1, govulncheck v1.8.0,
+    gosec v2.29.0) instalado sin `@versión`; `requirements-openapi.txt` con hashes; `npm ci --ignore-scripts`;
+    Dependabot para `/tools`; `make scan-deps` desde `tools/`. `gen.go` regenerado (runtime v1.4.0): los campos
+    opcionales anulables se omiten en vez de enviarse como `null`; ambos clientes ya usan `?? null` o veracidad.
+    `go test ./...` con Postgres real: 27 paquetes ok; `./internal/api` 160 PASS, 0 SKIP; `golangci-lint` 0;
+    osv-scanner v2.3.5 sobre `./tools` exit 0; actionlint 0. Hallazgo aparte (sin id): osv-scanner local v2.3.5
+    marca 21 avisos de stdlib en `backend/go.mod` (`go 1.26.0`) que el v2.6.0 de CI no marca; pendiente de decidir.
+    Revisión nativa del rango `3d0de78..8f57c76` (alto, 20 archivos, 4 lentes): **aprobada** y acusada
+    (`review-1a76f102a78bff85`), 10 avisos no bloqueantes: el de parámetros requeridos vacíos en `/oauth/authorize`
+    lo cubre `ValidateAuthorizeInput` (`oauth.go:180-187`); `omitempty` verificado en los clientes; `AGENTS.md:49`
+    corregido; el resto (simetría de `GOTOOLCHAIN` en `ci.yml`, `make scan-deps` sin `|| true` al instalar) queda
+    como sugerencia.
+  - [ ] D6 — Complejidad fuera de alcance de C1 (`gocognit -over 15`): `bootstrap.Ensure`, `rolegrid.Update`,
+    `refresh.Refresh`, `employee.CreateEmployee`, `mfa.Issue`, `mfa.Resend`, `notify.Render`,
+    `passwordreset.Confirm`, `invitation.Accept`, `testdb.New`, `oauth.Exchange` e `invitationresend.Resend`
+    (`gen.go` es generado: fuera). Mismo método que C1, un commit por función.
+
 ## Deuda menor (no bloquea la entrega; decidir cuál se atiende)
 
 - **SonarCloud en `main` (2026-10-06): 125 code smells.** Principales: S3776 (18, cubiertos en parte por
