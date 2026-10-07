@@ -8,7 +8,7 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
 
 ## Tareas
 
-- [ ] **C1 — Refactorización por complejidad cognitiva (Sonar S3776).** Extraer pasos con nombre propio
+- [x] **C1 — Refactorización por complejidad cognitiva (Sonar S3776).** Extraer pasos con nombre propio
   sin cambiar comportamiento, uno por commit, con las pruebas existentes (unitarias, integración contra
   Postgres y E2E) como red y revisión nativa por commit:
   `backend/internal/auth/admin/admin.go:126` (33), `backend/internal/auth/login/login.go:128` (32;
@@ -50,6 +50,8 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
     con `writeAuthorizationLoadFailed` y `hasRole`. Ruta: delegado (Sonnet, junto con C1d), revisado por Opus.
     Evidencia: `authorizeRole` 6 y `RequireRole` 3 en `gocognit` (antes 22; 16 en Sonar); `./internal/api/`
     81,9 %, 0 omitidas; `go vet`, `gofmt` y `golangci-lint` limpios.
+    Commit `917327b`. Evaluación nativa: riesgo medio, bajo el presupuesto (corte C1d+C1e pendiente).
+  - Cierre de C1 (2026-10-07): `make up` con las imágenes nuevas y `make e2e`: 52/52 en verde (3,6 min).
 - **Hallazgo fuera de alcance (C1):** `gocognit -over 15` marca además, en producción, `bootstrap.Ensure` (46),
   `rolegrid.Update` (31), `refresh.Refresh` (31), `employee.CreateEmployee` (30), `mfa.Issue` (23),
   `mfa.Resend` (21), `notify.Render` (20), `passwordreset.Confirm` (19), `invitation.Accept` (17),
