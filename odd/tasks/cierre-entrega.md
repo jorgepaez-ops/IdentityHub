@@ -72,9 +72,8 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
   `git push origin v1.0.0` (dispara el workflow de C3), `gh release create v1.0.0` con el PDF adjunto;
   (5) evidencia: URL del release y de las imágenes en Docker Hub, en T17, T21 y aquí.
 
-- [ ] **D — Hallazgos sueltos y deuda de Sonar (decisión del usuario, 2026-10-07: «soluciona el 4 y 5 y luego
-  merge del PR20»).** Van en la rama del PR #20 antes del merge; el PR crece por encima de ~400 líneas por
-  decisión explícita del usuario (excepción a `ask-on-risk`). Ejecutor: Sonnet; revisión de Opus; un commit por
+- [x] **D — Hallazgos sueltos y deuda de Sonar (decisión del usuario, 2026-10-07: «soluciona el 4 y 5 y luego
+  merge del PR20»).** Cambio posterior del usuario: el PR #20 se fusiona solo con C1 y la tarea D va en un PR nuevo. Ejecutor: Sonnet; revisión de Opus; un commit por
   tarea y evaluación nativa por commit.
   - [x] D1 — Regla `contrasena-en-variable-de-entorno` de `.gitleaks.toml`: `\s*` tras `[:=]` → `[ \t]*`, para
     que no cruce saltos de línea. Comprobar que sigue detectando los secretos sembrados de la línea base.
@@ -122,10 +121,34 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
     lo cubre `ValidateAuthorizeInput` (`oauth.go:180-187`); `omitempty` verificado en los clientes; `AGENTS.md:49`
     corregido; el resto (simetría de `GOTOOLCHAIN` en `ci.yml`, `make scan-deps` sin `|| true` al instalar) queda
     como sugerencia.
-  - [ ] D6 — Complejidad fuera de alcance de C1 (`gocognit -over 15`): `bootstrap.Ensure`, `rolegrid.Update`,
+  - [x] D6 — Complejidad fuera de alcance de C1 (`gocognit -over 15`): `bootstrap.Ensure`, `rolegrid.Update`,
     `refresh.Refresh`, `employee.CreateEmployee`, `mfa.Issue`, `mfa.Resend`, `notify.Render`,
     `passwordreset.Confirm`, `invitation.Accept`, `testdb.New`, `oauth.Exchange` e `invitationresend.Resend`
     (`gen.go` es generado: fuera). Mismo método que C1, un commit por función.
+    Ruta: delegado (Sonnet, tres lotes de cuatro; cada lote commitea por función), revisado por Opus (diffs de
+    `refresh`, `bootstrap`, `passwordreset` y `oauth` leídos completos). Evidencia por lote: `gofmt`, `go vet`,
+    pruebas con Postgres real 0 omitidas, `golangci-lint` 0 (salvo un `errcheck` preexistente en `testdb.go:76`,
+    ya presente en `main`); suite completa 27 paquetes ok (28 con `-tags integration`).
+    | Función | Commit | `gocognit` antes → después |
+    |---|---|---|
+    | `bootstrap.Ensure` | `e4f4c72` | 46 → 5 |
+    | `refresh.Refresh` | `dd90fe6` | 31 → 4 |
+    | `rolegrid.Update` | `66298cd` | 31 → 4 |
+    | `employee.CreateEmployee` | `a8dd48f` | 30 → 4 |
+    | `mfa.Issue` | `01b4772` | 23 → 5 |
+    | `mfa.Resend` | `cb299e3` | 21 → 3 |
+    | `notify.Render` | `07d7c91` | 20 → 5 |
+    | `passwordreset.Confirm` | `a1c9701` | 19 → 5 |
+    | `invitation.Accept` | `207b66c` | 17 → 3 |
+    | `testdb.New` | `5558b54` | 17 → 6 |
+    | `oauth.Exchange` | `11fae1e` | 16 → 4 |
+    | `invitationresend.Resend` | `a411526` | 16 → 4 |
+    `gocognit -over 15` sobre `internal/` y `cmd/` (sin pruebas ni `gen.go`): vacío. Revisiones nativas (alto, 4
+    lentes): lote A **aprobado** (`review-763db682c5cd9269`, 2 sugerencias), lote B **aprobado**
+    (`review-5bc1a743cfbc8ddb`, 1 sugerencia), lote C **aprobado** (`review-c3cce3fa9e198d96`, 1 sugerencia en
+    `testdb.go:88-104`). Todas acusadas.
+  - Cierre de D (2026-10-07): `make up` con las imágenes de la rama y `make e2e`: 52/52 en verde. Entrega en un PR
+    nuevo desde `chore/hallazgos-y-sonar` (el PR #20 se fusionó antes, `3d0de78`, por decisión del usuario).
 
 ## Deuda menor (no bloquea la entrega; decidir cuál se atiende)
 
