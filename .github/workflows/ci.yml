@@ -46,7 +46,8 @@ jobs:
 
       - name: Validar el contrato OpenAPI
         run: |
-          python3 -m pip install --quiet 'openapi-spec-validator==0.7.1'
+          # Versiones y hashes fijados en tools/requirements-openapi.txt (dependencias transitivas incluidas).
+          python3 -m pip install --quiet --require-hashes --only-binary :all: -r tools/requirements-openapi.txt
           python3 -m openapi_spec_validator specs/03-api/openapi.yaml
 
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
@@ -57,24 +58,28 @@ jobs:
       - name: Regenerar la API Go
         working-directory: backend
         run: |
-          go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.5.1
+          # Sin @versión a propósito: la versión (v2.7.1) la fija tools/go.mod y go.sum la verifica.
+          go -C ../tools install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen
           go generate ./internal/api
 
       - name: Regenerar consultas SQL con sqlc
         run: |
-          GOTOOLCHAIN=go1.26.2 go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1
+          # Versión (v1.31.1) fijada en tools/go.mod; la directiva `go` de ese módulo
+          # (1.26.8) fija el toolchain con el que se compila (GOTOOLCHAIN=auto lo descarga si hace falta).
+          GOTOOLCHAIN=auto go -C tools install github.com/sqlc-dev/sqlc/cmd/sqlc
           "$(go env GOPATH)/bin/sqlc" generate
 
-      # Sin `cache: npm`: todavía no hay package-lock.json (lo versiona T25) y
-      # setup-node falla si la ruta de dependencias no existe.
+      # `npm ci` instala exactamente lo versionado en frontend/package-lock.json.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Regenerar los tipos de la API
         working-directory: frontend
         run: |
-          npm install --no-package-lock --ignore-scripts
+          npm ci --ignore-scripts
           npm run gen:api
 
       # T14d — correspondencia 1 a 1 escenario Gherkin ↔ prueba E2E (stdlib, sin red).
@@ -253,7 +258,8 @@ jobs:
       - name: govulncheck
         working-directory: backend
         run: |
-          go install golang.org/x/vuln/cmd/govulncheck@latest
+          # Versión fijada en tools/go.mod (sin @versión: go.sum la verifica).
+          go -C ../tools install golang.org/x/vuln/cmd/govulncheck
           govulncheck ./...
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0

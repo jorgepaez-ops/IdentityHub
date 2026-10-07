@@ -39,7 +39,8 @@ volver a acordarse.
   dar por buena una tarea de backend, levantar un Postgres desechable igual al de CI
   (`postgres:16-bookworm` por digest, usuario/base `identity`, puerto libre como 55432) y exportar
   `TEST_DATABASE_URL`. Así se detectó en T12a un trigger que descartaba UPDATEs.
-- Generadores cacheados: usar `~/go/bin/oapi-codegen` (v2.5.1 real, no "(devel)") y `~/go/bin/sqlc`.
+- Generadores: las versiones las fija `tools/go.mod` (oapi-codegen v2.7.1 desde 2026-10-07, sqlc v1.31.1);
+  instalarlos con `go -C tools install <paquete>` (sin `@versión`). Evitar binarios "(devel)" o de otra versión.
   Evitar binarios en `/private/tmp/idp-gen-bin/` sin el ldflag de versión correcto.
 - **Hook de pre-commit instalado en este clon desde T16 (2026-10-05).** `pre-commit` vive en
   `~/.local/bin` (instalado con `uv tool install`); `.git/hooks/pre-commit` es el de pre-commit y

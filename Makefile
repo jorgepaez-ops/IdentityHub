@@ -177,9 +177,11 @@ scan-secrets: ## Gitleaks sobre el historial completo (RNF-003)
 	docker run --rm -v "$(PWD):/repo" ghcr.io/gitleaks/gitleaks:v8.24.3 \
 		detect --source=/repo --verbose || true
 
+# govulncheck se instala desde tools/go.mod, como en CI (sin @versión; go.sum fija la versión).
 scan-deps: ## govulncheck y npm audit (RNF-004)
 	@echo "── govulncheck ───────────────────────────────────────────"
-	cd backend && go run golang.org/x/vuln/cmd/govulncheck@latest ./... || true
+	go -C tools install golang.org/x/vuln/cmd/govulncheck
+	cd backend && "$$(go env GOPATH)/bin/govulncheck" ./... || true
 	@echo "── npm audit ─────────────────────────────────────────────"
 	cd frontend && npm audit --audit-level=high || true
 	cd contabilidad && npm audit --audit-level=high || true

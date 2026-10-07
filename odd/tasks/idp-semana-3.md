@@ -1356,6 +1356,8 @@ antes de T14 como **BUG-1** y **BUG-2** (evidencia de los logs de Nginx/API toma
   `/invitations/accept` "Refused to apply a stylesheet because its hash, its nonce, or
   'unsafe-inline' does not appear in the style-src directive". La CSP del Hub bloquea un estilo
   inline; falta ver qué lo inyecta y decidir en qué tarea se corrige.
+  **Cerrado (2026-10-07, D3 de `cierre-entrega.md`):** la aplicación no inyecta estilos (0 `<style>`, 0 `style`,
+  0 violaciones en Playwright WebKit y Chromium); lo más probable es el autocompletado de Safari. Sin cambios.
 
 Siguiente: fase 3 empezando por T14 (BUG-1/BUG-2 quedan pendientes de la prueba en Safari real) (E2E con Playwright, incluido el smoke test de Nginx
 con cabecera `Host` pendiente de T11). Para delegar con Gentle AI 4.0, cada tarea a un agente que

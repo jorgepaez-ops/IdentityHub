@@ -63,58 +63,83 @@ func New(repository Repository, publisher Publisher, hasher Hasher) *Service {
 // verification used to (D9: accepting the invitation supersedes it), only
 // after the broker confirms the publish.
 func (s *Service) Accept(ctx context.Context, input Input) error {
-	if strings.TrimSpace(input.Token) == "" {
-		return ErrInvalidInput
-	}
-	if n := utf8.RuneCountInString(input.Password); n < password.AccountPasswordMinRunes || n > password.AccountPasswordMaxRunes {
-		return &InvalidInputError{Field: "password", Detail: "must contain 12 to 128 characters"}
-	}
-	// employee.Service emits the raw token bytes base64url-encoded (see
-	// employee.go); hash the same raw bytes here, never the encoded string,
-	// or a real emailed link can never match what was stored.
-	raw, err := base64.RawURLEncoding.DecodeString(input.Token)
-	if err != nil {
-		return ErrTokenInvalid
-	}
-	tokenHash := sha256.Sum256(raw)
-	usable, err := s.repository.InvitationTokenIsUsable(ctx, tokenHash[:])
-	if err != nil {
+	if err := validateInput(input); err != nil {
 		return err
 	}
-	if !usable {
-		return ErrTokenInvalid
+	tokenHash, err := s.usableTokenHash(ctx, input.Token)
+	if err != nil {
+		return err
 	}
 	passwordHash, err := s.hasher.Hash(input.Password)
 	if err != nil {
 		return fmt.Errorf("hash password: %w", err)
 	}
 	return s.repository.WithinInvitationAcceptanceTransaction(ctx, func(writer store.InvitationAcceptanceWriter) error {
-		user, err := writer.ConsumeInvitationToken(ctx, store.ConsumeInvitationTokenParams{TokenHash: tokenHash[:], PasswordHash: passwordHash})
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) || errors.Is(err, ErrTokenInvalid) {
-				return ErrTokenInvalid
-			}
-			return fmt.Errorf("consume invitation token: %w", err)
-		}
-		resourceType, resourceID := "user", user.ID.String()
-		if _, err := writer.InsertAuditEvent(ctx, store.InsertAuditEventParams{
-			ActorUserID:  &user.ID,
-			Action:       "invitation_accepted",
-			ResourceType: &resourceType,
-			ResourceID:   &resourceID,
-			IP:           input.IP,
-			UserAgent:    input.UserAgent,
-			Metadata:     []byte(`{}`),
-		}); err != nil {
-			return fmt.Errorf("record invitation accepted audit: %w", err)
-		}
-		event := events.EmailVerified{Envelope: events.NewEnvelope(events.TypeEmailVerified, "")}
-		event.Data.UserID, event.Data.Email, event.Data.DisplayName = user.ID, user.Email, user.DisplayName
-		if err := s.publisher.Publish(ctx, events.TypeEmailVerified, event); err != nil {
-			return fmt.Errorf("%w: %w", ErrPublish, err)
-		}
-		return nil
+		return s.consumeAndPublish(ctx, writer, input, tokenHash[:], passwordHash)
 	})
+}
+
+// validateInput checks the token is present and the password length is within
+// the account password policy.
+func validateInput(input Input) error {
+	if strings.TrimSpace(input.Token) == "" {
+		return ErrInvalidInput
+	}
+	if n := utf8.RuneCountInString(input.Password); n < password.AccountPasswordMinRunes || n > password.AccountPasswordMaxRunes {
+		return &InvalidInputError{Field: "password", Detail: "must contain 12 to 128 characters"}
+	}
+	return nil
+}
+
+// usableTokenHash decodes the token, hashes its raw bytes and confirms the
+// repository still considers it usable.
+func (s *Service) usableTokenHash(ctx context.Context, token string) ([sha256.Size]byte, error) {
+	// employee.Service emits the raw token bytes base64url-encoded (see
+	// employee.go); hash the same raw bytes here, never the encoded string,
+	// or a real emailed link can never match what was stored.
+	raw, err := base64.RawURLEncoding.DecodeString(token)
+	if err != nil {
+		return [sha256.Size]byte{}, ErrTokenInvalid
+	}
+	tokenHash := sha256.Sum256(raw)
+	usable, err := s.repository.InvitationTokenIsUsable(ctx, tokenHash[:])
+	if err != nil {
+		return [sha256.Size]byte{}, err
+	}
+	if !usable {
+		return [sha256.Size]byte{}, ErrTokenInvalid
+	}
+	return tokenHash, nil
+}
+
+// consumeAndPublish runs inside the acceptance transaction: it consumes the
+// token, records the audit event and publishes the verified-email event.
+func (s *Service) consumeAndPublish(ctx context.Context, writer store.InvitationAcceptanceWriter, input Input, tokenHash []byte, passwordHash string) error {
+	user, err := writer.ConsumeInvitationToken(ctx, store.ConsumeInvitationTokenParams{TokenHash: tokenHash, PasswordHash: passwordHash})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) || errors.Is(err, ErrTokenInvalid) {
+			return ErrTokenInvalid
+		}
+		return fmt.Errorf("consume invitation token: %w", err)
+	}
+	resourceType, resourceID := "user", user.ID.String()
+	if _, err := writer.InsertAuditEvent(ctx, store.InsertAuditEventParams{
+		ActorUserID:  &user.ID,
+		Action:       "invitation_accepted",
+		ResourceType: &resourceType,
+		ResourceID:   &resourceID,
+		IP:           input.IP,
+		UserAgent:    input.UserAgent,
+		Metadata:     []byte(`{}`),
+	}); err != nil {
+		return fmt.Errorf("record invitation accepted audit: %w", err)
+	}
+	event := events.EmailVerified{Envelope: events.NewEnvelope(events.TypeEmailVerified, "")}
+	event.Data.UserID, event.Data.Email, event.Data.DisplayName = user.ID, user.Email, user.DisplayName
+	if err := s.publisher.Publish(ctx, events.TypeEmailVerified, event); err != nil {
+		return fmt.Errorf("%w: %w", ErrPublish, err)
+	}
+	return nil
 }
 
 // Acceptor is the narrow API boundary for invitation acceptance.

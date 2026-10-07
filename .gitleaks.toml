@@ -5,7 +5,7 @@
 # —claves de AWS, tokens de Slack, claves privadas PEM— porque puede
 # identificarlos por su forma. Pero NO detecta una contraseña genérica como
 #
-#     POSTGRES_PASSWORD: postgres_admin_2024
+#     POSTGRES_PASSWORD: <palabra genérica + año>
 #
 # porque es indistinguible de cualquier otra cadena. En la línea base, Gitleaks
 # con reglas por defecto encontró 2 de los 6 secretos sembrados.
@@ -26,7 +26,9 @@ description = "Contraseña o secreto asignado en una variable de entorno o en YA
 # `POSTGRES_PASSWORD`, porque el guion bajo es carácter de palabra y no hay
 # frontera antes de "PASSWORD". Sin esto, la regla pasaba por alto justo la
 # variable más común. Se detectó comparando lo encontrado con lo sembrado.
-regex = '''(?im)(?:^|[\s"',{[])(?:[a-z0-9]+[_-])*(?:password|passwd|pass|secret|api[_-]?key|signing[_-]?key)["']?\s*[:=]\s*["']?[^\s"'{$#][^\s"']{7,}["']?'''
+# Los espacios tras [:=] son `[ \t]*` y no `\s*`: `\s` también casa saltos de línea,
+# y un `CLAVE=` vacío seguido de otra línea se informaba como secreto.
+regex = '''(?im)(?:^|[\s"',{[])(?:[a-z0-9]+[_-])*(?:password|passwd|pass|secret|api[_-]?key|signing[_-]?key)["']?[ \t]*[:=][ \t]*["']?[^\s"'{$#][^\s"']{7,}["']?'''
 tags = ["secreto", "generico"]
 
 [[rules]]

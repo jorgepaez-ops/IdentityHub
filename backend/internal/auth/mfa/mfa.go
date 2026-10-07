@@ -418,65 +418,86 @@ func (s *Service) rejectCode(ctx context.Context, w Writer, challenge StoredChal
 	return &event, nil
 }
 
+// resendOutcome is what the resend transaction leaves behind for the code
+// after commit: the event to publish and the values needed to restore the
+// previous code if publishing fails.
+type resendOutcome struct {
+	event                  events.MfaChallengeIssued
+	challengeID            uuid.UUID
+	newHash, previousHash  []byte
+	sentAt, previousSentAt time.Time
+}
+
 func (s *Service) Resend(ctx context.Context, encodedToken string) error {
 	raw, err := base64.RawURLEncoding.DecodeString(encodedToken)
 	if err != nil {
 		return ErrChallengeInvalid
 	}
 	tokenHash := sha256.Sum256(raw)
-	var event events.MfaChallengeIssued
-	var challengeID uuid.UUID
-	var newHash, previousHash []byte
-	var sentAt, previousSentAt time.Time
+	var outcome resendOutcome
 	if err := s.repository.WithinMFATransaction(ctx, func(w Writer) error {
-		challenge, err := w.GetChallengeForUpdate(ctx, tokenHash[:])
-		if err != nil {
-			return challengeLookupError(err)
-		}
-		// One clock reading serves the expiry check, the window comparison and
-		// the stored last_sent_at.
-		now := s.now()
-		if challenge.Used || !now.Before(challenge.ExpiresAt) || challenge.User.Status != StatusActive {
-			return ErrChallengeInvalid
-		}
-		if now.Sub(challenge.LastSentAt) < ResendInterval {
-			return ErrResendTooSoon
-		}
-		code, err := generateCode(s.random)
-		if err != nil {
-			return fmt.Errorf("generate mfa resend code: %w", err)
-		}
-		challengeID, sentAt = challenge.ID, now
-		newHash, previousHash = hashCode(raw, code), append([]byte(nil), challenge.CodeHash...)
-		previousSentAt = challenge.LastSentAt
-		if err := w.ResendChallenge(ctx, challengeID, newHash, sentAt); err != nil {
-			return fmt.Errorf("resend mfa challenge: %w", err)
-		}
-		if err := w.InsertAuditEvent(ctx, AuditEvent{ActorUserID: challenge.User.ID, Action: "mfa_code_resent"}); err != nil {
-			return fmt.Errorf("audit mfa resend: %w", err)
-		}
-		event = challengeEvent(challenge.User, code, challenge.ExpiresAt)
-		return nil
+		return s.resendChallenge(ctx, w, raw, tokenHash[:], &outcome)
 	}); err != nil {
 		return err
 	}
-	if err := s.publishCode(ctx, event); err != nil {
-		compensationCtx, cancel := compensationContext(ctx)
-		defer cancel()
-		if restoreErr := s.repository.WithinMFATransaction(compensationCtx, func(w Writer) error {
-			if err := w.RestoreResend(compensationCtx, challengeID, newHash, previousHash, sentAt, previousSentAt); err != nil {
-				return fmt.Errorf("restore failed mfa resend: %w", err)
-			}
-			return nil
-		}); restoreErr != nil {
-			s.logCompensationFailure("restore_mfa_resend", restoreErr)
-			// Do not keep ErrDeliveryUnavailable in this path: the compensating
-			// database failure must surface as infrastructure failure (5xx).
-			return fmt.Errorf("restore undelivered mfa resend: %w", restoreErr)
-		}
-		return err
+	if err := s.publishCode(ctx, outcome.event); err != nil {
+		return s.restoreUndeliveredResend(ctx, outcome, err)
 	}
 	return nil
+}
+
+// resendChallenge runs inside the resend transaction: it checks that the
+// challenge is open and past the resend interval, stores a fresh code hash and
+// audits it, recording in outcome what the caller needs after commit.
+func (s *Service) resendChallenge(ctx context.Context, w Writer, raw, tokenHash []byte, outcome *resendOutcome) error {
+	challenge, err := w.GetChallengeForUpdate(ctx, tokenHash)
+	if err != nil {
+		return challengeLookupError(err)
+	}
+	// One clock reading serves the expiry check, the window comparison and
+	// the stored last_sent_at.
+	now := s.now()
+	if challenge.Used || !now.Before(challenge.ExpiresAt) || challenge.User.Status != StatusActive {
+		return ErrChallengeInvalid
+	}
+	if now.Sub(challenge.LastSentAt) < ResendInterval {
+		return ErrResendTooSoon
+	}
+	code, err := generateCode(s.random)
+	if err != nil {
+		return fmt.Errorf("generate mfa resend code: %w", err)
+	}
+	outcome.challengeID, outcome.sentAt = challenge.ID, now
+	outcome.newHash, outcome.previousHash = hashCode(raw, code), append([]byte(nil), challenge.CodeHash...)
+	outcome.previousSentAt = challenge.LastSentAt
+	if err := w.ResendChallenge(ctx, outcome.challengeID, outcome.newHash, outcome.sentAt); err != nil {
+		return fmt.Errorf("resend mfa challenge: %w", err)
+	}
+	if err := w.InsertAuditEvent(ctx, AuditEvent{ActorUserID: challenge.User.ID, Action: "mfa_code_resent"}); err != nil {
+		return fmt.Errorf("audit mfa resend: %w", err)
+	}
+	outcome.event = challengeEvent(challenge.User, code, challenge.ExpiresAt)
+	return nil
+}
+
+// restoreUndeliveredResend puts the prior code and timestamp back after a
+// failed publish and returns publishErr, or the infrastructure error when the
+// restore fails too.
+func (s *Service) restoreUndeliveredResend(ctx context.Context, outcome resendOutcome, publishErr error) error {
+	compensationCtx, cancel := compensationContext(ctx)
+	defer cancel()
+	if restoreErr := s.repository.WithinMFATransaction(compensationCtx, func(w Writer) error {
+		if err := w.RestoreResend(compensationCtx, outcome.challengeID, outcome.newHash, outcome.previousHash, outcome.sentAt, outcome.previousSentAt); err != nil {
+			return fmt.Errorf("restore failed mfa resend: %w", err)
+		}
+		return nil
+	}); restoreErr != nil {
+		s.logCompensationFailure("restore_mfa_resend", restoreErr)
+		// Do not keep ErrDeliveryUnavailable in this path: the compensating
+		// database failure must surface as infrastructure failure (5xx).
+		return fmt.Errorf("restore undelivered mfa resend: %w", restoreErr)
+	}
+	return publishErr
 }
 
 func compensationContext(parent context.Context) (context.Context, context.CancelFunc) {
@@ -517,59 +538,83 @@ func (s *Service) Issue(ctx context.Context, user User) (Challenge, error) {
 	if s.repository == nil || s.publisher == nil {
 		return Challenge{}, fmt.Errorf("mfa service is unavailable")
 	}
-	rawToken := make([]byte, 32)
-	if _, err := io.ReadFull(s.random, rawToken); err != nil {
-		return Challenge{}, fmt.Errorf("generate mfa token: %w", err)
-	}
-	code, err := generateCode(s.random)
+	rawToken, code, err := s.newIssueSecrets()
 	if err != nil {
-		return Challenge{}, fmt.Errorf("generate mfa code: %w", err)
+		return Challenge{}, err
 	}
 	tokenHash, codeHash := sha256.Sum256(rawToken), hashCode(rawToken, code)
 	challengeID := uuid.New()
 	now := s.now().UTC()
 	expiresAt := now.Add(ChallengeTTL)
+	params := CreateParams{ID: challengeID, UserID: user.ID, TokenHash: tokenHash[:], CodeHash: codeHash, ExpiresAt: expiresAt, AttemptsLeft: MaxAttempts, SentAt: now}
 	if err := s.repository.WithinMFATransaction(ctx, func(w Writer) error {
-		if err := w.LockChallengeIssuance(ctx, user.ID); err != nil {
-			return fmt.Errorf("lock mfa issuance: %w", err)
-		}
-		issued, err := w.CountChallengesSince(ctx, user.ID, now.Add(-IssuanceWindow))
-		if err != nil {
-			return fmt.Errorf("count mfa challenges: %w", err)
-		}
-		if issued >= MaxIssuancesPerWindow {
-			return ErrIssuanceLimited
-		}
-		if err := w.SupersedeOpenChallenges(ctx, user.ID, now); err != nil {
-			return fmt.Errorf("supersede mfa challenges: %w", err)
-		}
-		if err := w.CreateChallenge(ctx, CreateParams{ID: challengeID, UserID: user.ID, TokenHash: tokenHash[:], CodeHash: codeHash, ExpiresAt: expiresAt, AttemptsLeft: MaxAttempts, SentAt: now}); err != nil {
-			return fmt.Errorf("create mfa challenge: %w", err)
-		}
-		if err := w.InsertAuditEvent(ctx, AuditEvent{ActorUserID: user.ID, Action: "mfa_challenge_issued"}); err != nil {
-			return fmt.Errorf("audit mfa challenge issued: %w", err)
-		}
-		return nil
+		return s.storeChallenge(ctx, w, user, params, now)
 	}); err != nil {
 		return Challenge{}, err
 	}
 	if err := s.publishCode(ctx, challengeEvent(user, code, expiresAt)); err != nil {
-		compensationCtx, cancel := compensationContext(ctx)
-		defer cancel()
-		if cancelErr := s.repository.WithinMFATransaction(compensationCtx, func(w Writer) error {
-			if err := w.DeleteChallenge(compensationCtx, challengeID); err != nil {
-				return fmt.Errorf("cancel undelivered mfa challenge: %w", err)
-			}
-			return nil
-		}); cancelErr != nil {
-			s.logCompensationFailure("delete_mfa_challenge", cancelErr)
-			// A failed compensation is an infrastructure fault, not a delivery
-			// outcome; avoid mapping it to the retryable MFA domain error.
-			return Challenge{}, fmt.Errorf("cancel undelivered mfa challenge: %w", cancelErr)
-		}
-		return Challenge{}, err
+		return Challenge{}, s.cancelUndelivered(ctx, challengeID, err)
 	}
 	return Challenge{Token: base64.RawURLEncoding.EncodeToString(rawToken), ExpiresIn: challengeExpiresIn}, nil
+}
+
+// newIssueSecrets draws the raw challenge token and then the six-digit code,
+// in that order, from the service's random source.
+func (s *Service) newIssueSecrets() ([]byte, string, error) {
+	rawToken := make([]byte, 32)
+	if _, err := io.ReadFull(s.random, rawToken); err != nil {
+		return nil, "", fmt.Errorf("generate mfa token: %w", err)
+	}
+	code, err := generateCode(s.random)
+	if err != nil {
+		return nil, "", fmt.Errorf("generate mfa code: %w", err)
+	}
+	return rawToken, code, nil
+}
+
+// storeChallenge runs inside the issuance transaction: it enforces the
+// per-window issuance cap, supersedes the account's open challenges and
+// stores the new one with its audit event.
+func (s *Service) storeChallenge(ctx context.Context, w Writer, user User, params CreateParams, now time.Time) error {
+	if err := w.LockChallengeIssuance(ctx, user.ID); err != nil {
+		return fmt.Errorf("lock mfa issuance: %w", err)
+	}
+	issued, err := w.CountChallengesSince(ctx, user.ID, now.Add(-IssuanceWindow))
+	if err != nil {
+		return fmt.Errorf("count mfa challenges: %w", err)
+	}
+	if issued >= MaxIssuancesPerWindow {
+		return ErrIssuanceLimited
+	}
+	if err := w.SupersedeOpenChallenges(ctx, user.ID, now); err != nil {
+		return fmt.Errorf("supersede mfa challenges: %w", err)
+	}
+	if err := w.CreateChallenge(ctx, params); err != nil {
+		return fmt.Errorf("create mfa challenge: %w", err)
+	}
+	if err := w.InsertAuditEvent(ctx, AuditEvent{ActorUserID: user.ID, Action: "mfa_challenge_issued"}); err != nil {
+		return fmt.Errorf("audit mfa challenge issued: %w", err)
+	}
+	return nil
+}
+
+// cancelUndelivered deletes a challenge whose code could not be published and
+// returns publishErr, or the infrastructure error when the deletion fails too.
+func (s *Service) cancelUndelivered(ctx context.Context, challengeID uuid.UUID, publishErr error) error {
+	compensationCtx, cancel := compensationContext(ctx)
+	defer cancel()
+	if cancelErr := s.repository.WithinMFATransaction(compensationCtx, func(w Writer) error {
+		if err := w.DeleteChallenge(compensationCtx, challengeID); err != nil {
+			return fmt.Errorf("cancel undelivered mfa challenge: %w", err)
+		}
+		return nil
+	}); cancelErr != nil {
+		s.logCompensationFailure("delete_mfa_challenge", cancelErr)
+		// A failed compensation is an infrastructure fault, not a delivery
+		// outcome; avoid mapping it to the retryable MFA domain error.
+		return fmt.Errorf("cancel undelivered mfa challenge: %w", cancelErr)
+	}
+	return publishErr
 }
 
 // challengeLookupError keeps an unknown token (the store reports it as

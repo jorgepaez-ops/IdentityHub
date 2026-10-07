@@ -60,11 +60,34 @@ jobs:
           go-version: "1.22"
           cache-dependency-path: backend/go.sum
 
+      # El checkout anterior es el tag de la línea base, que no contiene tools/.
+      # Las herramientas se fijan en tools/go.mod de la rama del workflow
+      # (github.sha) y se COMPILAN con el toolchain que exige su directiva `go`
+      # (GOTOOLCHAIN=auto lo descarga a partir de Go 1.22); GOTOOLCHAIN
+      # solo se define en este paso. El análisis posterior sigue ejecutándose con
+      # el Go 1.22 de setup-go, porque govulncheck usa el `go` del PATH para
+      # cargar el código de backend y la versión de la biblioteca estándar.
+      - name: Obtener tools/ de la rama del workflow
+        continue-on-error: true
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          path: .herramientas
+          sparse-checkout: tools
+          persist-credentials: false
+
+      - name: Compilar govulncheck y gosec fijados
+        continue-on-error: true
+        env:
+          GOTOOLCHAIN: auto
+        run: |
+          go -C .herramientas/tools install golang.org/x/vuln/cmd/govulncheck github.com/securego/gosec/v2/cmd/gosec
+          rm -rf .herramientas
+
       - name: govulncheck
         continue-on-error: true
         working-directory: backend
         run: |
-          go install golang.org/x/vuln/cmd/govulncheck@latest
           govulncheck ./... | tee ../evidence/govulncheck.txt
           govulncheck -format json ./... > ../evidence/govulncheck.json
 
@@ -76,7 +99,7 @@ jobs:
         continue-on-error: true
         working-directory: frontend
         run: |
-          npm install --package-lock-only
+          npm install --package-lock-only --ignore-scripts
           npm audit --json > ../evidence/npm-audit.json || true
           npm audit || true
 
@@ -85,7 +108,6 @@ jobs:
         continue-on-error: true
         working-directory: backend
         run: |
-          go install github.com/securego/gosec/v2/cmd/gosec@latest
           gosec -fmt=json -out=../evidence/gosec.json -stdout ./... || true
 
       - name: Semgrep

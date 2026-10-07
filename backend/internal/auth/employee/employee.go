@@ -103,54 +103,77 @@ func (s *Service) CreateEmployee(ctx context.Context, input Input) (Result, erro
 	}
 	var result Result
 	err = s.repository.WithinEmployeeCreationTransaction(ctx, func(writer store.EmployeeCreationWriter) error {
-		found, validateErr := writer.ValidateRoleNames(ctx, finalRoles)
-		if validateErr != nil {
-			return fmt.Errorf("validate requested roles: %w", validateErr)
-		}
-		if len(found) != len(finalRoles) {
-			return &InvalidInputError{Field: "roles", Detail: "contains an unknown role"}
-		}
-		user, err := writer.CreateUser(ctx, store.CreateUserParams{Email: input.Email, PasswordHash: passwordHash, DisplayName: input.DisplayName})
-		if err != nil {
-			var pgErr interface{ SQLState() string }
-			if errors.As(err, &pgErr) && pgErr.SQLState() == "23505" {
-				return ErrEmailExists
-			}
-			if errors.Is(err, ErrEmailExists) {
-				return ErrEmailExists
-			}
-			return fmt.Errorf("create employee account: %w", err)
-		}
-		for _, role := range finalRoles {
-			if err := writer.AddUserRole(ctx, user.ID, role, input.ActorUserID); err != nil {
-				return fmt.Errorf("assign role %s: %w", role, err)
-			}
-		}
-		rawToken := make([]byte, 32)
-		if _, err := io.ReadFull(s.random, rawToken); err != nil {
-			return fmt.Errorf("generate invitation token: %w", err)
-		}
-		tokenHash := sha256.Sum256(rawToken)
-		expiresAt := s.now().UTC().Add(invitationTTL)
-		if err := writer.CreateInvitationToken(ctx, store.CreateInvitationTokenParams{UserID: user.ID, TokenHash: tokenHash[:], ExpiresAt: expiresAt}); err != nil {
-			return fmt.Errorf("persist invitation token: %w", err)
-		}
-		resourceType, resourceID := "user", user.ID.String()
-		if _, err := writer.InsertAuditEvent(ctx, store.InsertAuditEventParams{ActorUserID: &input.ActorUserID, Action: "employee_created", ResourceType: &resourceType, ResourceID: &resourceID, IP: input.IP, UserAgent: input.UserAgent, Metadata: []byte(`{}`)}); err != nil {
-			return fmt.Errorf("record employee creation audit: %w", err)
-		}
-		event := events.UserInvited{Envelope: events.NewEnvelope(events.TypeUserInvited, "")}
-		event.Data.UserID, event.Data.Email, event.Data.DisplayName, event.Data.InvitationToken, event.Data.ExpiresAt = user.ID, user.Email, user.DisplayName, base64.RawURLEncoding.EncodeToString(rawToken), expiresAt
-		if err := s.publisher.Publish(ctx, events.TypeUserInvited, event); err != nil {
-			return fmt.Errorf("%w: %w", ErrPublish, err)
-		}
-		result = Result{ID: user.ID, Email: user.Email, DisplayName: user.DisplayName, Status: user.Status, Roles: finalRoles, CreatedAt: user.CreatedAt}
-		return nil
+		var err error
+		result, err = s.createWithinTransaction(ctx, writer, input, finalRoles, passwordHash)
+		return err
 	})
 	if err != nil {
 		return Result{}, err
 	}
 	return result, nil
+}
+
+// createWithinTransaction persists the account, its roles, the invitation and
+// the audit entry, and publishes the invitation event before commit.
+func (s *Service) createWithinTransaction(ctx context.Context, writer store.EmployeeCreationWriter, input Input, finalRoles []string, passwordHash string) (Result, error) {
+	found, validateErr := writer.ValidateRoleNames(ctx, finalRoles)
+	if validateErr != nil {
+		return Result{}, fmt.Errorf("validate requested roles: %w", validateErr)
+	}
+	if len(found) != len(finalRoles) {
+		return Result{}, &InvalidInputError{Field: "roles", Detail: "contains an unknown role"}
+	}
+	user, err := writer.CreateUser(ctx, store.CreateUserParams{Email: input.Email, PasswordHash: passwordHash, DisplayName: input.DisplayName})
+	if err != nil {
+		return Result{}, mapCreateUserError(err)
+	}
+	for _, role := range finalRoles {
+		if err := writer.AddUserRole(ctx, user.ID, role, input.ActorUserID); err != nil {
+			return Result{}, fmt.Errorf("assign role %s: %w", role, err)
+		}
+	}
+	event, err := s.issueInvitation(ctx, writer, input, user)
+	if err != nil {
+		return Result{}, err
+	}
+	if err := s.publisher.Publish(ctx, events.TypeUserInvited, event); err != nil {
+		return Result{}, fmt.Errorf("%w: %w", ErrPublish, err)
+	}
+	return Result{ID: user.ID, Email: user.Email, DisplayName: user.DisplayName, Status: user.Status, Roles: finalRoles, CreatedAt: user.CreatedAt}, nil
+}
+
+// mapCreateUserError turns a duplicate-email failure into ErrEmailExists and
+// wraps any other account creation error.
+func mapCreateUserError(err error) error {
+	var pgErr interface{ SQLState() string }
+	if errors.As(err, &pgErr) && pgErr.SQLState() == "23505" {
+		return ErrEmailExists
+	}
+	if errors.Is(err, ErrEmailExists) {
+		return ErrEmailExists
+	}
+	return fmt.Errorf("create employee account: %w", err)
+}
+
+// issueInvitation persists a one-time invitation token, audits the admin as
+// actor and returns the user.invited event carrying the raw token.
+func (s *Service) issueInvitation(ctx context.Context, writer store.EmployeeCreationWriter, input Input, user store.User) (events.UserInvited, error) {
+	rawToken := make([]byte, 32)
+	if _, err := io.ReadFull(s.random, rawToken); err != nil {
+		return events.UserInvited{}, fmt.Errorf("generate invitation token: %w", err)
+	}
+	tokenHash := sha256.Sum256(rawToken)
+	expiresAt := s.now().UTC().Add(invitationTTL)
+	if err := writer.CreateInvitationToken(ctx, store.CreateInvitationTokenParams{UserID: user.ID, TokenHash: tokenHash[:], ExpiresAt: expiresAt}); err != nil {
+		return events.UserInvited{}, fmt.Errorf("persist invitation token: %w", err)
+	}
+	resourceType, resourceID := "user", user.ID.String()
+	if _, err := writer.InsertAuditEvent(ctx, store.InsertAuditEventParams{ActorUserID: &input.ActorUserID, Action: "employee_created", ResourceType: &resourceType, ResourceID: &resourceID, IP: input.IP, UserAgent: input.UserAgent, Metadata: []byte(`{}`)}); err != nil {
+		return events.UserInvited{}, fmt.Errorf("record employee creation audit: %w", err)
+	}
+	event := events.UserInvited{Envelope: events.NewEnvelope(events.TypeUserInvited, "")}
+	event.Data.UserID, event.Data.Email, event.Data.DisplayName, event.Data.InvitationToken, event.Data.ExpiresAt = user.ID, user.Email, user.DisplayName, base64.RawURLEncoding.EncodeToString(rawToken), expiresAt
+	return event, nil
 }
 
 // validate checks the request and returns the deduplicated role set the

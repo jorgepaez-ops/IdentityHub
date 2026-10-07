@@ -85,86 +85,105 @@ func (s *Service) Ensure(ctx context.Context, email string) (Outcome, error) {
 		return "", errors.New("bootstrap administrator service is unavailable")
 	}
 
-	outcome := OutcomeDisabled
-	var invitation *events.UserInvited
+	var result ensureResult
 	err := s.repository.WithinBootstrapAdminTransaction(ctx, func(writer store.BootstrapAdminWriter) error {
-		if err := writer.LockBootstrapAdmin(ctx); err != nil {
-			return err
-		}
-		adminExists, err := writer.NonPendingAdminExists(ctx)
-		if err != nil {
-			return err
-		}
-		if adminExists {
-			outcome = OutcomeAdminExists
-			return nil
-		}
-
-		existing, err := writer.GetUserByEmail(ctx, email)
-		if err == nil {
-			// A pending bootstrap admin that never accepted its invitation would
-			// leave the installation without any way in: replace the invitation.
-			reissue, err := s.isPendingAdmin(ctx, writer, existing)
-			if err != nil {
-				return err
-			}
-			if !reissue {
-				outcome = OutcomeEmailConflict
-				return nil
-			}
-			live, err := writer.HasLiveInvitationToken(ctx, existing.ID)
-			if err != nil {
-				return safeOperationError{message: "bootstrap invitation lookup failed", cause: err}
-			}
-			if live {
-				outcome = OutcomeInvitationPending
-				return nil
-			}
-			if err := writer.InvalidateInvitationTokens(ctx, existing.ID); err != nil {
-				return fmt.Errorf("invalidate old bootstrap invitation tokens: %w", err)
-			}
-			invitation, err = s.invite(ctx, writer, existing, "bootstrap_admin_invitation_reissued")
-			if err != nil {
-				return err
-			}
-			outcome = OutcomeInvitationReissued
-			return nil
-		}
-		if !errors.Is(err, pgx.ErrNoRows) {
-			return safeOperationError{message: "bootstrap account lookup failed", cause: err}
-		}
-
-		placeholder := make([]byte, placeholderPasswordSize)
-		if _, err := io.ReadFull(s.random, placeholder); err != nil {
-			return fmt.Errorf("generate bootstrap placeholder password: %w", err)
-		}
-		passwordHash, err := s.hasher.Hash(base64.RawURLEncoding.EncodeToString(placeholder))
-		if err != nil {
-			return fmt.Errorf("hash bootstrap placeholder password: %w", err)
-		}
-		user, err := writer.CreateUser(ctx, store.CreateUserParams{Email: email, PasswordHash: passwordHash, DisplayName: "Bootstrap Admin"})
-		if err != nil {
-			return safeOperationError{message: "bootstrap administrator creation failed", cause: err}
-		}
-		for _, role := range []string{roles.User, roles.Admin} {
-			if err := writer.AddBootstrapUserRole(ctx, user.ID, role); err != nil {
-				return fmt.Errorf("assign bootstrap role: %w", err)
-			}
-		}
-		invitation, err = s.invite(ctx, writer, user, "bootstrap_admin_created")
-		if err != nil {
-			return err
-		}
-		outcome = OutcomeCreated
-		return nil
+		var err error
+		result, err = s.ensureWithinTransaction(ctx, writer, email)
+		return err
 	})
 	if err != nil {
 		return "", err
 	}
-	if invitation != nil {
-		return s.publishAfterCommit(ctx, outcome, invitation), nil
+	if result.invitation != nil {
+		return s.publishAfterCommit(ctx, result.outcome, result.invitation), nil
 	}
-	return outcome, nil
+	return result.outcome, nil
+}
+
+// ensureResult carries what the Ensure transaction decided: the outcome and,
+// when a fresh invitation was persisted, the event to publish after commit.
+type ensureResult struct {
+	outcome    Outcome
+	invitation *events.UserInvited
+}
+
+// ensureWithinTransaction runs the locked bootstrap decision inside the
+// transaction: no administrator beyond a pending one may exist.
+func (s *Service) ensureWithinTransaction(ctx context.Context, writer store.BootstrapAdminWriter, email string) (ensureResult, error) {
+	if err := writer.LockBootstrapAdmin(ctx); err != nil {
+		return ensureResult{}, err
+	}
+	adminExists, err := writer.NonPendingAdminExists(ctx)
+	if err != nil {
+		return ensureResult{}, err
+	}
+	if adminExists {
+		return ensureResult{outcome: OutcomeAdminExists}, nil
+	}
+
+	existing, err := writer.GetUserByEmail(ctx, email)
+	if err == nil {
+		return s.reissueIfPending(ctx, writer, existing)
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return ensureResult{}, safeOperationError{message: "bootstrap account lookup failed", cause: err}
+	}
+	return s.createBootstrapAdmin(ctx, writer, email)
+}
+
+// reissueIfPending handles an existing account with the bootstrap email.
+func (s *Service) reissueIfPending(ctx context.Context, writer store.BootstrapAdminWriter, existing store.User) (ensureResult, error) {
+	// A pending bootstrap admin that never accepted its invitation would
+	// leave the installation without any way in: replace the invitation.
+	reissue, err := s.isPendingAdmin(ctx, writer, existing)
+	if err != nil {
+		return ensureResult{}, err
+	}
+	if !reissue {
+		return ensureResult{outcome: OutcomeEmailConflict}, nil
+	}
+	live, err := writer.HasLiveInvitationToken(ctx, existing.ID)
+	if err != nil {
+		return ensureResult{}, safeOperationError{message: "bootstrap invitation lookup failed", cause: err}
+	}
+	if live {
+		return ensureResult{outcome: OutcomeInvitationPending}, nil
+	}
+	if err := writer.InvalidateInvitationTokens(ctx, existing.ID); err != nil {
+		return ensureResult{}, fmt.Errorf("invalidate old bootstrap invitation tokens: %w", err)
+	}
+	invitation, err := s.invite(ctx, writer, existing, "bootstrap_admin_invitation_reissued")
+	if err != nil {
+		return ensureResult{}, err
+	}
+	return ensureResult{outcome: OutcomeInvitationReissued, invitation: invitation}, nil
+}
+
+// createBootstrapAdmin creates the invitation-only administrator with an
+// unusable random placeholder password and both bootstrap roles.
+func (s *Service) createBootstrapAdmin(ctx context.Context, writer store.BootstrapAdminWriter, email string) (ensureResult, error) {
+	placeholder := make([]byte, placeholderPasswordSize)
+	if _, err := io.ReadFull(s.random, placeholder); err != nil {
+		return ensureResult{}, fmt.Errorf("generate bootstrap placeholder password: %w", err)
+	}
+	passwordHash, err := s.hasher.Hash(base64.RawURLEncoding.EncodeToString(placeholder))
+	if err != nil {
+		return ensureResult{}, fmt.Errorf("hash bootstrap placeholder password: %w", err)
+	}
+	user, err := writer.CreateUser(ctx, store.CreateUserParams{Email: email, PasswordHash: passwordHash, DisplayName: "Bootstrap Admin"})
+	if err != nil {
+		return ensureResult{}, safeOperationError{message: "bootstrap administrator creation failed", cause: err}
+	}
+	for _, role := range []string{roles.User, roles.Admin} {
+		if err := writer.AddBootstrapUserRole(ctx, user.ID, role); err != nil {
+			return ensureResult{}, fmt.Errorf("assign bootstrap role: %w", err)
+		}
+	}
+	invitation, err := s.invite(ctx, writer, user, "bootstrap_admin_created")
+	if err != nil {
+		return ensureResult{}, err
+	}
+	return ensureResult{outcome: OutcomeCreated, invitation: invitation}, nil
 }
 
 // publishAfterCommit sends the committed invitation. When publishing fails it

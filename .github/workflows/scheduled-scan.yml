@@ -41,7 +41,9 @@ jobs:
         # vulnerabilidades y terminó en éxito).
         shell: bash
         run: |
-          go install golang.org/x/vuln/cmd/govulncheck@latest
+          # Versión fijada en tools/go.mod (sin @versión: go.sum la verifica); se
+          # actualiza con `go get -tool` dentro de tools/, no con @latest.
+          go -C ../tools install golang.org/x/vuln/cmd/govulncheck
           govulncheck ./... | tee /tmp/govulncheck.txt
 
       - name: Abrir una incidencia si aparecen vulnerabilidades nuevas
