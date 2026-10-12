@@ -76,7 +76,7 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
   en `golang.org/x/net` 0.59.0 de `tools/go.mod` (dependencia indirecta de las herramientas de desarrollo);
   subido a 0.60.0. Verificación local: las cuatro herramientas de `tools/` compilan y osv-scanner v2.6.0
   `--recursive --all-vulns` sobre `tools/` y `backend/` da "No issues found".
-- [ ] **C3 — Docker Hub (T17 de `idp-semana-4.md`).** Workflow de release en el tag `vX.Y.Z`: imágenes `api`,
+- [x] **C3 — Docker Hub (T17 de `idp-semana-4.md`).** Workflow de release en el tag `vX.Y.Z`: imágenes `api`,
   `worker` y `web` con `vX.Y.Z` y `latest`, SBOM con Syft y firma con Cosign (ADR 0011), environment
   protegido `dockerhub`. Requiere Q1: namespace y token de Docker Hub del usuario. Se prueba con el tag
   `v0.9.0` (y se borra o se deja marcado como prueba) antes de `v1.0.0`.
@@ -99,8 +99,43 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
     medias si falla el gate de una". Riesgo residual aceptado: un fallo de red durante `publish` aún puede dejar
     una imagen sin subir (se reintenta el job). Verificación: actionlint v1.7.7 con shellcheck 0.10.0 y zizmor
     1.14.2 `--offline`, sin hallazgos.
-  - [ ] PR y merge a `main`; tag de prueba `v0.9.0` sobre el merge; run verde; imágenes, firma y SBOM
-    visibles en Docker Hub (`cosign verify`).
+  - [x] PR y merge a `main`; tag de prueba `v0.9.0` sobre el merge; run verde; imágenes, firma y SBOM
+    visibles en Docker Hub (`cosign verify`). Evidencia (2026-10-12): PR #30 fusionado (`0ea0ea3`, tras el PR
+    #31 con los avisos de arriba); tag anotado `v0.9.0` sobre `0ea0ea3`; run Release
+    [38319904991](https://github.com/jorgepaez-ops/IdentityHub/actions/runs/38319904991) en verde (6 jobs, 1m 38s).
+    Digests: `api` `sha256:52f2988c…86a3`, `worker` `sha256:f9b5443d…d03c`, `web` `sha256:fcca1f1c…6005`
+    (completos en el resumen del run). `cosign verify` y `cosign verify-attestation --type cyclonedx` pasan en
+    las tres con **Cosign v3.0.6**; con Cosign v2.5.3 dan "no signatures found", porque el instalador trae v3 y
+    v3 guarda firma y atestación como OCI referrers (formato bundle), no como etiquetas `.sig`/`.att` (por eso
+    la pestaña Tags de Docker Hub no las muestra). Capturas: informe Desktop, sección "5. C3 — Release v0.9.0
+    en Docker Hub" (7 capturas; vista pública de Docker Hub, sin sesión). Docker Hub queda cerrado (usuario).
+- [ ] **E — Cierre documental (decisión del usuario, 2026-10-12: «solucionemos las bajas»).** El informe
+  técnico se escribió antes de T21a, D1 y C3 y declara pendiente lo que ya está hecho. Hoy, en la rama
+  `docs/cierre-informe`:
+  - [ ] E1 `docs/informe/informe-tecnico.md`: Docker Hub hecho (secciones de alcance, amenazas abiertas
+    AM-008/AM-009/AM-022, fase 5, limitaciones, trabajo futuro, anexos A y B; nota de Cosign v3); quitar las
+    menciones al guion como entregable (el documento se conserva y se puede consultar, pero el informe no lo
+    anuncia); quitar «Q4 abierta / sin validación del docente» (el equipo eligió el lenguaje con la potestad
+    que da el enunciado; no requiere autorización); sacar de trabajo futuro y de desafíos la codificación de
+    los correos (T21a) y la regla de Gitleaks (D1), ya hechas; mencionar los avisos del 2026-10-12 resueltos.
+  - [ ] E2 Revisión de T21 contra el enunciado: bitácora, matriz de trazabilidad, informe de seguridad
+    final; tag de versión y PR quedan para C2.
+  - [ ] E3 Badge de cobertura del README sin servicio externo.
+- [ ] **F — Mejoras de complejidad media y alta (decisión del usuario, 2026-10-12: se anotan hoy y se hacen
+  mañana, 2026-10-13; `v1.0.0` sale después).** Estimación de Claude (2026-10-12):
+  - [ ] F1 RF-019 exportación del audit log en CSV/JSON (media-baja, ~300 líneas: endpoint spec-first sobre el
+    listado existente, botón en la UI, pruebas).
+  - [ ] F2 SMTP autenticado con STARTTLS en el worker y hosts configurables (media, ~400 líneas): hoy
+    `smtp.SendMail` sin TLS (`backend/cmd/worker/main.go:204`) y cliente OAuth/hosts fijos
+    (`backend/internal/config/config.go:66-68`); un `.sh` genera CA y certificado locales (como en el ejemplo
+    de la app de mascotas) y Mailpit exige STARTTLS y autenticación. Hace aplicable la arquitectura de AWS (SES).
+  - [ ] F3 Falco (media, ~300 líneas): servicio en el perfil de observabilidad (modern eBPF), 2-3 reglas propias,
+    falcosidekick hacia Loki y una alerta. Riesgo a verificar primero: soporte en Docker Desktop de macOS.
+  - [ ] F4 RF-018 claves de servicio (media-alta, ~800 líneas): migración, endpoints, hash de la clave,
+    middleware de autenticación por clave, UI de administración, pruebas y E2E.
+  - [ ] F5 Decidir con el usuario: integración de terceros (clientes OAuth en BD, OpenID Connect, refresh tokens
+    por cliente, introspección, revocación) y outbox transaccional (alta, >2 000 líneas). Recomendación de
+    Claude: dejarlo como trabajo futuro justificado (toca el núcleo de autenticación ya probado).
 - [ ] **C2 — Tag `v1.0.0` y release** con el PDF del informe adjunto (`make informe`; el PDF no se
   versiona). En vivo frente al equipo (T21 de `idp-semana-4.md`). Requiere el merge del PR #20.
   Pasos: (1) merge del PR #20 y `main` local al día con CI en verde; (2) `make informe` y revisión del PDF;
@@ -211,7 +246,5 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
 
 ## Siguiente paso
 
-Merge del PR #20 (usuario) y Q1 (credenciales de Docker Hub); luego C3 con `v0.9.0` de prueba y, en vivo, C2
-con `v1.0.0`. Pendientes fuera de C1-C3: grabar el video (Q3) y decidir los hallazgos sueltos sin tarea
-(regla de gitleaks con `\s*`, Trivy 0.56.2 local frente a CI, estilo inline bloqueado por la CSP en
-`/invitations/accept`, complejidad fuera de alcance de C1).
+Hoy (2026-10-12): E1-E3 en la rama `docs/cierre-informe`. Mañana (2026-10-13): F1-F4, decisión de F5 y, al
+final, C2 con `v1.0.0` (imágenes y PDF con el estado final). Pendiente solo del usuario: grabar el video (Q3).
