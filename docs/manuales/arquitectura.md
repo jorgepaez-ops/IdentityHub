@@ -64,7 +64,7 @@ La implementación OAuth es mínima: Contabilidad es el cliente configurado, el 
 | [0011](../../specs/adr/0011-docker-hub-como-registry.md) | Sustituye GHCR por Docker Hub para publicar imágenes versionadas, SBOM y firma; implementado en `release.yml` (tarea C3), validado con el tag `v0.9.0`. |
 | [0012](../../specs/adr/0012-arquitectura-de-referencia-en-aws-con-localstack.md) | Arquitectura de producción de referencia en AWS (ECS Fargate, ALB, RDS, RabbitMQ en ECS, Secrets Manager) en Terraform, validada con LocalStack; la implementación llega en T8-T10. |
 
-El README documenta la elección técnica de Go y sus razones para el proyecto. Sin embargo, `ANALISIS-REQUISITOS.md` identifica Go como una desviación frente a Python/Node y pide validación escrita del docente; la pregunta Q4 de la semana 4 permanece abierta y prevé registrar esa evidencia en un ADR si existe. El repositorio no identifica un aprobador ni aporta esa validación escrita.
+El README y el ADR 0001 documentan la elección técnica de Go y sus razones para el proyecto. El enunciado deja al equipo la libertad de elegir el stack siempre que se cumplan los requisitos de DevSecOps y de gestor de identidad; Python y Node.js eran sugerencias del material del curso, no una restricción, así que la elección no requiere autorización adicional.
 
 ## Diagramas y modelo de amenazas
 

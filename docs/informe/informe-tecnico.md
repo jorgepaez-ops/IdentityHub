@@ -260,7 +260,7 @@ Las 23 amenazas se reparten así: 6 de suplantación (Spoofing), 4 de manipulaci
 
 Nota de transparencia: la especificación original repite el id AM-017 para dos amenazas distintas (códigos MFA y Argon2id como amplificador); el modelo de Threat Dragon las distingue como «AM-017 (MFA)» y «AM-017». Y la compuerta que la especificación cita para AM-014 («Trivy config sobre el compose de producción») no existe, porque Trivy config no analiza archivos de Docker Compose; la evidencia real es la comprobación `docker compose config` de la producción simulada, que confirma que ningún servicio salvo `web` publica puertos.
 
-## Amenazas que siguen abiertas y por qué
+## Amenazas que estaban abiertas y cómo se cerraron
 
 Ninguna de las 23 amenazas queda en estado *Open*. Las tres que lo estaban se cerraron con el workflow de publicación (`release.yml`, tarea C3):
 
