@@ -112,15 +112,38 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
 - [ ] **E — Cierre documental (decisión del usuario, 2026-10-12: «solucionemos las bajas»).** El informe
   técnico se escribió antes de T21a, D1 y C3 y declara pendiente lo que ya está hecho. Hoy, en la rama
   `docs/cierre-informe`:
-  - [ ] E1 `docs/informe/informe-tecnico.md`: Docker Hub hecho (secciones de alcance, amenazas abiertas
+  - [x] E1 `docs/informe/informe-tecnico.md`: Docker Hub hecho (secciones de alcance, amenazas abiertas
     AM-008/AM-009/AM-022, fase 5, limitaciones, trabajo futuro, anexos A y B; nota de Cosign v3); quitar las
     menciones al guion como entregable (el documento se conserva y se puede consultar, pero el informe no lo
     anuncia); quitar «Q4 abierta / sin validación del docente» (el equipo eligió el lenguaje con la potestad
     que da el enunciado; no requiere autorización); sacar de trabajo futuro y de desafíos la codificación de
     los correos (T21a) y la regla de Gitleaks (D1), ya hechas; mencionar los avisos del 2026-10-12 resueltos.
   - [ ] E2 Revisión de T21 contra el enunciado: bitácora, matriz de trazabilidad, informe de seguridad
-    final; tag de versión y PR quedan para C2.
-  - [ ] E3 Badge de cobertura del README sin servicio externo.
+    final; tag de versión y PR quedan para C2. Revisión hecha (explorador Sonnet, 2026-10-12, verificada por
+    Claude en `README.md:20`, `docs/security-report.html:545` y `scripts/traceability.py:5-7`): el enunciado no
+    nombra bitácora, matriz ni PR como requisitos (vienen de T21); sí exige badges de estado, cobertura y versión
+    (§4.1), imágenes en Docker Hub con semver (§3.2) y tabla de hallazgos (§6). Texto desactualizado tras C3:
+    - [ ] `docs/BITACORA.md`: entrada del 2026-10-12 (C3, `v0.9.0`, Cosign v3, PR #30 y #31, F para mañana) y
+      quitar "Docker Hub pendiente" (líneas 17, 35-36, 44-53).
+    - [ ] `docs/security-report.html` (versión 4, 2026-10-06): nota de avisos posteriores sin id (PR #31),
+      procedencia de imágenes (firma Cosign y SBOM atestado, `v0.9.0`) y etiquetas.
+    - [ ] Docker Hub ya no pendiente en `README.md:20`, `docs/README.md:43,77`,
+      `docs/manuales/despliegue-y-operacion.md:3,63,98,113`, `docs/manuales/arquitectura.md:64` y estado de
+      `specs/adr/0011-docker-hub-como-registry.md`; `docs/video/guion.md` sin la escena condicional de T17.
+    - [ ] `scripts/traceability.py:5-7`: la razón de RF-018/RF-019 dice "semana 4"; pasar a la planificación del
+      2026-10-13 y regenerar `specs/07-traceability.md` (no se edita a mano).
+    - [ ] `ANALISIS-REQUISITOS.md` (instantánea del 2026-09-26): aviso de que es histórica.
+    - [ ] Modelo de amenazas: `docs/threat-model/identity-hub.json` y su `README.md` aún dicen *Open* para AM-008,
+      AM-009 y AM-022; el informe ya los da por mitigados con C3.
+    - Para mañana (F6, media): RNF-001, 002, 006, 008 y 010 salen "sin cubrir" en la matriz porque el
+      generador solo cuenta pruebas Go, Gherkin y E2E; enlazarlos con su evidencia de CI (jobs, release).
+  - [x] E3 Badge de cobertura del README sin servicio externo.
+  - Evidencia E1/E3 (2026-10-12): ruta delegada a Sonnet (Codex falló al arrancar: su modelo por defecto
+    `gpt-5.6-sol` no se admite con la cuenta de ChatGPT; job `buk7uj44r`, sin cambios). Informe: alcance, tabla
+    STRIDE (AM-008/009/022 a *Mitigated*), amenazas abiertas, fase 5 (publicación y nota de Cosign v3), fase 6
+    (avisos del PR #31), desafíos, limitaciones, trabajo futuro y anexos A y B; sin Q4 ni guion. README: badge
+    estático del gate de cobertura (≥ 70 %, job 6b). Revisión de Claude sobre el diff; grep de Q4, T17, T20, T21,
+    guion y `cd.yml` sin coincidencias en el informe.
 - [ ] **F — Mejoras de complejidad media y alta (decisión del usuario, 2026-10-12: se anotan hoy y se hacen
   mañana, 2026-10-13; `v1.0.0` sale después).** Estimación de Claude (2026-10-12):
   - [ ] F1 RF-019 exportación del audit log en CSV/JSON (media-baja, ~300 líneas: endpoint spec-first sobre el
