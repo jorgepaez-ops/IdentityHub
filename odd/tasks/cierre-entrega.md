@@ -80,6 +80,27 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
   `worker` y `web` con `vX.Y.Z` y `latest`, SBOM con Syft y firma con Cosign (ADR 0011), environment
   protegido `dockerhub`. Requiere Q1: namespace y token de Docker Hub del usuario. Se prueba con el tag
   `v0.9.0` (y se borra o se deja marcado como prueba) antes de `v1.0.0`.
+  Ruta: inline (Claude, sesión en vivo con el equipo, 2026-10-12; un solo archivo nuevo). Avance:
+  - [x] Q1 resuelta: namespace `jorgeivp` (variable de repo `DOCKERHUB_NAMESPACE`); environment
+    `dockerhub` restringido a tags `v*`; secreto `DOCKERHUB_TOKEN` (PAT Read & Write) cargado por el
+    usuario en ese environment.
+  - [x] `.github/workflows/release.yml` en la rama `feat/c3-docker-hub-release`: solo tags
+    `v[0-9]+.[0-9]+.[0-9]+` (excluye `v0.0.0-vuln-baseline` y `v0.1.0-hardened`); matriz `api`/`worker`/`web`
+    con los mismos targets que CI; gate de Trivy idéntico al de CI antes del push; etiquetas `vX.Y.Z` y
+    `latest` en `docker.io/jorgeivp/identity-hub-<nombre>`; SBOM CycloneDX con Syft; firma y atestación
+    con Cosign keyless sobre el digest. Verificación: actionlint v1.7.7 sin errores; zizmor 1.14.2
+    `--offline` sin hallazgos (se corrigió `persist-credentials: false`). Revisión nativa (4 lentes) aprobada
+    sobre `5cca7f9`, sin bloqueantes.
+  - [x] Corrección de los avisos de la revisión (decisión del usuario, 2026-10-12: un release publica las tres
+    imágenes o ninguna; publicar una sola solo tendría sentido si cada contenedor se versionara aparte).
+    El workflow pasa a dos fases: `gate` construye y escanea las tres y guarda cada imagen como artefacto;
+    `publish` (`needs: gate`, único job con el environment `dockerhub`) carga la misma imagen escaneada, sin
+    reconstruirla, y la sube, firma y atesta. Resuelve "la imagen publicada no es la escaneada" y "release a
+    medias si falla el gate de una". Riesgo residual aceptado: un fallo de red durante `publish` aún puede dejar
+    una imagen sin subir (se reintenta el job). Verificación: actionlint v1.7.7 con shellcheck 0.10.0 y zizmor
+    1.14.2 `--offline`, sin hallazgos.
+  - [ ] PR y merge a `main`; tag de prueba `v0.9.0` sobre el merge; run verde; imágenes, firma y SBOM
+    visibles en Docker Hub (`cosign verify`).
 - [ ] **C2 — Tag `v1.0.0` y release** con el PDF del informe adjunto (`make informe`; el PDF no se
   versiona). En vivo frente al equipo (T21 de `idp-semana-4.md`). Requiere el merge del PR #20.
   Pasos: (1) merge del PR #20 y `main` local al día con CI en verde; (2) `make informe` y revisión del PDF;
