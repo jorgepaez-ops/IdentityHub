@@ -35,7 +35,7 @@ Cierra C3 y la parte documental del cierre. El detalle por tarea y la evidencia 
 
 ### Decisiones tomadas sobre la marcha
 
-- Un release publica las tres imágenes o ninguna, y publica la misma imagen que escaneó el gate (sin reconstruirla).
+- Un release no publica nada si alguna de las tres imágenes falla el gate, y publica la misma imagen que escaneó (sin reconstruirla). Un fallo de red durante `publish` todavía puede dejar una imagen sin subir; su corrección quedó planificada (F8).
 - Cosign v3 guarda la firma y la atestación como referrers OCI (formato bundle), no como etiquetas `.sig`/`.att`: no aparecen en la pestaña Tags de Docker Hub y Cosign v2 no las encuentra.
 
 ### Hallazgos

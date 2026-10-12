@@ -96,7 +96,7 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
     El workflow pasa a dos fases: `gate` construye y escanea las tres y guarda cada imagen como artefacto;
     `publish` (`needs: gate`, único job con el environment `dockerhub`) carga la misma imagen escaneada, sin
     reconstruirla, y la sube, firma y atesta. Resuelve "la imagen publicada no es la escaneada" y "release a
-    medias si falla el gate de una". Riesgo residual aceptado: un fallo de red durante `publish` aún puede dejar
+    medias si falla el gate de una". Riesgo residual (no aceptado por el usuario el 2026-10-12, ver F8): un fallo de red durante `publish` aún puede dejar
     una imagen sin subir (se reintenta el job). Verificación: actionlint v1.7.7 con shellcheck 0.10.0 y zizmor
     1.14.2 `--offline`, sin hallazgos.
   - [x] PR y merge a `main`; tag de prueba `v0.9.0` sobre el merge; run verde; imágenes, firma y SBOM
@@ -167,6 +167,20 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
   - [ ] F5 Decidir con el usuario: integración de terceros (clientes OAuth en BD, OpenID Connect, refresh tokens
     por cliente, introspección, revocación) y outbox transaccional (alta, >2 000 líneas). Recomendación de
     Claude: dejarlo como trabajo futuro justificado (toca el núcleo de autenticación ya probado).
+  - [ ] F6 Matriz: RNF-001, 002, 006, 008 y 010 salen "sin cubrir" porque el generador solo cuenta pruebas Go,
+    Gherkin y E2E; enlazarlos con su evidencia de CI y del release (origen: revisión de E2).
+  - [ ] F7 Release: `latest` solo después de firmar y atestar (decisión del usuario, 2026-10-12: «latest no puede
+    subir antes de la firma»). Hoy `publish` sube `vX.Y.Z` y `latest` y después firma; pasa a subir solo `vX.Y.Z`,
+    firmar y atestar el digest, y recién entonces mover `latest` a ese mismo digest. Se prueba con un tag de
+    validación (`v0.9.1`) antes de `v1.0.0`.
+  - [ ] F8 Release: reintento ante fallos de red en `publish` (push con reintentos acotados) y retención de los
+    artefactos de imagen suficiente para repetir solo el job fallido (hoy 1 día; el usuario no acepta el riesgo).
+  - [ ] F9 VULN-028 (GO-2026-5932): verificado el 2026-10-12 que **no tiene versión corregida ni la tendrá**
+    (osv.dev: afecta a `golang.org/x/crypto` desde la versión 0, sin `fixed`; el paquete `openpgp` está abandonado
+    por diseño). `go list -deps` no encuentra `x/crypto/openpgp` ni en `backend/` ni en las herramientas de
+    `tools/`. Propuesta: reclasificarlo de «riesgo aceptado con fecha» a «no afectado» (código vulnerable no
+    presente), con esa evidencia, en la ficha, el informe, la matriz de hallazgos y `osv-scanner.toml`.
+    Decisión del usuario pendiente.
 - [ ] **C2 — Tag `v1.0.0` y release** con el PDF del informe adjunto (`make informe`; el PDF no se
   versiona). En vivo frente al equipo (T21 de `idp-semana-4.md`). Requiere el merge del PR #20.
   Pasos: (1) merge del PR #20 y `main` local al día con CI en verde; (2) `make informe` y revisión del PDF;
@@ -256,26 +270,17 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
   - Cierre de D (2026-10-07): `make up` con las imágenes de la rama y `make e2e`: 52/52 en verde. Entrega en un PR
     nuevo desde `chore/hallazgos-y-sonar` (el PR #20 se fusionó antes, `3d0de78`, por decisión del usuario).
 
-## Deuda menor (no bloquea la entrega; decidir cuál se atiende)
+## Deuda menor (no bloquea la entrega)
 
-- **SonarCloud en `main` (2026-10-06): 125 code smells.** Principales: S3776 (18, cubiertos en parte por
-  C1), S6819 roles ARIA (15, justificados en P9e), S4666 CSS duplicado (11), S8196 nombres de interfaz
-  (11, convención hexagonal), S108 en código generado (6).
-- **SonarCloud: 20 vulnerabilidades.**
-  - 10 «bloqueantes» `secrets:S6698`/`S6736` en `security/evidence/gitleaks-baseline.json`: credenciales
-    sembradas de la línea base vulnerable, conservadas como evidencia del «antes» de VULN-001; el usuario
-    confirmó (2026-10-06) que ninguna es real ni se reutilizó. Acción: marcarlas en SonarCloud como
-    aceptadas con justificación y sumarlas a «Alertas abiertas conocidas» del `README.md`.
-  - 1 `secrets:S2068` en `.gitleaks.toml:8` (ejemplo de la propia regla): mismo tratamiento.
-  - 9 de cadena de suministro en workflows (reales): `pip`/`npm` sin archivo de bloqueo (S8545, S8543),
-    sin `--ignore-scripts` (S6505, `baseline-scan.yml:79`) y sin `--only-binary :all:` (S8541,
-    `ci.yml:49`). Acción: fijar versiones con hashes o archivos de bloqueo.
-- **Sugerencias menores de revisiones nativas** anotadas en `odd/tasks/pulido-frontend.md` (por ejemplo la
-  prueba del enlace para saltar al contenido, que jsdom no puede simular).
-- **AM-019:** hecho en P9e (alerta y runbook; amenaza mitigada). Nada pendiente.
-- **Falco:** fuera de alcance, documentado en el informe como trabajo futuro.
+- **SonarCloud en `main`: code smells** (125 al 2026-10-06; parte de S3776 cubierta por C1). No bloquean.
+- Las 20 vulnerabilidades de SonarCloud y la cadena de suministro de los workflows quedaron resueltas en D
+  (D4, D5; PR #21). Falco pasó a F3.
+- Sugerencias menores de revisiones nativas en `odd/tasks/pulido-frontend.md`.
 
 ## Siguiente paso
 
-Hoy (2026-10-12): E1-E3 en la rama `docs/cierre-informe`. Mañana (2026-10-13): F1-F4, decisión de F5 y, al
-final, C2 con `v1.0.0` (imágenes y PDF con el estado final). Pendiente solo del usuario: grabar el video (Q3).
+Hecho el 2026-10-12: C3, PR #31 y E1-E3 (rama `docs/cierre-informe`, sin push por decisión del usuario).
+Mañana (2026-10-13): push y PR de `docs/cierre-informe`; F1-F4 y F6-F8; decisiones del usuario sobre F5 y F9;
+al final C2 con `v1.0.0` (imágenes y PDF con el estado final).
+Prerrequisitos: Codex ya no está disponible (suscripción cancelada, 2026-10-12): la delegación va a Sonnet.
+Engram rechazó guardados en la sesión del 2026-10-12; abrir una consola nueva y correr `mem_doctor`.
