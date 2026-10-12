@@ -39,7 +39,7 @@ RUN npm run build
 # ── Imagen final ──────────────────────────────────────────────────────────
 # nginxinc/nginx-unprivileged:stable-alpine — corre como uid 101 por defecto y ya
 # escucha en el puerto 8080 que usa este proyecto, sin cambiar nada más.
-FROM nginxinc/nginx-unprivileged@sha256:15c994d10d6d78658721c3bcafff14cb281fba2a4bdf9d5ba92c416a472516e3 AS web
+FROM nginxinc/nginx-unprivileged@sha256:56b8272e43a0525f67aed68d1e0794a712d10e3e45a563e118e9a77c817e6f86 AS web
 
 COPY frontend/nginx/default.conf /etc/nginx/conf.d/default.conf
 COPY frontend/nginx/security-headers.conf /etc/nginx/security-headers.conf

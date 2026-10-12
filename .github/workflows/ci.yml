@@ -32,7 +32,9 @@ env:
   # corrigen a partir de Go 1.25.13 (decisión Q11 ampliada, 2026-09-21). Subido a
   # 1.26 en T34b (decisión Q11 amendment 2, 2026-09-26, autorizado por el usuario):
   # golang.org/x/crypto >= 0.56.0 (VULN-028) declara "go 1.26.0" en su propio go.mod.
-  GO_VERSION: "1.26"
+  # Parche exacto desde el cierre (2026-10-12): con "1.26", setup-go reutilizaba el
+  # go1.26.8 en caché del runner y govulncheck marcaba los avisos corregidos en 1.26.9.
+  GO_VERSION: "1.26.9"
   NODE_VERSION: "24"
 
 jobs:

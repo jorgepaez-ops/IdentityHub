@@ -61,6 +61,17 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
   release (solo `ci.yml`, `baseline-scan.yml` y `scheduled-scan.yml`); si `v1.0.0` saliera antes de C3, ese
   tag nunca tendría imágenes en Docker Hub y C3 obligaría a un `v1.0.1`. Con el orden nuevo, un solo `v1.0.0`
   publica en vivo el release con el PDF y las imágenes. **Revisarlo con el equipo en la sesión en vivo.**
+- [x] **Avisos nuevos que bloqueaban el release (2026-10-12, vistos en el CI del PR #30 de C3).** Sin id de
+  VULN por decisión del usuario (cierre del proyecto). Publicados después del último CI verde de `main`
+  (2026-10-07): (a) biblioteca estándar de Go en go1.26.8, GO-2026-6603 a GO-2026-6617 en `net/http`,
+  `net/textproto` y `crypto/tls` (govulncheck, job 5) y CVE-2026-78667, CVE-2026-78669 y CVE-2026-97031
+  (Trivy, imágenes `api`/`worker`), corregidos en 1.26.9; (b) `tiff` 4.7.1-r0 en `nginx-unprivileged`,
+  CVE-2026-4775 HIGH (Trivy, imagen `web`), corregido en 4.7.2-r0. Remediación en la rama
+  `fix/go-1.26.9-y-nginx`: `golang:1.26.9-bookworm` y `nginx-unprivileged:stable-alpine` por digest
+  nuevo; `GO_VERSION` de `ci.yml` y `go-version` de `scheduled-scan.yml` fijados a `1.26.9` (con `1.26`,
+  setup-go reutilizaba el go1.26.8 en caché del runner). Ruta: inline (Claude, sesión en vivo).
+  Verificación local: build de `api` y `web`, `go version` de la base = go1.26.9, y Trivy 0.70.0 con el
+  mismo gate de CI (HIGH/CRITICAL corregibles, `security/.trivyignore`) con salida 0 en ambas.
 - [ ] **C3 — Docker Hub (T17 de `idp-semana-4.md`).** Workflow de release en el tag `vX.Y.Z`: imágenes `api`,
   `worker` y `web` con `vX.Y.Z` y `latest`, SBOM con Syft y firma con Cosign (ADR 0011), environment
   protegido `dockerhub`. Requiere Q1: namespace y token de Docker Hub del usuario. Se prueba con el tag
