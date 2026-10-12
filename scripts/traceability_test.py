@@ -105,7 +105,7 @@ class GherkinParserTests(unittest.TestCase):
 
 class DeferredRequirementTests(unittest.TestCase):
     def test_rf018_and_rf019_are_rendered_as_deferred_to_week_4(self) -> None:
-        expected = "Backlog de semana 4 por decisión Q14."
+        expected = "Planificado para el 2026-10-13 (decisión del usuario del 2026-10-12)."
         self.assertEqual(traceability.DEFERRED["RF-018"], expected)
         self.assertEqual(traceability.DEFERRED["RF-019"], expected)
 
@@ -133,10 +133,10 @@ class DeferredRequirementTests(unittest.TestCase):
 
             rendered = traceability.render([])
 
-        self.assertIn("| **RF-018** | Claves de servicio | P2 | — | — | — | — | ⏳ diferido (semana 4) |", rendered)
-        self.assertIn("| **RF-019** | Exportación del audit log | P2 | — | — | — | — | ⏳ diferido (semana 4) |", rendered)
-        self.assertIn("**Resumen:** 2 requisitos · 0 completos · 0 parciales · 0 sin cubrir · 2 diferidos (semana 4).", rendered)
-        self.assertIn("*diferido (semana 4)* = backlog de semana 4 por decisión Q14.", rendered)
+        self.assertIn("| **RF-018** | Claves de servicio | P2 | — | — | — | — | ⏳ diferido (2026-10-13) |", rendered)
+        self.assertIn("| **RF-019** | Exportación del audit log | P2 | — | — | — | — | ⏳ diferido (2026-10-13) |", rendered)
+        self.assertIn("**Resumen:** 2 requisitos · 0 completos · 0 parciales · 0 sin cubrir · 2 diferidos (2026-10-13).", rendered)
+        self.assertIn("*diferido (2026-10-13)* = planificado para el 2026-10-13 por decisión del usuario (2026-10-12).", rendered)
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 # Manual de despliegue y operación
 
-Este manual describe el entorno local actual con Docker Compose. No afirma soporte de producción: la referencia cloud y `docker-compose.prod.yml` se incorporan en las tareas T7–T9 de la semana 4.
+Este manual describe el entorno local actual con Docker Compose. No afirma soporte de producción: la referencia cloud y `docker-compose.prod.yml` ya están incorporadas (referencia cloud como IaC y compose de producción simulada) y las imágenes se publican en Docker Hub con `release.yml`.
 
 ## Inicio rápido
 
@@ -60,7 +60,7 @@ Grafana carga por aprovisionamiento la alerta **DLQ de notificaciones con mensaj
 
 ### Backups, restauración y rotación
 
-No existe un procedimiento versionado de backup/restauración ni de rotación de claves de firma. No los ejecute por suposición. El compose de producción y sus secretos gestionados no existen todavía; corresponden a T7–T9. La publicación y firma de imágenes con Docker Hub llegan en T17.
+No existe un procedimiento versionado de backup/restauración ni de rotación de claves de firma. No los ejecute por suposición. El compose de producción de referencia (`deploy/docker-compose.prod.yml`) existe, pero no hay gestión de secretos de producción. Las imágenes se publican y firman en Docker Hub con `release.yml` (tarea C3).
 
 ## Operaciones comunes
 
@@ -95,7 +95,7 @@ Variables obligatorias en `.env`, además de las del desarrollo (el comando fall
 
 | Variable | Contenido |
 |---|---|
-| `IDENTITY_HUB_API_IMAGE`, `IDENTITY_HUB_WORKER_IMAGE`, `IDENTITY_HUB_WEB_IMAGE` | Digest de cada imagen publicada en Docker Hub (`nombre@sha256:...`). Las publica T17; hasta entonces no hay imágenes que referenciar. |
+| `IDENTITY_HUB_API_IMAGE`, `IDENTITY_HUB_WORKER_IMAGE`, `IDENTITY_HUB_WEB_IMAGE` | Digest de cada imagen publicada en Docker Hub (`nombre@sha256:...`). Las publica `release.yml` en `docker.io/jorgeivp/identity-hub-api`, `identity-hub-worker` e `identity-hub-web` con cada tag `vX.Y.Z` (validado con `v0.9.0`); use el digest de la publicación, que figura en el resumen del run. |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM` | Relay SMTP y remitente de producción. |
 
 Qué cambia frente a desarrollo:
@@ -110,4 +110,4 @@ Límites conocidos:
 
 - Los secretos siguen llegando como variables de entorno desde `.env`: la API no soporta variables `*_FILE`, así que no hay secretos por archivo.
 - El worker envía SMTP sin autenticación ni TLS (`backend/cmd/worker/main.go:198-199`); un relay real exige un cambio de código (misma brecha que el ADR 0012).
-- Hasta T17 no hay imágenes publicadas, de modo que la validación sin arrancar se limita a `docker compose ... config`.
+- Las imágenes ya están publicadas en Docker Hub; sin tener a mano sus digests, la validación sin arrancar se limita a `docker compose ... config`.

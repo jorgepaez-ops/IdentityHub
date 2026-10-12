@@ -109,7 +109,7 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
     v3 guarda firma y atestación como OCI referrers (formato bundle), no como etiquetas `.sig`/`.att` (por eso
     la pestaña Tags de Docker Hub no las muestra). Capturas: informe Desktop, sección "5. C3 — Release v0.9.0
     en Docker Hub" (7 capturas; vista pública de Docker Hub, sin sesión). Docker Hub queda cerrado (usuario).
-- [ ] **E — Cierre documental (decisión del usuario, 2026-10-12: «solucionemos las bajas»).** El informe
+- [x] **E — Cierre documental (decisión del usuario, 2026-10-12: «solucionemos las bajas»).** El informe
   técnico se escribió antes de T21a, D1 y C3 y declara pendiente lo que ya está hecho. Hoy, en la rama
   `docs/cierre-informe`:
   - [x] E1 `docs/informe/informe-tecnico.md`: Docker Hub hecho (secciones de alcance, amenazas abiertas
@@ -118,23 +118,31 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
     anuncia); quitar «Q4 abierta / sin validación del docente» (el equipo eligió el lenguaje con la potestad
     que da el enunciado; no requiere autorización); sacar de trabajo futuro y de desafíos la codificación de
     los correos (T21a) y la regla de Gitleaks (D1), ya hechas; mencionar los avisos del 2026-10-12 resueltos.
-  - [ ] E2 Revisión de T21 contra el enunciado: bitácora, matriz de trazabilidad, informe de seguridad
+  - [x] E2 Revisión de T21 contra el enunciado: bitácora, matriz de trazabilidad, informe de seguridad
     final; tag de versión y PR quedan para C2. Revisión hecha (explorador Sonnet, 2026-10-12, verificada por
     Claude en `README.md:20`, `docs/security-report.html:545` y `scripts/traceability.py:5-7`): el enunciado no
     nombra bitácora, matriz ni PR como requisitos (vienen de T21); sí exige badges de estado, cobertura y versión
     (§4.1), imágenes en Docker Hub con semver (§3.2) y tabla de hallazgos (§6). Texto desactualizado tras C3:
-    - [ ] `docs/BITACORA.md`: entrada del 2026-10-12 (C3, `v0.9.0`, Cosign v3, PR #30 y #31, F para mañana) y
+    - [x] `docs/BITACORA.md`: entrada del 2026-10-12 (C3, `v0.9.0`, Cosign v3, PR #30 y #31, F para mañana) y
       quitar "Docker Hub pendiente" (líneas 17, 35-36, 44-53).
-    - [ ] `docs/security-report.html` (versión 4, 2026-10-06): nota de avisos posteriores sin id (PR #31),
+    - [x] `docs/security-report.html` (versión 4, 2026-10-06): nota de avisos posteriores sin id (PR #31),
       procedencia de imágenes (firma Cosign y SBOM atestado, `v0.9.0`) y etiquetas.
-    - [ ] Docker Hub ya no pendiente en `README.md:20`, `docs/README.md:43,77`,
+    - [x] Docker Hub ya no pendiente en `README.md:20`, `docs/README.md:43,77`,
       `docs/manuales/despliegue-y-operacion.md:3,63,98,113`, `docs/manuales/arquitectura.md:64` y estado de
       `specs/adr/0011-docker-hub-como-registry.md`; `docs/video/guion.md` sin la escena condicional de T17.
-    - [ ] `scripts/traceability.py:5-7`: la razón de RF-018/RF-019 dice "semana 4"; pasar a la planificación del
+    - [x] `scripts/traceability.py:5-7`: la razón de RF-018/RF-019 dice "semana 4"; pasar a la planificación del
       2026-10-13 y regenerar `specs/07-traceability.md` (no se edita a mano).
-    - [ ] `ANALISIS-REQUISITOS.md` (instantánea del 2026-09-26): aviso de que es histórica.
-    - [ ] Modelo de amenazas: `docs/threat-model/identity-hub.json` y su `README.md` aún dicen *Open* para AM-008,
+    - [x] `ANALISIS-REQUISITOS.md` (instantánea del 2026-09-26): aviso de que es histórica.
+    - [x] Modelo de amenazas: `docs/threat-model/identity-hub.json` y su `README.md` aún dicen *Open* para AM-008,
       AM-009 y AM-022; el informe ya los da por mitigados con C3.
+    - Evidencia E2 (2026-10-12): ruta delegada a Sonnet, revisión de Claude. Bitácora con entrada del 2026-10-12;
+      `security-report.html` revisión 2026-10-12 (avisos del PR #31 sin id, procedencia de imágenes, `v0.9.0`);
+      README, `docs/README.md`, manuales, ADR 0011 (estado implementado) y guion sin Docker Hub pendiente; modelo
+      de amenazas con AM-008/009/022 *Mitigated* y `hasOpenThreats` coherente; `ANALISIS-REQUISITOS.md` con aviso
+      histórico (está en `.git/info/exclude`: cambio solo local). Matriz: Claude cambió además las cadenas fijas
+      "diferido (semana 4)" del generador por "diferido (2026-10-13)" (prueba primero: RED con 1 fallo, GREEN con
+      `scripts/traceability_test.py` OK) y regeneró; `python3 scripts/traceability.py --check`: al día;
+      `python3 -m json.tool` sobre el modelo: válido.
     - Para mañana (F6, media): RNF-001, 002, 006, 008 y 010 salen "sin cubrir" en la matriz porque el
       generador solo cuenta pruebas Go, Gherkin y E2E; enlazarlos con su evidencia de CI (jobs, release).
   - [x] E3 Badge de cobertura del README sin servicio externo.

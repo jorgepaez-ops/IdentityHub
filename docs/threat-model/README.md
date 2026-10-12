@@ -21,7 +21,7 @@ Las fronteras señalan dónde cambia la confianza: del navegador a Nginx, de Ngi
 
 ## Registro STRIDE
 
-`Mitigated` indica que la contramedida descrita en el modelo fuente está implementada en el repositorio. `Open` marca las tres amenazas cuya contramedida falta o está incompleta (AM-008, AM-009 y AM-022); cada fila dice qué falta y qué tarea de la semana 4 lo cierra.
+`Mitigated` indica que la contramedida descrita en el modelo fuente está implementada en el repositorio. Ninguna amenaza queda en `Open`: AM-008, AM-009 y AM-022, que lo estaban, pasaron a `Mitigated` con el workflow de publicación `release.yml` (tarea C3, validado con el tag `v0.9.0`).
 
 | Amenaza | Elemento del DFD | Categoría | Estado | Contramedida | Evidencia/especificación |
 |---|---|---|---|---|---|
@@ -33,8 +33,8 @@ Las fronteras señalan dónde cambia la confianza: del navegador a Nginx, de Ngi
 | AM-017 (MFA) | HTTPS: credenciales, MFA y sesión | Spoofing | Mitigated | Desafío SHA-256/HMAC-SHA256, uso único, vencimiento y límites de intentos. | [`threat-model.md`](../../specs/05-security/threat-model.md) — RF-013, RF-014, RF-017 |
 | AM-006 | SQL parametrizado | Tampering | Mitigated | Consultas parametrizadas generadas por `sqlc`. | [`threat-model.md`](../../specs/05-security/threat-model.md) — RF-010 |
 | AM-007 | HTTP interno: `/api` | Tampering | Mitigated | Roles consultados desde la base de datos en peticiones sensibles. | [`threat-model.md`](../../specs/05-security/threat-model.md) — RF-009 |
-| AM-008 | Imagen firmada por digest | Tampering | Open | Firma Cosign keyless y despliegue por digest. Pendiente (T17): todavía no hay firma Cosign ni workflow de despliegue (cd.yml); las imágenes solo se construyen y escanean en CI. | [`threat-model.md`](../../specs/05-security/threat-model.md) — RNF-006 |
-| AM-009 | Imagen firmada por digest | Tampering | Open | SBOM CycloneDX, `osv-scanner`, Dependabot y lockfiles. Parcial: osv-scanner, govulncheck, npm audit y lockfiles activos en CI; falta el SBOM CycloneDX por imagen (T17). | [`threat-model.md`](../../specs/05-security/threat-model.md) — RNF-004 |
+| AM-008 | Imagen firmada por digest | Tampering | Mitigated | Firma Cosign keyless y despliegue por digest. Implementado (C3): el job `publish` de `release.yml` firma cada imagen con Cosign keyless (OIDC de GitHub) sobre el digest; validado con el tag `v0.9.0`. | [`threat-model.md`](../../specs/05-security/threat-model.md) — RNF-006 |
+| AM-009 | Imagen firmada por digest | Tampering | Mitigated | SBOM CycloneDX, `osv-scanner`, Dependabot y lockfiles. Implementado (C3): osv-scanner, govulncheck, npm audit y lockfiles en CI, y SBOM CycloneDX (Syft) adjunto a cada imagen publicada como atestación Cosign. Riesgo residual: VULN-028, aceptado hasta 2026-12-25. | [`threat-model.md`](../../specs/05-security/threat-model.md) — RNF-004 |
 | AM-010 | Evento de auditoría | Repudiation | Mitigated | Audit log append-only con actor, IP y user-agent; sin `UPDATE`/`DELETE`. | [`threat-model.md`](../../specs/05-security/threat-model.md) — RF-011 |
 | AM-011 | Logs estructurados | Repudiation | Mitigated | Rol de aplicación sin borrado y envío de logs a Loki. | [`threat-model.md`](../../specs/05-security/threat-model.md) — RF-011, RNF-007 |
 | AM-012 | Imagen firmada por digest | Information disclosure | Mitigated | Secretos por entorno, sin valores por defecto y `.env` fuera de Git. | [`threat-model.md`](../../specs/05-security/threat-model.md) — RNF-003 |
@@ -47,7 +47,7 @@ Las fronteras señalan dónde cambia la confianza: del navegador a Nginx, de Ngi
 | AM-019 | Cola y DLQ | Denial of service | Mitigated | Regla de alerta de Grafana versionada (`deploy/observability/grafana/alerting/dlq.yml`) que se dispara con cualquier mensaje en `notifications.dlq` durante 2 min (umbral más estricto que el > 10 original: un mensaje ya es un correo perdido) y runbook de atención y purga. | [`runbooks/dlq-notificaciones.md`](../runbooks/dlq-notificaciones.md) — RNF-007 |
 | AM-020 | Artefacto de despliegue | Elevation of privilege | Mitigated | Usuario no-root, capacidades eliminadas, raíz de solo lectura y base distroless. | [`threat-model.md`](../../specs/05-security/threat-model.md) — RNF-008 |
 | AM-021 | HTTP interno: `/api` | Elevation of privilege | Mitigated | Autorización por ruta comprobada del lado del servidor. | [`threat-model.md`](../../specs/05-security/threat-model.md) — RF-009 |
-| AM-022 | Imagen firmada por digest | Elevation of privilege | Open | Permisos mínimos por job y OIDC keyless. Parcial: permisos mínimos por job en ci.yml; la publicación con OIDC keyless en el registry llega con T17. | [`threat-model.md`](../../specs/05-security/threat-model.md) — RNF-006 |
+| AM-022 | Imagen firmada por digest | Elevation of privilege | Mitigated | Permisos mínimos por job y OIDC keyless. Implementado (C3): permisos mínimos por job y el job `publish` de `release.yml`, único con el environment `dockerhub` restringido a tags `v*`, firma con OIDC keyless. | [`threat-model.md`](../../specs/05-security/threat-model.md) — RNF-006 |
 
 ## Nota sobre la evidencia de AM-014
 

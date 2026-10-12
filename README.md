@@ -17,7 +17,7 @@ Identity Hub es un proveedor de identidad desarrollado desde cero, comparable en
 - **Semana 2 cerrada:** 47 de 47 tareas completadas; el tag
   `v0.1.0-hardened` identifica el estado remediado en `main`, con CI verde.
 - **Semana 3 cerrada:** SSO entre dominios, MFA por correo, alta de empleados y frontend funcional.
-- **Semana 4:** documentación, IaC de referencia, grilla de roles, manual, informe y guion terminados; quedan la publicación de Docker Hub (T17), el tag, el release y la grabación del video. El seguimiento está en [`odd/tasks/idp-semana-4.md`](odd/tasks/idp-semana-4.md).
+- **Semana 4:** documentación, IaC de referencia, grilla de roles, manual, informe y guion terminados. Las imágenes ya están publicadas en Docker Hub (`docker.io/jorgeivp/identity-hub-api`, `-worker` y `-web`, firmadas con Cosign y con SBOM adjunto; validadas con el tag `v0.9.0`). Quedan el tag de entrega y el release de GitHub con el informe, y la grabación del video, que hace el equipo. El seguimiento está en [`odd/tasks/idp-semana-4.md`](odd/tasks/idp-semana-4.md).
 
 ## 4. Tecnologías
 

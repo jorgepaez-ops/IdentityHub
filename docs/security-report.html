@@ -532,7 +532,7 @@ footer p { margin-bottom: 0.5rem; }
 <div class="doc">
 
   <header class="masthead">
-    <p class="eyebrow">Identity Hub · Proyecto final de materia · Versión 4</p>
+    <p class="eyebrow">Identity Hub · Proyecto final de materia · Versión 4 · revisión 2026-10-12</p>
     <h1>Informe de seguridad de la línea base</h1>
     <p class="standfirst">
       Qué encontró el pipeline cuando se le dio, a propósito, algo real que
@@ -545,6 +545,7 @@ footer p { margin-bottom: 0.5rem; }
       <div><dt>Remediado</dt><dd>v0.1.0-hardened</dd></div>
       <div><dt>Medido</dt><dd>2026-10-06 · 924b581</dd></div>
       <div><dt>Fichas</dt><dd>31 · 30 remediadas · 1 aceptada</dd></div>
+      <div><dt>Publicado</dt><dd>v0.9.0 · Docker Hub</dd></div>
     </dl>
   </header>
 
@@ -1038,6 +1039,19 @@ trivy image --severity HIGH,CRITICAL identity-hub-api:latest
   </section>
 
   <section>
+    <h2>Revisión del 2026-10-12: avisos posteriores y procedencia de las imágenes</h2>
+    <p class="section-note">
+      La tabla de hallazgos y las cifras de las versiones anteriores no cambian;
+      esta revisión solo añade lo ocurrido después de la medición del 2026-10-06.
+    </p>
+    <ul class="plain">
+      <li><strong>Avisos posteriores a la línea base, sin identificador VULN:</strong> el 2026-10-12, con <code>main</code> en verde desde el 2026-10-07, aparecieron avisos publicados después de ese CI: biblioteca estándar de Go 1.26.8 (<code>net/http</code>, <code>net/textproto</code> y <code>crypto/tls</code>), <code>tiff</code> 4.7.1 en la base <code>nginx-unprivileged</code> (CVE-2026-4775) y <code>golang.org/x/net</code> 0.59.0 en <code>tools/go.mod</code>. Los gates bloquearon el release tal como están diseñados. El PR 31 los resolvió con Go 1.26.9, <code>tiff</code> 4.7.2 y <code>golang.org/x/net</code> 0.60.0. Por decisión del equipo no se les asignó ficha VULN.</li>
+      <li><strong>Procedencia de las imágenes:</strong> <code>release.yml</code> publica <code>api</code>, <code>worker</code> y <code>web</code> en <code>docker.io/jorgeivp/identity-hub-*</code> con las etiquetas <code>vX.Y.Z</code> y <code>latest</code>. Publica la misma imagen que escaneó el gate de Trivy, la firma con Cosign keyless (OIDC de GitHub) sobre el digest y le adjunta un SBOM CycloneDX generado con Syft como atestación. Con ello AM-008, AM-009 y AM-022 pasan a mitigadas; persiste solo el riesgo residual aceptado VULN-028.</li>
+      <li><strong>Tag de validación <code>v0.9.0</code>:</strong> sobre <span class="mono">0ea0ea3</span> (merge del PR 30), run Release 38319904991 en verde (6 jobs). <code>cosign verify</code> y <code>cosign verify-attestation --type cyclonedx</code> pasan sobre las tres imágenes con Cosign v3; Cosign v3 guarda firma y atestación como referrers OCI, así que no aparecen como etiquetas en Docker Hub y Cosign v2 no las encuentra.</li>
+    </ul>
+  </section>
+
+  <section>
     <h2>Limitaciones de este informe</h2>
     <p class="section-note">
       Lo que todavía no se ha medido, dicho antes de que lo pregunte quien lo lea.
@@ -1057,7 +1071,7 @@ trivy image --severity HIGH,CRITICAL identity-hub-api:latest
       Cifras medidas el 2026-09-05 sobre <span class="mono">v0.0.0-vuln-baseline</span>
       (<span class="mono">053e15f</span>). Versión 2: remediación medida el 2026-09-27 sobre
       <span class="mono">c6fa5d6</span>, mismo código que <span class="mono">v0.1.0-hardened</span>
-      (<span class="mono">2ee59e2</span>). Versión 3 (2026-10-05): incorpora VULN-030 y VULN-031, y los gates DAST y E2E verificados en el run 37065094942. Versión 4 final (2026-10-06): VULN-019 queda remediada con el run 37473616659 sobre <span class="mono">924b581</span>; las ocho imágenes del compose pasan de 710 a 108 hallazgos HIGH/CRITICAL.
+      (<span class="mono">2ee59e2</span>). Versión 3 (2026-10-05): incorpora VULN-030 y VULN-031, y los gates DAST y E2E verificados en el run 37065094942. Versión 4 final (2026-10-06): VULN-019 queda remediada con el run 37473616659 sobre <span class="mono">924b581</span>; las ocho imágenes del compose pasan de 710 a 108 hallazgos HIGH/CRITICAL. Revisión 2026-10-12: avisos posteriores sin identificador VULN (PR 31) y procedencia de las imágenes publicadas (tag <span class="mono">v0.9.0</span>, run 38319904991).
     </p>
     <p>
       Documentos relacionados: <span class="mono">specs/05-security/threat-model.md</span> ·
