@@ -104,7 +104,7 @@ class GherkinParserTests(unittest.TestCase):
 
 
 class DeferredRequirementTests(unittest.TestCase):
-    def test_rf018_and_rf019_are_rendered_as_deferred_to_week_4(self) -> None:
+    def test_rf018_and_rf019_are_rendered_as_deferred_with_planned_date(self) -> None:
         expected = "Planificado para el 2026-10-13 (decisión del usuario del 2026-10-12)."
         self.assertEqual(traceability.DEFERRED["RF-018"], expected)
         self.assertEqual(traceability.DEFERRED["RF-019"], expected)
