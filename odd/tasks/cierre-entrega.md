@@ -72,6 +72,10 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
   setup-go reutilizaba el go1.26.8 en caché del runner). Ruta: inline (Claude, sesión en vivo).
   Verificación local: build de `api` y `web`, `go version` de la base = go1.26.9, y Trivy 0.70.0 con el
   mismo gate de CI (HIGH/CRITICAL corregibles, `security/.trivyignore`) con salida 0 en ambas.
+  (c) Visto en el CI del PR #31: osv-scanner marcó los mismos avisos (GO-2026-6603, 6610, 6611, 6612 y 6617)
+  en `golang.org/x/net` 0.59.0 de `tools/go.mod` (dependencia indirecta de las herramientas de desarrollo);
+  subido a 0.60.0. Verificación local: las cuatro herramientas de `tools/` compilan y osv-scanner v2.6.0
+  `--recursive --all-vulns` sobre `tools/` y `backend/` da "No issues found".
 - [ ] **C3 — Docker Hub (T17 de `idp-semana-4.md`).** Workflow de release en el tag `vX.Y.Z`: imágenes `api`,
   `worker` y `web` con `vX.Y.Z` y `latest`, SBOM con Syft y firma con Cosign (ADR 0011), environment
   protegido `dockerhub`. Requiere Q1: namespace y token de Docker Hub del usuario. Se prueba con el tag
