@@ -2,13 +2,19 @@
 #  Release — publica api, worker y web en Docker Hub (ADR 0011, T17 / C3).
 #
 #  Se dispara solo con un tag vX.Y.Z (sin sufijo), así que nunca publica
-#  v0.0.0-vuln-baseline ni v0.1.0-hardened (ADR 0007). Cada imagen pasa el
-#  mismo gate de Trivy que CI antes del push; después se firma con Cosign
-#  keyless (OIDC del workflow) y se le adjunta el SBOM CycloneDX de Syft como
-#  atestación. Etiquetas: vX.Y.Z y latest.
+#  v0.0.0-vuln-baseline ni v0.1.0-hardened (ADR 0007).
+#
+#  Dos fases, para que un release publique las tres imágenes o ninguna:
+#    1. gate    — construye y escanea cada imagen con el mismo gate de Trivy que
+#                 CI y la guarda como artefacto.
+#    2. publish — solo si las tres pasaron: carga la MISMA imagen escaneada (no
+#                 la reconstruye), la sube con vX.Y.Z y latest, la firma con
+#                 Cosign keyless (OIDC del workflow) y le adjunta el SBOM
+#                 CycloneDX de Syft como atestación.
 #
 #  Credenciales: variable DOCKERHUB_NAMESPACE (repo) y secreto DOCKERHUB_TOKEN
-#  (environment protegido "dockerhub", restringido a tags v*).
+#  (environment protegido "dockerhub", restringido a tags v*). La fase 1 no
+#  tiene acceso a ninguno de los dos.
 # ═══════════════════════════════════════════════════════════════════════════
 name: Release
 
@@ -24,14 +30,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  publish:
-    name: Publicar ${{ matrix.name }}
+  gate:
+    name: Construir y escanear ${{ matrix.name }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    environment: dockerhub
     permissions:
       contents: read
-      id-token: write # Cosign keyless
     strategy:
       fail-fast: true
       matrix:
@@ -49,8 +53,7 @@ jobs:
             file: frontend/Dockerfile
             target: web
     env:
-      IMAGE: docker.io/${{ vars.DOCKERHUB_NAMESPACE }}/identity-hub-${{ matrix.name }}
-      VERSION: ${{ github.ref_name }}
+      LOCAL_TAG: identity-hub/${{ matrix.name }}:${{ github.ref_name }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -58,14 +61,14 @@ jobs:
 
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
-      - name: Construir ${{ matrix.name }} (local, para el gate)
+      - name: Construir ${{ matrix.name }}
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.file }}
           target: ${{ matrix.target }}
           load: true
-          tags: ${{ env.IMAGE }}:${{ env.VERSION }}
+          tags: ${{ env.LOCAL_TAG }}
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,scope=${{ matrix.name }},mode=max
 
@@ -73,30 +76,62 @@ jobs:
       - name: Trivy — romper si hay CVE corregibles
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: ${{ env.IMAGE }}:${{ env.VERSION }}
+          image-ref: ${{ env.LOCAL_TAG }}
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           trivyignores: security/.trivyignore
           exit-code: "1"
+
+      - name: Guardar la imagen escaneada
+        run: docker save "${LOCAL_TAG}" -o "image-${{ matrix.name }}.tar"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: image-${{ matrix.name }}
+          path: image-${{ matrix.name }}.tar
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Publicar ${{ matrix.name }}
+    needs: [gate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: dockerhub
+    permissions:
+      contents: read
+      id-token: write # Cosign keyless
+    strategy:
+      fail-fast: false
+      matrix:
+        name: [api, worker, web]
+    env:
+      LOCAL_TAG: identity-hub/${{ matrix.name }}:${{ github.ref_name }}
+      IMAGE: docker.io/${{ vars.DOCKERHUB_NAMESPACE }}/identity-hub-${{ matrix.name }}
+      VERSION: ${{ github.ref_name }}
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: image-${{ matrix.name }}
 
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           username: ${{ vars.DOCKERHUB_NAMESPACE }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Mismo contexto y caché que el paso anterior: Buildx reutiliza las capas ya construidas.
+      # Se sube exactamente la imagen que pasó el gate: se carga del artefacto, no se reconstruye.
       - name: Publicar ${{ matrix.name }}
         id: push
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: ${{ matrix.context }}
-          file: ${{ matrix.file }}
-          target: ${{ matrix.target }}
-          push: true
-          tags: |
-            ${{ env.IMAGE }}:${{ env.VERSION }}
-            ${{ env.IMAGE }}:latest
-          cache-from: type=gha,scope=${{ matrix.name }}
+        run: |
+          docker load -i "image-${{ matrix.name }}.tar"
+          docker tag "${LOCAL_TAG}" "${IMAGE}:${VERSION}"
+          docker tag "${LOCAL_TAG}" "${IMAGE}:latest"
+          docker push "${IMAGE}:${VERSION}"
+          docker push "${IMAGE}:latest"
+          digest="$(docker inspect --format '{{index .RepoDigests 0}}' "${IMAGE}:${VERSION}")"
+          digest="${digest#*@}"
+          [[ "${digest}" == sha256:* ]] || { echo "::error::digest no encontrado"; exit 1; }
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
 
       - name: SBOM CycloneDX (Syft)
         uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3

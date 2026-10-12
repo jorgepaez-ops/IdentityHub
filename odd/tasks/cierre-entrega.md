@@ -74,7 +74,16 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
     con los mismos targets que CI; gate de Trivy idéntico al de CI antes del push; etiquetas `vX.Y.Z` y
     `latest` en `docker.io/jorgeivp/identity-hub-<nombre>`; SBOM CycloneDX con Syft; firma y atestación
     con Cosign keyless sobre el digest. Verificación: actionlint v1.7.7 sin errores; zizmor 1.14.2
-    `--offline` sin hallazgos (se corrigió `persist-credentials: false`).
+    `--offline` sin hallazgos (se corrigió `persist-credentials: false`). Revisión nativa (4 lentes) aprobada
+    sobre `5cca7f9`, sin bloqueantes.
+  - [x] Corrección de los avisos de la revisión (decisión del usuario, 2026-10-12: un release publica las tres
+    imágenes o ninguna; publicar una sola solo tendría sentido si cada contenedor se versionara aparte).
+    El workflow pasa a dos fases: `gate` construye y escanea las tres y guarda cada imagen como artefacto;
+    `publish` (`needs: gate`, único job con el environment `dockerhub`) carga la misma imagen escaneada, sin
+    reconstruirla, y la sube, firma y atesta. Resuelve "la imagen publicada no es la escaneada" y "release a
+    medias si falla el gate de una". Riesgo residual aceptado: un fallo de red durante `publish` aún puede dejar
+    una imagen sin subir (se reintenta el job). Verificación: actionlint v1.7.7 con shellcheck 0.10.0 y zizmor
+    1.14.2 `--offline`, sin hallazgos.
   - [ ] PR y merge a `main`; tag de prueba `v0.9.0` sobre el merge; run verde; imágenes, firma y SBOM
     visibles en Docker Hub (`cosign verify`).
 - [ ] **C2 — Tag `v1.0.0` y release** con el PDF del informe adjunto (`make informe`; el PDF no se
