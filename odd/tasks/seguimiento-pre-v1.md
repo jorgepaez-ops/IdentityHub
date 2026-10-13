@@ -93,6 +93,20 @@ con esos temas abiertos.
   honestos en el informe: RNF-006 verifica al publicar, no al desplegar; RNF-008 solo api/worker/web; RNF-002 sin
   despliegue automatizado. Sin Go tocado (golangci-lint no aplica). `actionlint` limpio, `zizmor` 21 hallazgos (igual
   que HEAD).
+  Correcciones de la revisión nativa de S5/S6 (91404ff, dea7d27, 2840afe, cdafb16, 43556d2):
+  - `e2e/support/logs.ts`: `maxBuffer` de 256 MiB en `docker logs` (91404ff). Se probó acotar con `--since` y se descartó: la
+    API no registra nada por petición y la ventana quedó vacía («api no emitió logs», 2 pruebas rojas); además el chequeo
+    de RNF-012 debe cubrir también la aceptación de la invitación.
+  - RNF-007: playwright ya es `workers: 1`, pero el contador es global al proceso; ahora `>= antes + 1`. Variable `titles` renombrada a `panels` (91404ff).
+  - Job 7: `make load-test` ahora corre bajo `scripts/with-raised-login-limit.sh` como `make e2e` (dea7d27). Comprobado: justo
+    después de `make e2e` (IP con 36 fallos > límite 20) pasó el load test. Actualizados comentario de ci.yml (mismo número de líneas) y guía.
+  - `scripts/load-test.sh`: secretos por nombre (`-e LOAD_PW`), cuenta `load-*` deshabilitada al salir (no se borra: la FK
+    `ON DELETE SET NULL` de `audit_log` es un UPDATE que el disparador append-only rechaza) y rechazo de `docker-compose.prod.yml` (dea7d27).
+  - `auth-latency.js`: constantes con comentario para los reintentos del código MFA y los 2 s de desfase de relojes (dea7d27).
+  - `pipeline_controls_test.py`: `latest` se publica una vez y tras el último sign/attest/verify; gate de release con `exit-code: "1"`;
+    prueba de Dockerfile renombrada a lo que demuestra (2840afe).
+  - `traceability.py`: `verification_errors` comprueba por máquina el `# Verificación:` de cada escenario solo-`@RNF`; RED en copia temporal (cdafb16); README de 06-acceptance actualizado.
+  - Docs: tabla de evidencia de los 8 requisitos en el informe (Fase 4), subsección en la guía (43556d2).
 - [ ] **S7 — Code smells de SonarCloud.** 123 abiertos al 2026-10-13 (CRITICAL 32, MAJOR 55, MINOR 34,
   INFO 2); reglas principales: go:S3776 (16), typescript:S6819 (16), css:S4666 (11), godre:S8196 (10),
   plsql:S1192 (6), python:S3776 (6). Corregir sin cambiar comportamiento, con las pruebas como red; los
