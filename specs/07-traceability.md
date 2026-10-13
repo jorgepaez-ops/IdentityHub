@@ -27,8 +27,8 @@ declaración de buenas intenciones.
 | **RF-015** | Restablecimiento de contraseña | P1 | `requestPasswordReset`, `confirmPasswordReset` | 3 | 33 | 3 | — | ✅ completo |
 | **RF-016** | Sesiones activas | P1 | `listSessions`, `revokeSession` | 1 | 8 | 1 | — | ✅ completo |
 | **RF-017** | Bloqueo por fuerza bruta | P1 | — | 4 | 23 | 1 | — | ✅ completo |
-| **RF-018** | Claves de servicio | P2 | — | — | — | — | — | ⏳ diferido (semana 4) |
-| **RF-019** | Exportación del audit log | P2 | — | — | — | — | — | ⏳ diferido (semana 4) |
+| **RF-018** | Claves de servicio | P2 | — | — | — | — | — | ⏳ diferido (2026-10-13) |
+| **RF-019** | Exportación del audit log | P2 | — | — | — | — | — | ⏳ diferido (2026-10-13) |
 | **RF-020** | Autorización de aplicaciones cliente | P1 | `authorizeClient`, `exchangeAuthorizationCode` | 10 | 31 | 8 | — | ✅ completo |
 | **RF-021** | Roles y permisos configurables por aplicación | P1 | `listApplications`, `listApplicationRoles`, `createApplicationRole`, `updateApplicationRole`, `deleteApplicationRole` | 6 | 31 | 6 | — | ✅ completo |
 | **RNF-001** | Contenerización total | P0 | — | — | — | — | `ci.yml#e2e`, `.github/actions/stack-up/action.yml` | 🟡 parcial |
@@ -44,11 +44,11 @@ declaración de buenas intenciones.
 | **RNF-011** | Los specs son la fuente de verdad | P0 | — | — | 5 | — | `ci.yml#spec-drift` | ✅ completo |
 | **RNF-012** | Logs sin datos sensibles | P0 | — | — | 5 | — | — | 🟡 parcial |
 
-**Resumen:** 33 requisitos · 23 completos · 7 parciales · 1 sin cubrir · 2 diferidos (semana 4).
+**Resumen:** 33 requisitos · 23 completos · 7 parciales · 1 sin cubrir · 2 diferidos (2026-10-13).
 
 Leyenda de estado: *completo* = verificado por al menos dos de las
 cuatro columnas de evidencia (Escenarios, Pruebas Go, E2E, Controles CI) · *parcial* = una sola ·
-*sin cubrir* = ninguna · *diferido (semana 4)* = backlog de semana 4 por decisión Q14.
+*sin cubrir* = ninguna · *diferido (2026-10-13)* = planificado para el 2026-10-13 por decisión del usuario (2026-10-12).
 
 *Controles CI* lista los jobs, pasos o ajustes que hacen cumplir el requisito de forma
 automática (`archivo#sección`). Se declaran en `specs/07-controls.yaml` y `--check` falla
