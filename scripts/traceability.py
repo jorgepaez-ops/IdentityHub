@@ -36,7 +36,6 @@ E2E_TEST = re.compile(r"\btest\(\s*'((?:RNF|RF)-\d{3}[^']*)'\s*,")
 # mantiene diferidos hasta que sus tareas de backend/frontend queden cerradas.
 DEFERRED = {
     "RF-018": "Planificado para el 2026-10-13 (decisión del usuario del 2026-10-12).",
-    "RF-019": "Planificado para el 2026-10-13 (decisión del usuario del 2026-10-12).",
 }
 
 

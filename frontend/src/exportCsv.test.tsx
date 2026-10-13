@@ -10,8 +10,12 @@ const BOM = '﻿'
 
 // jsdom has no object URLs: capture the Blob handed to the anchor and the file name it downloads.
 const downloads: { name: string; text: string }[] = []
+// Each capture gets a generation: a FileReader still running from an earlier test must not
+// push into the array a later test just emptied.
+let generation = 0
 function captureDownloads() {
   downloads.length = 0
+  const current = ++generation
   const blobs = new Map<string, Blob>()
   let next = 0
   Object.assign(URL, {
@@ -26,7 +30,7 @@ function captureDownloads() {
     const blob = blobs.get(this.getAttribute('href') ?? '')
     if (!blob) return
     const reader = new FileReader()
-    reader.onload = () => downloads.push({ name: this.download, text: new TextDecoder('utf-8', { ignoreBOM: true }).decode(reader.result as ArrayBuffer) })
+    reader.onload = () => current === generation && downloads.push({ name: this.download, text: new TextDecoder('utf-8', { ignoreBOM: true }).decode(reader.result as ArrayBuffer) })
     reader.readAsArrayBuffer(blob)
   })
 }
@@ -116,69 +120,81 @@ describe('users CSV export', () => {
 
 const event = (id: number, overrides: Record<string, unknown> = {}) =>
   ({ id, actorUserId: ANA, action: 'login_failed', resourceType: null, resourceId: null, ip: null, userAgent: null, metadata: {}, createdAt: '2026-10-01T10:00:00Z', ...overrides })
-const openAudit = async (items: unknown[], path = '/auditoria') => {
+const exportFile = (body: string, type: string, name: string, truncated = false) =>
+  new Response(body, { status: 200, headers: { 'Content-Type': type, 'Content-Disposition': `attachment; filename="${name}"`, 'X-Export-Truncated': String(truncated) } })
+const exportRoute = (handler: Handler) => ({ 'GET /api/v1/admin/audit-log/export': handler })
+const openAuditWithExport = async (handler: Handler, path = '/auditoria') => {
   goTo(path)
   const api = stubApi({
     ...signedIn(adminUser),
     ...applicationsRoute,
-    'GET /api/v1/admin/audit-log': () => json(200, { items, nextCursor: null }),
+    'GET /api/v1/admin/audit-log': () => json(200, { items: [event(1)], nextCursor: null }),
     [`GET /api/v1/admin/users/${ANA}`]: () => json(200, profile({ id: ANA, email: 'ana@example.test' })),
+    ...exportRoute(handler),
   })
   render(<App />)
-  await screen.findByRole('heading', { name: 'Auditoría' })
+  await screen.findByRole('table', { name: 'Registro de auditoría' })
   return api
 }
+const exportCalls = (api: ReturnType<typeof stubApi>) => api.calls.filter((call) => call.key === 'GET /api/v1/admin/audit-log/export')
 
-describe('audit log CSV export', () => {
-  it('TestRF011_ExportsTheEventsWithTheResolvedActorAndFlatMetadata', async () => {
+describe('audit log server-side export', () => {
+  it('TestRF019_DownloadsTheCsvTheApiBuildsUsingTheServerFileName', async () => {
     captureDownloads()
-    await openAudit([
-      event(1, { resourceType: 'user', resourceId: 'res-1', ip: '10.0.0.1', metadata: { reason: 'bad password', nested: { attempts: 3, note: 'a, b' } } }),
-      event(2, { actorUserId: null, action: 'role_changed' }),
-    ])
-    await screen.findByText('ana@example.test')
-    fireEvent.click(exportButton())
+    const api = await openAuditWithExport(() => exportFile('id,action\r\n1,login_failed\r\n', 'text/csv; charset=utf-8', 'audit-log-20261012T100000Z.csv'))
+    fireEvent.click(screen.getByRole('button', { name: 'Exportar CSV' }))
     const file = await exported()
-    expect(file.name).toBe(`auditoria-${today()}.csv`)
-    expect(file.text.slice(1).split('\r\n')).toEqual([
-      'Fecha,Acción,Actor,Tipo de recurso,ID de recurso,IP,Metadatos',
-      '2026-10-01T10:00:00Z,login_failed,ana@example.test,user,res-1,10.0.0.1,"reason=bad password; nested.attempts=3; nested.note=a, b"',
-      '2026-10-01T10:00:00Z,role_changed,Sistema,,,,',
-      '',
-    ])
-    expect(within(screen.getByRole('status')).getByText('Exportados 2 registros')).toBeInTheDocument()
+    expect(file).toEqual({ name: 'audit-log-20261012T100000Z.csv', text: 'id,action\r\n1,login_failed\r\n' })
+    expect(exportCalls(api).map((call) => call.url)).toEqual(['/api/v1/admin/audit-log/export?format=csv'])
+    expect(await screen.findByText('Exportado CSV con los filtros actuales')).toBeInTheDocument()
   })
 
-  it('TestRF011_ExportsTheActorIdWhileTheEmailIsNotResolved', async () => {
+  it('TestRF019_ExportsJsonWithTheCurrentFiltersAndTheBearerToken', async () => {
     captureDownloads()
-    goTo('/auditoria')
-    stubApi({
-      ...signedIn(adminUser),
-      ...applicationsRoute,
-      'GET /api/v1/admin/audit-log': () => json(200, { items: [event(1)], nextCursor: null }),
-      [`GET /api/v1/admin/users/${ANA}`]: () => json(404, { type: 'about:blank', title: 'Not found', status: 404 }),
-    })
-    render(<App />)
-    await screen.findByRole('table', { name: 'Registro de auditoría' })
-    fireEvent.click(exportButton())
-    expect((await exported()).text).toContain(`login_failed,${ANA},`)
+    const api = await openAuditWithExport(() => exportFile('[]', 'application/json; charset=utf-8', 'audit-log-20261012T100000Z.json'), `/auditoria?accion=login_failed&actor=${ANA}`)
+    fireEvent.click(screen.getByRole('button', { name: 'Exportar JSON' }))
+    expect((await exported()).name).toBe('audit-log-20261012T100000Z.json')
+    const url = new URL(exportCalls(api)[0]!.url, 'http://localhost')
+    expect(url.searchParams.get('format')).toBe('json')
+    expect(url.searchParams.get('action')).toBe('login_failed')
+    expect(url.searchParams.get('actorId')).toBe(ANA)
+    const init = api.fetch.mock.calls.find(([input]) => String(input).startsWith('/api/v1/admin/audit-log/export'))![1]
+    expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer access')
   })
 
-  it('TestRF011_DisablesTheExportWhenThereAreNoEvents', async () => {
-    await openAudit([])
-    await screen.findByText('No hay eventos para los filtros elegidos.')
-    expect(exportButton()).toBeDisabled()
+  it('TestRF019_WarnsWhenTheExportWasTruncated', async () => {
+    captureDownloads()
+    await openAuditWithExport(() => exportFile('[]', 'application/json', 'audit-log-x.json', true))
+    fireEvent.click(screen.getByRole('button', { name: 'Exportar JSON' }))
+    expect(await screen.findByText('Exportación recortada a 10 000 eventos; acota los filtros para el resto')).toBeInTheDocument()
+    expect((await exported()).name).toBe('audit-log-x.json')
   })
 
-  it('TestRF011_WarnsThatOnlyTheLoadedEventsAreExportedWhenThereAreMore', async () => {
-    goTo('/auditoria')
-    stubApi({
-      ...signedIn(adminUser),
-      ...applicationsRoute,
-      'GET /api/v1/admin/audit-log': () => json(200, { items: [event(1)], nextCursor: 'next' }),
-      [`GET /api/v1/admin/users/${ANA}`]: () => json(200, profile({ id: ANA, email: 'ana@example.test' })),
-    })
-    render(<App />)
-    expect(await screen.findByText('Exporta los 1 cargados; carga más para incluir el resto.')).toBeInTheDocument()
+  it('TestRF019_ShowsAnErrorAndDownloadsNothingWhenTheExportFails', async () => {
+    captureDownloads()
+    await openAuditWithExport(() => json(500, { type: 'about:blank', title: 'Internal Server Error', status: 500 }, 'application/problem+json'))
+    fireEvent.click(screen.getByRole('button', { name: 'Exportar CSV' }))
+    expect(await screen.findByText('No fue posible exportar el registro de auditoría. Inténtalo de nuevo.')).toBeInTheDocument()
+    expect(downloads).toHaveLength(0)
+    expect(screen.getByRole('button', { name: 'Exportar CSV' })).toBeEnabled()
+  })
+
+  it('TestRF019_DisablesBothButtonsWhileAnExportIsRunning', async () => {
+    captureDownloads()
+    let release: (response: Response) => void = () => undefined
+    await openAuditWithExport(() => new Promise<Response>((resolve) => { release = resolve }))
+    fireEvent.click(screen.getByRole('button', { name: 'Exportar CSV' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Exportar JSON' })).toBeDisabled())
+    expect(screen.getByRole('button', { name: 'Exportar CSV' })).toBeDisabled()
+    release(exportFile('x', 'text/csv', 'audit-log-x.csv'))
+    await exported()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Exportar JSON' })).toBeEnabled())
+  })
+
+  it('TestRF019_FallsBackToAGenericFileNameWithoutContentDisposition', async () => {
+    captureDownloads()
+    await openAuditWithExport(() => new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    fireEvent.click(screen.getByRole('button', { name: 'Exportar JSON' }))
+    expect((await exported()).name).toBe('auditoria.json')
   })
 })

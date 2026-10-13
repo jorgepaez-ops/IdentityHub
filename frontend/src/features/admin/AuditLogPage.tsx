@@ -3,12 +3,13 @@ import { useSearchParams } from 'react-router-dom'
 import { LoadingSkeleton } from '../../components/LoadingSkeleton'
 import { Toast } from '../../components/Toast'
 import { DownloadIcon } from '../../components/icons'
-import { type AuditEvent, type AuditLogQuery, getUser, listAuditLog } from '../../api/client'
-import { csvFileName, downloadCsv, toCsv } from '../csv'
+import { type AuditEvent, type AuditExportFormat, type AuditLogQuery, exportAuditLog, getUser, listAuditLog } from '../../api/client'
+import { downloadBlob } from '../csv'
 import { formatDate } from '../format'
 import { AUDIT_PARAM, FAILED_SIGN_IN_ACTION, LAST_24H, MFA_CODE_REJECTED_ACTION, Problems, isAuthFailure } from './shared'
 
 const PAGE_SIZE = 50
+const EXPORT_LIMIT = '10 000 eventos'
 const DAY_MS = 24 * 60 * 60 * 1000
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const LOCAL_DATETIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/
@@ -125,6 +126,7 @@ export function AuditLogPage({ onSessionEnded }: Readonly<{ onSessionEnded: () =
   const [error, setError] = useState<string | null>(null)
   const [filterError, setFilterError] = useState<string | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [exporting, setExporting] = useState<AuditExportFormat | null>(null)
   // Bumped by "Filtrar" so re-submitting unchanged filters still reloads (and re-resolves a relative window).
   const [reloads, setReloads] = useState(0)
   const generation = useRef(0)
@@ -204,20 +206,21 @@ export function AuditLogPage({ onSessionEnded }: Readonly<{ onSessionEnded: () =
     }
   }
 
-  // Exports what is loaded under the current filters: fetching every page would contradict D3.
-  const exportEvents = () => {
-    const header = ['Fecha', 'Acción', 'Actor', 'Tipo de recurso', 'ID de recurso', 'IP', 'Metadatos']
-    const rows = (events ?? []).map((item) => [
-      item.createdAt,
-      item.action,
-      item.actorUserId ? actorEmails[item.actorUserId] ?? item.actorUserId : 'Sistema',
-      item.resourceType,
-      item.resourceId,
-      item.ip,
-      Object.keys(item.metadata ?? {}).length === 0 ? '' : metadataEntries(item.metadata).map(([key, text]) => `${key}=${text}`).join('; '),
-    ])
-    downloadCsv(csvFileName('auditoria'), toCsv(header, rows))
-    setToast((current) => ({ text: `Exportados ${rows.length} registros`, id: (current?.id ?? 0) + 1 }))
+  // Asks the API for every event under the applied filters (capped server-side), not just the loaded pages.
+  const exportLog = async (format: AuditExportFormat) => {
+    setExporting(format)
+    setError(null)
+    try {
+      const file = await exportAuditLog(format, toQuery(applied))
+      downloadBlob(file.fileName, file.content)
+      const text = file.truncated ? `Exportación recortada a ${EXPORT_LIMIT}; acota los filtros para el resto` : `Exportado ${format.toUpperCase()} con los filtros actuales`
+      setToast((current) => ({ text, id: (current?.id ?? 0) + 1 }))
+    } catch (reason) {
+      if (isAuthFailure(reason)) onSessionEnded()
+      else setError('No fue posible exportar el registro de auditoría. Inténtalo de nuevo.')
+    } finally {
+      setExporting(null)
+    }
   }
 
   const set = (key: keyof Filters) => (event: React.ChangeEvent<HTMLInputElement>) => setDraft((current) => ({ ...current, [key]: event.target.value }))
@@ -243,9 +246,10 @@ export function AuditLogPage({ onSessionEnded }: Readonly<{ onSessionEnded: () =
           ))}
           <button className="filter-button" type="button" aria-pressed={applied.since === LAST_24H} onClick={toggleLast24h}>Últimas 24 h</button>
         </div>
-        <div className="export-row">
-          <button className="secondary-button fit" type="button" disabled={!events?.length} onClick={exportEvents}><DownloadIcon />Exportar CSV</button>
-          {nextCursor && events && events.length > 0 && <p className="hint">Exporta los {events.length} cargados; carga más para incluir el resto.</p>}
+        <div className="export-row" role="group" aria-label="Exportar registro">
+          <button className="secondary-button fit" type="button" disabled={exporting !== null} onClick={() => void exportLog('csv')}><DownloadIcon />Exportar CSV</button>
+          <button className="secondary-button fit" type="button" disabled={exporting !== null} onClick={() => void exportLog('json')}><DownloadIcon />Exportar JSON</button>
+          <p className="hint">{exporting ? 'Exportando…' : `Exporta todos los eventos que cumplen los filtros aplicados (hasta ${EXPORT_LIMIT}).`}</p>
         </div>
         {filterError && <Problems messages={[filterError]} />}
         {error && <Problems messages={[error]} />}

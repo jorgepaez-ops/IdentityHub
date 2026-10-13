@@ -3,7 +3,7 @@ import { createActiveUser, inviteUser, seedAdmin, strongPassword } from '../supp
 import { api } from '../support/api'
 import { browserLoginWithMfa } from '../support/browser'
 import { contextApi, loginWithMfaContext } from '../support/auth'
-import { contabilidadUrl } from '../support/config'
+import { contabilidadUrl, hubUrl } from '../support/config'
 import { psql } from '../support/db'
 import { mailIds } from '../support/mailpit'
 
@@ -137,4 +137,34 @@ BEGIN
   EXCEPTION WHEN insufficient_privilege THEN NULL;
   END;
 END $$;`)).toBe('')
+})
+
+test('RF-019 Un administrador exporta el registro de auditoría filtrado', async () => {
+  const admin = await seedAdmin()
+  // A login_failed row gives the filter something to find, next to the admin's own successful login events.
+  psql(`INSERT INTO audit_log (action, metadata) VALUES ('login_failed', '{}'::jsonb)`)
+
+  const response = await fetch(`${hubUrl}/api/v1/admin/audit-log/export?format=csv&action=login_failed`, {
+    headers: { Authorization: `Bearer ${admin.accessToken}` },
+  })
+  expect(response.status).toBe(200)
+  expect(response.headers.get('content-type')).toContain('text/csv')
+  expect(response.headers.get('content-disposition')).toMatch(/^attachment; filename="audit-log-\d{8}T\d{6}Z\.csv"$/)
+  const lines = (await response.text()).replace(/^\uFEFF/, '').trim().split('\r\n')
+  expect(lines[0]).toBe('id,created_at,actor_user_id,action,resource_type,resource_id,ip,user_agent,metadata')
+  expect(lines.length).toBeGreaterThan(1)
+  for (const line of lines.slice(1)) expect(line.split(',')[3]).toBe('login_failed')
+
+  const recorded = psql(`SELECT count(*) FROM audit_log WHERE action = 'audit_log_exported' AND metadata->>'format' = 'csv' AND metadata->'filters'->>'action' = 'login_failed'`)
+  expect(Number(recorded)).toBeGreaterThanOrEqual(1)
+})
+
+test('RF-019 Un usuario corriente no puede exportar el registro de auditoría', async ({ playwright }) => {
+  const email = await createActiveUser(await seedAdmin())
+  const session = await loginWithMfaContext(playwright, email, strongPassword)
+
+  expect((await contextApi(session.context, 'GET', '/api/v1/admin/audit-log/export?format=json', {
+    headers: { Authorization: `Bearer ${session.accessToken}` },
+  })).status).toBe(403)
+  await session.context.dispose()
 })

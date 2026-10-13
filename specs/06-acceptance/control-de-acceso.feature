@@ -58,3 +58,17 @@ Característica: Control de acceso por roles
     Dado que existen eventos en el registro de auditoría
     Cuando la aplicación intenta modificar o borrar una entrada
     Entonces la base de datos rechaza la operación por falta de permisos
+
+  @RF-019 @p1
+  Escenario: Un administrador exporta el registro de auditoría filtrado
+    Dado que inicié sesión con una cuenta de rol "admin"
+    Y que existen eventos "login_failed" y otros eventos en el registro de auditoría
+    Cuando exporto el registro de auditoría en CSV filtrado por la acción "login_failed"
+    Entonces recibo un archivo CSV adjunto que contiene solo eventos "login_failed"
+    Y el registro de auditoría guarda el evento "audit_log_exported" con el formato y el filtro usados
+
+  @RF-019 @p1
+  Escenario: Un usuario corriente no puede exportar el registro de auditoría
+    Dado que inicié sesión con una cuenta de rol "user"
+    Cuando exporto el registro de auditoría en JSON
+    Entonces recibo una respuesta 403
