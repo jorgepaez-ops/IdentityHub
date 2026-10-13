@@ -136,7 +136,7 @@ db/          migraciones de PostgreSQL
 deploy/      compose de desarrollo y observabilidad
 docs/        bitácora, diagramas, evidencia e informe
 odd/         tareas y seguimiento de la feature
-scripts/     utilidades, incluida la trazabilidad
+scripts/     utilidades y sus pruebas (ver scripts/README.md)
 security/    fichas y evidencia de seguridad
 specs/       requisitos, contratos, ADR y aceptación
 ```

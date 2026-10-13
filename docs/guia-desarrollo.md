@@ -257,6 +257,9 @@ make load-test   # k6 en un contenedor (imagen fijada por digest); falla si el p
 
 ### Verificar los requisitos no funcionales
 
+El catálogo de cada script y de cada prueba de `scripts/` (quién los llama, entradas, salidas) está en
+[`scripts/README.md`](../scripts/README.md).
+
 Tres comandos, de menor a mayor costo; los tres corren también en CI:
 
 ```bash
