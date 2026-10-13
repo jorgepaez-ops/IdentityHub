@@ -11,7 +11,7 @@ SQLC_VERSION := v1.31.1
 SQLC         ?= sqlc
 
 .DEFAULT_GOAL := help
-.PHONY: help setup up down informe logs ps restart build test test-go test-integration test-front e2e _e2e-run capturas _capturas-run scan-dast _scan-dast-run spec-drift lint fmt gen scan scan-secrets scan-deps scan-image scan-config scan-iac migrate psql rabbit mail clean up-prod down-prod
+.PHONY: help setup up down informe logs ps restart build test test-go test-integration test-front e2e _e2e-run capturas _capturas-run scan-dast _scan-dast-run spec-drift lint fmt gen scan scan-secrets scan-deps scan-image scan-config scan-iac migrate psql rabbit mail clean up-prod down-prod falco-test
 
 help: ## Muestra esta ayuda
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -46,6 +46,17 @@ up-obs: ## Levanta el stack incluida la observabilidad
 
 down: ## Detiene el stack conservando los volúmenes
 	$(COMPOSE_OBS) down
+
+falco-test: ## Dispara eventos inofensivos que activan las reglas de Falco (requiere make up-obs)
+	@$(COMPOSE_OBS) ps --status running --services | grep -qx falco || \
+		{ echo "Falco no esta corriendo: ejecute make up-obs (solo Linux o Docker Desktop con eBPF)"; exit 1; }
+	@echo "Lanzando un contenedor desechable con nombre de servicio de la aplicacion..."
+	@docker run --rm --name identity-hub-falco-test-api-1 --read-only --cap-drop ALL alpine:3.20 \
+		sh -c 'echo prueba > /etc/falco-test 2>/dev/null; wget -q -T 2 -O /dev/null http://1.1.1.1/ 2>/dev/null; true'
+	@echo ""
+	@echo "  Alertas en crudo   $(COMPOSE_OBS) logs falco --since 1m | grep identity-hub-falco-test"
+	@echo "  En Grafana         http://localhost:3000  tablero 'Identity Hub - Seguridad', panel 'Alertas de Falco'"
+	@echo "  En Loki (Explore)  {service=\"falco\"}  (Alloy descubre contenedores cada ~60 s; la alerta de Grafana tarda ~1-2 min)"
 
 clean: ## Detiene el stack y BORRA los volúmenes de datos
 	$(COMPOSE_OBS) down -v

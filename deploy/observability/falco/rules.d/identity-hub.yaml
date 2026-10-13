@@ -1,0 +1,90 @@
+# Reglas de Falco de Identity Hub (control de detección en tiempo de ejecución).
+# Runbook: docs/runbooks/falco-alerta.md
+#
+# Amenaza cubierta: AM-020 (escape de contenedor desde un proceso comprometido). Los contenedores
+# api/worker son distroless (sin shell ni gestor de paquetes), tienen raíz de solo lectura, cap_drop
+# ALL y no-new-privileges: cualquier intento de lo que sigue es anómalo por construcción, así que las
+# reglas no necesitan listas de excepciones largas.
+#
+# Alcance: solo los contenedores api, worker y web del proyecto Compose (nombres
+# <proyecto>-api-1, <proyecto>-worker-1, <proyecto>-web-1). No se cargan las reglas por defecto de
+# Falco: producen falsos positivos con las sondas de salud de otros contenedores (p. ej. pg_isready
+# lee /etc/shadow en la imagen de PostgreSQL) y no distinguen estos servicios.
+
+- macro: ih_app_container
+  condition: >
+    container.id != host and
+    container.name regex "^identity-hub[a-z0-9-]*-(api|worker|web)-[0-9]+$"
+
+- macro: ih_spawned_process
+  condition: evt.type in (execve, execveat)
+
+- list: ih_shell_binaries
+  items: [sh, ash, bash, dash, zsh, ksh, csh, tcsh, fish]
+
+- list: ih_package_managers
+  items: [apk, apt, apt-get, dpkg, yum, dnf, rpm, pip, pip3, npm, yarn, pnpm, curl, wget]
+
+# El entrypoint de nginx-unprivileged es un script de sh (proc.vpid=1) que a su vez lanza subshells.
+# La regex de Falco debe coincidir con el nombre completo (no es una búsqueda parcial).
+# Un shell lanzado por `docker exec` nunca es PID 1 ni hijo de PID 1.
+- macro: ih_web_entrypoint_shell
+  condition: container.name regex "^identity-hub[a-z0-9-]*-web-[0-9]+$" and (proc.vpid = 1 or proc.pvpid = 1)
+
+- rule: Identity Hub shell in application container
+  desc: >
+    Se ejecutó un shell dentro de api, worker o web. Las imágenes de api y worker no incluyen shell,
+    así que solo ocurre si alguien lo inyectó o usó docker exec.
+  condition: >
+    ih_spawned_process and ih_app_container and proc.name in (ih_shell_binaries)
+    and not ih_web_entrypoint_shell
+  output: >
+    Shell spawned in application container (container=%container.name image=%container.image.repository
+    user=%user.name command=%proc.cmdline parent=%proc.pname)
+  priority: WARNING
+  tags: [identity-hub, container, shell, AM-020]
+
+- rule: Identity Hub write to system directory in application container
+  desc: >
+    Intento de abrir para escritura un archivo bajo /etc, /bin, /sbin, /usr o /lib en api, worker o
+    web. La raíz es de solo lectura (read_only: true) y el intento fallará con EROFS, pero la
+    tentativa sigue siendo la señal.
+  condition: >
+    evt.type in (open, openat, openat2) and evt.is_open_write = true
+    and ih_app_container
+    and (evt.arg.name startswith /etc/ or evt.arg.name startswith /bin/ or evt.arg.name startswith /sbin/
+         or evt.arg.name startswith /usr/ or evt.arg.name startswith /lib/)
+  output: >
+    Write attempt below system directory in application container (container=%container.name
+    file=%evt.arg.name result=%evt.res user=%user.name command=%proc.cmdline)
+  priority: WARNING
+  tags: [identity-hub, container, filesystem, AM-020]
+
+- rule: Identity Hub package manager or downloader in application container
+  desc: >
+    Se ejecutó un gestor de paquetes o un descargador (apk, apt, pip, npm, curl, wget...) dentro de
+    api, worker o web: típico de quien prepara herramientas tras comprometer un proceso.
+    Excepción: solo el comando exacto de la sonda de salud de web (frontend/Dockerfile).
+  condition: >
+    ih_spawned_process and ih_app_container and proc.name in (ih_package_managers)
+    and not proc.pname in (ih_package_managers)
+    and not (proc.name = wget and container.name regex "^identity-hub[a-z0-9-]*-web-[0-9]+$" and proc.cmdline = "wget -q -O /dev/null http://127.0.0.1:8080/")
+  output: >
+    Package manager or downloader executed in application container (container=%container.name
+    command=%proc.cmdline parent=%proc.pname user=%user.name)
+  priority: WARNING
+  tags: [identity-hub, container, supply-chain, AM-020]
+
+- rule: Identity Hub outbound connection to public address from application container
+  desc: >
+    api, worker o web abrieron una conexión IPv4 hacia una dirección que no es privada ni loopback.
+    Estos servicios solo hablan con db, broker y mailpit dentro de la red de Compose.
+  condition: >
+    evt.type = connect and evt.res in (SUCCESS, EINPROGRESS) and fd.typechar = 4
+    and ih_app_container
+    and not fd.snet in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "127.0.0.0/8")
+  output: >
+    Outbound connection to public address from application container (container=%container.name
+    connection=%fd.name command=%proc.cmdline user=%user.name)
+  priority: WARNING
+  tags: [identity-hub, container, network, AM-020]

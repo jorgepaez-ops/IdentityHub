@@ -26,7 +26,7 @@ Identity Hub es un proveedor de identidad desarrollado desde cero, comparable en
 | Backend y procesamiento asíncrono | Go 1.26 para API y worker |
 | Frontend | React, TypeScript, Vite y Nginx |
 | Datos y mensajería | PostgreSQL 16, RabbitMQ 4 y Mailpit |
-| Observabilidad | Prometheus, Loki, Grafana Alloy y Grafana |
+| Observabilidad | Prometheus, Loki, Grafana Alloy, Grafana y Falco (detección en tiempo de ejecución) |
 | Seguridad en CI | Gitleaks, CodeQL, Semgrep, gosec mediante golangci-lint, govulncheck, npm audit, osv-scanner, Hadolint y Trivy |
 
 El backend está escrito en Go por decisión del proyecto: el profesor permitió elegir el stack siempre que se cumplieran los requisitos de DevSecOps y de gestor de identidad. Las alternativas mostradas en el material del curso eran sugerencias, no una restricción.

@@ -58,6 +58,16 @@ make logs S=worker
 
 Grafana carga por aprovisionamiento la alerta **DLQ de notificaciones con mensajes** (`deploy/observability/grafana/alerting/dlq.yml`); su procedimiento de atención está en [`../runbooks/dlq-notificaciones.md`](../runbooks/dlq-notificaciones.md).
 
+### Detección en tiempo de ejecución (Falco)
+
+El perfil `observability` también levanta **Falco** (AM-020): observa las llamadas al sistema de los contenedores con el driver modern eBPF y evalúa `deploy/observability/falco/rules.d/identity-hub.yaml` sobre `api`, `worker` y `web` (shell, escritura en directorios del sistema, gestor de paquetes o descargador, conexión saliente a una IP pública). Escribe cada alerta como JSON en su salida estándar; Alloy la envía a Loki con las etiquetas `rule` y `priority`, el tablero «Identity Hub — Seguridad» la muestra y Grafana aprovisiona la alerta **Falco detectó actividad anómala en un contenedor** (`deploy/observability/grafana/alerting/falco.yml`). Atención y triaje en [`../runbooks/falco-alerta.md`](../runbooks/falco-alerta.md).
+
+```bash
+make falco-test   # dispara eventos inofensivos y dice dónde ver la alerta
+```
+
+Falco corre sin `privileged`, solo con las capacidades `BPF`, `PERFMON`, `SYS_RESOURCE` y `SYS_PTRACE`, y monta `/proc` y el socket de Docker en solo lectura. Es un control del stack desplegado: **no forma parte del CI** (los runners de GitHub no ofrecen eBPF equivalente) y requiere un kernel Linux con BTF (Docker Desktop o Linux moderno). La imagen está fijada por digest (0.45.0).
+
 ### Backups, restauración y rotación
 
 No existe un procedimiento versionado de backup/restauración ni de rotación de claves de firma. No los ejecute por suposición. El compose de producción de referencia (`deploy/docker-compose.prod.yml`) existe, pero no hay gestión de secretos de producción. Las imágenes se publican y firman en Docker Hub con `release.yml` (tarea C3).
