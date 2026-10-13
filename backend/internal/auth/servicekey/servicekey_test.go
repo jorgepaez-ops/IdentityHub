@@ -313,8 +313,10 @@ func TestRF018_AnonymousJunkIsLoggedAndNeverWrittenToTheAuditLog(t *testing.T) {
 	}
 	logs.Reset()
 	_, _ = service.Authenticate(context.Background(), "ihk_0000000000000000_"+secret, ScopeAuditLogRead, meta)
-	if !strings.Contains(logs.String(), "public_id=0000000000000000") {
-		t.Fatalf("a well-formed public id should be logged: %q", logs.String())
+	// Even a well-formed public id comes from the request header of an anonymous client: it is
+	// not logged (CodeQL go/log-injection and go/clear-text-logging).
+	if strings.Contains(logs.String(), "public_id") || strings.Contains(logs.String(), "0000000000000000") {
+		t.Fatalf("an unknown public id must not be logged: %q", logs.String())
 	}
 	logs.Reset()
 	_, _ = service.Authenticate(context.Background(), "ihk_garbage", ScopeAuditLogRead, meta)

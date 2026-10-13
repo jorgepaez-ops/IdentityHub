@@ -40,8 +40,8 @@ a la integración todos los permisos de ese admin.
   a una clave existente (secreto incorrecto, revocada, expirada o sin el alcance). Una clave
   malformada o con `public_id` desconocido la puede enviar cualquiera sin autenticarse, y auditarla
   permitiría inflar la tabla `audit_log` sin límite (amplificación de escritura); esos intentos van a
-  un log estructurado (`Warn`, con motivo, alcance, IP y el `public_id` solo si tiene formato válido,
-  nunca el secreto ni la cabecera), que Alloy/Loki ya recogen. Si falla la escritura de auditoría o
+  un log estructurado (`Warn`, con motivo, alcance e IP; ningún dato de la cabecera, ni siquiera el
+  `public_id`, porque proviene de un cliente anónimo), que Alloy/Loki ya recogen. Si falla la escritura de auditoría o
   la de `last_used_at`, se registra en el log (`Error` / `Warn`) y el resultado de la petición no cambia. `last_used_at` se actualiza como máximo una
   vez por minuto para no convertir cada lectura en una escritura.
 - **Límite de peticiones:** no se añade un limitador propio. La adivinanza es inviable (256 bits) y

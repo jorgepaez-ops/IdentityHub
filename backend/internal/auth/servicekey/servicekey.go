@@ -276,13 +276,10 @@ func (s *Service) Authenticate(ctx context.Context, rawKey, requiredScope string
 func (s *Service) auditRejection(ctx context.Context, publicID string, wellFormed bool, reason, scope string, keyID *uuid.UUID, meta RequestMeta) {
 	if keyID == nil {
 		if s.logger != nil {
+			// Nothing taken from the request header is logged: the client is anonymous here.
 			attrs := []any{"event", ActionRejected, "reason", reason, "scope", scope}
 			if meta.IP.IsValid() {
 				attrs = append(attrs, "ip", meta.IP.String())
-			}
-			// Only a well-formed public id (16 hex characters) is logged: anything else is attacker-controlled text.
-			if wellFormed {
-				attrs = append(attrs, "public_id", publicID)
 			}
 			s.logger.Warn("service key rejected", attrs...)
 		}
