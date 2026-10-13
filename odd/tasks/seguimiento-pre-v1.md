@@ -103,6 +103,13 @@ Estrategia: `ask-on-risk` → `stacked-to-main` (usuario, 2026-10-13). Cortes: P
 | S6 | — | pendiente | — | — |
 | S7 | — | pendiente | — | — |
 
+Revisión nativa de S1-S4 (2026-10-13): aprobada (4 lentes, 15 archivos). Correcciones posteriores, también
+aprobadas: identidad de `cosign verify` restringida a `release.yml` en un tag (probada contra `v0.9.1`, y
+rechaza la identidad de `ci.yml`) (`a15ee05`); informe con el clasificador probado y extracto de `release.yml`
+corregido (`f1b60ca`). Advertencia descartada con evidencia: la prueba de puertos sin `.env` pasa en una copia
+limpia con `CI=true` (el compose no usa `env_file` ni interpolación sin `:?`). El rango 161-196 del extracto
+incluye a propósito el comentario de la línea 161 y termina en el último renglón del paso de `latest`.
+
 ## Siguiente paso
 
-S1-S4 (corte PR-A) con un escritor delegado, un commit por tarea.
+PR de documentación (tras la revisión del PDF por el usuario), luego PR-A (S1-S4) y S5-S6.
