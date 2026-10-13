@@ -135,7 +135,7 @@ Cierra el trabajo verificable de la semana 4 antes de la publicación en Docker 
 
 ### Estado
 
-- Al cierre de esta entrada estaban pendientes T17 (publicación en Docker Hub), el tag `vX.Y.Z` y el release de GitHub con el PDF adjunto. *Actualización 2026-10-12: Docker Hub quedó hecho con C3; tag y release siguen pendientes.*
+- Al cierre de esta entrada estaban pendientes T17 (publicación en Docker Hub), el tag `vX.Y.Z` y el release de GitHub con el PDF adjunto. *Actualización 2026-10-12: Docker Hub quedó hecho con C3; tag y release siguen pendientes. Actualización 2026-10-13: tag `v1.0.0` y release publicados, con el PDF adjunto.*
 - La grabación del video sigue pendiente; el guion de 13 minutos está listo.
 
 ### Siguiente paso
