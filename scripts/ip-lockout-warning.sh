@@ -25,6 +25,7 @@ window_minutes="${LOGIN_FAILURE_WINDOW_MINUTES:-15}"
 
 case "$limit$window_minutes" in
   '' | *[!0-9]*) exit 0 ;;
+  *) ;;
 esac
 
 # Para cada IP en o sobre el límite: cuántos fallos tiene y en cuántos segundos el fallo número
@@ -52,14 +53,16 @@ SQL
   exit 0
 }
 
-[ -n "$rows" ] || exit 0
+[[ -n "$rows" ]] || exit 0
 
 local_time() { # $1 = segundos desde ahora
-  date -v+"$1"S +%H:%M 2>/dev/null || date -d "+$1 seconds" +%H:%M 2>/dev/null || echo '?'
+  local seconds_from_now="$1"
+  date -v+"${seconds_from_now}"S +%H:%M 2>/dev/null || date -d "+${seconds_from_now} seconds" +%H:%M 2>/dev/null || echo '?'
+  return 0
 }
 
 while read -r ip count seconds; do
-  [ -n "$ip" ] || continue
+  [[ -n "$ip" ]] || continue
   minutes=$(((seconds + 59) / 60))
   {
     echo "AVISO: la IP $ip tiene $count fallos de login en los últimos ${window_minutes} min (límite: $limit)."

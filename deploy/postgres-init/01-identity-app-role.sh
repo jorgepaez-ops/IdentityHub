@@ -7,7 +7,7 @@
 # recrearlo una vez (docker compose down -v) para que este script corra.
 set -euo pipefail
 
-if [ -z "${IDENTITY_APP_PASSWORD:-}" ]; then
+if [[ -z "${IDENTITY_APP_PASSWORD:-}" ]]; then
     echo "01-identity-app-role.sh: IDENTITY_APP_PASSWORD no está definida, abortando" >&2
     exit 1
 fi
