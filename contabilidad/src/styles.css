@@ -56,7 +56,7 @@ button:disabled { cursor: not-allowed; opacity: .6; }
 .login-card .muted { margin: 0 0 1rem; }
 .brand-mark { width: 3.25rem; height: 3.25rem; display: grid; place-items: center; border-radius: .9rem; background: var(--accent); color: var(--accent-ink); font-family: var(--display); font-weight: 600; font-size: 1.6rem; margin: 0 auto 1rem; box-shadow: var(--shadow); }
 .brand-mark.small { width: 2rem; height: 2rem; font-size: 1.1rem; margin: 0; border-radius: .55rem; }
-.validating { display: flex; align-items: center; justify-content: center; gap: .6rem; color: var(--muted); }
+.validating { margin: 1rem 0; display: flex; align-items: center; justify-content: center; gap: .6rem; color: var(--muted); }
 .pulse { width: .65rem; height: .65rem; border-radius: 50%; background: var(--accent); animation: pulse 1.2s ease-in-out infinite; }
 @keyframes pulse { 50% { opacity: .25; transform: scale(.8); } }
 @media (prefers-reduced-motion: reduce) { .pulse { animation: none; } * { transition: none !important; } }
@@ -130,7 +130,7 @@ th[aria-sort] .sort-arrow { opacity: 1; color: var(--accent); }
 .empty-state { display: grid; justify-items: center; gap: .75rem; padding: 2rem 1rem; text-align: center; color: var(--muted); }
 .empty-state p { margin: 0; }
 .dialog-backdrop { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 1rem; background: rgb(0 0 0 / 45%); }
-.dialog { width: min(100%, 26rem); margin: 0; }
+.dialog { position: static; width: min(100%, 26rem); max-width: none; height: auto; max-height: none; margin: 0; color: inherit; }
 .dialog h2 { margin: 0 0 .5rem; font-family: var(--display); font-size: 1.25rem; }
 .dialog p { margin: 0 0 1.25rem; }
 .dialog-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: .6rem; }

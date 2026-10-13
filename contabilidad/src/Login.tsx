@@ -12,7 +12,7 @@ export function LoginScreen({ state, onContinue }: Readonly<{ state: LoginState;
         <div className="brand-mark" aria-hidden="true">C</div>
         <h1 id="login-title">Contabilidad</h1>
         {state.kind === 'validating' ? (
-          <p className="validating" role="status"><span className="pulse" aria-hidden="true" />Validando con Identity Hub…</p>
+          <output className="validating"><span className="pulse" aria-hidden="true" />Validando con Identity Hub…</output>
         ) : (
           <>
             <p className="muted">Inicia sesión con tu cuenta de Identity Hub. Esta aplicación no tiene usuarios propios.</p>

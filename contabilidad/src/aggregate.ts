@@ -45,7 +45,7 @@ export function totalsByMonth(movements: Movement[]): MonthTotal[] {
   const keys = movements.map((movement) => movement.date.slice(0, 7)).filter((key) => MONTH_KEY.test(key)).sort((a, b) => a.localeCompare(b))
   if (keys.length === 0) return []
   const first = keys[0] as string
-  const last = keys[keys.length - 1] as string
+  const last = keys.at(-1) as string
   const result: MonthTotal[] = []
   for (let month = first; month <= last; month = nextMonth(month)) {
     const matching = movements.filter((movement) => movement.date.startsWith(month))

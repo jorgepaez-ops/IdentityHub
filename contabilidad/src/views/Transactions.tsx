@@ -26,12 +26,25 @@ const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
   { value: 'rejected', label: STATUS_LABEL.rejected },
 ]
 
+interface SortState { key: SortKey; direction: SortDirection }
+
+/** Clicking the active column flips its direction; any other column starts at its natural one. */
+function nextDirection(current: SortState, key: SortKey): SortDirection {
+  if (current.key !== key) return FIRST_DIRECTION[key]
+  return current.direction === 'ascending' ? 'descending' : 'ascending'
+}
+
+function sortArrow(sort: SortState, key: SortKey): string {
+  if (sort.key !== key) return '↕'
+  return sort.direction === 'ascending' ? '↑' : '↓'
+}
+
 export function TransactionsView({ access, movements, onDecide, onRegister }: Readonly<Props>) {
   const [adding, setAdding] = useState(false)
   const [text, setText] = useState('')
   const [status, setStatus] = useState<StatusFilter>('all')
   const [category, setCategory] = useState('')
-  const [sort, setSort] = useState<{ key: SortKey; direction: SortDirection }>({ key: 'date', direction: 'descending' })
+  const [sort, setSort] = useState<SortState>({ key: 'date', direction: 'descending' })
   const [deciding, setDeciding] = useState<{ movement: Movement; decision: Decision } | null>(null)
   const table = useRef<HTMLTableElement>(null)
   if (access.level === 'none') return null
@@ -45,11 +58,11 @@ export function TransactionsView({ access, movements, onDecide, onRegister }: Re
     setStatus('all')
     setCategory('')
   }
-  const sortBy = (key: SortKey) => setSort((current) => ({ key, direction: current.key === key ? (current.direction === 'ascending' ? 'descending' : 'ascending') : FIRST_DIRECTION[key] }))
+  const sortBy = (key: SortKey) => setSort((current) => ({ key, direction: nextDirection(current, key) }))
   const ariaSort = (key: SortKey) => (sort.key === key ? sort.direction : undefined)
   const sortHeader = (key: SortKey, label: string, className?: string) => (
     <th scope="col" className={className} aria-sort={ariaSort(key)}>
-      <button className="sort-button" type="button" onClick={() => sortBy(key)}>{label}<span className="sort-arrow" aria-hidden="true">{sort.key === key ? (sort.direction === 'ascending' ? '↑' : '↓') : '↕'}</span></button>
+      <button className="sort-button" type="button" onClick={() => sortBy(key)}>{label}<span className="sort-arrow" aria-hidden="true">{sortArrow(sort, key)}</span></button>
     </th>
   )
 

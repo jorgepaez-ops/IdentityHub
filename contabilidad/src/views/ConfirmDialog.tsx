@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useId, useRef, type ReactNode } from 'react'
 
 interface Props {
   title: string
@@ -24,7 +24,8 @@ function tabWrapTarget(items: HTMLElement[], current: Element | null, backwards:
 export function ConfirmDialog({ title, children, confirmLabel, tone, onConfirm, onCancel, fallbackFocus }: Readonly<Props>) {
   const titleId = useId()
   const bodyId = useId()
-  const dialog = useRef<HTMLDivElement>(null)
+  const backdrop = useRef<HTMLDivElement>(null)
+  const dialog = useRef<HTMLDialogElement>(null)
   const cancel = useRef<HTMLButtonElement>(null)
 
   const fallback = useRef(fallbackFocus)
@@ -42,30 +43,48 @@ export function ConfirmDialog({ title, children, confirmLabel, tone, onConfirm, 
     }
   }, [])
 
-  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Escape') {
-      event.stopPropagation()
-      onCancel()
-      return
+  // The latest onCancel is kept in a ref so the listeners below attach once.
+  const cancelHandler = useRef(onCancel)
+  cancelHandler.current = onCancel
+
+  // Native listeners: the dialog is a real <dialog>, so keyboard and outside-click handling attach to the DOM nodes.
+  useEffect(() => {
+    const dialogNode = dialog.current
+    const backdropNode = backdrop.current
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.stopPropagation()
+        cancelHandler.current()
+        return
+      }
+      if (event.key !== 'Tab' || !dialogNode) return
+      const items = [...dialogNode.querySelectorAll<HTMLElement>(FOCUSABLE)]
+      const wrapTo = tabWrapTarget(items, document.activeElement, event.shiftKey)
+      if (!wrapTo) return
+      event.preventDefault()
+      wrapTo.focus()
     }
-    if (event.key !== 'Tab' || !dialog.current) return
-    const items = [...dialog.current.querySelectorAll<HTMLElement>(FOCUSABLE)]
-    const wrapTo = tabWrapTarget(items, document.activeElement, event.shiftKey)
-    if (!wrapTo) return
-    event.preventDefault()
-    wrapTo.focus()
-  }
+    const onBackdropMouseDown = (event: MouseEvent) => {
+      if (event.target === event.currentTarget) cancelHandler.current()
+    }
+    dialogNode?.addEventListener('keydown', onKeyDown)
+    backdropNode?.addEventListener('mousedown', onBackdropMouseDown)
+    return () => {
+      dialogNode?.removeEventListener('keydown', onKeyDown)
+      backdropNode?.removeEventListener('mousedown', onBackdropMouseDown)
+    }
+  }, [])
 
   return (
-    <div className="dialog-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onCancel() }}>
-      <div className="dialog card" ref={dialog} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={bodyId} onKeyDown={onKeyDown}>
+    <div className="dialog-backdrop" ref={backdrop}>
+      <dialog className="dialog card" ref={dialog} open aria-modal="true" aria-labelledby={titleId} aria-describedby={bodyId}>
         <h2 id={titleId}>{title}</h2>
         <p id={bodyId}>{children}</p>
         <div className="dialog-actions">
           <button className="secondary-button" type="button" ref={cancel} onClick={onCancel}>Cancelar</button>
           <button className={`primary-button ${tone}`} type="button" onClick={onConfirm}>{confirmLabel}</button>
         </div>
-      </div>
+      </dialog>
     </div>
   )
 }

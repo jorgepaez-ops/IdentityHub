@@ -46,6 +46,44 @@ function takeStoredFlow() {
   return flow
 }
 
+async function exchangeCode(code: string, verifier: string): Promise<string> {
+  try {
+    const response = await fetch(`${HUB_ORIGIN}/oauth/token`, {
+      method: 'POST',
+      credentials: 'omit',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: redirectUri(),
+        client_id: CLIENT_ID,
+        code_verifier: verifier,
+      }).toString(),
+    })
+    if (!response.ok) throw new Error(`token endpoint answered ${response.status}`)
+    const body: unknown = await response.json()
+    const candidate = (body as { access_token?: unknown } | null)?.access_token
+    if (typeof candidate !== 'string' || candidate === '') throw new Error('token response without access_token')
+    return candidate
+  } catch (reason) {
+    throw new CallbackError('exchange', reason instanceof Error ? reason.message : 'token exchange failed')
+  }
+}
+
+async function fetchJwks(): Promise<Jwks> {
+  try {
+    const response = await fetch(`${HUB_ORIGIN}/.well-known/jwks.json`, { credentials: 'omit' })
+    if (!response.ok) throw new Error(`jwks answered ${response.status}`)
+    const body: unknown = await response.json()
+    if (typeof body !== 'object' || body === null || !Array.isArray((body as { keys?: unknown }).keys)) {
+      throw new Error('jwks response without keys array')
+    }
+    return body as Jwks
+  } catch (reason) {
+    throw new CallbackError('hub_unavailable', reason instanceof Error ? reason.message : 'JWKS retrieval failed')
+  }
+}
+
 /**
  * Finishes the authorization code flow. The authorization code and state are
  * removed from the address bar before anything asynchronous happens, and the
@@ -64,41 +102,8 @@ export async function completeCallback(search: string): Promise<Session> {
   const code = params.get('code')
   if (!code) throw new CallbackError('exchange', 'missing authorization code')
 
-  let accessToken: string
-  try {
-    const response = await fetch(`${HUB_ORIGIN}/oauth/token`, {
-      method: 'POST',
-      credentials: 'omit',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        grant_type: 'authorization_code',
-        code,
-        redirect_uri: redirectUri(),
-        client_id: CLIENT_ID,
-        code_verifier: stored.verifier,
-      }).toString(),
-    })
-    if (!response.ok) throw new Error(`token endpoint answered ${response.status}`)
-    const body: unknown = await response.json()
-    const candidate = (body as { access_token?: unknown } | null)?.access_token
-    if (typeof candidate !== 'string' || candidate === '') throw new Error('token response without access_token')
-    accessToken = candidate
-  } catch (reason) {
-    throw new CallbackError('exchange', reason instanceof Error ? reason.message : 'token exchange failed')
-  }
-
-  let jwks: Jwks
-  try {
-    const response = await fetch(`${HUB_ORIGIN}/.well-known/jwks.json`, { credentials: 'omit' })
-    if (!response.ok) throw new Error(`jwks answered ${response.status}`)
-    const body: unknown = await response.json()
-    if (typeof body !== 'object' || body === null || !Array.isArray((body as { keys?: unknown }).keys)) {
-      throw new Error('jwks response without keys array')
-    }
-    jwks = body as Jwks
-  } catch (reason) {
-    throw new CallbackError('hub_unavailable', reason instanceof Error ? reason.message : 'JWKS retrieval failed')
-  }
+  const accessToken = await exchangeCode(code, stored.verifier)
+  const jwks = await fetchJwks()
 
   try {
     const verified = await verifyAccessToken(accessToken, jwks, { issuer: ISSUER, audience: AUDIENCE })
