@@ -104,14 +104,13 @@ class GherkinParserTests(unittest.TestCase):
 
 
 class DeferredRequirementTests(unittest.TestCase):
-    def test_rf018_and_rf019_are_rendered_as_deferred_to_week_4(self) -> None:
+    def test_rf018_is_rendered_as_deferred_to_week_4_and_rf019_is_not(self) -> None:
         expected = "Backlog de semana 4 por decisión Q14."
         self.assertEqual(traceability.DEFERRED["RF-018"], expected)
-        self.assertEqual(traceability.DEFERRED["RF-019"], expected)
+        self.assertNotIn("RF-019", traceability.DEFERRED)
 
         requirements = {
             "RF-018": ("Claves de servicio", "P2"),
-            "RF-019": ("Exportación del audit log", "P2"),
         }
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory)
@@ -134,8 +133,7 @@ class DeferredRequirementTests(unittest.TestCase):
             rendered = traceability.render([])
 
         self.assertIn("| **RF-018** | Claves de servicio | P2 | — | — | — | — | ⏳ diferido (semana 4) |", rendered)
-        self.assertIn("| **RF-019** | Exportación del audit log | P2 | — | — | — | — | ⏳ diferido (semana 4) |", rendered)
-        self.assertIn("**Resumen:** 2 requisitos · 0 completos · 0 parciales · 0 sin cubrir · 2 diferidos (semana 4).", rendered)
+        self.assertIn("**Resumen:** 1 requisitos · 0 completos · 0 parciales · 0 sin cubrir · 1 diferidos (semana 4).", rendered)
         self.assertIn("*diferido (semana 4)* = backlog de semana 4 por decisión Q14.", rendered)
 
 

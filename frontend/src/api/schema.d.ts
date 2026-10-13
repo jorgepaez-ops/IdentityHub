@@ -393,6 +393,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/audit-log/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Exportar el registro de auditoría filtrado en CSV o JSON
+         * @description Aplica los mismos filtros que el listado y devuelve como máximo 10 000 eventos, del más reciente
+         *     al más antiguo, como descarga (Content-Disposition: attachment). Si había más, la cabecera
+         *     X-Export-Truncated vale true. Las celdas CSV que empiezan por = + - @, tabulador o retorno de carro
+         *     se neutralizan con una comilla simple (inyección de fórmulas). La exportación queda registrada
+         *     en el propio registro de auditoría (audit_log_exported) con el formato y los filtros usados.
+         */
+        get: operations["exportAuditLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/applications": {
         parameters: {
             query?: never;
@@ -745,6 +769,7 @@ export interface components {
         Action: string;
         ActorId: string;
         Since: string;
+        ExportFormat: "csv" | "json";
         Limit: number;
         Cursor: string;
     };
@@ -1410,6 +1435,39 @@ export interface operations {
                     "application/json": components["schemas"]["AuditLogPage"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    exportAuditLog: {
+        parameters: {
+            query: {
+                format: components["parameters"]["ExportFormat"];
+                action?: components["parameters"]["Action"];
+                actorId?: components["parameters"]["ActorId"];
+                since?: components["parameters"]["Since"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Archivo con los eventos filtrados */
+            200: {
+                headers: {
+                    /** @description attachment con un nombre que incluye la marca de tiempo */
+                    "Content-Disposition"?: string;
+                    /** @description true si el filtro tenía más de 10 000 eventos y la exportación se recortó */
+                    "X-Export-Truncated"?: "true" | "false";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                    "application/json": components["schemas"]["AuditEvent"][];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
         };

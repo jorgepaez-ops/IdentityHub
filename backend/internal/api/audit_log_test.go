@@ -13,9 +13,18 @@ import (
 )
 
 type auditLogServiceStub struct {
-	input  auditlog.ListInput
-	events []auditlog.Event
-	err    error
+	input   auditlog.ListInput
+	events  []auditlog.Event
+	err     error
+	export  auditlog.ExportInput
+	exports int
+	result  auditlog.ExportResult
+}
+
+func (s *auditLogServiceStub) Export(ctx context.Context, input auditlog.ExportInput) (auditlog.ExportResult, error) {
+	s.export = input
+	s.exports++
+	return s.result, s.err
 }
 
 func (s *auditLogServiceStub) List(ctx context.Context, input auditlog.ListInput) ([]auditlog.Event, error) {

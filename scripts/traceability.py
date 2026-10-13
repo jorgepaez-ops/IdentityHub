@@ -33,7 +33,6 @@ E2E_TEST = re.compile(r"\btest\(\s*'((?:RNF|RF)-\d{3}[^']*)'\s*,")
 # mantiene diferidos hasta que sus tareas de backend/frontend queden cerradas.
 DEFERRED = {
     "RF-018": "Backlog de semana 4 por decisión Q14.",
-    "RF-019": "Backlog de semana 4 por decisión Q14.",
 }
 
 
