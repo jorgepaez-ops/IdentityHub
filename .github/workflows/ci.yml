@@ -587,8 +587,8 @@ jobs:
         run: make e2e
 
       # RNF-010: k6 (imagen fijada por digest) contra el mismo stack, después de las pruebas E2E. Rompe
-      # la build si el p95 de refresh, GET /me o JWKS supera 300 ms. Un login correcto y ninguno
-      # fallido, y el refresh va por debajo de los 5 r/s de Nginx: no hace falta subir el límite por IP.
+      # la build si el p95 de refresh, GET /me o JWKS supera 300 ms. make load-test sube el límite por IP
+      # como make e2e: los logins fallidos de la suite pueden seguir en la ventana de RF-017 al restaurarlo.
       - name: Prueba de carga de latencia (make load-test)
         run: make load-test
 

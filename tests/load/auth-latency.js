@@ -25,6 +25,15 @@ const INVITATION = __ENV.LOAD_INVITATION_TOKEN
 const P95_MS = Number(__ENV.P95_MS || 300) // RNF-010
 const DURATION = __ENV.DURATION || '20s'
 
+// Espera del código MFA en Mailpit: 40 intentos x 0,5 s = 20 s máximo, el mismo margen que los 20 s de
+// espera de correo de las pruebas E2E (el worker publica y envía el correo de forma asíncrona).
+const MAIL_ATTEMPTS = 40
+const MAIL_POLL_SECONDS = 0.5
+// `since` se toma en el reloj de k6 (contenedor) y `Created` viene del reloj de Mailpit (otro proceso, a
+// veces otra máquina virtual): se acepta un correo creado hasta 2 s antes de `since` para absorber esa
+// diferencia de relojes. No admite correos viejos: la cuenta es nueva por ejecución y solo recibe este código.
+const MAIL_CLOCK_SKEW_MS = 2000
+
 const json = { headers: { 'Content-Type': 'application/json' } }
 
 export const options = {
@@ -68,16 +77,16 @@ export const options = {
 }
 
 function mailCode(since) {
-  for (let attempt = 0; attempt < 40; attempt++) {
+  for (let attempt = 0; attempt < MAIL_ATTEMPTS; attempt++) {
     const found = http.get(`${MAILPIT}/api/v1/search?query=${encodeURIComponent(`to:${EMAIL}`)}`)
     const message = (found.json('messages') || []).find(
-      (m) => m.Subject.includes('sign-in code') && new Date(m.Created).getTime() >= since - 2000,
+      (m) => m.Subject.includes('sign-in code') && new Date(m.Created).getTime() >= since - MAIL_CLOCK_SKEW_MS,
     )
     if (message) {
       const match = /\b(\d{6})\b/.exec(http.get(`${MAILPIT}/api/v1/message/${message.ID}`).json('Text'))
       if (match) return match[1]
     }
-    sleep(0.5)
+    sleep(MAIL_POLL_SECONDS)
   }
   return fail('no llegó el código MFA')
 }

@@ -6,10 +6,18 @@
 # completo una sola vez; las mediciones no incluyen Argon2id. Sale con código distinto de cero si
 # se supera algún umbral de tests/load/auth-latency.js.
 #
+# Al terminar (pase o falle) la cuenta sembrada queda deshabilitada (status 'disabled'), como hace el
+# teardown de E2E con e2e-*: no se borra porque audit_log es append-only y sus filas referencian a
+# users con ON DELETE SET NULL, que es un UPDATE y el disparador lo rechaza. Se niega a correr contra
+# la producción simulada (docker-compose.prod.yml): siembra una cuenta con SQL directo.
+#
 # Uso: COMPOSE="docker compose --env-file .env -f deploy/docker-compose.yml" scripts/load-test.sh
 set -euo pipefail
 
 : "${COMPOSE:?COMPOSE es obligatorio}"
+case "$COMPOSE" in
+  *docker-compose.prod.yml*) echo "ERROR: make load-test no corre contra la producción simulada (siembra una cuenta con SQL directo)." >&2; exit 2 ;;
+esac
 cd "$(dirname "$0")/.."
 
 # grafana/k6 2.3.0; digest del índice multi-arquitectura (docker pull + docker inspect, 2026-10-13).
@@ -28,7 +36,20 @@ print(f"load-{int(time.time())}-{secrets.token_hex(3)}@example.test",
 PY
 )
 
-# shellcheck disable=SC2086 # COMPOSE es un comando con argumentos, se parte a propósito.
+# La cuenta se deshabilita al salir aunque la siembra o k6 fallen (si no llegó a crearse, no toca nada).
+cleanup() {
+  status=$?
+  trap - EXIT INT TERM
+  # shellcheck disable=SC2086 # COMPOSE es un comando con argumentos, se parte a propósito.
+  if ! $COMPOSE exec -T db psql -U "$db_user" -d "$db_name" -X -q -v ON_ERROR_STOP=1 -v "email=$email" >/dev/null \
+    <<<"UPDATE users SET status = 'disabled' WHERE email = :'email' AND status <> 'disabled';"; then
+    echo "AVISO: no se pudo deshabilitar la cuenta de carga $email." >&2
+  fi
+  exit "$status"
+}
+trap cleanup EXIT INT TERM
+
+# shellcheck disable=SC2086
 $COMPOSE exec -T db psql -U "$db_user" -d "$db_name" -X -q -v ON_ERROR_STOP=1 \
   -v "email=$email" -v "hash=$token_hash" >/dev/null <<'SQL'
 WITH u AS (
@@ -43,7 +64,10 @@ SELECT id, decode(:'hash', 'hex'), 'invitation', now() + interval '1 hour' FROM 
 SQL
 
 # host.docker.internal alcanza los puertos publicados del host tanto en Docker Desktop como en Linux.
+# Los secretos se pasan por nombre (-e NAME): el valor viene del entorno de este proceso y no aparece
+# en la línea de comandos de `docker run` (visible en la lista de procesos).
+export LOAD_EMAIL="$email" LOAD_PW="$password" LOAD_INVITATION_TOKEN="$token"
 docker run --rm -i --add-host host.docker.internal:host-gateway \
-  -e LOAD_EMAIL="$email" -e LOAD_PW="$password" -e LOAD_INVITATION_TOKEN="$token" \
+  -e LOAD_EMAIL -e LOAD_PW -e LOAD_INVITATION_TOKEN \
   -e HUB_URL -e MAILPIT_URL -e P95_MS -e DURATION \
   "$K6_IMAGE" run - < tests/load/auth-latency.js

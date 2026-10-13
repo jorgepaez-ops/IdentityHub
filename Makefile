@@ -130,9 +130,10 @@ _e2e-run:
 	cd e2e && npm ci --ignore-scripts && npx playwright test
 
 load-test: ## Prueba de carga de latencia (RNF-010, k6 en contenedor) contra el stack levantado; falla si el p95 supera 300 ms
-	@# Un solo login correcto en setup() y ninguno fallido: no hay bloqueo por IP (RF-017) que esquivar,
-	@# y el escenario de refresh va por debajo del límite de Nginx (5 r/s), así que no usa WITH_RAISED_LIMIT.
-	@COMPOSE='$(COMPOSE)' scripts/load-test.sh
+	@# Corre con el límite por IP elevado, como make e2e: tras make e2e los logins fallidos de la suite pueden
+	@# seguir dentro de la ventana de RF-017 y bloquear la IP del login de setup() de k6 al restaurar el límite.
+	@COMPOSE='$(COMPOSE)' LOCAL_TEST_LOGIN_IP_MAX_FAILURES=$(LOCAL_TEST_LOGIN_IP_MAX_FAILURES) \
+	    scripts/with-raised-login-limit.sh scripts/load-test.sh
 
 capturas: ## Regenera las capturas del manual de usuario (docs/manuales/img/usuario) contra el stack levantado
 	@$(WITH_RAISED_LIMIT) _capturas-run
