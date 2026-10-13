@@ -1,6 +1,6 @@
 # Despliegue local con Docker Compose
 
-La topología representa el archivo Compose actual: todos los servicios usan la red predeterminada `identity-hub_default` con subred `172.28.0.0/16`; los componentes de observabilidad se habilitan mediante el perfil `observability`.
+La topología representa el archivo Compose actual: todos los servicios usan la red predeterminada `identity-hub_default` con subred `172.28.0.0/16`; los componentes de observabilidad pertenecen al perfil `observability`, que `make up` activa; `make up-app` levanta solo la aplicación (lo usa CI).
 
 ```mermaid
 flowchart TB
@@ -12,11 +12,15 @@ flowchart TB
     Migrate["migrate\nEjecución única"]
     DB[("db: PostgreSQL\nHost: 5432\nVolumen: pgdata")]
     Broker[("broker: RabbitMQ\nHost: 5672 (AMQP), 15672 (administración)\nVolumen: rabbitdata")]
-    Mailpit["mailpit\nHost: 1025 (SMTP), 8025 (web/API)"]
+    Mailpit["mailpit\nHost: 1025 (SMTP con STARTTLS y AUTH), 8025 (web/API)"]
     Prometheus["prometheus (perfil observability)\nHost: 9090"]
     Loki["loki (perfil observability)\nHost: 3100"]
     Alloy["alloy (perfil observability)\nSin puerto publicado"]
     Grafana["grafana (perfil observability)\nHost: 3000\nVolumen: grafanadata"]
+    Falco["falco (perfil observability)\nSin puerto publicado\nmodern eBPF"]
+    Certs["Bind mount: deploy/certs (make certs, solo lectura)\nserver.pem, server-key.pem, smtp-auth.txt"]
+    CACert["Bind mount: certs/ca.pem (solo lectura)"]
+    FalcoRules["Bind mounts: falco/rules.d, /proc y docker.sock (solo lectura)"]
     PgInit["Bind mount: postgres-init/01-identity-app-role.sh (solo lectura)"]
     Migrations["Bind mount: db/migrations (solo lectura)"]
     PrometheusConfig["Bind mount: observability/prometheus.yml (solo lectura)"]
@@ -48,6 +52,7 @@ flowchart TB
         Loki
         Alloy
         Grafana
+        Falco
     end
 
     Web --- Network
@@ -61,10 +66,15 @@ flowchart TB
     Loki --- Network
     Alloy --- Network
     Grafana --- Network
+    Falco --- Network
     API --> DB
     API --> Broker
     Worker --> Broker
-    Worker --> Mailpit
+    Worker -->|"SMTP STARTTLS + AUTH"| Mailpit
+    Certs --> Mailpit
+    CACert --> Worker
+    Falco -->|"alertas JSON por stdout"| Alloy
+    FalcoRules --> Falco
     Migrate --> DB
     Prometheus --> API
     Prometheus --> Worker
@@ -81,6 +91,6 @@ flowchart TB
     RuntimeTmpfs --> Web
 ```
 
-La referencia de despliegue en nube para producción se incorpora en las tareas T7–T8; este diagrama no la representa como infraestructura actual.
+Mailpit exige STARTTLS y autenticación con los archivos que genera `make certs` (idempotente; `make up` y `make up-app` lo ejecutan primero) y el worker confía en la CA local mediante `SMTP_CA_FILE`. Falco observa las llamadas al sistema de todos los contenedores del host, pero solo evalúa sus reglas sobre `api`, `worker` y `web`. La referencia de despliegue en nube para producción está en el [despliegue AWS](despliegue-aws.md); este diagrama solo representa el entorno local.
 
-Fuente: `deploy/docker-compose.yml`, `frontend/Dockerfile`, `frontend/nginx/default.conf` y `odd/tasks/idp-semana-4.md`.
+Fuente: `deploy/docker-compose.yml`, `frontend/Dockerfile`, `frontend/nginx/default.conf`, `scripts/gen-smtp-certs.sh` y `docs/runbooks/falco-alerta.md`.

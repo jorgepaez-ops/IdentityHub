@@ -1,6 +1,6 @@
 # AGENTS.md — Identity Hub
 
-Instrucciones para agentes de código (Codex). Este archivo y `odd/tasks/idp-semana-2.md` son
+Instrucciones para agentes de código (Codex). Codex ya no se usa en el proyecto (2026-10-12); el archivo se conserva como referencia de las reglas de trabajo. Este archivo y `odd/tasks/idp-semana-2.md` son
 todo el contexto que necesitas: no asumas nada que no esté aquí o en `specs/`.
 Los documentos del proyecto van en español; identificadores, código y mensajes de commit,
 en inglés convencional.
@@ -20,16 +20,16 @@ la remedia con evidencia antes/después. **`specs/` es la fuente de verdad**: el
 specs/          requisitos (01), modelo (02), API (03), eventos (04), amenazas (05),
                 aceptación .feature (06), trazabilidad generada (07), ADR
 backend/        módulo Go `github.com/jorgepaez/identity-hub`: cmd/api, cmd/worker,
-                internal/{api,config,events,observability,store}
+                internal/{api,audit,auth,config,domain,events,notify,observability,store}
 frontend/       React + TS + Vite; Nginx en frontend/nginx/
 db/migrations/  esquema versionado (golang-migrate: NNNNNN_nombre.up.sql / .down.sql)
-deploy/         docker-compose.yml y observabilidad
+deploy/         docker-compose.yml, certificados SMTP locales (certs/) y observabilidad (incl. Falco)
 security/       findings/ (fichas VULN-NNN), evidence/ (salidas de escáneres), .trivyignore
-scripts/        traceability.py
+scripts/        traceability.py, gen-smtp-certs.sh
 odd/tasks/      lista de tareas de la feature en curso (idp-semana-2.md)
 docs/           BITACORA.md, security-report.html, evidencia/ (ver más abajo)
-e2e/tests/      vacío; Playwright llega en la semana 3
-.github/workflows/  ci.yml, baseline-scan.yml, scheduled-scan.yml
+e2e/tests/      pruebas Playwright (59 pruebas en 10 archivos, `make e2e`)
+.github/workflows/  ci.yml, release.yml, baseline-scan.yml, scheduled-scan.yml
 ```
 
 ## Comandos (verificados contra `Makefile` y los workflows)
@@ -37,7 +37,10 @@ e2e/tests/      vacío; Playwright llega en la semana 3
 | Qué | Comando |
 |---|---|
 | Ayuda | `make help` |
-| Levantar / bajar stack | `make up` · `make down` · `make clean` (borra volúmenes) |
+| Levantar / bajar stack | `make up` (stack completo con observabilidad y Falco; ejecuta antes `make certs`) · `make up-app` (solo la aplicación, lo usa CI) · `make down` · `make clean` (borra volúmenes) |
+| Certificados SMTP / Falco | `make certs` (CA y certificado de Mailpit, idempotente) · `make falco-test` (requiere `make up`) |
+| Primer arranque | `make setup` (no toca un `.env` existente) y `make up`; si `make certs` dice «falta SMTP_PASSWORD» en un `.env` anterior a F2: `grep -q '^SMTP_PASSWORD=' .env \|\| printf '\nSMTP_PASSWORD=%s\n' "$(openssl rand -hex 24)" >> .env`; nunca `setup_env.py --force` sobre un entorno existente (rompe la autenticación de los volúmenes) |
+| E2E | `make e2e` (Playwright contra el stack levantado) |
 | Un servicio | `make restart S=api` · `make logs S=api` · `make ps` · `make build` |
 | Tests Go (con `-race`) | `make test-go` (= `cd backend && go test -race -coverprofile=coverage.out -covermode=atomic ./...`) |
 | Un paquete / una prueba | `cd backend && go test -race ./internal/config/...` · `go test -run TestRNF003 ./internal/config/` |
@@ -55,8 +58,7 @@ e2e/tests/      vacío; Playwright llega en la semana 3
 | Hooks locales | `pre-commit install` (gitleaks, gofmt, go build, traceability) |
 
 Puertos del stack: web 8080, api 8081, Mailpit 8025, RabbitMQ 15672.
-**No existen todavía** (los crean las tareas): pruebas Playwright y `docs/runbook.md`. `make e2e` es un
-placeholder. Las pruebas de integración usan `make test-integration` y `TEST_DATABASE_URL` (una PostgreSQL local):
+Un `.env` anterior a F2 necesita `SMTP_PASSWORD` (se agrega con `openssl rand -hex 24`); sin él `make up` falla. Los runbooks viven en `docs/runbooks/`. Las pruebas de integración usan `make test-integration` y `TEST_DATABASE_URL` (una PostgreSQL local):
 tu sandbox no llega a ella, así que déjalas compilando (`go vet -tags=integration ./...`) y avisa: Claude las ejecuta.
 Go es 1.26 (`go.mod`, T34b); `x/crypto` está en v0.56.0.
 

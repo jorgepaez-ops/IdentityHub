@@ -6,8 +6,12 @@ las pruebas de Go a mano y cómo configurar GoLand.
 
 ## 1. Dos formas de correr el proyecto
 
-**Todo en Docker (`make up`)** — la forma "de verdad", igual que en CI. Levanta
-`db`, `broker`, `mailpit`, `migrate`, `api`, `worker` y `web`. Útil para probar
+**Todo en Docker (`make up`)** — la forma "de verdad" (CI usa `make up-app`, la misma aplicación sin observabilidad). Primero
+ejecuta `make certs` (CA y certificado SMTP locales en `deploy/certs/`, idempotente;
+Mailpit exige STARTTLS y autenticación) y luego levanta `db`, `broker`, `mailpit`,
+`migrate`, `api`, `worker` y `web`. También levanta la observabilidad
+(Prometheus, Loki, Alloy, Grafana y Falco); `make up-app` levanta solo la aplicación, como CI. Un `.env` generado antes de F2
+necesita `SMTP_PASSWORD` (`openssl rand -hex 24`), o el compose no interpola. Útil para probar
 el sistema completo, no para iterar rápido en Go: cada cambio exige
 `make restart S=api`, que reconstruye la imagen.
 
@@ -15,19 +19,77 @@ el sistema completo, no para iterar rápido en Go: cada cambio exige
 `backend/`, y la que usa Claude para verificar tareas contra una base real:
 
 ```bash
-cd deploy && docker compose up -d db
+# desde la raíz del repositorio, con el .env generado por `make setup`
+docker compose --env-file .env -f deploy/docker-compose.yml up -d db
 # espera a que quede "healthy":
 docker inspect --format='{{.State.Health.Status}}' identity-hub-db-1
 
 # aplica las migraciones (usa el servicio `migrate` del compose, no un binario local):
-docker compose run --rm migrate
+docker compose --env-file .env -f deploy/docker-compose.yml run --rm migrate
 
-cd ../backend && go build ./...
+cd backend && go build ./...
 ```
+
+Hay que pasar `--env-file .env` desde la raíz: el compose interpola **todas** las variables
+obligatorias del archivo (incluida `SMTP_PASSWORD`) aunque solo se levante `db`, y desde
+`deploy/` no encuentra el `.env` de la raíz y falla con «must be set in the repository root .env».
 
 Con la base así levantada, `go test`, `go run` y el depurador de GoLand
 hablan directo con PostgreSQL en `localhost:5432` sin pasar por Nginx ni por
 el contenedor de la API.
+
+### Primer arranque y `.env` anterior a F2
+
+1. Clon nuevo: `make setup` crea `.env` desde `.env.example` con secretos aleatorios (incluida `SMTP_PASSWORD`; `scripts/setup_env.py`) y `make up` levanta el stack. `make up` ejecuta `make certs` primero, así que no hay que correrlo a mano. `make up` incluye la observabilidad y Falco; `make up-app` solo la aplicación.
+2. `.env` creado antes de F2: `make setup` no modifica un `.env` existente, por lo que nunca agrega `SMTP_PASSWORD`. Agregue solo esa línea:
+
+   ```bash
+   grep -q '^SMTP_PASSWORD=' .env || printf '\nSMTP_PASSWORD=%s\n' "$(openssl rand -hex 24)" >> .env
+   ```
+
+3. No use `python3 scripts/setup_env.py --force` sobre un entorno existente: regenera todos los secretos, pero PostgreSQL y RabbitMQ conservan las contraseñas antiguas en sus volúmenes y el stack deja de autenticarse (habría que usar `make clean`, que borra los datos).
+
+Problema frecuente: `make certs` o `make up` terminan con `error: falta SMTP_PASSWORD en .env`. Es el caso 2: agregue la línea de arriba y repita `make up`.
+
+### Levantar el stack
+
+El flujo completo son dos comandos: `make setup` (solo en un clon nuevo; no sobrescribe un `.env` existente) y `make up`. No hay un segundo comando para la observabilidad.
+
+`make up` ejecuta antes `make certs` (CA y certificado SMTP locales, idempotente), construye las imágenes y levanta **todo** el stack:
+
+| Grupo | Servicios | Puertos publicados en el host |
+|---|---|---|
+| Aplicación | `db` (PostgreSQL), `broker` (RabbitMQ), `mailpit`, `migrate` (corre y termina), `api`, `worker`, `web` (Nginx) | `web` 8080 · `api` 8081 · `worker` 9091 (métricas) · `db` 5432 · `broker` 5672 y 15672 · `mailpit` 1025 y 8025 |
+| Observabilidad | `prometheus`, `loki`, `alloy`, `grafana`, `falco` | `prometheus` 9090 · `loki` 3100 · `grafana` 3000 · `alloy` y `falco` no publican puertos |
+
+Al terminar imprime estas direcciones:
+
+| Servicio | Dirección |
+|---|---|
+| Hub | <http://identityhub.localhost:8080> (<http://localhost:8080> también sirve el Hub) |
+| Contabilidad | <http://contabilidad.localhost:8080> |
+| API | <http://localhost:8081/healthz> |
+| RabbitMQ | <http://localhost:15672> |
+| Mailpit | <http://localhost:8025> |
+| Grafana | <http://localhost:3000> |
+| Prometheus | <http://localhost:9090> |
+
+Las credenciales de RabbitMQ y Grafana salen de `.env` (`RABBITMQ_DEFAULT_USER`/`RABBITMQ_DEFAULT_PASS` y `GRAFANA_ADMIN_USER`/`GRAFANA_ADMIN_PASSWORD`, generadas por `make setup`); no se imprimen ni se versionan.
+
+Grafana (3000), Prometheus (9090) y Loki (3100) solo escuchan en `127.0.0.1`: Prometheus y Loki no tienen autenticación, así que no se exponen a la red local.
+
+Tiempos de espera: la aplicación queda lista cuando `api` y `web` aparecen `healthy` en `make ps` (unos 30 a 60 s tras construir). Grafana responde en <http://localhost:3000/api/health> a los pocos segundos; sus paneles con datos tardan 1 a 2 minutos porque Prometheus raspa cada 15 s y Alloy descubre contenedores nuevos cada ~60 s. Una alerta de Falco tarda también 1 a 2 minutos en verse en Loki y Grafana (`make falco-test` la dispara).
+
+- **Solo la aplicación:** `make up-app` levanta únicamente los servicios del grupo Aplicación, sin Prometheus, Loki, Alloy, Grafana ni Falco. Es lo que usa CI (acción compuesta `stack-up`, jobs E2E y DAST) y sirve en un equipo con pocos recursos.
+- **Detener:** `make down` detiene todos los contenedores, observabilidad incluida, y **conserva los volúmenes** (`pgdata`, `rabbitdata`, `grafanadata`). `make clean` hace lo mismo y además **borra los volúmenes**: se pierden los datos y las contraseñas guardadas de Postgres y RabbitMQ.
+- **Estado y logs:** `make ps` lista todos los servicios, observabilidad incluida; `make logs S=<servicio>` sigue el log de uno (por ejemplo `make logs S=falco`).
+- **Falco y el kernel:** Falco usa el driver modern eBPF y necesita un kernel Linux con BTF (Linux moderno o Docker Desktop). Sin él, `make up` termina bien, la aplicación y el resto de la observabilidad funcionan y solo `falco` falla y se reinicia (`restart: unless-stopped`; nada depende de él). Se ve en `make ps` (estado `Restarting` o `Exited`) y la causa en `make logs S=falco`. Falco no corre en CI.
+
+Problemas frecuentes:
+
+1. `error: falta SMTP_PASSWORD en .env` (o `falta .env`): el `.env` es anterior a F2 o no existe. Ejecute `make setup` en un clon nuevo; en uno existente agregue solo la línea `SMTP_PASSWORD` como se explica arriba, y repita `make up`.
+2. Puerto ocupado (`port is already allocated`, típico de 8080, 5432 o 3000): detenga el proceso que lo usa (`lsof -i :8080`) o un stack anterior (`make down`) y repita `make up`.
+3. `falco` en `Restarting`: revise `make logs S=falco`. Si el mensaje habla de BTF, eBPF o del driver, el kernel no lo soporta: el resto del stack funciona y puede ignorarlo, o usar `make up-app` para no verlo.
 
 ## 2. `make gen`, paso a paso
 
@@ -226,8 +288,7 @@ repo ya lo rechaza, pero verlo en el editor ahorra una vuelta.
 ## 5. Variables de entorno que la API espera hoy
 
 Reflejan `backend/internal/config/config.go` (fuente real; `.env.example`
-en la raíz del repo quedó desactualizado desde la semana 1 y T21 lo pone al
-día cuando cablee `main.go`). Obligatorias = el proceso no arranca sin ellas.
+en la raíz del repo es la plantilla; `make setup` genera el `.env` con secretos aleatorios, incluida `SMTP_PASSWORD`). Obligatorias = el proceso no arranca sin ellas.
 
 | Variable | Obligatoria | Default | Qué es |
 |---|---|---|---|
@@ -236,10 +297,12 @@ día cuando cablee `main.go`). Obligatorias = el proceso no arranca sin ellas.
 | `JWT_SIGNING_KEY` | sí (no para el worker) | — | semilla Ed25519 de 32 bytes, en base64 (`openssl rand -base64 32`); el worker no la recibe ni la lee |
 | `API_PORT` | no | `8081` | puerto HTTP de la API |
 | `LOG_LEVEL` | no | `info` | |
+| `APP_VERSION` | no | `dev` | versión que reporta el servicio |
 | `JWT_ISSUER` | no | `http://identityhub.localhost:8080` | claim `iss` del token |
 | `JWT_AUDIENCE` | no | `identity-hub` | claim `aud` |
 | `JWT_ACCESS_TTL` | no | `15m` | vigencia del access token |
 | `JWT_REFRESH_TTL` | no | `720h` | vigencia del refresh token (cookie) |
+| `HUB_SESSION_TTL` | no | `720h` | vigencia de la sesión del Hub (debe ser positiva) |
 | `LOGIN_ACCOUNT_MAX_FAILURES` | no | `5` | fallos antes de bloquear la cuenta (RF-017) |
 | `LOGIN_IP_MAX_FAILURES` | no | `20` | fallos por IP antes de bloquear (RF-017 / VULN-020) |
 | `LOGIN_FAILURE_WINDOW` | no | `15m` | ventana deslizante de los dos contadores |

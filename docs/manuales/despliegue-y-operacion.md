@@ -12,7 +12,7 @@ Este manual describe el entorno local actual con Docker Compose. No afirma sopor
 
 ```bash
 make setup
-docker compose up -d   # equivalente: make up (construye las imágenes)
+docker compose up -d   # solo la aplicación (equivale a make up-app); make up añade la observabilidad
 make ps
 ```
 
@@ -30,7 +30,7 @@ Complete `.env` sin guardar secretos en Git. Las variables que se muestran a con
 | API y JWT | `API_PORT`, `API_BASE_URL`, `LOG_LEVEL`, `JWT_SIGNING_KEY`, `JWT_ISSUER`, `TRUSTED_PROXIES`, `JWT_ACCESS_TTL`, `JWT_REFRESH_TTL` | Puerto, URL local, nivel de log, firma y parámetros de token; `JWT_SIGNING_KEY` no tiene valor por defecto. Solo la API los recibe: el worker no firma tokens ni usa `TRUSTED_PROXIES`. |
 | Correo (SMTP) | `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM`, `SMTP_TLS`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_CA_FILE` | Destino y seguridad del SMTP del worker; por defecto apunta a Mailpit con STARTTLS y autenticación (ver "Correo SMTP"). `SMTP_PASSWORD` lo genera `make setup`. |
 | Cliente OAuth | `OAUTH_CLIENT_ID`, `OAUTH_REDIRECT_URI`, `OAUTH_CLIENT_ORIGIN` | Opcionales; por defecto los valores locales de Contabilidad (ver "Hosts configurables y fijos"). |
-| Observabilidad | `GRAFANA_ADMIN_USER`, `GRAFANA_ADMIN_PASSWORD` | Acceso inicial de Grafana cuando se habilita su perfil. |
+| Observabilidad | `GRAFANA_ADMIN_USER`, `GRAFANA_ADMIN_PASSWORD` | Acceso inicial de Grafana (los levanta `make up`). |
 | Arranque inicial | `BOOTSTRAP_ADMIN_EMAIL` | Variable opcional consumida por Compose: crea o reemite por invitación el primer administrador bajo D17. No hay contraseña en esta variable. |
 | Límite local de E2E | `LOGIN_IP_MAX_FAILURES` | Compose lo admite para el límite por IP; `make e2e` lo eleva temporalmente y lo restaura. |
 
@@ -50,24 +50,24 @@ El `healthcheck` del contenedor API consulta `/healthz`; no use esa sonda para i
 ### Observabilidad y logs
 
 ```bash
-make up-obs
+make up           # ya incluye la observabilidad
 make logs S=api
 make logs S=worker
 ```
 
-`make up-obs` activa Prometheus (`:9090`), Loki (`:3100`), Alloy y Grafana (`:3000`). Consulte métricas en Prometheus, logs de contenedores en Loki y ambas fuentes desde Grafana. `make logs S=<servicio>` sigue el log del servicio seleccionado.
+`make up` activa, junto con la aplicación, Prometheus (`:9090`), Loki (`:3100`), Alloy y Grafana (`:3000`). Consulte métricas en Prometheus, logs de contenedores en Loki y ambas fuentes desde Grafana. `make logs S=<servicio>` sigue el log del servicio seleccionado.
 
 Grafana carga por aprovisionamiento la alerta **DLQ de notificaciones con mensajes** (`deploy/observability/grafana/alerting/dlq.yml`); su procedimiento de atención está en [`../runbooks/dlq-notificaciones.md`](../runbooks/dlq-notificaciones.md).
 
 ### Detección en tiempo de ejecución (Falco)
 
-El perfil `observability` también levanta **Falco** (AM-020): observa las llamadas al sistema de los contenedores con el driver modern eBPF y evalúa `deploy/observability/falco/rules.d/identity-hub.yaml` sobre `api`, `worker` y `web` (shell, escritura en directorios del sistema, gestor de paquetes o descargador, conexión saliente a una IP pública). Escribe cada alerta como JSON en su salida estándar; Alloy la envía a Loki con las etiquetas `rule` y `priority`, el tablero «Identity Hub — Seguridad» la muestra y Grafana aprovisiona la alerta **Falco detectó actividad anómala en un contenedor** (`deploy/observability/grafana/alerting/falco.yml`). Atención y triaje en [`../runbooks/falco-alerta.md`](../runbooks/falco-alerta.md).
+`make up` también levanta **Falco** (AM-020): observa las llamadas al sistema de los contenedores con el driver modern eBPF y evalúa `deploy/observability/falco/rules.d/identity-hub.yaml` sobre `api`, `worker` y `web` (shell, escritura en directorios del sistema, gestor de paquetes o descargador, conexión saliente a una IP pública). Escribe cada alerta como JSON en su salida estándar; Alloy la envía a Loki con las etiquetas `rule` y `priority`, el tablero «Identity Hub — Seguridad» la muestra y Grafana aprovisiona la alerta **Falco detectó actividad anómala en un contenedor** (`deploy/observability/grafana/alerting/falco.yml`). Atención y triaje en [`../runbooks/falco-alerta.md`](../runbooks/falco-alerta.md).
 
 ```bash
 make falco-test   # dispara eventos inofensivos y dice dónde ver la alerta
 ```
 
-Falco corre sin `privileged`, solo con las capacidades `BPF`, `PERFMON`, `SYS_RESOURCE` y `SYS_PTRACE`, y monta `/proc` y el socket de Docker en solo lectura. Es un control del stack desplegado: **no forma parte del CI** (los runners de GitHub no ofrecen eBPF equivalente) y requiere un kernel Linux con BTF (Docker Desktop o Linux moderno). La imagen está fijada por digest (0.45.0).
+Falco corre sin `privileged`, solo con las capacidades `BPF`, `PERFMON`, `SYS_RESOURCE` y `SYS_PTRACE`, y monta `/proc` y el socket de Docker en solo lectura. Es un control del stack desplegado: **no forma parte del CI** (los runners de GitHub no ofrecen eBPF equivalente) y requiere un kernel Linux con BTF (Docker Desktop o Linux moderno). Sin él, `make up` termina bien y el resto del stack funciona; solo `falco` se reinicia (revise `make ps` y `make logs S=falco`). `make up-app` levanta la aplicación sin observabilidad ni Falco y es lo que usa CI. `make down` detiene todo conservando los volúmenes; `make clean` también los borra. La imagen está fijada por digest (0.45.0).
 
 ### Backups, restauración y rotación
 
@@ -111,7 +111,7 @@ El worker no usa `smtp.SendMail`: abre la sesión SMTP explícitamente (EHLO, ST
 make certs    # sh scripts/gen-smtp-certs.sh --env-file .env
 ```
 
-Crea `deploy/certs/` (ignorado por git): `ca.pem` y `ca-key.pem` (CA local), `server.pem` y `server-key.pem` (SAN `mailpit`, `localhost`, `127.0.0.1`; claves en modo 0600) y `smtp-auth.txt` (usuario y contraseña de `.env`, que se reescribe en cada ejecución). Es idempotente; `sh scripts/gen-smtp-certs.sh --force` regenera la CA y los certificados. `make up`, `make up-obs` y `make restart` la ejecutan antes de levantar el stack, y la acción `stack-up` de CI también (vía `make up`). El worker monta solo `ca.pem` y confía en ella con `SMTP_CA_FILE`; un `.env` anterior sin `SMTP_PASSWORD` debe añadirla (`openssl rand -hex 24`).
+Crea `deploy/certs/` (ignorado por git): `ca.pem` y `ca-key.pem` (CA local), `server.pem` y `server-key.pem` (SAN `mailpit`, `localhost`, `127.0.0.1`; claves en modo 0600) y `smtp-auth.txt` (usuario y contraseña de `.env`, que se reescribe en cada ejecución). Es idempotente; `sh scripts/gen-smtp-certs.sh --force` regenera la CA y los certificados. `make up`, `make up-app` y `make restart` la ejecutan antes de levantar el stack, y la acción `stack-up` de CI también (vía `make up-app`, sin observabilidad). El worker monta solo `ca.pem` y confía en ella con `SMTP_CA_FILE`; un `.env` anterior sin `SMTP_PASSWORD` debe añadirla (`openssl rand -hex 24`).
 
 **Producción con Amazon SES.** Use el endpoint SMTP regional de SES (`email-smtp.<región>.amazonaws.com`) en el puerto 587 con `SMTP_TLS=starttls`; no defina `SMTP_CA_FILE` (los certificados de SES los firma una CA pública). `SMTP_USERNAME` y `SMTP_PASSWORD` son las credenciales SMTP de SES, que no son la clave de acceso IAM: se derivan de ella (`aws_iam_access_key.ses_smtp_password_v4` en Terraform). La referencia de `infraestructura/terraform` las crea para un usuario IAM con solo `ses:SendRawEmail`, las guarda en Secrets Manager (cifradas con KMS) y las inyecta únicamente al worker. El remitente `SMTP_FROM` debe pertenecer a una identidad verificada en SES y, mientras la cuenta esté en el sandbox, los destinatarios también.
 
@@ -140,7 +140,7 @@ Variables obligatorias en `.env`, además de las del desarrollo (el comando fall
 
 | Variable | Contenido |
 |---|---|
-| `IDENTITY_HUB_API_IMAGE`, `IDENTITY_HUB_WORKER_IMAGE`, `IDENTITY_HUB_WEB_IMAGE` | Digest de cada imagen publicada en Docker Hub (`nombre@sha256:...`). Las publica `release.yml` en `docker.io/jorgeivp/identity-hub-api`, `identity-hub-worker` e `identity-hub-web` con cada tag `vX.Y.Z` (validado con `v0.9.0`); use el digest de la publicación, que figura en el resumen del run. |
+| `IDENTITY_HUB_API_IMAGE`, `IDENTITY_HUB_WORKER_IMAGE`, `IDENTITY_HUB_WEB_IMAGE` | Digest de cada imagen publicada en Docker Hub (`nombre@sha256:...`). Las publica `release.yml` en `docker.io/jorgeivp/identity-hub-api`, `identity-hub-worker` e `identity-hub-web` con cada tag `vX.Y.Z` (validado con `v0.9.0` y `v0.9.1`); solo después de firmar y atestar mueve `latest` al digest firmado, y únicamente para el `vX.Y.Z` más alto. Los pasos de red se reintentan hasta tres veces y los artefactos de imagen se retienen 7 días. Use el digest de la publicación, que figura en el resumen del run. |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM` | Relay SMTP y remitente de producción. |
 | `SMTP_USERNAME`, `SMTP_PASSWORD` | Credenciales del relay (con SES, las credenciales SMTP derivadas de una clave IAM). El worker las presenta solo tras STARTTLS. |
 

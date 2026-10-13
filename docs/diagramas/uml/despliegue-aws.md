@@ -55,7 +55,7 @@ flowchart TB
     Api -->|5432| RDS
     Api -->|AMQP 5672| Broker
     Worker -->|AMQP 5672| Broker
-    Worker -->|SMTP| NAT
+    Worker -->|SMTP STARTTLS + AUTH| NAT
     Migrate -->|5432| RDS
     NAT --> SES
     NAT --> DockerHub
@@ -101,12 +101,12 @@ sequenceDiagram
 - **TLS, DNS público y WAF** se definen pero no se prueban (solo se crean en LocalStack, y no se
   aplica en ninguna nube).
 - **El worker no toca la base de datos.** Solo consume la cola (AMQP) y envía SMTP: no recibe `DATABASE_URL` ni tiene regla de red hacia RDS.
-- **El correo por SES** exige que el worker soporte autenticación SMTP y STARTTLS, y hoy no lo hace.
+- **El correo por SES:** el worker ya autentica por SMTP y exige STARTTLS (`SMTP_TLS=starttls`, puerto 587; las credenciales SMTP de SES viven en Secrets Manager). Lo que no se prueba es la verificación real de la identidad del dominio y de DKIM en SES, que el Terraform declara pero no se aplica en ninguna nube.
 - **Detrás del ALB**, Nginx tiene que propagar la IP real del cliente; si no, el límite de fallos
   por IP trataría a todos los usuarios como uno solo.
-- **Los hosts `*.localhost`** están fijos en el código y habría que volverlos configurables.
+- **Los hosts y el cliente OAuth** ya se configuran por variables (`SMTP_*`, `OAUTH_*`); siguen fijos el `server_name` de Nginx, las constantes de Contabilidad y la fila del cliente en la base de datos.
 
-Detalle de estas brechas: [ADR 0012, Consecuencias](../../../specs/adr/0012-arquitectura-de-referencia-en-aws-con-localstack.md).
+Detalle de estas brechas (con la actualización del 2026-10-13): [ADR 0012, Consecuencias](../../../specs/adr/0012-arquitectura-de-referencia-en-aws-con-localstack.md).
 
 Fuente: `infraestructura/terraform/` (`network.tf`, `alb.tf`, `ecs.tf`, `rds.tf`, `secrets.tf`,
 `kms.tf`, `logs.tf`, `service_discovery.tf`, `dns_tls_waf.tf`) y la ADR 0012.

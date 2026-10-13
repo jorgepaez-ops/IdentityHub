@@ -1,7 +1,7 @@
 name: Levantar el stack
 description: >-
   Genera un .env desechable (secretos enmascarados), resuelve los hosts *.localhost, levanta el
-  stack con make up y espera a que Nginx responda. Lo usan los jobs 7 (E2E) y 11 (DAST).
+  stack solo de aplicación con make up-app (sin observabilidad ni Falco) y espera a que Nginx responda. Lo usan los jobs 7 (E2E) y 11 (DAST).
 runs:
   using: composite
   steps:
@@ -29,7 +29,7 @@ runs:
             echo "DATABASE_URL=postgres://identity_app:${APP_PASS}@db:5432/identity?sslmode=disable"
             echo "RABBITMQ_URL=amqp://identity:${MQ_PASS}@broker:5672/"
             echo "JWT_SIGNING_KEY=${JWT_KEY}"
-            # Credenciales SMTP de Mailpit (STARTTLS + autenticación). make up corre make certs,
+            # Credenciales SMTP de Mailpit (STARTTLS + autenticación). make up-app corre make certs,
             # que genera la CA local y deploy/certs/smtp-auth.txt a partir de estas variables.
             echo "SMTP_USERNAME=identity-hub"
             echo "SMTP_PASSWORD=${SMTP_PASS}"
@@ -46,11 +46,11 @@ runs:
         shell: bash
         run: echo "127.0.0.1 identityhub.localhost contabilidad.localhost" | sudo tee -a /etc/hosts
 
-      # make up depende de make certs: genera la CA local y el certificado de Mailpit
+      # make up-app depende de make certs (y no levanta Grafana, Loki ni Falco): genera la CA local y el certificado de Mailpit
       # (deploy/certs/) antes de que compose monte esos archivos.
-      - name: Levantar el stack (make up)
+      - name: Levantar el stack de aplicación (make up-app)
         shell: bash
-        run: make up
+        run: make up-app
 
       # `up -d` no espera. `web` no tiene healthcheck pero depende de `api` sana (que a su vez
       # espera a db, broker y migrate), así que responder en :8080 implica el stack listo.

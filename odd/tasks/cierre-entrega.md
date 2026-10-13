@@ -353,14 +353,33 @@ Mañana (2026-10-13), en este orden:
      y `scripts/` cuentan como código aunque sean `.md`; `sast`, `semgrep`, `iac-scan` e `iac-checkov` también
      corren siempre (alimentan los checks SARIF). Verificación: actionlint limpio, zizmor sin hallazgos nuevos,
      clasificador probado en local, CI completo verde en #43, revisión nativa aprobada (3 pasadas).
-   - Pendiente para cerrar: este PR (#42, solo documentación) debe saltarse los jobs pesados y resolver todos
-     los checks obligatorios, incluido `Trivy` sin los SARIF de las imágenes.
+   - **Cerrada (2026-10-13).** PR #42 (solo documentación): jobs pesados *skipped*, las tres imágenes *success*
+     con pasos omitidos, CodeQL/Semgrep OSS/Checkov/SonarCloud *success*, `Trivy` *neutral* (faltan los SARIF de
+     imágenes; no bloquea), PR `CLEAN`, ~1 min contra ~8 min antes. Push a `main` del merge (`32e8359`): el job 0
+     decidió `code=false (solo documentación)` y el run terminó *success* con el mismo patrón.
    - Seguimiento (advertencias no bloqueantes de la revisión): mover el clasificador a `scripts/` con prueba;
      la guarda repetida en cada paso de `image` depende de que cada paso nuevo la incluya.
 1. Validar F7 con un tag `v0.9.1` sobre `main`: `latest` se mueve recién después de firmar y atestar; `cosign verify`
    (Cosign v3) de las tres imágenes; prompt de capturas para Claude Desktop.
+   - **Cerrada (2026-10-13).** Tag `v0.9.1` sobre `32e8359`, run de `release.yml` 38405885275 *success*. Por imagen,
+     el paso "Mover latest" empieza después de terminar "Firmar y atestar" (api 13:34:25→13:34:28, worker
+     13:34:32→13:34:35, web 13:34:32→13:34:36 UTC). `latest` = `v0.9.1` en Docker Hub (`jorgeivp/identity-hub-*`).
+     Verificación local con Cosign v3.1.3 (`cosign verify` + `verify-attestation --type cyclonedx`, identidad
+     `^https://github.com/jorgepaez-ops/IdentityHub/`, issuer de Actions): OK en las tres. Digests:
+     api `sha256:147b1694…c052`, worker `sha256:14152883…bd71`, web `sha256:f6c911dc…4e56`.
+     Capturas: 16 en el informe formal APA, sección "F7 · Release firmado (v0.9.1)" (pp. 19-21, Anexo B B110-B125),
+     confirmadas por el usuario el 2026-10-13.
+     Verificación extra de `v0.9.0` (Cosign v3.1.3, mismos comandos): OK en las tres imágenes (api `52f2988c…`,
+     worker `f9b5443d…`, web `fcca1f1c…`). Informe formal actualizado por Desktop: obs. 14 y 16 con la verificación
+     independiente; recomendación (a) pasa a "automatizar cosign verify como paso posterior del release".
 2. C2: `make informe` (incluir en el informe lo hecho en F1-F4, F6-F10 y los hallazgos de arriba), revisión del PDF
    por el usuario, notas del release, tag `v1.0.0` en vivo y `gh release create v1.0.0` con el PDF.
+   - **Avance (2026-10-13).** Informe técnico actualizado (`b4bf102`, PDF 51 pp., sin versionar) y auditoría de toda
+     la documentación; correcciones en 21 archivos (`ae016a1`, `55d330c`, `f9b43d4`, `82fb5c7`, `a8a93c2`): bitácora,
+     READMEs, AGENTS/CLAUDE, guía de desarrollo (primer arranque y `.env` anterior a F2), diagramas (Falco, SMTP
+     STARTTLS, claves de servicio), AM-023 en Threat Dragon (24 amenazas), controles de release (F7/F8) y escenas de
+     demo para exportación, claves de servicio y Falco (video en 15:00). Revisión nativa aprobada. Pendiente: revisión
+     del PDF por el usuario, PR de documentación, notas del release, tag `v1.0.0` y release con el PDF.
 3. Entorno local del usuario: agregar `SMTP_PASSWORD` al `.env` (`openssl rand -hex 24`) y correr `make certs`
    antes de `make up`.
 Notas operativas: Codex ya no está disponible (la delegación va a Sonnet); `gh pr merge --delete-branch` también

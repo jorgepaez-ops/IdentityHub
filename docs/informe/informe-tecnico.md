@@ -7,7 +7,7 @@ docente: Jaider Ospina Navas
 equipo: Miguel Ángel Díaz Díaz · María Fernanda Giraldo Osorio · William Ricardo Niño Pico · Jorge Iván Páez Rincón · Milena Rocío Ramírez Espinosa
 repositorio: https://github.com/jorgepaez-ops/IdentityHub
 licencia: Apache License 2.0 (archivo LICENSE del repositorio)
-fecha: 6 de octubre de 2026
+fecha: 13 de octubre de 2026
 entrega: 23 de octubre de 2026
 ---
 
@@ -32,9 +32,9 @@ La elección del lenguaje merece una nota. El backend está escrito en **Go** (A
 
 ## Alcance y estado de la entrega
 
-Identity Hub incluye registro por invitación por correo, contraseñas con Argon2id, JWT firmados con Ed25519 y publicados por JWKS, refresh tokens rotativos, MFA obligatorio por código enviado al correo, roles, una grilla de roles y permisos por aplicación, auditoría append-only y SSO hacia Contabilidad. Quedan fuera por decisión documentada: federación con proveedores externos, multi-tenancy efectivo, alta disponibilidad, TOTP y WebAuthn. El objetivo de despliegue es un único host con Docker Compose; la nube es una arquitectura de referencia.
+Identity Hub incluye registro por invitación por correo, contraseñas con Argon2id, JWT firmados con Ed25519 y publicados por JWKS, refresh tokens rotativos, MFA obligatorio por código enviado al correo, roles, una grilla de roles y permisos por aplicación, auditoría append-only con exportación a CSV o JSON, claves de servicio para integraciones de máquina a máquina y SSO hacia Contabilidad. El worker entrega el correo por SMTP con STARTTLS obligatorio y autenticación. Quedan fuera por decisión documentada: federación con proveedores externos, multi-tenancy efectivo, alta disponibilidad, TOTP y WebAuthn. El objetivo de despliegue es un único host con Docker Compose; la nube es una arquitectura de referencia.
 
-A la fecha de este documento están completas las semanas 1 a 3 y la semana 4, incluida la publicación de las imágenes en Docker Hub con SBOM y firma Cosign mediante el workflow `release.yml` (validado con el tag `v0.9.0`). El tag de entrega es `v1.0.0`: el workflow de release publica cada tag `vX.Y.Z`, de modo que el resultado no depende de que ese tag ya exista al leer este informe. Lo que todavía no existe se declara en las secciones de limitaciones y trabajo futuro.
+A la fecha de este documento están completas las semanas 1 a 4 y el cierre de la entrega. La semana 4 incluyó la publicación de las imágenes en Docker Hub con SBOM y firma Cosign mediante el workflow `release.yml` (validado primero con el tag `v0.9.0`). Entre el 12 y el 13 de octubre se fusionaron en `main` los PR 32 a 41 y el PR 43, que cerraron las funciones que habían quedado diferidas y endurecieron la entrega: exportación del audit log (RF-019), claves de servicio (RF-018), SMTP autenticado con STARTTLS y hosts configurables, detección en ejecución con Falco, una columna de controles de CI en la matriz de trazabilidad, un badge de cobertura con el valor medido, el orden de publicación del release (`latest` solo después de firmar y atestar), la reclasificación de VULN-028 y un filtro que evita correr el pipeline completo en cambios solo de documentación. La matriz de trazabilidad queda con 33 requisitos: 25 completos, 7 parciales, 1 sin cubrir (RNF-010, latencia, sin prueba de carga) y 0 diferidos. El release se revalidó con el tag `v0.9.1`, que ya publica con el orden definitivo. El tag de entrega es `v1.0.0`: el workflow de release publica cada tag `vX.Y.Z`, de modo que el resultado no depende de que ese tag ya exista al leer este informe. Lo que todavía no existe se declara en las secciones de limitaciones y trabajo futuro.
 
 # Arquitectura
 
@@ -46,13 +46,13 @@ Identity Hub es un conjunto de contenedores orquestados por Docker Compose. La t
 |---|---|
 | `web` | Nginx que sirve las dos SPA (Hub y Contabilidad), aplica cabeceras de seguridad y el límite de peticiones de autenticación, y hace de proxy hacia la API. |
 | `api` | API HTTP en Go: autenticación, autorización, dominio, persistencia y publicación de eventos. |
-| `worker` | Proceso asíncrono en Go que consume eventos y entrega notificaciones por SMTP; publica métricas y salud. |
+| `worker` | Proceso asíncrono en Go que consume eventos y entrega notificaciones por SMTP con STARTTLS y autenticación; publica métricas y salud. |
 | PostgreSQL 16 | Usuarios, sesiones, roles, permisos y auditoría; la aplicación usa un rol de mínimo privilegio sin permiso de `UPDATE`/`DELETE` sobre la auditoría. |
 | RabbitMQ 4 | Eventos persistentes con confirmación de publicación entre la API y el worker, con cola de mensajes muertos (DLQ). |
-| Mailpit | Captura el SMTP local: en desarrollo los correos no salen a Internet. |
-| Prometheus, Loki, Alloy y Grafana | Métricas y logs, bajo el perfil `observability` de Compose. |
+| Mailpit | Captura el SMTP local: en desarrollo los correos no salen a Internet. Exige STARTTLS y autenticación con una CA local que genera `make certs`. |
+| Prometheus, Loki, Alloy, Falco y Grafana | Métricas, logs y detección de comportamiento anómalo en ejecución, bajo el perfil `observability` de Compose, que `make up` activa. |
 
-Los flujos entre dominios son: navegador a `web` a `api` por HTTP; `api` a PostgreSQL por SQL (consultas generadas por `sqlc`); `api` a RabbitMQ a `worker` por AMQP; `worker` a Mailpit por SMTP; y Hub a Contabilidad por OAuth 2.0 Authorization Code con PKCE sobre dos orígenes (`identityhub.localhost` y `contabilidad.localhost`). Las decisiones más relevantes están registradas como ADR (0001 a 0013): stack y contenerización, IdP propio en lugar de Keycloak, OpenAPI 3.0.3 como fuente de verdad, Argon2id, refresh tokens rotativos con familia, publicación directa sin outbox, línea base vulnerable deliberada, GitHub Actions, SSO con PKCE, MFA por correo, Docker Hub como registry, arquitectura de referencia en AWS y roles y permisos configurables por aplicación.
+Los flujos entre dominios son: navegador a `web` a `api` por HTTP; `api` a PostgreSQL por SQL (consultas generadas por `sqlc`); `api` a RabbitMQ a `worker` por AMQP; `worker` a Mailpit por SMTP con STARTTLS; y Hub a Contabilidad por OAuth 2.0 Authorization Code con PKCE sobre dos orígenes (`identityhub.localhost` y `contabilidad.localhost`). Las decisiones más relevantes están registradas como ADR (0001 a 0014): stack y contenerización, IdP propio en lugar de Keycloak, OpenAPI 3.0.3 como fuente de verdad, Argon2id, refresh tokens rotativos con familia, publicación directa sin outbox, línea base vulnerable deliberada, GitHub Actions, SSO con PKCE, MFA por correo, Docker Hub como registry, arquitectura de referencia en AWS, roles y permisos configurables por aplicación y claves de servicio para integraciones máquina a máquina.
 
 ## Diagramas UML del sistema
 
@@ -88,12 +88,13 @@ El pipeline cubre las seis fases del enunciado. El diagrama sitúa cada herramie
 
 ```mermaid
 %%landscape
-%%caption: Pipeline DevSecOps de Identity Hub por fases (fuente: ci.yml, baseline-scan.yml y scheduled-scan.yml). En GitHub Actions casi todos los jobs corren en paralelo; solo la construcción de imágenes depende del job de lint.
+%%caption: Pipeline DevSecOps de Identity Hub por fases (fuente: ci.yml, baseline-scan.yml y scheduled-scan.yml). En GitHub Actions casi todos los jobs corren en paralelo; los pesados dependen del job 0, que decide si el cambio toca código, y la construcción de imágenes depende además del job de lint.
 flowchart LR
     subgraph F1["1 · Planificación"]
         direction LR
         TD["OWASP Threat Dragon · DFD 0 y 1 · STRIDE"]
         SP["Specs, ADR y contrato OpenAPI"]
+        J0["Job 0 · Detección de cambios: omite los jobs pesados si solo hay documentación"]
         J1["Job 1 · Deriva de specs"]
     end
     subgraph F2["2 · Codificación"]
@@ -112,7 +113,7 @@ flowchart LR
     end
     subgraph F4["4 · Pruebas"]
         direction LR
-        J6["Jobs 6 y 6b · Unitarias e integración, gate de cobertura 70 %"]
+        J6["Jobs 6, 6b y 6c · Unitarias, integración, gate de cobertura 70 % y badge"]
         J7["Job 7 · E2E Playwright"]
         J11["Job 11 · DAST OWASP ZAP"]
     end
@@ -120,10 +121,11 @@ flowchart LR
         direction LR
         IAC["Terraform de referencia en AWS, sin apply"]
         PROD["Compose de producción simulada, imágenes por digest"]
+        REL["release.yml: publica vX.Y.Z, firma y atesta, y recién entonces mueve latest"]
     end
     subgraph F6["6 · Operación"]
         direction LR
-        OBS["Prometheus, Loki, Alloy y Grafana"]
+        OBS["Prometheus, Loki, Alloy, Falco y Grafana"]
         WK["Escaneo semanal: govulncheck e incidencia automática"]
     end
     CS(["Code Scanning de GitHub: SARIF de CodeQL, Semgrep, Trivy y Checkov"])
@@ -162,13 +164,13 @@ La segunda figura describe cómo llegaría una versión a producción: tag, gate
 
 {{mermaid:../diagramas/uml/despliegue-aws.md#2|Despliegue de una versión según el Terraform de referencia.}}
 
-Lo que esta referencia no promete, según el propio ADR: TLS, DNS público y WAF se definen pero no se prueban; el correo por SES exige que el worker soporte autenticación SMTP y STARTTLS, y hoy no lo hace; detrás de un ALB, Nginx debe propagar la IP real del cliente o el límite por IP trataría a todos los usuarios como uno; y los hosts `*.localhost` están fijos en el código.
+Lo que esta referencia no promete, según el propio ADR: TLS, DNS público y WAF se definen pero no se prueban; el correo por SES exigía que el worker soportara autenticación SMTP y STARTTLS, lo que ya hace (la tarea F2 lo implementó y el Terraform crea las credenciales SMTP de SES); detrás de un ALB, Nginx debe propagar la IP real del cliente o el límite por IP trataría a todos los usuarios como uno; y el `server_name` de Nginx y los hosts `*.localhost` siguen fijos en el código, aunque el cliente OAuth y sus URL ya se configuran por variables de entorno.
 
 # Modelado de Amenazas
 
 ## Modelo en OWASP Threat Dragon
 
-El modelo versionado está en `docs/threat-model/identity-hub.json` (formato Threat Dragon v2) y se alinea con la fuente de verdad `specs/05-security/threat-model.md`. Contiene dos diagramas de flujo de datos con sus fronteras de confianza y 23 amenazas clasificadas por STRIDE. El archivo conserva la estructura de los modelos de demostración oficiales y valida contra el esquema oficial de Threat Dragon con una sola salvedad (`strokeDasharray: null`), que los modelos oficiales también tienen; no se abrió en la interfaz gráfica de Threat Dragon en el entorno de desarrollo.
+El modelo versionado está en `docs/threat-model/identity-hub.json` (formato Threat Dragon v2) y se alinea con la fuente de verdad `specs/05-security/threat-model.md`. Contiene dos diagramas de flujo de datos con sus fronteras de confianza y 24 amenazas clasificadas por STRIDE (las 23 del modelo inicial y AM-023, agregada con las claves de servicio). El archivo conserva la estructura de los modelos de demostración oficiales y valida contra el esquema oficial de Threat Dragon con una sola salvedad (`strokeDasharray: null`), que los modelos oficiales también tienen; no se abrió en la interfaz gráfica de Threat Dragon en el entorno de desarrollo.
 
 ### DFD nivel 0: contexto y cadena de suministro
 
@@ -230,7 +232,7 @@ flowchart LR
 
 ## Amenazas por categoría STRIDE y contramedidas
 
-Las 23 amenazas se reparten así: 6 de suplantación (Spoofing), 4 de manipulación (Tampering), 2 de repudio (Repudiation), 5 de divulgación de información (Information disclosure), 3 de denegación de servicio (Denial of service) y 3 de elevación de privilegios (Elevation of privilege). La columna «Amenaza» resume el riesgo (el elemento del DFD y el texto completo están en el modelo). La columna Estado sigue el modelo: *Mitigated* indica que la contramedida está implementada en el repositorio; *Open* que falta o está incompleta.
+Las 24 amenazas se reparten así: 7 de suplantación (Spoofing), 4 de manipulación (Tampering), 2 de repudio (Repudiation), 5 de divulgación de información (Information disclosure), 3 de denegación de servicio (Denial of service) y 3 de elevación de privilegios (Elevation of privilege). La columna «Amenaza» resume el riesgo (el elemento del DFD y el texto completo están en el modelo). La columna Estado sigue el modelo: *Mitigated* indica que la contramedida está implementada en el repositorio; *Open* que falta o está incompleta.
 
 | Categoría | Id | Amenaza (elemento del DFD) | Contramedida implementada | Estado |
 |---|---|---|---|---|
@@ -240,6 +242,7 @@ Las 23 amenazas se reparten así: 6 de suplantación (Spoofing), 4 de manipulaci
 | Spoofing | AM-004 | Enumeración de cuentas | Respuestas iguales, comparación en tiempo constante y hash señuelo | Mitigated |
 | Spoofing | AM-005 | Sesión robada tras cambio de contraseña | El restablecimiento revoca todas las sesiones activas | Mitigated |
 | Spoofing | AM-017 (MFA) | Adivinar códigos MFA | Desafío SHA-256/HMAC-SHA256, uso único, vencimiento y límite de intentos | Mitigated |
+| Spoofing | AM-023 | Robo o fuerza bruta de una clave de servicio | Secreto de 256 bits del que solo se guarda el SHA-256, comparación en tiempo constante, `401` uniforme, vencimiento obligatorio, alcance mínimo `audit-log:read` y revocación inmediata (ADR 0014) | Mitigated |
 | Tampering | AM-006 | Inyección SQL | Consultas parametrizadas generadas por `sqlc` | Mitigated |
 | Tampering | AM-007 | Roles obsoletos en el token | Roles consultados en la base de datos en peticiones sensibles | Mitigated |
 | Tampering | AM-008 | Imagen manipulada en la cadena de suministro | Firma Cosign keyless (OIDC de GitHub) sobre el digest y despliegue por digest | Mitigated |
@@ -254,15 +257,17 @@ Las 23 amenazas se reparten así: 6 de suplantación (Spoofing), 4 de manipulaci
 | Denial of service | AM-017 | Argon2id como amplificador de carga | `limit_req` antes de la API y Argon2id calibrado a unos 250 ms | Mitigated |
 | Denial of service | AM-018 | Cuerpos enormes | `client_max_body_size 1m` y `http.MaxBytesReader` | Mitigated |
 | Denial of service | AM-019 | Cola de notificaciones saturada | Regla de alerta de Grafana versionada (`deploy/observability/grafana/alerting/dlq.yml`) y runbook (`docs/runbooks/dlq-notificaciones.md`) | Mitigated |
-| Elevation of privilege | AM-020 | Contenedor comprometido | Usuario no root, capacidades eliminadas, raíz de solo lectura, base distroless | Mitigated |
+| Elevation of privilege | AM-020 | Contenedor comprometido | Usuario no root, capacidades eliminadas, raíz de solo lectura, base distroless y detección en ejecución con Falco | Mitigated |
 | Elevation of privilege | AM-021 | Acceso a rutas administrativas | Autorización por ruta comprobada en el servidor | Mitigated |
 | Elevation of privilege | AM-022 | Permisos excesivos del pipeline | Permisos mínimos por job, OIDC keyless y environment protegido `dockerhub` restringido a tags `v*` | Mitigated |
 
 Nota de transparencia: la especificación original repite el id AM-017 para dos amenazas distintas (códigos MFA y Argon2id como amplificador); el modelo de Threat Dragon las distingue como «AM-017 (MFA)» y «AM-017». Y la compuerta que la especificación cita para AM-014 («Trivy config sobre el compose de producción») no existe, porque Trivy config no analiza archivos de Docker Compose; la evidencia real es la comprobación `docker compose config` de la producción simulada, que confirma que ningún servicio salvo `web` publica puertos.
 
+**AM-023 (claves de servicio).** La función RF-018 añadió una credencial de larga vida para integraciones de máquina a máquina, y con ella una amenaza nueva: su robo o fuerza bruta. La contramedida, registrada en `specs/05-security/threat-model.md` y en el ADR 0014, es un secreto de 256 bits aleatorios (formato `ihk_<publicId>_<secreto>`) del que solo se guarda el SHA-256, comparación en tiempo constante con un hash señuelo, el mismo `401` para clave desconocida, incorrecta, expirada o revocada (sin oráculo), vencimiento obligatorio de 1 a 365 días, un alcance mínimo (`audit-log:read`, solo lectura, aceptado únicamente en `GET /api/v1/admin/audit-log`) y revocación inmediata. AM-023 figura también en el modelo de Threat Dragon (`docs/threat-model/identity-hub.json`) como amenaza de suplantación sobre el flujo interno hacia `/api`, en estado *Mitigated*.
+
 ## Amenazas que estaban abiertas y cómo se cerraron
 
-Ninguna de las 23 amenazas queda en estado *Open*. Las tres que lo estaban se cerraron con el workflow de publicación (`release.yml`, tarea C3):
+Ninguna de las 24 amenazas queda en estado *Open*. Las tres que lo estaban se cerraron con el workflow de publicación (`release.yml`, tarea C3):
 
 - **AM-008 (firma de imágenes) y AM-022 (OIDC keyless):** el job `publish` firma cada imagen con Cosign keyless (identidad OIDC de GitHub, sin claves de larga vida) sobre el digest, y es el único job con el environment protegido `dockerhub`, restringido a tags `v*`. Además se mantienen los permisos mínimos por job (`permissions: contents: read` por defecto en `ci.yml`).
 - **AM-009 (cadena de suministro):** además de osv-scanner, govulncheck, npm audit y lockfiles, cada imagen publicada lleva un SBOM CycloneDX generado con Syft y adjunto como atestación firmada. No queda riesgo residual: VULN-028 (GO-2026-5932, sin versión corregida) se reclasificó el 2026-10-12 como no afectado, porque `go list -deps` no encuentra `x/crypto/openpgp` ni en el backend ni en las herramientas.
@@ -277,7 +282,11 @@ Hay cuatro workflows en `.github/workflows/`: `ci.yml` (el pipeline principal, c
 
 El workflow principal se dispara en `push` a `main`, en cada `pull_request` y manualmente; cancela las ejecuciones previas de la misma rama, y el token por defecto solo lee (el principio de mínimo privilegio responde a la amenaza AM-022).
 
-{{code:yaml:.github/workflows/ci.yml:16-28}}
+{{code:yaml:.github/workflows/ci.yml:31-44}}
+
+**Detección de cambios (job 0).** Un cambio solo de documentación no debería costar un pipeline completo. El job `changes` compara el diff del PR (o del push) y marca `code=false` únicamente si todos los archivos, con renombres incluidos, terminan en `.md` o están bajo `odd/` o `docs/`, y ninguno está bajo `.github/`, `specs/` o `scripts/`, que cuentan como código aunque sean Markdown porque gobiernan el comportamiento. Ante cualquier duda (lista vacía, error de `git`, `workflow_dispatch` o falla del propio job) decide `code=true`, y los jobs pesados se condicionan con `!cancelled() && needs.changes.outputs.code != 'false'`, de modo que un job 0 caído corre todo en vez de omitir pruebas. No se usó `paths-ignore`: el ruleset de `main` exige 17 checks por nombre y un check que no se ejecuta queda en «Expected — waiting» para siempre, mientras que un job omitido (*skipped*) cuenta como aprobado. Por la misma razón el job de imágenes, cuya matriz expande los nombres obligatorios, arranca siempre y omite cada paso. Los jobs baratos que alimentan checks obligatorios o SARIF (deriva de specs, secretos, SAST, Semgrep, configuración e IaC) corren siempre. Se validó con un PR real solo de documentación (PR 42): los jobs pesados quedaron omitidos, los checks de CodeQL, Semgrep, Checkov y SonarCloud terminaron en verde, el check agregado de Trivy quedó en *neutral* por faltar los SARIF de imágenes (no bloquea) y la ejecución tomó cerca de 1 minuto contra unos 8 minutos antes; el push a `main` del merge repitió el patrón con `code=false (solo documentación)`.
+
+{{code:yaml:.github/workflows/ci.yml:120-128}}
 
 ## Fase 1: Planificación
 
@@ -289,23 +298,23 @@ El modelado de amenazas con Threat Dragon y STRIDE se describe en la sección an
 
 **Secretos (job 3).** Gitleaks corre sobre el **historial completo** (`fetch-depth: 0`), porque un secreto borrado en el último commit sigue siendo válido en el historial. Se usa una configuración propia (`.gitleaks.toml`) con reglas adicionales: la regla por defecto dejó pasar la mayoría de los secretos sembrados (VULN-023) y se añadieron reglas para contraseñas en variables de entorno o YAML y para URLs de conexión con credenciales.
 
-{{code:yaml:.github/workflows/ci.yml:164-177}}
+{{code:yaml:.github/workflows/ci.yml:261-276}}
 
 **Lint y tipos (job 2).** `golangci-lint` v2.13.2 incluye **gosec**, que detecta patrones inseguros en Go; ESLint y la comprobación de tipos corren sobre el Hub y Contabilidad, y Hadolint analiza los Dockerfiles con `failure-threshold: warning`.
 
 **SAST (jobs 4 y 4b).** CodeQL con las consultas `security-extended` analiza Go y JavaScript/TypeScript y publica sus resultados como SARIF. Semgrep 1.86.0 usa los conjuntos `p/owasp-top-ten`, `p/golang` y `p/react`, publica un SARIF y, en un segundo paso, rompe la build con severidad `ERROR`. El enunciado menciona Bandit para Python; como el backend es Go, los equivalentes son gosec, CodeQL y govulncheck, y Semgrep se mantiene como herramienta común.
 
-{{code:yaml:.github/workflows/ci.yml:211-235}}
+{{code:yaml:.github/workflows/ci.yml:309-333}}
 
 **Dependencias (job 5).** `govulncheck` analiza **alcanzabilidad**: solo informa de vulnerabilidades cuyo código es realmente invocable, lo que elimina casi todo el ruido frente a un escáner que solo lee `go.mod`. `npm audit --audit-level=high` cubre el Hub y Contabilidad, y osv-scanner v2.6.0 (`--recursive --all-vulns`) recorre todos los manifiestos, marcando como no invocado lo que el análisis de llamadas descarta.
 
-{{code:yaml:.github/workflows/ci.yml:250-257}}
+{{code:yaml:.github/workflows/ci.yml:346-358}}
 
 ## Fase 3: Integración (build)
 
 **Imágenes (jobs 9-10).** Una matriz construye las tres imágenes (`api`, `worker` y `web`) con Buildx y caché de GitHub Actions, y las escanea con Trivy en dos pasos: primero un informe SARIF que se sube siempre a Code Scanning y luego el gate, que rompe la build ante CVE de severidad `HIGH` o `CRITICAL` **con parche disponible** (`ignore-unfixed: true`). La política es deliberada: bloquear por un CVE sin arreglo no protege de nada y entrena al equipo a ignorar el rojo. Las excepciones se registrarían en `security/.trivyignore`, que se mantiene vacío a propósito: toda excepción exige CVE, justificación, responsable, expiración y ficha asociada.
 
-{{code:yaml:.github/workflows/ci.yml:545-555}}
+{{code:yaml:.github/workflows/ci.yml:738-753}}
 
 **Configuración (job 8).** Trivy config analiza Dockerfiles y demás configuración con el mismo patrón de dos pasos (SARIF y gate en `HIGH,CRITICAL`).
 
@@ -315,27 +324,33 @@ El modelado de amenazas con Threat Dragon y STRIDE se describe en la sección an
 
 **Unitarias e integración (jobs 6 y 6b).** `go test -race` y las pruebas de Vitest del frontend y de Contabilidad. El job 6b ejecuta las pruebas con la etiqueta `integration` contra un PostgreSQL real (imagen fijada por digest) y aplica un **gate de cobertura del 70 %** sobre `./internal/...`.
 
-{{code:yaml:.github/workflows/ci.yml:380-393}}
+{{code:yaml:.github/workflows/ci.yml:484-500}}
 
-**E2E (job 7).** Playwright ejecuta 52 pruebas en Chromium contra el stack completo levantado con Compose; cada prueba corresponde a un escenario Gherkin de los requisitos (el verificador de trazabilidad exige la correspondencia uno a uno). Si falla o se cancela, sube el informe y las trazas como artefactos.
+**Badge de cobertura (job 6c).** El README muestra el porcentaje que mide el job 6b, no un valor fijo. El job 6c corre solo en `push` a `main`, es el único con `contents: write` y publica un `coverage.json` en la rama huérfana `badges`, de donde lo lee el badge sin depender de un servicio externo. Distingue una rama inexistente (`git ls-remote --exit-code` devuelve 2) de un fallo de red, que se reintenta, y lleva `continue-on-error` para que un problema al publicar el badge no ponga `main` en rojo, porque el gate real es el 6b. Tras el merge se verificó `badges/coverage.json` con 78,4 %.
+
+**E2E (job 7).** Playwright ejecuta 59 pruebas en Chromium contra el stack completo levantado con Compose; cada prueba corresponde a un escenario Gherkin de los requisitos (el verificador de trazabilidad exige la correspondencia uno a uno). Si falla o se cancela, sube el informe y las trazas como artefactos.
 
 **DAST (job 11).** OWASP ZAP 2.17.0 corre en tres escaneos: *baseline* del Hub, *baseline* de Contabilidad y escaneo de API a partir del contrato OpenAPI, todos contra el stack levantado. ZAP se ejecuta con `-I` (no decide él); el único punto de decisión es `scripts/zap-gate.py`, que rompe la build ante alertas de riesgo medio o alto, salvo una entrada `IGNORE` justificada en `.zap/rules.tsv`. Los informes JSON y HTML se suben como artefacto aunque el job falle.
 
-{{code:yaml:.github/workflows/ci.yml:562-577}}
+{{code:yaml:.github/workflows/ci.yml:755-777}}
 
 ## Fase 5: Despliegue
 
 El despliegue de referencia en AWS se describió en la sección de arquitectura y se valida con Checkov y `terraform validate`. Para el entorno de producción simulado que exige el enunciado, `deploy/docker-compose.prod.yml` es un *override* del Compose base: imágenes por digest y sin `build`, solo `web` publica un puerto, Mailpit no arranca, `restart: unless-stopped`, rotación de logs, límites de memoria y CPU, y se conserva el endurecimiento del Compose base (`read_only`, `cap_drop: ALL`, `no-new-privileges`, `tmpfs`). Se levanta con `make up-prod` y se detiene con `make down-prod`. Las imágenes ya existen en Docker Hub (`docker.io/jorgeivp/identity-hub-api`, `identity-hub-worker` e `identity-hub-web`), de modo que `IDENTITY_HUB_API_IMAGE`, `IDENTITY_HUB_WORKER_IMAGE` e `IDENTITY_HUB_WEB_IMAGE` pueden apuntar a ellas por digest.
 
-**Publicación (`release.yml`).** El workflow se dispara solo con tags `vX.Y.Z` y tiene dos fases. El job `gate` construye `api`, `worker` y `web`, ejecuta el mismo gate de Trivy que CI y guarda cada imagen como artefacto. El job `publish` depende de `gate`, es el único con el environment protegido `dockerhub` (restringido a tags `v*`), carga la misma imagen ya escaneada, la publica con las etiquetas `vX.Y.Z` y `latest`, genera un SBOM CycloneDX con Syft, firma con Cosign keyless (OIDC de GitHub) y adjunta el SBOM como atestación, todo sobre el digest. Se validó con el tag `v0.9.0` (ejecución 38319904991, en verde, 6 jobs); el tag de entrega es `v1.0.0` y el workflow publica cada tag de la misma manera.
+**Publicación (`release.yml`).** El workflow se dispara solo con tags `vX.Y.Z` y tiene dos fases. El job `gate` construye `api`, `worker` y `web`, ejecuta el mismo gate de Trivy que CI y guarda cada imagen como artefacto. El job `publish` depende de `gate`, es el único con el environment protegido `dockerhub` (restringido a tags `v*`), carga la misma imagen ya escaneada y la publica solo con la etiqueta `vX.Y.Z`; después genera un SBOM CycloneDX con Syft, firma con Cosign keyless (OIDC de GitHub) y adjunta el SBOM como atestación, todo sobre el digest. Solo entonces un paso final mueve `latest` a ese mismo digest, y únicamente si el tag es el `vX.Y.Z` más alto del repositorio (repetir el release de un tag viejo no hace retroceder `latest`), y verifica que el digest de `latest` coincida con el firmado. Este orden (tarea F7) corrige el diseño original, que subía `latest` antes de firmar y dejaba una ventana en la que la etiqueta apuntaba a una imagen sin firma. Los pasos de red (push, firma, atestación y consulta de tags) se reintentan hasta tres veces con espera creciente, y los artefactos de imagen se retienen 7 días en lugar de 1 para poder repetir solo el job de publicación si falla (F8). El workflow se validó con el tag `v0.9.0` (ejecución 38319904991, en verde, 6 jobs) y el orden nuevo con el tag `v0.9.1` sobre el commit `32e8359` (ejecución 38405885275, en verde): en las tres imágenes el paso «Mover latest» empezó después de terminar «Firmar y atestar», y `latest` quedó apuntando a `v0.9.1` en Docker Hub. El tag de entrega es `v1.0.0` y el workflow publica cada tag de la misma manera.
 
-**Verificación.** `cosign verify` y `cosign verify-attestation --type cyclonedx` pasan sobre las tres imágenes con Cosign v3. Cosign v3 guarda la firma y la atestación como referrers OCI (formato *bundle*), por lo que no aparecen como etiquetas `.sig` o `.att` en Docker Hub y Cosign v2 no las encuentra: la verificación debe hacerse con Cosign v3.
+{{code:yaml:.github/workflows/release.yml:161-182}}
+
+**Verificación.** `cosign verify` y `cosign verify-attestation --type cyclonedx` pasan sobre las tres imágenes con Cosign v3. Cosign v3 guarda la firma y la atestación como referrers OCI (formato *bundle*), por lo que no aparecen como etiquetas `.sig` o `.att` en Docker Hub y Cosign v2 no las encuentra: la verificación debe hacerse con Cosign v3. La verificación se repitió de forma independiente el 13 de octubre con Cosign v3.1.3 sobre `v0.9.0` y `v0.9.1`, con la identidad `^https://github.com/jorgepaez-ops/IdentityHub/` y el emisor OIDC de GitHub Actions: `cosign verify` y `cosign verify-attestation --type cyclonedx` resultaron correctos en las tres imágenes de ambas versiones. Esa comprobación se hizo a mano; todavía no es un paso del workflow (ver «Limitaciones»).
 
 ## Fase 6: Operación y monitoreo
 
-La observabilidad (sección 7) y el reescaneo semanal cierran el ciclo. `scheduled-scan.yml` se ejecuta los lunes a las 06:00 UTC y ejecuta `govulncheck`; si aparecen vulnerabilidades en código que no cambió, abre automáticamente una incidencia con la salida. Es la parte «continua» del DevSecOps: una dependencia segura el lunes puede tener un aviso publicado el jueves sin que nadie toque el repositorio. Ocurrió el 2026-10-12, con `main` en verde: aparecieron avisos en la biblioteca estándar de Go (net/http, net/textproto y crypto/tls, detectados por govulncheck y Trivy), en libtiff de la base de nginx y en una dependencia del módulo de herramientas (osv-scanner), y los gates bloquearon el release tal como están diseñados. El PR 31 los resolvió subiendo Go de 1.26.8 a 1.26.9, tiff de 4.7.1 a 4.7.2 en la base `nginx-unprivileged` (CVE-2026-4775) y `golang.org/x/net` de 0.59.0 a 0.60.0 en `tools/go.mod`. Por decisión del equipo no recibieron identificador VULN.
+La observabilidad (sección 7) y el reescaneo semanal cierran el ciclo. `scheduled-scan.yml` se ejecuta los lunes a las 06:00 UTC y ejecuta `govulncheck`; si aparecen vulnerabilidades en código que no cambió, abre automáticamente una incidencia con la salida. Es la parte «continua» del DevSecOps: una dependencia segura el lunes puede tener un aviso publicado el jueves sin que nadie toque el repositorio. Ocurrió el 2026-10-12, con `main` en verde: aparecieron avisos en la biblioteca estándar de Go (net/http, net/textproto y crypto/tls, detectados por govulncheck y Trivy), en libtiff de la base de nginx y en una dependencia del módulo de herramientas (osv-scanner), y los gates bloquearon el release tal como están diseñados. El PR 31 los resolvió subiendo Go de 1.26.8 a 1.26.9, tiff de 4.7.1 a 4.7.2 en la base `nginx-unprivileged` (CVE-2026-4775) y `golang.org/x/net` de 0.59.0 a 0.60.0 en `tools/go.mod`. Por decisión del equipo no recibieron identificador VULN. El incidente de ese día (issue 29, abierto por el escaneo semanal con go1.26.8) se cerró con evidencia: un escaneo manual sobre `main` (ejecución 38337722846) con go1.26.9 terminó con govulncheck sin vulnerabilidades.
 
 {{code:yaml:.github/workflows/scheduled-scan.yml:9-12}}
+
+**Detección en ejecución (Falco).** `make up` incluye Falco 0.45.0 (perfil `observability`), fijado por digest, con el driver modern eBPF; funciona en Docker Desktop sin ejecutarse como `privileged`. Evalúa cuatro reglas propias, solo sobre `api`, `worker` y `web` (los contenedores de solo lectura y sin capacidades de AM-020): un shell dentro del contenedor, la escritura en directorios del sistema, un gestor de paquetes o descargador (`apk`, `apt`, `pip`, `npm`, `curl`, `wget`) y una conexión saliente a una dirección pública. Las excepciones son deliberadas: el shell del entrypoint de `web` y la sonda de salud con `wget` contra `127.0.0.1`. Sus alertas llegan a Loki por Alloy, activan una regla de Grafana («Falco detectó actividad anómala en un contenedor», con prioridad `Warning` o superior en los últimos 5 minutos) y tienen runbook (`docs/runbooks/falco-alerta.md`); `make falco-test` dispara eventos inofensivos para comprobarlo. La revisión encontró dos huecos que se cerraron y se verificaron con Falco: una evasión de la excepción de `wget` y la falta de detección de `connect` no bloqueantes. Falco no forma parte de CI, porque exige un kernel Linux con BTF.
 
 ## Escaneo de la línea base
 
@@ -348,6 +363,7 @@ La observabilidad (sección 7) y el reescaneo semanal cierran el ciclo. `schedul
 | Fase | Job o archivo | Herramienta | Integración y umbral |
 |---|---|---|---|
 | Codificación | pre-commit | Gitleaks, detect-private-key, gofmt, go build | Bloquea el commit local |
+| Planificación | 0 | Detección de cambios | Omite los jobs pesados si el cambio es solo documentación |
 | Codificación | 3 | Gitleaks (historial completo) | Falla ante hallazgos |
 | Codificación | 2 | gosec (golangci-lint), ESLint, Hadolint | Falla ante hallazgos; Hadolint en `warning` |
 | Codificación | 4 y 4b | CodeQL `security-extended`, Semgrep | SARIF a Code Scanning; Semgrep falla con `ERROR` |
@@ -356,9 +372,12 @@ La observabilidad (sección 7) y el reescaneo semanal cierran el ciclo. `schedul
 | Integración | 9-10 | Trivy image (api, worker, web) | SARIF y gate en `HIGH,CRITICAL` corregibles |
 | Integración | 12 | Checkov 3.3.23 | Falla ante cualquier hallazgo; SARIF |
 | Pruebas | 6 y 6b | go test, Vitest | Gate de cobertura del 70 % |
-| Pruebas | 7 | Playwright | 52 pruebas E2E |
+| Pruebas | 7 | Playwright | 59 pruebas E2E |
+| Pruebas | 6c | Badge de cobertura | Publica el porcentaje medido en la rama `badges`; solo en `main` |
 | Pruebas | 11 | OWASP ZAP 2.17.0 | `zap-gate.py` falla con riesgo medio o alto |
+| Despliegue | release.yml | Syft, Cosign | SBOM y firma keyless; `latest` se mueve solo tras firmar y atestar |
 | Operación | scheduled-scan | govulncheck | Abre una incidencia automática |
+| Operación | `make up` | Falco | Reglas propias; alertas a Loki y Grafana (no corre en CI) |
 | Externo | PR | SonarCloud | Gate de calidad del código nuevo; no está definido en `ci.yml` |
 
 # Resultados de Seguridad
@@ -478,11 +497,24 @@ Además de la interfaz, la rama cerró las alertas de *code scanning* que quedab
 - **Checkov filtrado en el SARIF.** Las 27 alertas de Checkov eran omisiones ya justificadas en línea (`#checkov:skip`); GitHub las mostraba aunque llevaran `suppressions`, así que CI las filtra con `jq` antes de subir el SARIF. El gate no cambia, y el filtro no oculta un fallo de Checkov.
 - **Alertas abiertas conocidas.** El `README.md` tiene una sección con las alertas que siguen abiertas y su justificación: GO-2026-5932 (VULN-028, no afectado) y `tzdata` en las imágenes distroless, a la espera de un nuevo digest de la base.
 
+## Hallazgos y correcciones posteriores al cierre de la remediación
+
+Durante la integración de las funciones de cierre (PR 32 a 41) aparecieron hallazgos que no corresponden a la línea base ni se remedian con una ficha. Por decisión del equipo no recibieron identificador `VULN`, y se listan aquí para que el rastro sea completo:
+
+- **CVE-2026-85091 (`zlib` 1.3.2-r0, severidad media) en la imagen `web`.** Se mitigó con una capa temporal `apk upgrade --no-cache zlib` hasta que la base de nginx lo incluya (PR 40). Trivy con severidad media o superior quedó sin hallazgos y el proceso sigue con uid 101.
+- **Doble envío de correo por un error de la tarea F2.** El hook de revisión con IA lo detectó al integrar `main` en la rama de la matriz (F6): si fallaba el comando `QUIT` después de que el servidor aceptara el mensaje con `250`, el worker reencolaba el evento y el correo se enviaba dos veces. `QUIT` pasó a ser de mejor esfuerzo, con una prueba que primero falla y luego pasa (PR 41).
+- **Registro de intentos anónimos con claves de servicio.** La revisión de F4 llevó a auditar solo los rechazos ligados a una clave existente, a registrar los anónimos sin datos de la cabecera (alerta `go/log-injection` de CodeQL) y a no descartar en silencio ningún fallo de auditoría.
+- **Fallas de CI resueltas en los PR.** Checkov marcó CKV_AWS_273 y CKV_AWS_40 sobre el usuario IAM de las credenciales SMTP de SES; se justificaron en línea porque SES SMTP exige un usuario IAM. Sonar reportó un falso positivo (S7552) en `scripts/gen-smtp-certs.sh`, y una prueba del frontend de F1 no estaba aislada (un `FileReader` se colaba entre pruebas).
+- **Issue 29 (escaneo semanal del 12 de octubre con go1.26.8).** Se cerró con evidencia: escaneo manual sobre `main` con go1.26.9 y govulncheck sin vulnerabilidades.
+- **VULN-028.** Se reclasificó como *no afectado* el 12 de octubre: GO-2026-5932 no tiene versión corregida ni la tendrá, y `go list -deps` no encuentra `x/crypto/openpgp` en el backend ni en las herramientas.
+
+El cambio de SMTP merece una nota propia: el worker abre la sesión explícitamente (EHLO, STARTTLS, AUTH, MAIL, RCPT, DATA, QUIT) con TLS 1.2 como mínimo, exige STARTTLS antes de autenticar y no envía nada si el servidor no lo ofrece; Mailpit local lo exige con una CA generada por `make certs`, y se comprobó que un envío en claro se rechaza (código 530).
+
 # Monitoreo y Observabilidad
 
 ## Stack y cómo se activa
 
-El perfil `observability` del Compose añade cuatro servicios, todos con imágenes fijadas por digest:
+El perfil `observability` del Compose añade cinco servicios a la aplicación, todos con imágenes fijadas por digest:
 
 | Servicio | Función | Puerto del host |
 |---|---|---|
@@ -490,16 +522,17 @@ El perfil `observability` del Compose añade cuatro servicios, todos con imágen
 | Loki | Almacena los logs estructurados | 3100 |
 | Grafana Alloy | Lee los logs de los contenedores por el socket de Docker (solo lectura) y los envía a Loki | sin puerto publicado |
 | Grafana | Visualiza ambas fuentes; datasources y dashboard aprovisionados desde `deploy/observability/grafana/` | 3000 |
+| Falco | Detección de comportamiento anómalo en tiempo de ejecución (driver modern eBPF); sus alertas llegan a Loki por Alloy | sin puerto publicado |
 
-Se activa con `make up-obs` y las credenciales de Grafana viven en `.env` (`GRAFANA_ADMIN_USER` y `GRAFANA_ADMIN_PASSWORD`, generadas por `make setup`). Los logs de la API y del worker son JSON estructurado; Alloy los etiqueta con el servicio (`api`, `worker`, `broker`, `db`, `web`, etc.). Las capturas de esta sección se tomaron con el stack real levantado y después de ejecutar la suite E2E (`make e2e`, 52 pruebas), que genera inicios de sesión correctos y fallidos, MFA, invitaciones y eventos, de modo que las consultas muestran datos reales. El script de captura (`docs/informe/capturas-grafana.mjs`) abre la sesión de Grafana por HTTP, sin mostrar jamás el formulario de acceso, de modo que ninguna captura contiene credenciales.
+Forma parte de `make up`, el único comando para levantar el stack completo; `make up-app` levanta solo la aplicación, sin estos cinco servicios (es lo que usa CI). Sin kernel con BTF, Falco falla y se reinicia, pero la aplicación y el resto de la observabilidad funcionan. Las credenciales de Grafana viven en `.env` (`GRAFANA_ADMIN_USER` y `GRAFANA_ADMIN_PASSWORD`, generadas por `make setup`). Los logs de la API y del worker son JSON estructurado; Alloy los etiqueta con el servicio (`api`, `worker`, `broker`, `db`, `web`, etc.). Las capturas de esta sección se tomaron con el stack real levantado y después de ejecutar la suite E2E (`make e2e`, 52 pruebas), que genera inicios de sesión correctos y fallidos, MFA, invitaciones y eventos, de modo que las consultas muestran datos reales. El script de captura (`docs/informe/capturas-grafana.mjs`) abre la sesión de Grafana por HTTP, sin mostrar jamás el formulario de acceso, de modo que ninguna captura contiene credenciales.
 
 ## Dashboard «Identity Hub — Seguridad»
 
-El dashboard aprovisionado (`deploy/observability/grafana/dashboards/seguridad.json`) tiene cinco paneles: intentos de inicio de sesión por resultado, reusos de refresh token detectados, profundidad de la DLQ de RabbitMQ, latencia p95 por ruta y eventos publicados frente a consumidos. Los paneles se alinean con amenazas del modelo: fuerza bruta (AM-001), reuso de refresh token (AM-002) y cola saturada (AM-019); esta última cuenta además con la regla de alerta `deploy/observability/grafana/alerting/dlq.yml` y el runbook `docs/runbooks/dlq-notificaciones.md`.
+El dashboard aprovisionado (`deploy/observability/grafana/dashboards/seguridad.json`) tiene siete paneles. Los cinco de la aplicación muestran: intentos de inicio de sesión por resultado, reusos de refresh token detectados, profundidad de la DLQ de RabbitMQ, latencia p95 por ruta y eventos publicados frente a consumidos; los otros dos, «Alertas de Falco (24 h)» y «Alertas de Falco», cuentan y listan las detecciones de Falco. Los paneles se alinean con amenazas del modelo: fuerza bruta (AM-001), reuso de refresh token (AM-002) y cola saturada (AM-019); esta última cuenta además con la regla de alerta `deploy/observability/grafana/alerting/dlq.yml` y el runbook `docs/runbooks/dlq-notificaciones.md`.
 
 ![Dashboard de Grafana «Identity Hub — Seguridad» tras la ejecución de la suite E2E: intentos de inicio de sesión por resultado, reusos de refresh token detectados, profundidad de la DLQ, latencia p95 por ruta y eventos publicados frente a consumidos, todos con datos.](img/grafana-dashboard-seguridad.png)
 
-Los cinco paneles muestran datos reales. Durante la redacción del informe la captura reveló que tres contadores (`identity_login_attempts_total`, `identity_events_published_total` e `identity_refresh_reuse_detected_total`) estaban definidos pero ningún código los incrementaba, y que el panel de la DLQ consultaba una serie sin la etiqueta `queue`. Se corrigió en la misma semana: el broker cuenta cada publicación (confirmada o fallida), el servicio de refresh cuenta cada reuso solo cuando la revocación se confirma en la base, los handlers de inicio de sesión y verificación MFA cuentan `mfa_required`, `failed`, `locked` y `succeeded`, y Prometheus raspa además el endpoint detallado de RabbitMQ (`/metrics/detailed`, familia `queue_coarse_metrics`), del que el panel lee `rabbitmq_detailed_queue_messages`. Cada contador tiene su prueba (`TestRNF007_*`). El panel de reusos muestra una serie por instancia: la de la API acumula los reusos que provoca la suite y la del worker queda en 0, porque el worker no atiende refresh.
+Los cinco paneles de la aplicación que recoge la captura muestran datos reales. Durante la redacción del informe la captura reveló que tres contadores (`identity_login_attempts_total`, `identity_events_published_total` e `identity_refresh_reuse_detected_total`) estaban definidos pero ningún código los incrementaba, y que el panel de la DLQ consultaba una serie sin la etiqueta `queue`. Se corrigió en la misma semana: el broker cuenta cada publicación (confirmada o fallida), el servicio de refresh cuenta cada reuso solo cuando la revocación se confirma en la base, los handlers de inicio de sesión y verificación MFA cuentan `mfa_required`, `failed`, `locked` y `succeeded`, y Prometheus raspa además el endpoint detallado de RabbitMQ (`/metrics/detailed`, familia `queue_coarse_metrics`), del que el panel lee `rabbitmq_detailed_queue_messages`. Cada contador tiene su prueba (`TestRNF007_*`). El panel de reusos muestra una serie por instancia: la de la API acumula los reusos que provoca la suite y la del worker queda en 0, porque el worker no atiende refresh.
 
 ## Explore: logs en Loki
 
@@ -521,7 +554,7 @@ La página de objetivos de Prometheus confirma que la API, el worker, RabbitMQ y
 
 ## Alcance de la observabilidad
 
-Falco, que el enunciado menciona para la detección de comportamiento anómalo en tiempo de ejecución, quedó **fuera del alcance** salvo que sobrara tiempo: es el único faltante del bonus de observabilidad. La DLQ (AM-019) sí tiene alerta versionada y runbook (`deploy/observability/grafana/alerting/dlq.yml`, `docs/runbooks/dlq-notificaciones.md`).
+Falco, que el enunciado menciona para la detección de comportamiento anómalo en tiempo de ejecución, se incorporó en la tarea F3 (ver «Fase 6: Operación y monitoreo»), de modo que el bonus de observabilidad queda completo en el perfil local. Su alcance es acotado: corre con `make up` (no con `make up-app`), necesita un kernel Linux con BTF y no se ejecuta en CI. La DLQ (AM-019) tiene alerta versionada y runbook (`deploy/observability/grafana/alerting/dlq.yml`, `docs/runbooks/dlq-notificaciones.md`), y Falco tiene la suya (`deploy/observability/grafana/alerting/falco.yml`, `docs/runbooks/falco-alerta.md`).
 
 # Conclusiones
 
@@ -530,19 +563,25 @@ Falco, que el enunciado menciona para la detección de comportamiento anómalo e
 - **Una línea base vulnerable es un instrumento delicado.** Sembrar vulnerabilidades reales permite medir cada gate, pero obliga a proteger la evidencia: alguien puede «arreglar» una vulnerabilidad sembrada y destruirla. Se mitigó con el ADR 0007, avisos en los archivos afectados y un tag inmutable. Además, la imagen `api` del tag vulnerable ya no se puede construir hoy: su `apt-get install` sobre Debian 11 falla con 404 porque los repositorios retiraron esos paquetes (la propia base sembrada envejeció), por lo que parte del «antes» se obtuvo con escaneos de la época y con construcciones parciales (por ejemplo, solo el target `web`).
 - **Los falsos positivos de los gates también son hallazgos.** Gitleaks detectó referencias de Terraform (`random_password.*.result`) como secretos y, al construir la plantilla `.env`, una regla de `.gitleaks.toml` cruzaba saltos de línea. Se resolvió registrando huellas puntuales (nunca exclusiones amplias) y, después, ajustando la regla `contrasena-en-variable-de-entorno` para que ya no cruce saltos de línea (tarea D1).
 - **El repositorio vive en una carpeta sincronizada con iCloud.** Aparecieron unas 135 copias sin seguimiento con sufijo « 2» (por ejemplo `gen 2.go`) que rompían `go build` por símbolos duplicados, y en T18 iCloud renombró o borró 15 capturas del manual. Se adoptó una rutina: al iniciar cada sesión buscar los archivos `* 2*`, compararlos con el original con `cmp`, borrar solo los idénticos e informar siempre qué se borró; y los binarios generados (PNG, PDF) se producen en una carpeta temporal fuera del repositorio y se copian una sola vez al final.
-- **Los límites de las herramientas delegadas.** El agente Codex trabaja en un sandbox sin red saliente y sin el socket de Docker; fallaron tareas que necesitaban `go get`, `govulncheck`, `docker build` o `make up`. Se estableció una regla: lo que necesita red o Docker (dependencias, escaneos, E2E, capturas, publicación) lo cierra directamente el orquestador. Y todo job delegado se monitorea de forma activa en vez de esperar a que alguien pregunte.
+- **Los límites de las herramientas delegadas.** El agente Codex trabaja en un sandbox sin red saliente y sin el socket de Docker; fallaron tareas que necesitaban `go get`, `govulncheck`, `docker build` o `make up`. Se estableció una regla: lo que necesita red o Docker (dependencias, escaneos, E2E, capturas, publicación) lo cierra directamente el orquestador. Y todo job delegado se monitorea de forma activa en vez de esperar a que alguien pregunte. Desde el 12 de octubre Codex dejó de estar disponible (su modelo por defecto no se admitía con la cuenta), y las tareas F1 a F10 se delegaron a otro modelo bajo revisión del orquestador.
 - **Los gates tienen interacciones que no se ven a primera vista.** El límite de 20 fallos por IP (RF-017) bloqueaba el navegador del desarrollador después de una corrida de E2E o de DAST, porque todas las pruebas salen de la misma IP y el `audit_log` es append-only. Se resolvió con un envoltorio (`scripts/with-raised-login-limit.sh`) que sube solo el límite por IP mientras corre la suite y lo restaura con un `trap`, y con un aviso al terminar. Del mismo modo, `make test-integration` sin `TEST_DATABASE_URL` omite en silencio las pruebas contra la base: «pasa» pero la cobertura cae, lo que ocultaba errores hasta que se levantó un PostgreSQL desechable igual al de CI.
 - **Defecto de codificación en los correos (T18), encontrado y corregido.** Al fotografiar el manual de usuario se detectó que el worker no declaraba la codificación del correo: `buildRawMessage` no enviaba `MIME-Version` ni `Content-Type: text/plain; charset=utf-8` ni codificaba el asunto (RFC 2047), de modo que Mailpit mostraba «GÃ³mez» en lugar de «Gómez». Era un error funcional, no de seguridad. La tarea T21a lo corrigió: el worker envía ahora `MIME-Version`, `Content-Type: text/plain; charset=utf-8`, el asunto codificado según RFC 2047 y elimina CR y LF de las cabeceras.
 - **Avisos nuevos con `main` en verde (2026-10-12).** Una dependencia, la biblioteca estándar de Go y la base de nginx publicaron avisos después del último verde; los gates bloquearon el release y se remedió en el PR 31 (ver «Fase 6: Operación y monitoreo»).
+- **Integrar diez ramas a la vez produjo problemas que ninguna mostraba sola.** Al fusionar los PR 32 a 41 en `main` aparecieron un CVE de `zlib` en la imagen `web`, el doble envío de correo causado por `QUIT` (encontrado por el hook de revisión con IA al integrar `main` en la rama de F6), el issue 29 del escaneo semanal y tres fallas de CI (Checkov, un falso positivo de Sonar y una prueba del frontend no aislada); el detalle está en «Hallazgos y correcciones posteriores al cierre de la remediación».
+- **Un PR de solo notas corrió el pipeline completo.** El PR 42, que cambiaba únicamente `odd/tasks/cierre-entrega.md`, ejecutó E2E, DAST, integración e imágenes, unos 8 minutos, porque `ci.yml` no distinguía documentación de código. Se resolvió con el job 0 (PR 43) y con una regla de trabajo: las notas de fin de día viven en una rama local, sin PR hasta que se pidan. El diseño inicial con `paths-ignore` se descartó porque los checks obligatorios del ruleset quedarían en «Expected — waiting».
+- **El orden importa en un release firmado.** El primer diseño de `release.yml` movía `latest` antes de firmar. Se corrigió (F7) y se comprobó con un tag de validación, `v0.9.1`, antes del tag de entrega.
 
 ## Limitaciones
 
-- **Observabilidad parcial:** sin Falco todavía; la DLQ (AM-019) ya tiene alerta y runbook.
-- **La nube es solo una referencia:** el Terraform no se aplica; el worker envía SMTP sin autenticación ni TLS, por lo que SES real exigiría cambiar código; los hosts `*.localhost` y el cliente OAuth (`contabilidad`) están fijos en el código.
+- **Falco solo en el perfil local de observabilidad:** no corre en CI y requiere un kernel Linux con BTF; la DLQ (AM-019) y Falco tienen alerta y runbook.
+- **La nube es solo una referencia:** el Terraform no se aplica. El worker ya autentica por SMTP con STARTTLS, y el cliente OAuth y sus URL se configuran por variables, pero siguen fijos el `server_name` de Nginx, las constantes de Contabilidad y la fila del cliente en la base de datos. Un `.env` anterior a F2 necesita `SMTP_PASSWORD` y ejecutar `make certs`.
 - **Un solo cliente OAuth y sin OpenID Connect:** la guía de integración de terceros enumera lo que falta (registro dinámico, refresh tokens para aplicaciones, cierre de sesión único, revocación).
 - **Sin outbox transaccional** (ADR 0006): la publicación al broker usa *publisher confirms*, pero no hay garantía transaccional conjunta entre la base de datos y el broker; el outbox es trabajo futuro deliberado.
 - **Sin riesgo aceptado vigente:** VULN-028 (GO-2026-5932) se reclasificó el 2026-10-12 como no afectado; solo se reabriría si algún paquete empezara a importar `x/crypto/openpgp`.
-- **Funciones diferidas en la matriz:** claves de servicio (RF-018) y exportación del audit log (RF-019).
+- **Cobertura de la matriz de trazabilidad:** de 33 requisitos, 25 están completos, 7 son parciales (RF-008, RNF-001, RNF-002, RNF-006, RNF-007, RNF-008 y RNF-012, con una sola fuente de evidencia) y RNF-010 (latencia) no tiene prueba, porque no hay prueba de carga. No queda ningún requisito diferido.
+- **El clasificador del job 0 no tiene pruebas automatizadas:** vive como script embebido en el workflow y se probó en local y con PR reales; el seguimiento previsto es moverlo a `scripts/` con una prueba. Además, la guarda repetida en cada paso del job de imágenes depende de que cada paso nuevo la incluya.
+- **La verificación de firmas no está automatizada:** `cosign verify` y `cosign verify-attestation` se ejecutaron a mano (Cosign v3.1.3) sobre `v0.9.0` y `v0.9.1`; el workflow de release firma y atesta, pero no verifica después.
+- **Las claves de servicio tienen un único alcance:** `audit-log:read`, solo en el listado del audit log.
 
 ## Diferencias conocidas entre especificación y código
 
@@ -561,13 +600,17 @@ La revisión de la rama de pulido encontró tres diferencias entre lo que decía
 5. **La composición real importa más que las pruebas aisladas.** Dos manejadores HTTP pasaron todas sus pruebas aisladas pero devolvían `501` en el enrutador real durante dos tareas; desde entonces se verifica que cada manejador quede compuesto en `Server.Routes()`.
 6. **Evidencia por capas.** Separar el texto verificable del repositorio (`evidencia.json`) de las capturas externas mantiene el repositorio liviano y la trazabilidad completa.
 7. **Documentar lo que no se hizo es parte del trabajo.** Las secciones de limitaciones de los manuales y de este informe declaran lo que falta, en lugar de afirmar cobertura que no existe.
+8. **Un job omitido no es un check ausente.** Con un ruleset que exige checks por nombre, `paths-ignore` bloquea el merge; un job que decide en tiempo de ejecución y se omite cuenta como aprobado y ahorra el pipeline completo sin debilitar la protección.
+9. **El orden de las etapas de publicación es parte de la seguridad.** Una etiqueta móvil como `latest` solo debe apuntar a lo que ya está firmado y atestado.
+10. **Integrar también es verificar.** La revisión automática al fusionar ramas encontró un doble envío de correo que las pruebas de la rama de origen no cubrían.
 
 ## Trabajo futuro
 
-1. **Falco** para detección en ejecución (la alerta y el runbook de la DLQ, AM-019, ya están hechos).
-2. **Soporte SMTP autenticado con STARTTLS** en el worker y hosts configurables, para poder aplicar de verdad la arquitectura de AWS.
+1. **Automatizar la verificación del release:** un paso posterior que ejecute `cosign verify` y `cosign verify-attestation --type cyclonedx` con la identidad del workflow.
+2. **Mover el clasificador del job 0 a `scripts/` con una prueba** y sustituir la guarda repetida en el job de imágenes por una forma que no dependa de cada paso nuevo.
 3. Evolucionar la integración de terceros: clientes OAuth en base de datos, OpenID Connect, refresh tokens por cliente, introspección y revocación; y reemplazar la publicación directa por un **outbox transaccional**.
-4. Funciones diferidas en la matriz: claves de servicio (RF-018) y exportación del audit log (RF-019).
+4. **Medir la latencia (RNF-010)** con una prueba de carga y completar la evidencia de los requisitos que la matriz marca como parciales.
+5. Ampliar los alcances de las claves de servicio más allá de la lectura del audit log.
 
 # Anexo A — Puesta en marcha y operación
 
@@ -589,13 +632,13 @@ git clone https://github.com/jorgepaez-ops/IdentityHub.git
 cd IdentityHub
 
 make setup                # 1. genera .env con secretos aleatorios (scripts/setup_env.py)
-make up                   # 2. construye y levanta el stack de desarrollo
-# equivalente desde la raíz:  docker compose up -d
+make up                   # 2. construye y levanta el stack completo (aplicación y observabilidad)
+# equivalente desde la raíz:  docker compose --profile observability up -d
 make ps                   # 3. estado de los contenedores
 ```
 
-1. **`make setup`** ejecuta `python3 scripts/setup_env.py`. Parte de `.env.example` y escribe un `.env` local con contraseñas aleatorias (PostgreSQL, rol de aplicación, RabbitMQ y Grafana) y la semilla de la clave de firma de JWT. El `.env` no se versiona (AM-012) y un `.env` existente **no se sobrescribe**. Regenerarlo con `python3 scripts/setup_env.py --force` cambia las contraseñas, pero PostgreSQL y RabbitMQ conservan las de sus volúmenes: después hay que ejecutar `make clean`, que borra los datos.
-2. **`make up`** ejecuta `docker compose --env-file .env -f deploy/docker-compose.yml up -d --build`. El `docker-compose.yml` de la raíz incluye `deploy/docker-compose.yml`, por lo que `docker compose up -d` desde la raíz levanta lo mismo; la diferencia es que `make up` añade `--build` y por tanto reconstruye las imágenes.
+1. **`make setup`** ejecuta `python3 scripts/setup_env.py`. Parte de `.env.example` y escribe un `.env` local con contraseñas aleatorias (PostgreSQL, rol de aplicación, RabbitMQ y Grafana) la contraseña SMTP de Mailpit y la semilla de la clave de firma de JWT. El `.env` no se versiona (AM-012) y un `.env` existente **no se sobrescribe**. Regenerarlo con `python3 scripts/setup_env.py --force` cambia las contraseñas, pero PostgreSQL y RabbitMQ conservan las de sus volúmenes: después hay que ejecutar `make clean`, que borra los datos.
+2. **`make up`** depende de `make certs`, que genera (de forma idempotente) en `deploy/certs/` la CA local, el certificado de Mailpit y su archivo de credenciales SMTP con `scripts/gen-smtp-certs.sh`; después ejecuta `docker compose --env-file .env -f deploy/docker-compose.yml up -d --build`. El `docker-compose.yml` de la raíz incluye `deploy/docker-compose.yml`, por lo que `docker compose up -d` desde la raíz levanta lo mismo; la diferencia es que `make up` añade `--build` y por tanto reconstruye las imágenes.
 3. **Primer administrador (opcional):** define `BOOTSTRAP_ADMIN_EMAIL` en `.env` antes del primer arranque. Si no existe ningún administrador, la API crea una cuenta pendiente con el rol `admin` y envía la invitación por el flujo normal a Mailpit; la persona elige su propia contraseña. No existe una variable de contraseña inicial.
 
 ## Direcciones
@@ -608,9 +651,9 @@ make ps                   # 3. estado de los contenedores
 | Métricas del worker | `http://localhost:9091/metrics` |
 | Mailpit (buzón de pruebas) | `http://localhost:8025` |
 | RabbitMQ (administración) | `http://localhost:15672` (credenciales en `.env`) |
-| Grafana (con `make up-obs`) | `http://localhost:3000` (credenciales en `.env`) |
-| Prometheus (con `make up-obs`) | `http://localhost:9090` |
-| Loki (con `make up-obs`) | `http://localhost:3100` |
+| Grafana (incluido en `make up`) | `http://localhost:3000` (credenciales en `.env`) |
+| Prometheus (incluido en `make up`) | `http://localhost:9090` |
+| Loki (incluido en `make up`) | `http://localhost:3100` |
 
 Los dominios `*.localhost` se resuelven a `127.0.0.1` en los navegadores modernos sin editar `/etc/hosts` ni instalar certificados.
 
@@ -621,10 +664,12 @@ Los dominios `*.localhost` se resuelven a `127.0.0.1` en los navegadores moderno
 | Objetivo | Qué hace |
 |---|---|
 | `make setup` | Genera `.env` con secretos aleatorios (no sobrescribe uno existente) |
-| `make up` / `make down` | Levanta el stack de desarrollo / lo detiene conservando los volúmenes |
+| `make certs` | Genera la CA local, el certificado de Mailpit y sus credenciales SMTP (`deploy/certs/`; `make up` lo invoca) |
+| `make up` / `make down` | Levanta el stack completo, observabilidad y Falco incluidos / lo detiene conservando los volúmenes |
 | `make clean` | Detiene el stack y **borra los volúmenes** de datos |
 | `make ps`, `make logs S=api`, `make restart S=api`, `make build` | Estado, logs de un servicio, reconstruir y reiniciar un servicio, construir las tres imágenes |
-| `make up-obs` | Levanta el stack con el perfil de observabilidad (Grafana y Prometheus) |
+| `make up-app` | Levanta solo la aplicación, sin observabilidad (lo usa CI) |
+| `make falco-test` | Dispara eventos inofensivos que activan las reglas de Falco (requiere `make up`) |
 | `make up-prod` / `make down-prod` | Producción simulada (imágenes por digest, sin build, solo `web` publica puerto) / su detención |
 | `make test`, `make test-go`, `make test-integration`, `make test-front` | Pruebas unitarias de Go y del frontend, integración con PostgreSQL |
 | `make e2e` | Suite E2E de Playwright contra el stack levantado (sube y restaura el límite de fallos por IP) |
@@ -647,7 +692,8 @@ Todas se definen en `.env` (nunca en Git). Solo se enumeran los nombres y su uso
 | Rol de aplicación y migraciones | `IDENTITY_APP_PASSWORD`, `MIGRATE_DATABASE_URL`, `DATABASE_URL` |
 | RabbitMQ | `RABBITMQ_DEFAULT_USER`, `RABBITMQ_DEFAULT_PASS`, `RABBITMQ_URL` |
 | API y JWT | `API_PORT`, `LOG_LEVEL`, `JWT_SIGNING_KEY`, `JWT_ISSUER`, `TRUSTED_PROXIES`, `JWT_ACCESS_TTL`, `JWT_REFRESH_TTL` |
-| Correo local | `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM` |
+| Correo (SMTP) | `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM`, `SMTP_TLS`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_CA_FILE` |
+| Cliente OAuth (opcionales) | `OAUTH_CLIENT_ID`, `OAUTH_REDIRECT_URI`, `OAUTH_CLIENT_ORIGIN` |
 | Observabilidad | `GRAFANA_ADMIN_USER`, `GRAFANA_ADMIN_PASSWORD` |
 | Arranque inicial | `BOOTSTRAP_ADMIN_EMAIL` |
 
@@ -666,7 +712,7 @@ Exige en `.env`, además de las variables de desarrollo: `IDENTITY_HUB_API_IMAGE
 
 La guía completa es `docs/guia-desarrollo.md`.
 
-- **Dos formas de correr el proyecto:** todo en Docker (`make up`, igual que en CI) o solo PostgreSQL en Docker y Go en el host (`cd deploy && docker compose up -d db`, luego `docker compose run --rm migrate` y `cd ../backend && go build ./...`).
+- **Dos formas de correr el proyecto:** todo en Docker (`make up`; CI usa `make up-app`, sin observabilidad) o solo PostgreSQL en Docker y Go en el host (`cd deploy && docker compose up -d db`, luego `docker compose run --rm migrate` y `cd ../backend && go build ./...`).
 - **Generadores:** `make gen` ejecuta `go generate ./internal/api` (oapi-codegen v2.7.1), `sqlc generate` (v1.31.1), `npm run gen:api` y `scripts/traceability.py`. El código generado no se edita a mano: `make gen && git diff --exit-code` debe quedar limpio, y en CI lo exige el job 1.
 - **Pruebas:** `go test -race ./...` desde `backend/`; las de integración llevan la etiqueta `integration` y requieren `TEST_DATABASE_URL`: sin esa variable se omiten en silencio y el resultado «ok» no significa que pasaran. Las pruebas de trazabilidad se nombran `TestRFnnn_...` o `TestRNFnnn_...`.
 - **Hooks de pre-commit:** una vez por clon, `uv tool install pre-commit` (o `brew install pre-commit`) y `pre-commit install`. Si ya existía un `.git/hooks/pre-commit`, se conserva como `pre-commit.legacy`. Los hooks `trailing-whitespace`, `end-of-file-fixer` y gofmt pueden modificar archivos y abortar el commit: se repite el `git add` y el commit. `pre-commit run --all-files` los ejecuta sobre todo el repositorio.
@@ -713,7 +759,7 @@ Qué demuestra: el Hub emite en el token solo los permisos marcados en la grilla
 ## Cómo regenerar este informe
 
 ```bash
-make up-obs        # solo para volver a capturar Grafana
+make up            # incluye Grafana; solo para volver a capturarlo
 make e2e           # genera tráfico real para los paneles (opcional)
 cd docs/informe && npm install --ignore-scripts && node capturas-grafana.mjs --out /tmp/informe-grafana
 # copie a mano las capturas revisadas a docs/informe/img/
@@ -748,10 +794,11 @@ La tabla relaciona cada requisito del enunciado con el artefacto versionado, sig
 | Fase 3: build, escaneo y gate de CVE | `ci.yml` y los Dockerfiles | Hecho |
 | Fase 4: pruebas unitarias y DAST | `ci.yml`, `e2e/` y `security/zap-reports/` | Hecho |
 | Fase 5: IaC y orquestación simulada | `infraestructura/terraform/` y `deploy/docker-compose.prod.yml` | Hecho (T8 a T10) |
-| Fase 6: métricas y logs | `deploy/observability/` | Parcial: sin Falco |
+| Fase 6: métricas, logs y detección en ejecución | `deploy/observability/` y `docs/runbooks/falco-alerta.md` | Hecho (F3) |
+| Claves de servicio (RF-018) y exportación del audit log (RF-019) | ADR 0014, `docs/manuales/claves-de-servicio.md` y `specs/06-acceptance/` | Hecho (F4 y F1) |
 | Fichas y evidencia de vulnerabilidades | `security/findings/`, `docs/evidencia/`, `security/evidence/` | Hecho |
 | Informe técnico en PDF | `docs/informe/informe-tecnico.md`; el PDF se genera con `make informe` y se adjunta al release de GitHub (no se versiona por tamaño) | Hecho (T19) |
-| Imágenes en Docker Hub | ADR 0011 y `.github/workflows/release.yml` (imágenes `jorgeivp/identity-hub-*`, SBOM y firma Cosign) | Hecho (C3) |
+| Imágenes en Docker Hub | ADR 0011 y `.github/workflows/release.yml` (imágenes `jorgeivp/identity-hub-*`, SBOM y firma Cosign; `latest` solo tras firmar) | Hecho (C3 y F7) |
 | Repositorio público de GitHub | `README.md` y `.github/workflows/` | Hecho |
 
-Otros artefactos de apoyo: `specs/` (visión, requisitos, contrato OpenAPI, ADR 0001 a 0013, escenarios de aceptación y matriz de trazabilidad), `docs/BITACORA.md` (decisiones y avances), `docs/security-report.html` (informe de seguridad) y `odd/tasks/` (tareas y seguimiento de las semanas 2 a 4).
+Otros artefactos de apoyo: `specs/` (visión, requisitos, contrato OpenAPI, ADR 0001 a 0014, escenarios de aceptación y matriz de trazabilidad), `docs/BITACORA.md` (decisiones y avances), `docs/security-report.html` (informe de seguridad) y `odd/tasks/` (tareas y seguimiento de las semanas 2 a 4).

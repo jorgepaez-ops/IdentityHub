@@ -11,7 +11,7 @@ SQLC_VERSION := v1.31.1
 SQLC         ?= sqlc
 
 .DEFAULT_GOAL := help
-.PHONY: help setup certs up down informe logs ps restart build test test-go test-integration test-front e2e _e2e-run capturas _capturas-run scan-dast _scan-dast-run spec-drift lint fmt gen scan scan-secrets scan-deps scan-image scan-config scan-iac migrate psql rabbit mail clean up-prod down-prod falco-test
+.PHONY: help setup certs up down informe logs ps restart build test test-go test-integration test-front e2e _e2e-run capturas _capturas-run scan-dast _scan-dast-run spec-drift lint fmt gen scan scan-secrets scan-deps scan-image scan-config scan-iac migrate psql rabbit mail clean up-app up-prod down-prod falco-test
 
 help: ## Muestra esta ayuda
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -25,7 +25,20 @@ certs: ## Genera la CA local, el certificado de Mailpit y sus credenciales SMTP 
 	@test -f .env || { echo "falta .env: corre make setup primero"; exit 1; }
 	sh scripts/gen-smtp-certs.sh --env-file .env
 
-up: certs ## Levanta el stack de desarrollo
+up: certs ## Levanta el stack completo, incluida la observabilidad (Grafana, Prometheus, Loki, Alloy y Falco)
+	$(COMPOSE_OBS) up -d --build
+	@echo ""
+	@echo "  Hub             http://identityhub.localhost:8080  (localhost:8080 también sirve el Hub)"
+	@echo "  Contabilidad    http://contabilidad.localhost:8080"
+	@echo "  API             http://localhost:8081/healthz"
+	@echo "  RabbitMQ        http://localhost:15672   (credentials from .env)"
+	@echo "  Mailpit         http://localhost:8025"
+	@echo "  Grafana         http://localhost:3000     (credentials from .env)"
+	@echo "  Prometheus      http://localhost:9090"
+	@echo ""
+	@echo "  Falco necesita un kernel Linux con BTF (Linux o Docker Desktop); sin él el resto del stack funciona igual."
+
+up-app: certs ## Levanta solo la aplicación, sin observabilidad (lo usa CI)
 	$(COMPOSE) up -d --build
 	@echo ""
 	@echo "  Hub             http://identityhub.localhost:8080  (localhost:8080 también sirve el Hub)"
@@ -33,8 +46,6 @@ up: certs ## Levanta el stack de desarrollo
 	@echo "  API             http://localhost:8081/healthz"
 	@echo "  RabbitMQ        http://localhost:15672   (credentials from .env)"
 	@echo "  Mailpit         http://localhost:8025"
-	@echo ""
-	@echo "  Observabilidad: make up-obs  →  Grafana en http://localhost:3000"
 
 up-prod: ## Levanta la producción simulada (imágenes por digest, sin build ni puertos de desarrollo)
 	$(COMPOSE_PROD) up -d --no-build
@@ -43,17 +54,12 @@ up-prod: ## Levanta la producción simulada (imágenes por digest, sin build ni 
 down-prod: ## Detiene la producción simulada conservando los volúmenes
 	$(COMPOSE_PROD) down
 
-up-obs: certs ## Levanta el stack incluida la observabilidad
-	$(COMPOSE_OBS) up -d --build
-	@echo "  Grafana         http://localhost:3000     (credentials from .env)"
-	@echo "  Prometheus      http://localhost:9090"
-
 down: ## Detiene el stack conservando los volúmenes
 	$(COMPOSE_OBS) down
 
-falco-test: ## Dispara eventos inofensivos que activan las reglas de Falco (requiere make up-obs)
+falco-test: ## Dispara eventos inofensivos que activan las reglas de Falco (requiere make up)
 	@$(COMPOSE_OBS) ps --status running --services | grep -qx falco || \
-		{ echo "Falco no esta corriendo: ejecute make up-obs (solo Linux o Docker Desktop con eBPF)"; exit 1; }
+		{ echo "Falco no esta corriendo: ejecute make up (solo Linux o Docker Desktop con eBPF)"; exit 1; }
 	@echo "Lanzando un contenedor desechable con nombre de servicio de la aplicacion..."
 	@docker run --rm --name identity-hub-falco-test-api-1 --read-only --cap-drop ALL alpine:3.20 \
 		sh -c 'echo prueba > /etc/falco-test 2>/dev/null; wget -q -T 2 -O /dev/null http://1.1.1.1/ 2>/dev/null; true'
@@ -66,16 +72,16 @@ clean: ## Detiene el stack y BORRA los volúmenes de datos
 	$(COMPOSE_OBS) down -v
 
 ps: ## Estado de los contenedores
-	$(COMPOSE) ps
+	$(COMPOSE_OBS) ps
 
 logs: ## Sigue los logs (make logs S=api)
-	$(COMPOSE) logs -f $(S)
+	$(COMPOSE_OBS) logs -f $(S)
 
 restart: certs ## Reconstruye y reinicia un servicio (make restart S=api)
-	$(COMPOSE) up -d --build $(S)
+	$(COMPOSE_OBS) up -d --build $(S)
 
 build: ## Construye las tres imágenes
-	$(COMPOSE) build
+	$(COMPOSE_OBS) build
 
 # ── Desarrollo ───────────────────────────────────────────────────────────
 gen: ## Regenera todo lo derivado de los specs (RNF-011)

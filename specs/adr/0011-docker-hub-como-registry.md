@@ -11,7 +11,7 @@ orquestador, permisos mínimos por job, SARIF en code scanning, Cosign keyless) 
 ## Decisión
 
 - Las imágenes `api`, `worker` y `web` se publican en **Docker Hub** desde un job de GitHub
-  Actions que corre solo al crear un tag `vX.Y.Z`, con las etiquetas `vX.Y.Z` y `latest`.
+  Actions que corre solo al crear un tag `vX.Y.Z`, con las etiquetas `vX.Y.Z` y `latest` (esta última solo después de firmar y atestar; ver «Estado de implementación»).
 - La publicación ocurre al final del proyecto (semana 4), después de que las imágenes pasen los
   mismos gates que hoy (Trivy sin HIGH/CRITICAL corregibles, Hadolint, Trivy config).
 - **Firma con Cosign keyless** (OIDC del workflow) y **SBOM CycloneDX con Syft** adjunto como
@@ -32,4 +32,4 @@ orquestador, permisos mínimos por job, SARIF en code scanning, Cosign keyless) 
 
 ## Estado de implementación
 
-Implementada el 2026-10-12 en `.github/workflows/release.yml` (tarea C3). El workflow se dispara solo con tags `vX.Y.Z`; el job `gate` construye y escanea `api`, `worker` y `web`, y el job `publish` (único con el *environment* protegido `dockerhub`, restringido a tags `v*`) sube las mismas imágenes escaneadas a `docker.io/jorgeivp/identity-hub-api`, `-worker` y `-web` con `vX.Y.Z` y `latest`, adjunta el SBOM CycloneDX (Syft) como atestación y firma el digest con Cosign keyless. Validada con el tag `v0.9.0` (ejecución 38319904991). Cosign v3 guarda firma y atestación como referrers OCI, por lo que la verificación exige Cosign v3.
+Implementada el 2026-10-12 en `.github/workflows/release.yml` (tarea C3). El workflow se dispara solo con tags `vX.Y.Z`; el job `gate` construye y escanea `api`, `worker` y `web`, y el job `publish` (único con el *environment* protegido `dockerhub`, restringido a tags `v*`) sube las mismas imágenes escaneadas a `docker.io/jorgeivp/identity-hub-api`, `-worker` y `-web` solo con `vX.Y.Z`, adjunta el SBOM CycloneDX (Syft) como atestación y firma el digest con Cosign keyless. Solo después de firmar y atestar mueve `latest` a ese mismo digest, y únicamente si el tag es el `vX.Y.Z` más alto del repositorio (tarea F7); los pasos de red se reintentan hasta tres veces y los artefactos de imagen se retienen 7 días (tarea F8). Validada con el tag `v0.9.0` (ejecución 38319904991) y, para el orden nuevo, con `v0.9.1` (ejecución 38405885275). Cosign v3 guarda firma y atestación como referrers OCI, por lo que la verificación exige Cosign v3.

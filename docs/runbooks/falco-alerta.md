@@ -60,7 +60,7 @@ sonda de salud de `web` (`wget` contra `127.0.0.1`).
 
 ## Cómo probar la alerta
 
-Con el stack de observabilidad levantado (`make up-obs`):
+Con el stack levantado con `make up` (la observabilidad y Falco forman parte de él; `make up-app` no los incluye):
 
 ```bash
 make falco-test
@@ -73,7 +73,7 @@ alerta aparece en 1-2 minutos. No hay nada que limpiar: el contenedor se borra s
 
 ## Limitaciones conocidas
 
-- **Plataforma.** Requiere un kernel Linux con BTF y eBPF (Docker Desktop en macOS/Windows y Linux
+- **Plataforma.** Si el kernel no lo soporta, `make up` igual termina bien, la aplicación y el resto de la observabilidad funcionan y solo `falco` se reinicia. Requiere un kernel Linux con BTF y eBPF (Docker Desktop en macOS/Windows y Linux
   modernos). Se verificó en Docker Desktop con kernel 7.0.14 (aarch64). Falco corre sin `privileged`, con
   `BPF`, `PERFMON`, `SYS_RESOURCE` y `SYS_PTRACE`; en hosts con SELinux o políticas AppArmor
   restrictivas puede hacer falta ajustar `security_opt`.
@@ -84,7 +84,7 @@ alerta aparece en 1-2 minutos. No hay nada que limpiar: el contenedor se borra s
   de ejecución del stack desplegado, no un gate de pipeline. Las reglas se validan con
   `falco -V deploy/observability/falco/rules.d/identity-hub.yaml` con la misma imagen fijada.
 - **Falco o Alloy caídos no alertan.** Sin datos la regla queda en *Normal* (es el estado sano). Compruebe
-  que `falco` esté `running` (`make ps` con el perfil) y que existan líneas recientes en Loki.
+  que `falco` esté `running` (`make ps`; la causa, en `make logs S=falco`) y que existan líneas recientes en Loki.
 - **Solo observa, no bloquea.** Falco no detiene el proceso: detecta y avisa.
 - **Sin punto de contacto.** Como la alerta del DLQ, usa la política por defecto de Grafana, que en local
   no envía correos; en producción hay que definir un punto de contacto para `severity=warning`.

@@ -15,8 +15,9 @@ Incluye registro e invitaciones por correo, contraseñas Argon2id, JWT Ed25519 y
 | `worker` | Consume eventos y entrega notificaciones por SMTP; también publica métricas y salud. | [`backend/cmd/worker/main.go`](../../backend/cmd/worker/main.go) |
 | PostgreSQL | Conserva usuarios, sesiones, auditoría y demás estado transaccional. | [`db/migrations/`](../../db/migrations/) |
 | RabbitMQ | Transporta eventos persistentes desde la API al worker. | [`backend/internal/events/`](../../backend/internal/events/) |
-| Mailpit | Captura el SMTP local para desarrollo y pruebas; no es el broker. | [`deploy/docker-compose.yml`](../../deploy/docker-compose.yml) |
+| Mailpit | Captura el SMTP local para desarrollo y pruebas, con STARTTLS y autenticación obligatorios; no es el broker. | [`deploy/docker-compose.yml`](../../deploy/docker-compose.yml) |
 | Prometheus, Loki, Alloy y Grafana | Recogen métricas y logs, y los presentan cuando se activa el perfil de observabilidad. | [`deploy/observability/`](../../deploy/observability/) |
+| Falco | Detección de comportamiento anómalo en tiempo de ejecución (driver modern eBPF) con cuatro reglas propias sobre `api`, `worker` y `web`; sus alertas llegan a Loki por Alloy y a Grafana ([runbook](../runbooks/falco-alerta.md)). Solo en el perfil de observabilidad. | [`deploy/observability/falco/`](../../deploy/observability/falco/) |
 
 ## Comunicación entre dominios
 
@@ -25,7 +26,7 @@ Incluye registro e invitaciones por correo, contraseñas Argon2id, JWT Ed25519 y
 | Navegador ↔ `web` ↔ `api` | HTTP | Nginx entrega SPA y proxifica API; `/metrics` no se expone por Nginx. |
 | `api` ↔ PostgreSQL | SQL | Persistencia transaccional mediante consultas generadas por `sqlc`. |
 | `api` → RabbitMQ → `worker` | AMQP | Eventos persistentes; la publicación usa *publisher confirms* sin outbox transaccional. |
-| `worker` → Mailpit | SMTP | Invitaciones, códigos MFA y avisos de seguridad en el entorno local. |
+| `worker` → Mailpit | SMTP con STARTTLS y autenticación | Invitaciones, códigos MFA y avisos de seguridad. El worker exige STARTTLS (TLS 1.2 como mínimo) antes de autenticarse y no envía nada si el servidor no lo ofrece; en local, Mailpit usa la CA y las credenciales que genera `make certs`. |
 | Hub ↔ Contabilidad | OAuth 2.0 Authorization Code con PKCE sobre HTTP local | Son dos orígenes (`identityhub.localhost` y `contabilidad.localhost`); la aplicación canjea código y verifica JWT con JWKS. |
 
 La implementación OAuth es mínima: Contabilidad es el cliente configurado, el `redirect_uri` se compara exactamente y PKCE S256 sustituye un secreto de cliente en la SPA. No hay registro dinámico de clientes ni federación externa.
@@ -63,6 +64,8 @@ La implementación OAuth es mínima: Contabilidad es el cliente configurado, el 
 | [0010](../../specs/adr/0010-mfa-por-codigo-enviado-por-correo.md) | Sustituye TOTP por MFA obligatorio con código de un solo uso enviado al correo verificado. |
 | [0011](../../specs/adr/0011-docker-hub-como-registry.md) | Sustituye GHCR por Docker Hub para publicar imágenes versionadas, SBOM y firma; implementado en `release.yml` (tarea C3), validado con el tag `v0.9.0`. |
 | [0012](../../specs/adr/0012-arquitectura-de-referencia-en-aws-con-localstack.md) | Arquitectura de producción de referencia en AWS (ECS Fargate, ALB, RDS, RabbitMQ en ECS, Secrets Manager) en Terraform, validada con LocalStack; la implementación llega en T8-T10. |
+| [0013](../../specs/adr/0013-roles-y-permisos-configurables-por-aplicacion.md) | Roles y permisos configurables por aplicación desde el Hub, sin límite de roles de aplicación. |
+| [0014](../../specs/adr/0014-claves-de-servicio-para-integraciones-maquina.md) | Claves de servicio `ihk_<publicId>_<secreto>` para integraciones máquina (RF-018): solo se guarda el SHA-256 del secreto, alcance `audit-log:read` y un único 401 para toda causa ([manual](claves-de-servicio.md)). |
 
 El README y el ADR 0001 documentan la elección técnica de Go y sus razones para el proyecto. El enunciado deja al equipo la libertad de elegir el stack siempre que se cumplan los requisitos de DevSecOps y de gestor de identidad; Python y Node.js eran sugerencias del material del curso, no una restricción, así que la elección no requiere autorización adicional.
 

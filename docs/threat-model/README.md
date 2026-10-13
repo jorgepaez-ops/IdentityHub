@@ -21,7 +21,7 @@ Las fronteras señalan dónde cambia la confianza: del navegador a Nginx, de Ngi
 
 ## Registro STRIDE
 
-`Mitigated` indica que la contramedida descrita en el modelo fuente está implementada en el repositorio. Ninguna amenaza queda en `Open`: AM-008, AM-009 y AM-022, que lo estaban, pasaron a `Mitigated` con el workflow de publicación `release.yml` (tarea C3, validado con el tag `v0.9.0`).
+`Mitigated` indica que la contramedida descrita en el modelo fuente está implementada en el repositorio. Ninguna amenaza queda en `Open`: AM-008, AM-009 y AM-022, que lo estaban, pasaron a `Mitigated` con el workflow de publicación `release.yml` (tarea C3, validado con el tag `v0.9.0`; el orden firmar y atestar antes de mover `latest` se validó con `v0.9.1`). AM-023 (claves de servicio, RF-018) se agregó con la tarea F4.
 
 | Amenaza | Elemento del DFD | Categoría | Estado | Contramedida | Evidencia/especificación |
 |---|---|---|---|---|---|
@@ -31,6 +31,7 @@ Las fronteras señalan dónde cambia la confianza: del navegador a Nginx, de Ngi
 | AM-004 | Solicitud y sesión de autenticación | Spoofing | Mitigated | Respuestas iguales, comparación constante y hash señuelo. | [`threat-model.md`](../../specs/05-security/threat-model.md) — RF-001, RF-015 |
 | AM-005 | HTTP interno: `/api` | Spoofing | Mitigated | El restablecimiento revoca todas las sesiones activas. | [`threat-model.md`](../../specs/05-security/threat-model.md) — RF-015 |
 | AM-017 (MFA) | HTTPS: credenciales, MFA y sesión | Spoofing | Mitigated | Desafío SHA-256/HMAC-SHA256, uso único, vencimiento y límites de intentos. | [`threat-model.md`](../../specs/05-security/threat-model.md) — RF-013, RF-014, RF-017 |
+| AM-023 | HTTP interno: `/api` | Spoofing | Mitigated | Secreto de 256 bits con solo su SHA-256 guardado, comparación en tiempo constante, mismo `401` para toda causa, vencimiento obligatorio, alcance mínimo `audit-log:read` y revocación inmediata. Ver [ADR 0014](../../specs/adr/0014-claves-de-servicio-para-integraciones-maquina.md). | [`threat-model.md`](../../specs/05-security/threat-model.md) — RF-018, RF-011 |
 | AM-006 | SQL parametrizado | Tampering | Mitigated | Consultas parametrizadas generadas por `sqlc`. | [`threat-model.md`](../../specs/05-security/threat-model.md) — RF-010 |
 | AM-007 | HTTP interno: `/api` | Tampering | Mitigated | Roles consultados desde la base de datos en peticiones sensibles. | [`threat-model.md`](../../specs/05-security/threat-model.md) — RF-009 |
 | AM-008 | Imagen firmada por digest | Tampering | Mitigated | Firma Cosign keyless y despliegue por digest. Implementado (C3): el job `publish` de `release.yml` firma cada imagen con Cosign keyless (OIDC de GitHub) sobre el digest; validado con el tag `v0.9.0`. | [`threat-model.md`](../../specs/05-security/threat-model.md) — RNF-006 |
@@ -45,7 +46,7 @@ Las fronteras señalan dónde cambia la confianza: del navegador a Nginx, de Ngi
 | AM-017 (DoS) | Solicitud y sesión de autenticación | Denial of service | Mitigated | `limit_req` antes de API y Argon2id calibrado a ~250 ms. | [`threat-model.md`](../../specs/05-security/threat-model.md) — RNF-010 |
 | AM-018 | HTTP interno: `/api` | Denial of service | Mitigated | `client_max_body_size 1m` y `http.MaxBytesReader`. | [`threat-model.md`](../../specs/05-security/threat-model.md) |
 | AM-019 | Cola y DLQ | Denial of service | Mitigated | Regla de alerta de Grafana versionada (`deploy/observability/grafana/alerting/dlq.yml`) que se dispara con cualquier mensaje en `notifications.dlq` durante 2 min (umbral más estricto que el > 10 original: un mensaje ya es un correo perdido) y runbook de atención y purga. | [`runbooks/dlq-notificaciones.md`](../runbooks/dlq-notificaciones.md) — RNF-007 |
-| AM-020 | Artefacto de despliegue | Elevation of privilege | Mitigated | Usuario no-root, capacidades eliminadas, raíz de solo lectura y base distroless. | [`threat-model.md`](../../specs/05-security/threat-model.md) — RNF-008 |
+| AM-020 | Artefacto de despliegue | Elevation of privilege | Mitigated | Usuario no-root, capacidades eliminadas, raíz de solo lectura y base distroless; detección en ejecución con Falco (cuatro reglas propias, alerta en Grafana y [runbook](../runbooks/falco-alerta.md)). | [`threat-model.md`](../../specs/05-security/threat-model.md) — RNF-008 |
 | AM-021 | HTTP interno: `/api` | Elevation of privilege | Mitigated | Autorización por ruta comprobada del lado del servidor. | [`threat-model.md`](../../specs/05-security/threat-model.md) — RF-009 |
 | AM-022 | Imagen firmada por digest | Elevation of privilege | Mitigated | Permisos mínimos por job y OIDC keyless. Implementado (C3): permisos mínimos por job y el job `publish` de `release.yml`, único con el environment `dockerhub` restringido a tags `v*`, firma con OIDC keyless. | [`threat-model.md`](../../specs/05-security/threat-model.md) — RNF-006 |
 

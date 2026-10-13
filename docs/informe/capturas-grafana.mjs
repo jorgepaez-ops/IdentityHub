@@ -1,7 +1,7 @@
 // Captures the Grafana dashboard, Explore (Loki logs and Prometheus metrics) and the Prometheus
 // targets page for the technical report.
 //
-//   make up-obs                       # the observability profile must be running
+//   make up                       # the observability profile must be running
 //   node capturas-grafana.mjs [--out DIR]
 //
 // Default output: a folder under the OS temp directory (binaries are copied into docs/informe/img/

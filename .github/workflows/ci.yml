@@ -591,7 +591,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # .env desechable, hosts *.localhost, make up y espera de salud (acción compuesta local).
+      # .env desechable, hosts *.localhost, make up-app (solo la aplicación) y espera de salud (acción compuesta local).
       - name: Levantar el stack
         uses: ./.github/actions/stack-up
 
@@ -768,7 +768,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # .env desechable, hosts *.localhost, make up y espera de salud (acción compuesta local).
+      # .env desechable, hosts *.localhost, make up-app (solo la aplicación) y espera de salud (acción compuesta local).
       - name: Levantar el stack
         uses: ./.github/actions/stack-up
 

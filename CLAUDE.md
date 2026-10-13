@@ -39,6 +39,8 @@ volver a acordarse.
   dar por buena una tarea de backend, levantar un Postgres desechable igual al de CI
   (`postgres:16-bookworm` por digest, usuario/base `identity`, puerto libre como 55432) y exportar
   `TEST_DATABASE_URL`. Así se detectó en T12a un trigger que descartaba UPDATEs.
+- **`make up` levanta el stack completo (observabilidad y Falco incluidos; `make up-app` es solo la app, lo usa CI) y corre `make certs` primero y falla si un `.env` viejo no tiene `SMTP_PASSWORD`** (Mailpit exige STARTTLS y
+  autenticación desde F2). Agregarla con `openssl rand -hex 24`.
 - Generadores: las versiones las fija `tools/go.mod` (oapi-codegen v2.7.1 desde 2026-10-07, sqlc v1.31.1);
   instalarlos con `go -C tools install <paquete>` (sin `@versión`). Evitar binarios "(devel)" o de otra versión.
   Evitar binarios en `/private/tmp/idp-gen-bin/` sin el ldflag de versión correcto.
