@@ -76,6 +76,8 @@ Al terminar imprime estas direcciones:
 
 Las credenciales de RabbitMQ y Grafana salen de `.env` (`RABBITMQ_DEFAULT_USER`/`RABBITMQ_DEFAULT_PASS` y `GRAFANA_ADMIN_USER`/`GRAFANA_ADMIN_PASSWORD`, generadas por `make setup`); no se imprimen ni se versionan.
 
+Grafana (3000), Prometheus (9090) y Loki (3100) solo escuchan en `127.0.0.1`: Prometheus y Loki no tienen autenticación, así que no se exponen a la red local.
+
 Tiempos de espera: la aplicación queda lista cuando `api` y `web` aparecen `healthy` en `make ps` (unos 30 a 60 s tras construir). Grafana responde en <http://localhost:3000/api/health> a los pocos segundos; sus paneles con datos tardan 1 a 2 minutos porque Prometheus raspa cada 15 s y Alloy descubre contenedores nuevos cada ~60 s. Una alerta de Falco tarda también 1 a 2 minutos en verse en Loki y Grafana (`make falco-test` la dispara).
 
 - **Solo la aplicación:** `make up-app` levanta únicamente los servicios del grupo Aplicación, sin Prometheus, Loki, Alloy, Grafana ni Falco. Es lo que usa CI (acción compuesta `stack-up`, jobs E2E y DAST) y sirve en un equipo con pocos recursos.

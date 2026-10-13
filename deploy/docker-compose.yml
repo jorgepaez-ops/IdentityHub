@@ -221,7 +221,7 @@ services:
     volumes:
       - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"  # solo loopback: Prometheus no tiene autenticación
 
   loki:
     # grafana/loki 3.7.8, con soporte, fijado por digest real.
@@ -229,7 +229,7 @@ services:
     profiles: ["observability"]
     command: ["-config.file=/etc/loki/local-config.yaml"]
     ports:
-      - "3100:3100"
+      - "127.0.0.1:3100:3100"  # solo loopback: Loki no tiene autenticación
 
   alloy:
     # Grafana Alloy sustituye a Promtail, que está descontinuado.
@@ -292,7 +292,7 @@ services:
       - ./observability/grafana:/etc/grafana/provisioning:ro
       - grafanadata:/var/lib/grafana
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"  # solo loopback
 
 networks:
   default:

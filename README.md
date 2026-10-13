@@ -49,7 +49,7 @@ La visión y los contratos del sistema están en [`specs/00-vision.md`](specs/00
 ```bash
 git clone <url-del-repositorio> && cd <directorio>
 make setup
-make up        # o: make certs && docker compose up -d
+make up        # o: make certs && docker compose --profile observability up -d
 ```
 
 El `docker-compose.yml` de la raíz incluye `deploy/docker-compose.yml`; `make up` usa `docker compose --env-file .env -f deploy/docker-compose.yml`. Al terminar se exponen estas direcciones:

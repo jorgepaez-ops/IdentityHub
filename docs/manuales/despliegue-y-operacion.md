@@ -111,7 +111,7 @@ El worker no usa `smtp.SendMail`: abre la sesión SMTP explícitamente (EHLO, ST
 make certs    # sh scripts/gen-smtp-certs.sh --env-file .env
 ```
 
-Crea `deploy/certs/` (ignorado por git): `ca.pem` y `ca-key.pem` (CA local), `server.pem` y `server-key.pem` (SAN `mailpit`, `localhost`, `127.0.0.1`; claves en modo 0600) y `smtp-auth.txt` (usuario y contraseña de `.env`, que se reescribe en cada ejecución). Es idempotente; `sh scripts/gen-smtp-certs.sh --force` regenera la CA y los certificados. `make up`, `make up-app` y `make restart` la ejecutan antes de levantar el stack, y la acción `stack-up` de CI también (vía `make up`). El worker monta solo `ca.pem` y confía en ella con `SMTP_CA_FILE`; un `.env` anterior sin `SMTP_PASSWORD` debe añadirla (`openssl rand -hex 24`).
+Crea `deploy/certs/` (ignorado por git): `ca.pem` y `ca-key.pem` (CA local), `server.pem` y `server-key.pem` (SAN `mailpit`, `localhost`, `127.0.0.1`; claves en modo 0600) y `smtp-auth.txt` (usuario y contraseña de `.env`, que se reescribe en cada ejecución). Es idempotente; `sh scripts/gen-smtp-certs.sh --force` regenera la CA y los certificados. `make up`, `make up-app` y `make restart` la ejecutan antes de levantar el stack, y la acción `stack-up` de CI también (vía `make up-app`, sin observabilidad). El worker monta solo `ca.pem` y confía en ella con `SMTP_CA_FILE`; un `.env` anterior sin `SMTP_PASSWORD` debe añadirla (`openssl rand -hex 24`).
 
 **Producción con Amazon SES.** Use el endpoint SMTP regional de SES (`email-smtp.<región>.amazonaws.com`) en el puerto 587 con `SMTP_TLS=starttls`; no defina `SMTP_CA_FILE` (los certificados de SES los firma una CA pública). `SMTP_USERNAME` y `SMTP_PASSWORD` son las credenciales SMTP de SES, que no son la clave de acceso IAM: se derivan de ella (`aws_iam_access_key.ses_smtp_password_v4` en Terraform). La referencia de `infraestructura/terraform` las crea para un usuario IAM con solo `ses:SendRawEmail`, las guarda en Secrets Manager (cifradas con KMS) y las inyecta únicamente al worker. El remitente `SMTP_FROM` debe pertenecer a una identidad verificada en SES y, mientras la cuenta esté en el sandbox, los destinatarios también.
 
@@ -146,7 +146,7 @@ Variables obligatorias en `.env`, además de las del desarrollo (el comando fall
 
 Qué cambia frente a desarrollo:
 
-- Solo `web` publica un puerto (8080). `db`, `broker`, `api`, `worker` y, con `make up`, Prometheus, Loki y Grafana quedan solo en la red interna de Compose (AM-014).
+- Solo `web` publica un puerto (8080). `db`, `broker`, `api`, `worker` y, con el perfil `observability`, Prometheus, Loki y Grafana quedan solo en la red interna de Compose (AM-014).
 - `api`, `worker` y `web` usan las imágenes por digest, sin `build`; `LOG_LEVEL` pasa a `info`.
 - Mailpit no arranca (perfil `correo-local`); el worker ya no depende de él.
 - `restart: unless-stopped`, rotación de logs (`json-file`, 10 MB x 3) y límites de memoria y CPU.

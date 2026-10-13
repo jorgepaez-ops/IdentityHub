@@ -633,7 +633,7 @@ cd IdentityHub
 
 make setup                # 1. genera .env con secretos aleatorios (scripts/setup_env.py)
 make up                   # 2. construye y levanta el stack completo (aplicación y observabilidad)
-# equivalente desde la raíz:  docker compose up -d
+# equivalente desde la raíz:  docker compose --profile observability up -d
 make ps                   # 3. estado de los contenedores
 ```
 
@@ -712,7 +712,7 @@ Exige en `.env`, además de las variables de desarrollo: `IDENTITY_HUB_API_IMAGE
 
 La guía completa es `docs/guia-desarrollo.md`.
 
-- **Dos formas de correr el proyecto:** todo en Docker (`make up`, igual que en CI) o solo PostgreSQL en Docker y Go en el host (`cd deploy && docker compose up -d db`, luego `docker compose run --rm migrate` y `cd ../backend && go build ./...`).
+- **Dos formas de correr el proyecto:** todo en Docker (`make up`; CI usa `make up-app`, sin observabilidad) o solo PostgreSQL en Docker y Go en el host (`cd deploy && docker compose up -d db`, luego `docker compose run --rm migrate` y `cd ../backend && go build ./...`).
 - **Generadores:** `make gen` ejecuta `go generate ./internal/api` (oapi-codegen v2.7.1), `sqlc generate` (v1.31.1), `npm run gen:api` y `scripts/traceability.py`. El código generado no se edita a mano: `make gen && git diff --exit-code` debe quedar limpio, y en CI lo exige el job 1.
 - **Pruebas:** `go test -race ./...` desde `backend/`; las de integración llevan la etiqueta `integration` y requieren `TEST_DATABASE_URL`: sin esa variable se omiten en silencio y el resultado «ok» no significa que pasaran. Las pruebas de trazabilidad se nombran `TestRFnnn_...` o `TestRNFnnn_...`.
 - **Hooks de pre-commit:** una vez por clon, `uv tool install pre-commit` (o `brew install pre-commit`) y `pre-commit install`. Si ya existía un `.git/hooks/pre-commit`, se conserva como `pre-commit.legacy`. Los hooks `trailing-whitespace`, `end-of-file-fixer` y gofmt pueden modificar archivos y abortar el commit: se repite el `git add` y el commit. `pre-commit run --all-files` los ejecuta sobre todo el repositorio.
