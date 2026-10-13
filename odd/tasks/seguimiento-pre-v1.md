@@ -124,6 +124,8 @@ con esos temas abiertos.
   falsos positivos se justifican en Sonar, no se silencian en bloque.
   - Quinta ronda (inline, Opus): las comillas invertidas fuera de una referencia son formato si están cerradas; el mensaje de comilla sin pareja ya no culpa a `make`; prueba fuerte del mensaje; la prueba de los `.feature` reales tokeniza sus líneas `# Verificación:`; `test_the_grammar_copies_match_the_docstring` mantiene sincronizadas las tres copias de la gramática (mutación en `scripts/README.md`: falla). Revisión de la quinta ronda: aprobada; la advertencia R3-001 (restaurar la prueba de «make» en prosa fuera de `# Verificación:`) se descarta porque el analizador solo lee esas líneas y la ronda anterior marcó esa prueba como incorrecta; se aplicaron las dos sugerencias (prueba con ruta real entre comillas invertidas y `skipTest` con `python -OO`).
 
+Lote 1/3 (Go), 2026-10-13: ver apéndice «S7 — inventario Sonar». Corregido: godre:S8242 (`internal/testdb/testdb.go:73`, `migrationLock` ya no guarda `context.Context`; `release`/`releaseIfHeld` lo reciben por parámetro) y de paso el `errcheck` que golangci-lint con `-tags=integration` marcaba en la misma función (`_ = dropDatabase(...)`). Sin cambio de comportamiento. No aplicado: go:S3776 x16 (todos en archivos `_test.go`, fuera de alcance por instrucción), godre:S8196 x10 (la descripción de la regla no está en la API; el nombre «método+er» daría `WithinLoginTransactioner`, peor que `Repository`; se propone marcar falso positivo en Sonar, decisión del usuario), go:S1135 (falso positivo: «todo» en español). Sin código generado marcado; `.sonarcloud.properties` ya excluye duplicados de `gen.go`/`sqlc`. Observación fuera de alcance: `gocognit` da 25 a `(*smtpMailer).Send` (`backend/cmd/worker/smtp.go:80`) y Sonar no lo marca (cuenta distinto).
+
 ## Criterios de aceptación
 
 1. Las pruebas de cada tarea pasan (RED observado antes de GREEN cuando aplica) y CI queda en verde.
@@ -153,7 +155,7 @@ Estrategia: `ask-on-risk` → `stacked-to-main` (usuario, 2026-10-13). Cortes: P
 | S4 | delegado (Sonnet) | hecho | aeeb74e | — |
 | S5 | delegado (Sonnet) | hecho | d64043a | — |
 | S6 | delegado (Sonnet) | hecho | df56da3 | — |
-| S7 | — | pendiente | — | — |
+| S7 | delegado (Sonnet) | en curso: lote 1/3 Go hecho (godre:S8242); lotes 2/3 y 3/3 pendientes | ver «Lote 1/3» | — |
 
 Revisión nativa de S1-S4 (2026-10-13): aprobada (4 lentes, 15 archivos). Correcciones posteriores, también
 aprobadas: identidad de `cosign verify` restringida a `release.yml` en un tag (probada contra `v0.9.1`, y
@@ -165,3 +167,133 @@ incluye a propósito el comentario de la línea 161 y termina en el último reng
 ## Siguiente paso
 
 PR de documentación (tras la revisión del PDF por el usuario), luego PR-A (S1-S4) y S5-S6.
+
+## Apéndice S7 — inventario Sonar (2026-10-13)
+
+Fuente: `api/issues/search` (CODE_SMELL, sin resolver), 123 al momento de la consulta. Agrupado por lenguaje y regla; las columnas «Estado» de Go las llena el lote 1/3, el resto queda «pendiente» para los lotes 2/3 (frontend/contabilidad/e2e/CSS/docs JS) y 3/3 (Python, shell, SQL, workflows).
+
+| Lenguaje | Regla | Severidad | Archivo:línea | Mensaje | Estado |
+|---|---|---|---|---|---|
+| css | css:S4666 | MAJOR | `frontend/src/styles.css:106` | Duplicate selector ".stat-tile", first used at line 103 | pendiente |
+| css | css:S4666 | MAJOR | `frontend/src/styles.css:177` | Duplicate selector ".link-button", first used at line 146 | pendiente |
+| css | css:S4666 | MAJOR | `frontend/src/styles.css:201` | Duplicate selector ":root", first used at line 1 | pendiente |
+| css | css:S4666 | MAJOR | `frontend/src/styles.css:203` | Duplicate selector ":root[data-theme="dark"]", first used at line 31 | pendiente |
+| css | css:S4666 | MAJOR | `frontend/src/styles.css:204` | Duplicate selector "body", first used at line 33 | pendiente |
+| css | css:S4666 | MAJOR | `frontend/src/styles.css:214` | Duplicate selector ".left-rail", first used at line 55 | pendiente |
+| css | css:S4666 | MAJOR | `frontend/src/styles.css:215` | Duplicate selector "nav a", first used at line 59 | pendiente |
+| css | css:S4666 | MAJOR | `frontend/src/styles.css:217` | Duplicate selector ".logout-button", first used at line 64 | pendiente |
+| css | css:S4666 | MAJOR | `frontend/src/styles.css:218` | Duplicate selector ".icon-button", first used at line 154 | pendiente |
+| css | css:S4666 | MAJOR | `frontend/src/styles.css:222` | Duplicate selector ".table-scroll", first used at line 134 | pendiente |
+| css | css:S4666 | MAJOR | `frontend/src/styles.css:225` | Duplicate selector ".toast", first used at line 168 | pendiente |
+| githubactions | githubactions:S1135 | INFO | `.github/workflows/ci.yml:14` | Complete the task associated to this "TODO" comment. | pendiente |
+| go | go:S1135 | INFO | `backend/internal/events/events_test.go:85` | Complete the task associated to this TODO comment. | falso positivo: «todo» es español («todo tipo de evento»), no un marcador TODO |
+| go | go:S3776 | CRITICAL | `backend/cmd/worker/smtp_test.go:136` | Refactor this method to reduce its Cognitive Complexity from 26 to the 15 allowed. | fuera de alcance (archivo de pruebas); propuesta: marcar «won't fix» en Sonar o refactor aparte |
+| go | go:S3776 | CRITICAL | `backend/internal/api/login_test.go:308` | Refactor this method to reduce its Cognitive Complexity from 17 to the 15 allowed. | fuera de alcance (archivo de pruebas); propuesta: marcar «won't fix» en Sonar o refactor aparte |
+| go | go:S3776 | CRITICAL | `backend/internal/api/login_test.go:429` | Refactor this method to reduce its Cognitive Complexity from 19 to the 15 allowed. | fuera de alcance (archivo de pruebas); propuesta: marcar «won't fix» en Sonar o refactor aparte |
+| go | go:S3776 | CRITICAL | `backend/internal/api/oauth_test.go:133` | Refactor this method to reduce its Cognitive Complexity from 23 to the 15 allowed. | fuera de alcance (archivo de pruebas); propuesta: marcar «won't fix» en Sonar o refactor aparte |
+| go | go:S3776 | CRITICAL | `backend/internal/api/server_generated_test.go:15` | Refactor this method to reduce its Cognitive Complexity from 18 to the 15 allowed. | fuera de alcance (archivo de pruebas); propuesta: marcar «won't fix» en Sonar o refactor aparte |
+| go | go:S3776 | CRITICAL | `backend/internal/audit/audit_integration_test.go:13` | Refactor this method to reduce its Cognitive Complexity from 19 to the 15 allowed. | fuera de alcance (archivo de pruebas); propuesta: marcar «won't fix» en Sonar o refactor aparte |
+| go | go:S3776 | CRITICAL | `backend/internal/auth/bootstrap/bootstrap_integration_test.go:169` | Refactor this method to reduce its Cognitive Complexity from 16 to the 15 allowed. | fuera de alcance (archivo de pruebas); propuesta: marcar «won't fix» en Sonar o refactor aparte |
+| go | go:S3776 | CRITICAL | `backend/internal/auth/login/login_test.go:168` | Refactor this method to reduce its Cognitive Complexity from 17 to the 15 allowed. | fuera de alcance (archivo de pruebas); propuesta: marcar «won't fix» en Sonar o refactor aparte |
+| go | go:S3776 | CRITICAL | `backend/internal/auth/mfa/mfa_integration_test.go:103` | Refactor this method to reduce its Cognitive Complexity from 18 to the 15 allowed. | fuera de alcance (archivo de pruebas); propuesta: marcar «won't fix» en Sonar o refactor aparte |
+| go | go:S3776 | CRITICAL | `backend/internal/auth/refresh/refresh_integration_test.go:23` | Refactor this method to reduce its Cognitive Complexity from 18 to the 15 allowed. | fuera de alcance (archivo de pruebas); propuesta: marcar «won't fix» en Sonar o refactor aparte |
+| go | go:S3776 | CRITICAL | `backend/internal/auth/servicekey/servicekey_integration_test.go:186` | Refactor this method to reduce its Cognitive Complexity from 18 to the 15 allowed. | fuera de alcance (archivo de pruebas); propuesta: marcar «won't fix» en Sonar o refactor aparte |
+| go | go:S3776 | CRITICAL | `backend/internal/auth/servicekey/servicekey_test.go:282` | Refactor this method to reduce its Cognitive Complexity from 22 to the 15 allowed. | fuera de alcance (archivo de pruebas); propuesta: marcar «won't fix» en Sonar o refactor aparte |
+| go | go:S3776 | CRITICAL | `backend/internal/store/queries_integration_test.go:18` | Refactor this method to reduce its Cognitive Complexity from 16 to the 15 allowed. | fuera de alcance (archivo de pruebas); propuesta: marcar «won't fix» en Sonar o refactor aparte |
+| go | go:S3776 | CRITICAL | `backend/internal/store/rolegrid_integration_test.go:20` | Refactor this method to reduce its Cognitive Complexity from 25 to the 15 allowed. | fuera de alcance (archivo de pruebas); propuesta: marcar «won't fix» en Sonar o refactor aparte |
+| go | go:S3776 | CRITICAL | `backend/internal/store/rolegrid_integration_test.go:75` | Refactor this method to reduce its Cognitive Complexity from 25 to the 15 allowed. | fuera de alcance (archivo de pruebas); propuesta: marcar «won't fix» en Sonar o refactor aparte |
+| go | go:S3776 | CRITICAL | `backend/internal/store/sessions_integration_test.go:17` | Refactor this method to reduce its Cognitive Complexity from 22 to the 15 allowed. | fuera de alcance (archivo de pruebas); propuesta: marcar «won't fix» en Sonar o refactor aparte |
+| go | godre:S8196 | MINOR | `backend/cmd/api/main.go:67` | Rename this interface to follow Go naming conventions for single-method interfaces. | pendiente de decisión: nombre método+«er» (p. ej. WithinLoginTransactioner) empeora la legibilidad; descripción de la regla no accesible por API. Propuesta: marcar falso positivo en Sonar |
+| go | godre:S8196 | MINOR | `backend/cmd/api/main.go:243` | Rename this interface to follow Go naming conventions for single-method interfaces. | pendiente de decisión: nombre método+«er» (p. ej. WithinLoginTransactioner) empeora la legibilidad; descripción de la regla no accesible por API. Propuesta: marcar falso positivo en Sonar |
+| go | godre:S8196 | MINOR | `backend/internal/auth/bootstrap/bootstrap.go:55` | Rename this interface to follow Go naming conventions for single-method interfaces. | pendiente de decisión: nombre método+«er» (p. ej. WithinLoginTransactioner) empeora la legibilidad; descripción de la regla no accesible por API. Propuesta: marcar falso positivo en Sonar |
+| go | godre:S8196 | MINOR | `backend/internal/auth/employee/employee.go:46` | Rename this interface to follow Go naming conventions for single-method interfaces. | pendiente de decisión: nombre método+«er» (p. ej. WithinLoginTransactioner) empeora la legibilidad; descripción de la regla no accesible por API. Propuesta: marcar falso positivo en Sonar |
+| go | godre:S8196 | MINOR | `backend/internal/auth/invitationresend/resend.go:32` | Rename this interface to follow Go naming conventions for single-method interfaces. | pendiente de decisión: nombre método+«er» (p. ej. WithinLoginTransactioner) empeora la legibilidad; descripción de la regla no accesible por API. Propuesta: marcar falso positivo en Sonar |
+| go | godre:S8196 | MINOR | `backend/internal/auth/login/login.go:86` | Rename this interface to follow Go naming conventions for single-method interfaces. | pendiente de decisión: nombre método+«er» (p. ej. WithinLoginTransactioner) empeora la legibilidad; descripción de la regla no accesible por API. Propuesta: marcar falso positivo en Sonar |
+| go | godre:S8196 | MINOR | `backend/internal/auth/logout/logout.go:40` | Rename this interface to follow Go naming conventions for single-method interfaces. | pendiente de decisión: nombre método+«er» (p. ej. WithinLoginTransactioner) empeora la legibilidad; descripción de la regla no accesible por API. Propuesta: marcar falso positivo en Sonar |
+| go | godre:S8196 | MINOR | `backend/internal/auth/mfa/mfa.go:160` | Rename this interface to follow Go naming conventions for single-method interfaces. | pendiente de decisión: nombre método+«er» (p. ej. WithinLoginTransactioner) empeora la legibilidad; descripción de la regla no accesible por API. Propuesta: marcar falso positivo en Sonar |
+| go | godre:S8196 | MINOR | `backend/internal/auth/refresh/refresh.go:77` | Rename this interface to follow Go naming conventions for single-method interfaces. | pendiente de decisión: nombre método+«er» (p. ej. WithinLoginTransactioner) empeora la legibilidad; descripción de la regla no accesible por API. Propuesta: marcar falso positivo en Sonar |
+| go | godre:S8196 | MINOR | `backend/internal/events/broker.go:13` | Rename this interface to follow Go naming conventions for single-method interfaces. | pendiente de decisión: nombre método+«er» (p. ej. WithinLoginTransactioner) empeora la legibilidad; descripción de la regla no accesible por API. Propuesta: marcar falso positivo en Sonar |
+| go | godre:S8242 | MAJOR | `backend/internal/testdb/testdb.go:73` | Remove this 'context.Context' field and pass context as a parameter to methods that need it. | corregido (lote 1/3) |
+| javascript | javascript:S4624 | MAJOR | `docs/informe/build.mjs:138` | Refactor this code to not use nested template literals. | pendiente |
+| javascript | javascript:S4624 | MAJOR | `docs/informe/build.mjs:157` | Refactor this code to not use nested template literals. | pendiente |
+| javascript | javascript:S6582 | MINOR | `docs/informe/build.mjs:81` | Prefer using an optional chain expression instead, as it's more concise and easier to read. | pendiente |
+| javascript | javascript:S7758 | MINOR | `docs/informe/build.mjs:122` | Prefer `String.fromCodePoint()` over `String.fromCharCode()`. | pendiente |
+| javascript | javascript:S7781 | MINOR | `docs/informe/build.mjs:31` | Prefer `String#replaceAll()` over `String#replace()`. | pendiente |
+| javascript | javascript:S7781 | MINOR | `docs/informe/build.mjs:31` | Prefer `String#replaceAll()` over `String#replace()`. | pendiente |
+| javascript | javascript:S7781 | MINOR | `docs/informe/build.mjs:31` | Prefer `String#replaceAll()` over `String#replace()`. | pendiente |
+| javascript | javascript:S7781 | MINOR | `docs/informe/build.mjs:31` | Prefer `String#replaceAll()` over `String#replace()`. | pendiente |
+| javascript | javascript:S878 | MAJOR | `docs/informe/build.mjs:136` | Unexpected use of comma operator. | pendiente |
+| javascript | javascript:S878 | MAJOR | `docs/informe/build.mjs:137` | Unexpected use of comma operator. | pendiente |
+| javascript | javascript:S8786 | MAJOR | `docs/informe/build.mjs:88` | Simplify this regular expression to reduce its runtime, as it has super-linear performance due to backtracking. | pendiente |
+| javascript | javascript:S9382 | MINOR | `docs/informe/build.mjs:301` | Unexpected `await` inside a loop. | pendiente |
+| javascript | javascript:S9382 | MINOR | `docs/informe/build.mjs:322` | Unexpected `await` inside a loop. | pendiente |
+| javascript | javascript:S9382 | MINOR | `docs/informe/build.mjs:322` | Unexpected `await` inside a loop. | pendiente |
+| plsql | plsql:OrderByExplicitAscCheck | MINOR | `db/queries/roles.sql:6` | Add ASC in order to make the order explicit. | pendiente |
+| plsql | plsql:OrderByExplicitAscCheck | MINOR | `db/queries/roles.sql:26` | Add ASC in order to make the order explicit. | pendiente |
+| plsql | plsql:OrderByExplicitAscCheck | MINOR | `db/queries/users.sql:39` | Add ASC in order to make the order explicit. | pendiente |
+| plsql | plsql:S1192 | CRITICAL | `db/migrations/000001_initial_schema.up.sql:17` | Define a constant instead of duplicating this literal 5 times. | pendiente |
+| plsql | plsql:S1192 | CRITICAL | `db/queries/users.sql:38` | Define a constant instead of duplicating this literal 11 times. | pendiente |
+| plsql | plsql:S1192 | CRITICAL | `db/queries/users.sql:62` | Define a constant instead of duplicating this literal 5 times. | pendiente |
+| plsql | plsql:S1192 | CRITICAL | `db/queries/users.sql:104` | Define a constant instead of duplicating this literal 5 times. | pendiente |
+| plsql | plsql:S1192 | CRITICAL | `db/queries/users.sql:287` | Define a constant instead of duplicating this literal 6 times. | pendiente |
+| plsql | plsql:S1192 | CRITICAL | `db/queries/users.sql:338` | Define a constant instead of duplicating this literal 4 times. | pendiente |
+| python | python:S1481 | MINOR | `scripts/zap-gate.py:109` | Replace the unused local variable "comment" with "_". | pendiente |
+| python | python:S3358 | MAJOR | `scripts/traceability.py:337` | Extract this nested conditional expression into an independent statement. | pendiente |
+| python | python:S3358 | MAJOR | `scripts/traceability.py:338` | Extract this nested conditional expression into an independent statement. | pendiente |
+| python | python:S3776 | CRITICAL | `scripts/traceability.py:69` | Refactor this function to reduce its Cognitive Complexity from 16 to the 15 allowed. | pendiente |
+| python | python:S3776 | CRITICAL | `scripts/traceability.py:114` | Refactor this function to reduce its Cognitive Complexity from 22 to the 15 allowed. | pendiente |
+| python | python:S3776 | CRITICAL | `scripts/traceability.py:167` | Refactor this function to reduce its Cognitive Complexity from 16 to the 15 allowed. | pendiente |
+| python | python:S3776 | CRITICAL | `scripts/traceability.py:240` | Refactor this function to reduce its Cognitive Complexity from 25 to the 15 allowed. | pendiente |
+| python | python:S3776 | CRITICAL | `scripts/traceability.py:288` | Refactor this function to reduce its Cognitive Complexity from 40 to the 15 allowed. | pendiente |
+| python | python:S3776 | CRITICAL | `scripts/zap-gate.py:80` | Refactor this function to reduce its Cognitive Complexity from 22 to the 15 allowed. | pendiente |
+| shell | shelldre:S131 | CRITICAL | `scripts/ip-lockout-warning.sh:26` | Add a default case (*) to handle unexpected values. | pendiente |
+| shell | shelldre:S7679 | MAJOR | `scripts/gen-smtp-certs.sh:48` | Assign this positional parameter to a local variable. | pendiente |
+| shell | shelldre:S7679 | MAJOR | `scripts/ip-lockout-warning.sh:58` | Assign this positional parameter to a local variable. | pendiente |
+| shell | shelldre:S7679 | MAJOR | `scripts/ip-lockout-warning.sh:58` | Assign this positional parameter to a local variable. | pendiente |
+| shell | shelldre:S7682 | MAJOR | `scripts/ip-lockout-warning.sh:57` | Add an explicit return statement at the end of the function. | pendiente |
+| shell | shelldre:S7688 | MAJOR | `deploy/postgres-init/01-identity-app-role.sh:10` | Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. | pendiente |
+| shell | shelldre:S7688 | MAJOR | `scripts/ip-lockout-warning.sh:55` | Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. | pendiente |
+| shell | shelldre:S7688 | MAJOR | `scripts/ip-lockout-warning.sh:62` | Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. | pendiente |
+| shell | shelldre:S7688 | MAJOR | `scripts/with-raised-login-limit.sh:15` | Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. | pendiente |
+| shell | shelldre:S7688 | MAJOR | `scripts/with-raised-login-limit.sh:25` | Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. | pendiente |
+| typescript | typescript:S3358 | MAJOR | `contabilidad/src/views/Transactions.tsx:48` | Extract this nested ternary operation into an independent statement. | pendiente |
+| typescript | typescript:S3358 | MAJOR | `contabilidad/src/views/Transactions.tsx:52` | Extract this nested ternary operation into an independent statement. | pendiente |
+| typescript | typescript:S3358 | MAJOR | `frontend/src/features/admin/AuditLogPage.tsx:49` | Extract this nested ternary operation into an independent statement. | pendiente |
+| typescript | typescript:S3735 | CRITICAL | `frontend/src/features/admin/ServiceKeysPage.tsx:246` | Remove this use of the "void" operator. | pendiente |
+| typescript | typescript:S3776 | CRITICAL | `contabilidad/src/auth/flow.ts:54` | Refactor this function to reduce its Cognitive Complexity from 16 to the 15 allowed. | pendiente |
+| typescript | typescript:S3776 | CRITICAL | `frontend/src/features/admin/UserDrawer.tsx:97` | Refactor this function to reduce its Cognitive Complexity from 18 to the 15 allowed. | pendiente |
+| typescript | typescript:S4624 | MAJOR | `e2e/manual/capturas.ts:114` | Refactor this code to not use nested template literals. | pendiente |
+| typescript | typescript:S4624 | MAJOR | `e2e/support/mailpit.ts:22` | Refactor this code to not use nested template literals. | pendiente |
+| typescript | typescript:S5906 | MINOR | `frontend/src/auditLog.test.tsx:136` | Prefer "expect(await within(table).findAllByText('ana@example.test')).toHaveLength(2)" over this generic assertion for b | pendiente |
+| typescript | typescript:S6479 | MAJOR | `frontend/src/features/account/MyAccountPage.tsx:36` | Do not use Array index in keys | pendiente |
+| typescript | typescript:S6479 | MAJOR | `frontend/src/features/account/PublicPages.tsx:34` | Do not use Array index in keys | pendiente |
+| typescript | typescript:S6479 | MAJOR | `frontend/src/features/admin/shared.tsx:63` | Do not use Array index in keys | pendiente |
+| typescript | typescript:S6551 | MINOR | `frontend/src/test-utils.ts:19` | 'input' may use Object's default stringification format ('[object Object]') when stringified. | pendiente |
+| typescript | typescript:S6551 | MINOR | `frontend/src/test-utils.ts:21` | 'init.body' may use Object's default stringification format ('[object Object]') when stringified. | pendiente |
+| typescript | typescript:S6819 | MAJOR | `contabilidad/src/Login.tsx:15` | Use <output> instead of the "status" role to ensure accessibility across all devices. | pendiente |
+| typescript | typescript:S6819 | MAJOR | `contabilidad/src/Toast.tsx:15` | Use <output> instead of the "status" role to ensure accessibility across all devices. | pendiente |
+| typescript | typescript:S6819 | MAJOR | `contabilidad/src/views/ConfirmDialog.tsx:61` | Use <dialog> instead of the "dialog" role to ensure accessibility across all devices. | pendiente |
+| typescript | typescript:S6819 | MAJOR | `frontend/src/App.tsx:136` | Use <output> instead of the "status" role to ensure accessibility across all devices. | pendiente |
+| typescript | typescript:S6819 | MAJOR | `frontend/src/components/LoadingSkeleton.tsx:2` | Use <output> instead of the "status" role to ensure accessibility across all devices. | pendiente |
+| typescript | typescript:S6819 | MAJOR | `frontend/src/components/Toast.tsx:16` | Use <output> instead of the "status" role to ensure accessibility across all devices. | pendiente |
+| typescript | typescript:S6819 | MAJOR | `frontend/src/features/account/MyAccountPage.tsx:37` | Use <output> instead of the "status" role to ensure accessibility across all devices. | pendiente |
+| typescript | typescript:S6819 | MAJOR | `frontend/src/features/account/PublicPages.tsx:120` | Use <output> instead of the "status" role to ensure accessibility across all devices. | pendiente |
+| typescript | typescript:S6819 | MAJOR | `frontend/src/features/account/PublicPages.tsx:155` | Use <output> instead of the "status" role to ensure accessibility across all devices. | pendiente |
+| typescript | typescript:S6819 | MAJOR | `frontend/src/features/account/PublicPages.tsx:184` | Use <output> instead of the "status" role to ensure accessibility across all devices. | pendiente |
+| typescript | typescript:S6819 | MAJOR | `frontend/src/features/admin/AuditLogPage.tsx:243` | Use <details>, <fieldset>, <optgroup>, or <address> instead of the "group" role to ensure accessibility across all devic | pendiente |
+| typescript | typescript:S6819 | MAJOR | `frontend/src/features/admin/AuditLogPage.tsx:249` | Use <details>, <fieldset>, <optgroup>, or <address> instead of the "group" role to ensure accessibility across all devic | pendiente |
+| typescript | typescript:S6819 | MAJOR | `frontend/src/features/admin/HomePage.tsx:63` | Use <details>, <fieldset>, <optgroup>, or <address> instead of the "group" role to ensure accessibility across all devic | pendiente |
+| typescript | typescript:S6819 | MAJOR | `frontend/src/features/admin/UserDrawer.tsx:140` | Use <dialog> instead of the "dialog" role to ensure accessibility across all devices. | pendiente |
+| typescript | typescript:S6819 | MAJOR | `frontend/src/features/admin/UsersPage.tsx:23` | Use <details>, <fieldset>, <optgroup>, or <address> instead of the "group" role to ensure accessibility across all devic | pendiente |
+| typescript | typescript:S6819 | MAJOR | `frontend/src/features/admin/UsersPage.tsx:188` | Use <details>, <fieldset>, <optgroup>, or <address> instead of the "group" role to ensure accessibility across all devic | pendiente |
+| typescript | typescript:S6847 | MAJOR | `contabilidad/src/views/ConfirmDialog.tsx:61` | Non-interactive elements should not be assigned mouse or keyboard event listeners. | pendiente |
+| typescript | typescript:S6847 | MAJOR | `frontend/src/features/admin/UserDrawer.tsx:140` | Non-interactive elements should not be assigned mouse or keyboard event listeners. | pendiente |
+| typescript | typescript:S6848 | MAJOR | `contabilidad/src/views/ConfirmDialog.tsx:60` | Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tab | pendiente |
+| typescript | typescript:S7503 | MINOR | `e2e/support/global-teardown.ts:9` | Async function 'globalTeardown' has no 'await' expression. | pendiente |
+| typescript | typescript:S7755 | MINOR | `contabilidad/src/aggregate.ts:48` | Prefer `.at(…)` over `[….length - index]`. | pendiente |
+| typescript | typescript:S7781 | MINOR | `frontend/src/features/csv.ts:20` | Prefer `String#replaceAll()` over `String#replace()`. | pendiente |
+| typescript | typescript:S9382 | MINOR | `e2e/manual/capturas.ts:258` | Unexpected `await` inside a loop. | pendiente |
+| typescript | typescript:S9382 | MINOR | `e2e/manual/capturas.ts:498` | Unexpected `await` inside a loop. | pendiente |
+| typescript | typescript:S9382 | MINOR | `e2e/support/mailpit.ts:33` | Unexpected `await` inside a loop. | pendiente |
+| typescript | typescript:S9382 | MINOR | `e2e/support/mailpit.ts:39` | Unexpected `await` inside a loop. | pendiente |
+| typescript | typescript:S9382 | MINOR | `e2e/support/mailpit.ts:74` | Unexpected `await` inside a loop. | pendiente |
