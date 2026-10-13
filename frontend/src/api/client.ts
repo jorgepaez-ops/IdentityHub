@@ -147,6 +147,35 @@ export async function authenticatedRequest<T>(path: string, init: RequestInit = 
   }
 }
 
+/**
+ * Authenticated GET that returns the raw response for file downloads (the body is CSV or JSON, so the
+ * JSON-only `request` helper does not fit). It retries once after a refresh, like `authenticatedRequest`.
+ */
+async function authenticatedDownload(path: string): Promise<Response> {
+  const attempt = () => {
+    const headers = new Headers({ Accept: 'text/csv, application/json' })
+    if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`)
+    return fetch(path, { headers, credentials: 'same-origin' })
+  }
+  let response = await attempt()
+  if (response.status === 401) {
+    await refreshSession()
+    response = await attempt()
+  }
+  if (!response.ok) throw await parseError(response)
+  return response
+}
+
+export type AuditExportFormat = operations['exportAuditLog']['parameters']['query']['format']
+export type AuditExport = { content: Blob; fileName: string; truncated: boolean }
+
+/** Server-side export (RF-019) of the whole filtered audit log, capped by the API. */
+export async function exportAuditLog(format: AuditExportFormat, query: AuditLogQuery = {}): Promise<AuditExport> {
+  const response = await authenticatedDownload(withQuery('/api/v1/admin/audit-log/export', { format, ...query }))
+  const named = /filename="([^"]+)"/.exec(response.headers.get('content-disposition') ?? '')
+  return { content: await response.blob(), fileName: named?.[1] ?? `auditoria.${format}`, truncated: response.headers.get('x-export-truncated') === 'true' }
+}
+
 export const login = (input: LoginRequest) => post<MfaChallenge>('/api/v1/auth/login', input)
 
 export async function verifyMfa(input: MfaVerifyRequest): Promise<void> {
