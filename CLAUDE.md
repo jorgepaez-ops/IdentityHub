@@ -81,9 +81,10 @@ volver a acordarse.
 
 - **Opus 5.5 (sesión principal): auditar, orquestar y revisar.** No implementa tareas que un agente
   menos capaz pueda hacer; revisa a fondo lo que ellos entregan antes de commitear.
-- **Codex es el ejecutor preferido.** El usuario quiere que Codex apoye siempre que pueda.
-- **Sonnet 5 (Agent con model "sonnet") cuando Codex no puede:** tareas cortas que necesitan red
-  saliente, el daemon de Docker o Postgres real (ver límites de Codex abajo).
+- **Codex ya no está disponible (2026-10-12):** el usuario canceló la suscripción. No delegar a
+  `codex:codex-rescue`; las secciones de Codex de abajo quedan solo como historial.
+- **Sonnet 5 (Agent con model "sonnet") es el ejecutor:** escritura delegada, exploración y tareas que
+  necesitan red, el daemon de Docker o Postgres real.
 
 ## Delegación a Codex (`codex:codex-rescue`)
 

@@ -76,7 +76,7 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
   en `golang.org/x/net` 0.59.0 de `tools/go.mod` (dependencia indirecta de las herramientas de desarrollo);
   subido a 0.60.0. Verificación local: las cuatro herramientas de `tools/` compilan y osv-scanner v2.6.0
   `--recursive --all-vulns` sobre `tools/` y `backend/` da "No issues found".
-- [ ] **C3 — Docker Hub (T17 de `idp-semana-4.md`).** Workflow de release en el tag `vX.Y.Z`: imágenes `api`,
+- [x] **C3 — Docker Hub (T17 de `idp-semana-4.md`).** Workflow de release en el tag `vX.Y.Z`: imágenes `api`,
   `worker` y `web` con `vX.Y.Z` y `latest`, SBOM con Syft y firma con Cosign (ADR 0011), environment
   protegido `dockerhub`. Requiere Q1: namespace y token de Docker Hub del usuario. Se prueba con el tag
   `v0.9.0` (y se borra o se deja marcado como prueba) antes de `v1.0.0`.
@@ -96,11 +96,124 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
     El workflow pasa a dos fases: `gate` construye y escanea las tres y guarda cada imagen como artefacto;
     `publish` (`needs: gate`, único job con el environment `dockerhub`) carga la misma imagen escaneada, sin
     reconstruirla, y la sube, firma y atesta. Resuelve "la imagen publicada no es la escaneada" y "release a
-    medias si falla el gate de una". Riesgo residual aceptado: un fallo de red durante `publish` aún puede dejar
+    medias si falla el gate de una". Riesgo residual (no aceptado por el usuario el 2026-10-12, ver F8): un fallo de red durante `publish` aún puede dejar
     una imagen sin subir (se reintenta el job). Verificación: actionlint v1.7.7 con shellcheck 0.10.0 y zizmor
     1.14.2 `--offline`, sin hallazgos.
-  - [ ] PR y merge a `main`; tag de prueba `v0.9.0` sobre el merge; run verde; imágenes, firma y SBOM
-    visibles en Docker Hub (`cosign verify`).
+  - [x] PR y merge a `main`; tag de prueba `v0.9.0` sobre el merge; run verde; imágenes, firma y SBOM
+    visibles en Docker Hub (`cosign verify`). Evidencia (2026-10-12): PR #30 fusionado (`0ea0ea3`, tras el PR
+    #31 con los avisos de arriba); tag anotado `v0.9.0` sobre `0ea0ea3`; run Release
+    [38319904991](https://github.com/jorgepaez-ops/IdentityHub/actions/runs/38319904991) en verde (6 jobs, 1m 38s).
+    Digests: `api` `sha256:52f2988c…86a3`, `worker` `sha256:f9b5443d…d03c`, `web` `sha256:fcca1f1c…6005`
+    (completos en el resumen del run). `cosign verify` y `cosign verify-attestation --type cyclonedx` pasan en
+    las tres con **Cosign v3.0.6**; con Cosign v2.5.3 dan "no signatures found", porque el instalador trae v3 y
+    v3 guarda firma y atestación como OCI referrers (formato bundle), no como etiquetas `.sig`/`.att` (por eso
+    la pestaña Tags de Docker Hub no las muestra). Capturas: informe Desktop, sección "5. C3 — Release v0.9.0
+    en Docker Hub" (7 capturas; vista pública de Docker Hub, sin sesión). Docker Hub queda cerrado (usuario).
+- [x] **E — Cierre documental (decisión del usuario, 2026-10-12: «solucionemos las bajas»).** El informe
+  técnico se escribió antes de T21a, D1 y C3 y declara pendiente lo que ya está hecho. Hoy, en la rama
+  `docs/cierre-informe`:
+  - [x] E1 `docs/informe/informe-tecnico.md`: Docker Hub hecho (secciones de alcance, amenazas abiertas
+    AM-008/AM-009/AM-022, fase 5, limitaciones, trabajo futuro, anexos A y B; nota de Cosign v3); quitar las
+    menciones al guion como entregable (el documento se conserva y se puede consultar, pero el informe no lo
+    anuncia); quitar «Q4 abierta / sin validación del docente» (el equipo eligió el lenguaje con la potestad
+    que da el enunciado; no requiere autorización); sacar de trabajo futuro y de desafíos la codificación de
+    los correos (T21a) y la regla de Gitleaks (D1), ya hechas; mencionar los avisos del 2026-10-12 resueltos.
+  - [x] E2 Revisión de T21 contra el enunciado: bitácora, matriz de trazabilidad, informe de seguridad
+    final; tag de versión y PR quedan para C2. Revisión hecha (explorador Sonnet, 2026-10-12, verificada por
+    Claude en `README.md:20`, `docs/security-report.html:545` y `scripts/traceability.py:5-7`): el enunciado no
+    nombra bitácora, matriz ni PR como requisitos (vienen de T21); sí exige badges de estado, cobertura y versión
+    (§4.1), imágenes en Docker Hub con semver (§3.2) y tabla de hallazgos (§6). Texto desactualizado tras C3:
+    - [x] `docs/BITACORA.md`: entrada del 2026-10-12 (C3, `v0.9.0`, Cosign v3, PR #30 y #31, F para mañana) y
+      quitar "Docker Hub pendiente" (líneas 17, 35-36, 44-53).
+    - [x] `docs/security-report.html` (versión 4, 2026-10-06): nota de avisos posteriores sin id (PR #31),
+      procedencia de imágenes (firma Cosign y SBOM atestado, `v0.9.0`) y etiquetas.
+    - [x] Docker Hub ya no pendiente en `README.md:20`, `docs/README.md:43,77`,
+      `docs/manuales/despliegue-y-operacion.md:3,63,98,113`, `docs/manuales/arquitectura.md:64` y estado de
+      `specs/adr/0011-docker-hub-como-registry.md`; `docs/video/guion.md` sin la escena condicional de T17.
+    - [x] `scripts/traceability.py:5-7`: la razón de RF-018/RF-019 dice "semana 4"; pasar a la planificación del
+      2026-10-13 y regenerar `specs/07-traceability.md` (no se edita a mano).
+    - [x] `ANALISIS-REQUISITOS.md` (instantánea del 2026-09-26): aviso de que es histórica.
+    - [x] Modelo de amenazas: `docs/threat-model/identity-hub.json` y su `README.md` aún dicen *Open* para AM-008,
+      AM-009 y AM-022; el informe ya los da por mitigados con C3.
+    - Evidencia E2 (2026-10-12): ruta delegada a Sonnet, revisión de Claude. Bitácora con entrada del 2026-10-12;
+      `security-report.html` revisión 2026-10-12 (avisos del PR #31 sin id, procedencia de imágenes, `v0.9.0`);
+      README, `docs/README.md`, manuales, ADR 0011 (estado implementado) y guion sin Docker Hub pendiente; modelo
+      de amenazas con AM-008/009/022 *Mitigated* y `hasOpenThreats` coherente; `ANALISIS-REQUISITOS.md` con aviso
+      histórico (está en `.git/info/exclude`: cambio solo local). Matriz: Claude cambió además las cadenas fijas
+      "diferido (semana 4)" del generador por "diferido (2026-10-13)" (prueba primero: RED con 1 fallo, GREEN con
+      `scripts/traceability_test.py` OK) y regeneró; `python3 scripts/traceability.py --check`: al día;
+      `python3 -m json.tool` sobre el modelo: válido.
+    - Para mañana (F6, media): RNF-001, 002, 006, 008 y 010 salen "sin cubrir" en la matriz porque el
+      generador solo cuenta pruebas Go, Gherkin y E2E; enlazarlos con su evidencia de CI (jobs, release).
+  - [x] E3 Badge de cobertura del README sin servicio externo.
+  - Evidencia E1/E3 (2026-10-12): ruta delegada a Sonnet (Codex falló al arrancar: su modelo por defecto
+    `gpt-5.6-sol` no se admite con la cuenta de ChatGPT; job `buk7uj44r`, sin cambios). Informe: alcance, tabla
+    STRIDE (AM-008/009/022 a *Mitigated*), amenazas abiertas, fase 5 (publicación y nota de Cosign v3), fase 6
+    (avisos del PR #31), desafíos, limitaciones, trabajo futuro y anexos A y B; sin Q4 ni guion. README: badge
+    estático del gate de cobertura (≥ 70 %, job 6b). Revisión de Claude sobre el diff; grep de Q4, T17, T20, T21,
+    guion y `cd.yml` sin coincidencias en el informe.
+- [ ] **F — Mejoras de complejidad media y alta (decisión del usuario, 2026-10-12: se anotan hoy y se hacen
+  mañana, 2026-10-13; `v1.0.0` sale después).** Estimación de Claude (2026-10-12):
+  - [x] F1 RF-019 exportación del audit log en CSV/JSON (media-baja, ~300 líneas: endpoint spec-first sobre el
+    listado existente, botón en la UI, pruebas).
+    Evidencia (2026-10-12): rama `feat/f1-rf019-audit-export` (`bacd7ca`, `62a0a4e`), ruta delegada a Sonnet.
+    `GET /api/v1/admin/audit-log/export?format=csv|json`, tope 10 000 filas, CSV protegido contra fórmulas,
+    exportación auditada; pruebas RED→GREEN con Postgres real, cobertura 80,6 %, golangci-lint 0, vitest 257;
+    E2E 54/54 con stack real; revisión nativa aprobada. Sin push.
+  - [x] F2 SMTP autenticado con STARTTLS en el worker y hosts configurables (media, ~400 líneas): hoy
+    `smtp.SendMail` sin TLS (`backend/cmd/worker/main.go:204`) y cliente OAuth/hosts fijos
+    (`backend/internal/config/config.go:66-68`); un `.sh` genera CA y certificado locales (como en el ejemplo
+    de la app de mascotas) y Mailpit exige STARTTLS y autenticación. Hace aplicable la arquitectura de AWS (SES).
+    Evidencia (2026-10-12): rama `feat/f2-smtp-starttls` (`2561a74`, `b10771c`, `eaf7cc1`, `d9fd3d2`), ruta delegada a
+    Sonnet. STARTTLS obligatorio y AUTH solo tras TLS, `scripts/gen-smtp-certs.sh` + `make certs`, Mailpit con
+    STARTTLS y credenciales, SES en Terraform, cliente OAuth por variables. E2E 52/52; envío en claro rechazado
+    (530). Revisión aprobada; Claude corrigió las comillas del archivo de credenciales. Sin push. Requiere
+    `SMTP_PASSWORD` en `.env` viejos. Siguen fijos: `server_name` de Nginx, constantes de Contabilidad y la fila
+    del cliente en la BD (documentado).
+  - [x] F3 Falco (media, ~300 líneas): servicio en el perfil de observabilidad (modern eBPF), 2-3 reglas propias,
+    falcosidekick hacia Loki y una alerta. Riesgo a verificar primero: soporte en Docker Desktop de macOS.
+    Evidencia (2026-10-12): rama `feat/f3-falco` (`7a86ae9`, `0697dfe`), ruta delegada a Sonnet. Falco 0.45.0 por digest
+    con modern eBPF en Docker Desktop sin `privileged`; 4 reglas propias (AM-020), alertas a Loki vía Alloy, alerta
+    y paneles en Grafana, runbook y `make falco-test`. Revisión aprobada; Claude cerró la evasión de la excepción
+    de `wget` y la detección de `connect` no bloqueante, verificado con Falco. Sin push.
+  - [ ] F4 RF-018 claves de servicio (media-alta, ~800 líneas): migración, endpoints, hash de la clave,
+    middleware de autenticación por clave, UI de administración, pruebas y E2E.
+  - [x] F5 Decidido por el usuario (2026-10-12): **queda como trabajo futuro** (exposición del proyecto en 5 días;
+    no se arriesga el núcleo de autenticación ya probado). Documentado en `docs/manuales/integracion-terceros.md`
+    §9.1. Antes: integración de terceros (clientes OAuth en BD, OpenID Connect, refresh tokens
+    por cliente, introspección, revocación) y outbox transaccional (alta, >2 000 líneas). Recomendación de
+    Claude: dejarlo como trabajo futuro justificado (toca el núcleo de autenticación ya probado).
+  - [x] F6 Matriz: RNF-001, 002, 006, 008 y 010 salen "sin cubrir" porque el generador solo cuenta pruebas Go,
+    Gherkin y E2E; enlazarlos con su evidencia de CI y del release (origen: revisión de E2).
+    Evidencia (2026-10-12): rama `feat/f6-rnf-evidence` (`86c5d85`, `313dc82`). Columna "Controles CI" desde
+    `specs/07-controls.yaml`, verificada contra workflows/compose/Makefile (sin comentarios); de 5 RNF sin cubrir a 1
+    (RNF-010, sin prueba de latencia). Revisión aprobada. Sin push.
+  - [x] F7 Release: `latest` solo después de firmar y atestar (decisión del usuario, 2026-10-12: «latest no puede
+    subir antes de la firma»). Hoy `publish` sube `vX.Y.Z` y `latest` y después firma; pasa a subir solo `vX.Y.Z`,
+    firmar y atestar el digest, y recién entonces mover `latest` a ese mismo digest. Se prueba con un tag de
+    validación (`v0.9.1`) antes de `v1.0.0`.
+    Evidencia (2026-10-12): rama `fix/f7-f8-release-latest-and-retries` (`4784bab`, `63a1f98`), ruta inline (Claude).
+    `publish` sube solo `vX.Y.Z`, firma y atesta, y luego mueve `latest` si es el tag más alto, verificando el
+    digest. actionlint/shellcheck y zizmor sin hallazgos; revisión aprobada. Pendiente: probar con `v0.9.1`
+    (requiere push, mañana).
+  - [x] F8 Release: reintento ante fallos de red en `publish` (push con reintentos acotados) y retención de los
+    artefactos de imagen suficiente para repetir solo el job fallido (hoy 1 día; el usuario no acepta el riesgo).
+    Evidencia (2026-10-12): mismo commit que F7. Reintentos (3) en push, cosign y consulta de tags; artefactos 7 días
+    (repositorio público: sin costo). Revisión aprobada.
+  - [x] F9 VULN-028 (GO-2026-5932): verificado el 2026-10-12 que **no tiene versión corregida ni la tendrá**
+    (osv.dev: afecta a `golang.org/x/crypto` desde la versión 0, sin `fixed`; el paquete `openpgp` está abandonado
+    por diseño). `go list -deps` no encuentra `x/crypto/openpgp` ni en `backend/` ni en las herramientas de
+    `tools/`. Propuesta: reclasificarlo de «riesgo aceptado con fecha» a «no afectado» (código vulnerable no
+    presente), con esa evidencia, en la ficha, el informe, la matriz de hallazgos y `osv-scanner.toml`.
+    Decisión del usuario (2026-10-12): reclasificar. Hecho: `go -C backend list -deps ./... | grep x/crypto/openpgp` y
+    `go -C tools list -deps` de oapi-codegen, gosec, sqlc y govulncheck dan 0 resultados; backend solo usa `argon2` y
+    `blake2b`. Cambios: ambos `osv-scanner.toml` (exclusión permanente, sin `ignoreUntil`), ficha VULN-028 (estado
+    `no afectado`, leyenda en `security/findings/README.md`), `evidencia.json`, README, informe técnico, informe HTML,
+    threat model, manual de seguridad y BITACORA. Commit: `fix(security): reclassify VULN-028 as not affected` (hash en el
+    historial de la rama).
+  - [ ] F10 Badge de cobertura con el valor medido: hoy es estático («gate ≥ 70 %», E3) y siempre se ve verde
+    aunque la cobertura real cambie (aviso de dos lentes de la revisión nativa del 2026-10-12). Publicar el
+    porcentaje que mide el job 6b sin servicio externo.
 - [ ] **C2 — Tag `v1.0.0` y release** con el PDF del informe adjunto (`make informe`; el PDF no se
   versiona). En vivo frente al equipo (T21 de `idp-semana-4.md`). Requiere el merge del PR #20.
   Pasos: (1) merge del PR #20 y `main` local al día con CI en verde; (2) `make informe` y revisión del PDF;
@@ -190,28 +303,17 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
   - Cierre de D (2026-10-07): `make up` con las imágenes de la rama y `make e2e`: 52/52 en verde. Entrega en un PR
     nuevo desde `chore/hallazgos-y-sonar` (el PR #20 se fusionó antes, `3d0de78`, por decisión del usuario).
 
-## Deuda menor (no bloquea la entrega; decidir cuál se atiende)
+## Deuda menor (no bloquea la entrega)
 
-- **SonarCloud en `main` (2026-10-06): 125 code smells.** Principales: S3776 (18, cubiertos en parte por
-  C1), S6819 roles ARIA (15, justificados en P9e), S4666 CSS duplicado (11), S8196 nombres de interfaz
-  (11, convención hexagonal), S108 en código generado (6).
-- **SonarCloud: 20 vulnerabilidades.**
-  - 10 «bloqueantes» `secrets:S6698`/`S6736` en `security/evidence/gitleaks-baseline.json`: credenciales
-    sembradas de la línea base vulnerable, conservadas como evidencia del «antes» de VULN-001; el usuario
-    confirmó (2026-10-06) que ninguna es real ni se reutilizó. Acción: marcarlas en SonarCloud como
-    aceptadas con justificación y sumarlas a «Alertas abiertas conocidas» del `README.md`.
-  - 1 `secrets:S2068` en `.gitleaks.toml:8` (ejemplo de la propia regla): mismo tratamiento.
-  - 9 de cadena de suministro en workflows (reales): `pip`/`npm` sin archivo de bloqueo (S8545, S8543),
-    sin `--ignore-scripts` (S6505, `baseline-scan.yml:79`) y sin `--only-binary :all:` (S8541,
-    `ci.yml:49`). Acción: fijar versiones con hashes o archivos de bloqueo.
-- **Sugerencias menores de revisiones nativas** anotadas en `odd/tasks/pulido-frontend.md` (por ejemplo la
-  prueba del enlace para saltar al contenido, que jsdom no puede simular).
-- **AM-019:** hecho en P9e (alerta y runbook; amenaza mitigada). Nada pendiente.
-- **Falco:** fuera de alcance, documentado en el informe como trabajo futuro.
+- **SonarCloud en `main`: code smells** (125 al 2026-10-06; parte de S3776 cubierta por C1). No bloquean.
+- Las 20 vulnerabilidades de SonarCloud y la cadena de suministro de los workflows quedaron resueltas en D
+  (D4, D5; PR #21). Falco pasó a F3.
+- Sugerencias menores de revisiones nativas en `odd/tasks/pulido-frontend.md`.
 
 ## Siguiente paso
 
-Merge del PR #20 (usuario) y Q1 (credenciales de Docker Hub); luego C3 con `v0.9.0` de prueba y, en vivo, C2
-con `v1.0.0`. Pendientes fuera de C1-C3: grabar el video (Q3) y decidir los hallazgos sueltos sin tarea
-(regla de gitleaks con `\s*`, Trivy 0.56.2 local frente a CI, estilo inline bloqueado por la CSP en
-`/invitations/accept`, complejidad fuera de alcance de C1).
+Hecho el 2026-10-12: C3, PR #31 y E1-E3 (rama `docs/cierre-informe`, sin push por decisión del usuario).
+Mañana (2026-10-13): push y PR de `docs/cierre-informe`; F1-F4 y F6-F8; decisiones del usuario sobre F5 y F9;
+al final C2 con `v1.0.0` (imágenes y PDF con el estado final).
+Prerrequisitos: Codex ya no está disponible (suscripción cancelada, 2026-10-12): la delegación va a Sonnet.
+Engram rechazó guardados en la sesión del 2026-10-12; abrir una consola nueva y correr `mem_doctor`.
