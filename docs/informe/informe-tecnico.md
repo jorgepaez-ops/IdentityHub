@@ -52,7 +52,7 @@ Identity Hub es un conjunto de contenedores orquestados por Docker Compose. La t
 | Mailpit | Captura el SMTP local: en desarrollo los correos no salen a Internet. Exige STARTTLS y autenticación con una CA local que genera `make certs`. |
 | Prometheus, Loki, Alloy, Falco y Grafana | Métricas, logs y detección de comportamiento anómalo en ejecución, bajo el perfil `observability` de Compose. |
 
-Los flujos entre dominios son: navegador a `web` a `api` por HTTP; `api` a PostgreSQL por SQL (consultas generadas por `sqlc`); `api` a RabbitMQ a `worker` por AMQP; `worker` a Mailpit por SMTP con STARTTLS; y Hub a Contabilidad por OAuth 2.0 Authorization Code con PKCE sobre dos orígenes (`identityhub.localhost` y `contabilidad.localhost`). Las decisiones más relevantes están registradas como ADR (0001 a 0014): stack y contenerización, IdP propio en lugar de Keycloak, OpenAPI 3.0.3 como fuente de verdad, Argon2id, refresh tokens rotativos con familia, publicación directa sin outbox, línea base vulnerable deliberada, GitHub Actions, SSO con PKCE, MFA por correo, Docker Hub como registry, arquitectura de referencia en AWS y roles y permisos configurables por aplicación.
+Los flujos entre dominios son: navegador a `web` a `api` por HTTP; `api` a PostgreSQL por SQL (consultas generadas por `sqlc`); `api` a RabbitMQ a `worker` por AMQP; `worker` a Mailpit por SMTP con STARTTLS; y Hub a Contabilidad por OAuth 2.0 Authorization Code con PKCE sobre dos orígenes (`identityhub.localhost` y `contabilidad.localhost`). Las decisiones más relevantes están registradas como ADR (0001 a 0014): stack y contenerización, IdP propio en lugar de Keycloak, OpenAPI 3.0.3 como fuente de verdad, Argon2id, refresh tokens rotativos con familia, publicación directa sin outbox, línea base vulnerable deliberada, GitHub Actions, SSO con PKCE, MFA por correo, Docker Hub como registry, arquitectura de referencia en AWS, roles y permisos configurables por aplicación y claves de servicio para integraciones máquina a máquina.
 
 ## Diagramas UML del sistema
 
@@ -242,6 +242,7 @@ Las 24 amenazas se reparten así: 7 de suplantación (Spoofing), 4 de manipulaci
 | Spoofing | AM-004 | Enumeración de cuentas | Respuestas iguales, comparación en tiempo constante y hash señuelo | Mitigated |
 | Spoofing | AM-005 | Sesión robada tras cambio de contraseña | El restablecimiento revoca todas las sesiones activas | Mitigated |
 | Spoofing | AM-017 (MFA) | Adivinar códigos MFA | Desafío SHA-256/HMAC-SHA256, uso único, vencimiento y límite de intentos | Mitigated |
+| Spoofing | AM-023 | Robo o fuerza bruta de una clave de servicio | Secreto de 256 bits del que solo se guarda el SHA-256, comparación en tiempo constante, `401` uniforme, vencimiento obligatorio, alcance mínimo `audit-log:read` y revocación inmediata (ADR 0014) | Mitigated |
 | Tampering | AM-006 | Inyección SQL | Consultas parametrizadas generadas por `sqlc` | Mitigated |
 | Tampering | AM-007 | Roles obsoletos en el token | Roles consultados en la base de datos en peticiones sensibles | Mitigated |
 | Tampering | AM-008 | Imagen manipulada en la cadena de suministro | Firma Cosign keyless (OIDC de GitHub) sobre el digest y despliegue por digest | Mitigated |
