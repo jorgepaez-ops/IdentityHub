@@ -72,34 +72,38 @@ func TestRNF011_ConsultasBaseSqlcUsanParametros(t *testing.T) {
 	if auditEvent.Action != "user.created" {
 		t.Errorf("InsertAuditEvent action = %q, want %q", auditEvent.Action, "user.created")
 	}
-	if auditEvent.ActorUserID == nil || *auditEvent.ActorUserID != created.ID {
-		t.Errorf("InsertAuditEvent actor ID = %v, want %v", auditEvent.ActorUserID, created.ID)
-	}
-	if auditEvent.ResourceType == nil || *auditEvent.ResourceType != resourceType {
-		t.Errorf("InsertAuditEvent resource type = %v, want %q", auditEvent.ResourceType, resourceType)
-	}
-	if auditEvent.ResourceID == nil || *auditEvent.ResourceID != resourceID {
-		t.Errorf("InsertAuditEvent resource ID = %v, want %q", auditEvent.ResourceID, resourceID)
-	}
-	if auditEvent.IP == nil || *auditEvent.IP != clientIP {
-		t.Errorf("InsertAuditEvent IP = %v, want %v", auditEvent.IP, clientIP)
-	}
-	if auditEvent.UserAgent == nil || *auditEvent.UserAgent != userAgent {
-		t.Errorf("InsertAuditEvent user agent = %v, want %q", auditEvent.UserAgent, userAgent)
-	}
-	var gotMetadata, wantMetadata any
-	if err := json.Unmarshal(auditEvent.Metadata, &gotMetadata); err != nil {
-		t.Fatalf("decode returned audit metadata: %v", err)
-	}
-	if err := json.Unmarshal(metadata, &wantMetadata); err != nil {
-		t.Fatalf("decode expected audit metadata: %v", err)
-	}
-	if !reflect.DeepEqual(gotMetadata, wantMetadata) {
-		t.Errorf("InsertAuditEvent metadata = %s, want %s", auditEvent.Metadata, metadata)
-	}
+	requirePointee(t, "InsertAuditEvent actor ID", auditEvent.ActorUserID, created.ID)
+	requirePointee(t, "InsertAuditEvent resource type", auditEvent.ResourceType, resourceType)
+	requirePointee(t, "InsertAuditEvent resource ID", auditEvent.ResourceID, resourceID)
+	requirePointee(t, "InsertAuditEvent IP", auditEvent.IP, clientIP)
+	requirePointee(t, "InsertAuditEvent user agent", auditEvent.UserAgent, userAgent)
+	requireSameJSON(t, "InsertAuditEvent metadata", auditEvent.Metadata, metadata)
 
 	_, err = queries.GetUserByEmail(ctx, "' OR '1'='1' --")
 	if !errors.Is(err, pgx.ErrNoRows) {
 		t.Errorf("injection-shaped email error = %v, want pgx.ErrNoRows", err)
+	}
+}
+
+// requirePointee reports (without stopping the test) unless got is non-nil and points to want.
+func requirePointee[T comparable](t *testing.T, label string, got *T, want T) {
+	t.Helper()
+	if got == nil || *got != want {
+		t.Errorf("%s = %v, want %v", label, got, want)
+	}
+}
+
+// requireSameJSON reports (without stopping the test) unless got and want decode to equal values.
+func requireSameJSON(t *testing.T, label string, got, want json.RawMessage) {
+	t.Helper()
+	var gotValue, wantValue any
+	if err := json.Unmarshal(got, &gotValue); err != nil {
+		t.Fatalf("decode returned audit metadata: %v", err)
+	}
+	if err := json.Unmarshal(want, &wantValue); err != nil {
+		t.Fatalf("decode expected audit metadata: %v", err)
+	}
+	if !reflect.DeepEqual(gotValue, wantValue) {
+		t.Errorf("%s = %s, want %s", label, got, want)
 	}
 }

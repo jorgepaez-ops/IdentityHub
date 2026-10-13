@@ -82,7 +82,7 @@ func TestRF012_LosTiposDeEventoCoincidenConLosCanalesDelSpec(t *testing.T) {
 		}
 	}
 
-	// La cola `notifications` está enlazada a `user.*` y `security.*`: todo tipo
+	// La cola `notifications` está enlazada a `user.*` y `security.*`: cualquier tipo
 	// de evento tiene que caer bajo uno de esos dos prefijos o se perdería en
 	// silencio, que es la peor forma de perder un mensaje.
 	for tipo := range esperados {
@@ -165,11 +165,11 @@ func TestRNF007_PublishCuentaFalloDeSerializacion(t *testing.T) {
 }
 
 type publisherStub struct {
-	confirmation deferredConfirmation
+	confirmation confirmationWaiter
 	err          error
 }
 
-func (p publisherStub) PublishWithDeferredConfirmWithContext(context.Context, string, string, bool, bool, amqp.Publishing) (deferredConfirmation, error) {
+func (p publisherStub) PublishWithDeferredConfirmWithContext(context.Context, string, string, bool, bool, amqp.Publishing) (confirmationWaiter, error) {
 	return p.confirmation, p.err
 }
 

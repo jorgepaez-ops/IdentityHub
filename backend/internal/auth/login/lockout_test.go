@@ -72,7 +72,7 @@ func (r *lockoutRepository) InsertAuditEvent(_ context.Context, event AuditEvent
 	return nil
 }
 
-func newLockoutService(t *testing.T, repository Repository, policy LockoutConfig) *Service {
+func newLockoutService(t *testing.T, repository LoginTransactor, policy LockoutConfig) *Service {
 	t.Helper()
 	return New(repository, policy).WithMFA(lockoutMFAIssuer{})
 }

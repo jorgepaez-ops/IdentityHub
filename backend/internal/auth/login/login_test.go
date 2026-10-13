@@ -30,7 +30,7 @@ func (i testMFAIssuer) Issue(_ context.Context, user mfa.User) (mfa.Challenge, e
 	}
 	return mfa.Challenge{Token: "mfa-token", ExpiresIn: 300}, nil
 }
-func withMFA(repository Repository) *Service {
+func withMFA(repository LoginTransactor) *Service {
 	return New(repository).WithMFA(testMFAIssuer{})
 }
 
@@ -192,17 +192,24 @@ func TestRF003_ContrasenaLargaDevuelveCredencialesInvalidasYSeAudita(t *testing.
 			if !errors.Is(err, ErrInvalidCredentials) {
 				t.Fatalf("Login() error = %v, want invalid credentials", err)
 			}
-			if len(testCase.repository.audits) != 1 || testCase.repository.audits[0].Action != "login_failed" {
-				t.Fatalf("audits=%+v", testCase.repository.audits)
-			}
-			gotActorID := testCase.repository.audits[0].ActorUserID
-			if testCase.actorID == nil && gotActorID != nil {
-				t.Fatalf("actor ID = %v, want nil", gotActorID)
-			}
-			if testCase.actorID != nil && (gotActorID == nil || *gotActorID != *testCase.actorID) {
-				t.Fatalf("actor ID = %v, want %v", gotActorID, testCase.actorID)
-			}
+			assertSingleLoginFailedAudit(t, testCase.repository, testCase.actorID)
 		})
+	}
+}
+
+// assertSingleLoginFailedAudit checks that exactly one login_failed audit event was recorded
+// and that its actor is wantActor (nil when the email is unknown).
+func assertSingleLoginFailedAudit(t *testing.T, repository *repositoryStub, wantActor *uuid.UUID) {
+	t.Helper()
+	if len(repository.audits) != 1 || repository.audits[0].Action != "login_failed" {
+		t.Fatalf("audits=%+v", repository.audits)
+	}
+	gotActorID := repository.audits[0].ActorUserID
+	if wantActor == nil && gotActorID != nil {
+		t.Fatalf("actor ID = %v, want nil", gotActorID)
+	}
+	if wantActor != nil && (gotActorID == nil || *gotActorID != *wantActor) {
+		t.Fatalf("actor ID = %v, want %v", gotActorID, wantActor)
 	}
 }
 

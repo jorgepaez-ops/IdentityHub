@@ -52,19 +52,21 @@ type Hasher interface{ Hash(string) (string, error) }
 type Publisher interface {
 	Publish(context.Context, string, any) error
 }
-type Repository interface {
+
+// BootstrapAdminTransactor is the persistence boundary: it runs one unit of work in a single transaction.
+type BootstrapAdminTransactor interface {
 	WithinBootstrapAdminTransaction(context.Context, func(store.BootstrapAdminWriter) error) error
 }
 
 type Service struct {
-	repository Repository
+	repository BootstrapAdminTransactor
 	publisher  Publisher
 	hasher     Hasher
 	random     io.Reader
 	now        func() time.Time
 }
 
-func New(repository Repository, publisher Publisher, hasher Hasher, random io.Reader, now func() time.Time) *Service {
+func New(repository BootstrapAdminTransactor, publisher Publisher, hasher Hasher, random io.Reader, now func() time.Time) *Service {
 	return &Service{repository: repository, publisher: publisher, hasher: hasher, random: random, now: now}
 }
 

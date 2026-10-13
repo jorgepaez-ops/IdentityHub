@@ -43,7 +43,9 @@ type Hasher interface {
 type Publisher interface {
 	Publish(context.Context, string, any) error
 }
-type Repository interface {
+
+// EmployeeCreationTransactor is the persistence boundary: it runs one unit of work in a single transaction.
+type EmployeeCreationTransactor interface {
 	WithinEmployeeCreationTransaction(context.Context, func(store.EmployeeCreationWriter) error) error
 }
 
@@ -68,14 +70,14 @@ type InvalidInputError struct{ Field, Detail string }
 func (e *InvalidInputError) Error() string { return e.Field + ": " + e.Detail }
 
 type Service struct {
-	repository Repository
+	repository EmployeeCreationTransactor
 	publisher  Publisher
 	hasher     Hasher
 	random     io.Reader
 	now        func() time.Time
 }
 
-func New(repository Repository, publisher Publisher, hasher Hasher, random io.Reader, now func() time.Time) *Service {
+func New(repository EmployeeCreationTransactor, publisher Publisher, hasher Hasher, random io.Reader, now func() time.Time) *Service {
 	return &Service{repository: repository, publisher: publisher, hasher: hasher, random: random, now: now}
 }
 

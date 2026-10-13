@@ -83,7 +83,8 @@ type Writer interface {
 	InsertAuditEvent(context.Context, AuditEvent) error
 }
 
-type Repository interface {
+// LoginTransactor is the persistence boundary: it runs one unit of work in a single transaction.
+type LoginTransactor interface {
 	WithinLoginTransaction(context.Context, func(Writer) error) error
 }
 
@@ -92,7 +93,7 @@ type Authenticator interface {
 }
 
 type Service struct {
-	repository Repository
+	repository LoginTransactor
 	lockout    LockoutConfig
 	publisher  EventPublisher
 	mfa        mfa.Issuer
@@ -117,7 +118,7 @@ type LockoutConfig = lockout.Config
 // compatibility with existing callers while allowing composition to inject the
 // environment-derived policy. Sessions are issued by the mfa package, so this
 // service needs no token signer or refresh lifetime.
-func New(repository Repository, policies ...LockoutConfig) *Service {
+func New(repository LoginTransactor, policies ...LockoutConfig) *Service {
 	policy := lockout.Default()
 	if len(policies) == 1 {
 		policy = policies[0]

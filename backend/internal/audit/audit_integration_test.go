@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jorgepaez/identity-hub/internal/testdb"
 )
 
@@ -29,42 +30,42 @@ func TestRF011_IdentityAppNoTieneUpdateNiDeleteSobreAuditLog(t *testing.T) {
 	if err := pool.QueryRow(ctx, `INSERT INTO audit_log (action) VALUES ('login_failed') RETURNING id`).Scan(&id); err != nil {
 		t.Fatalf("insert audit event: %v", err)
 	}
-	if _, err := pool.Exec(ctx, `ALTER TABLE audit_log DISABLE TRIGGER audit_log_no_update`); err != nil {
-		t.Fatalf("disable update trigger: %v", err)
-	}
-	if _, err := pool.Exec(ctx, `ALTER TABLE audit_log DISABLE TRIGGER audit_log_no_delete`); err != nil {
-		t.Fatalf("disable delete trigger: %v", err)
-	}
+	mustExec(t, pool, "disable update trigger", `ALTER TABLE audit_log DISABLE TRIGGER audit_log_no_update`)
+	mustExec(t, pool, "disable delete trigger", `ALTER TABLE audit_log DISABLE TRIGGER audit_log_no_delete`)
 	t.Cleanup(func() {
 		_, _ = pool.Exec(ctx, `ALTER TABLE audit_log ENABLE TRIGGER audit_log_no_update`)
 		_, _ = pool.Exec(ctx, `ALTER TABLE audit_log ENABLE TRIGGER audit_log_no_delete`)
 	})
 
-	if _, err := pool.Exec(ctx, `SET ROLE identity_app`); err != nil {
-		t.Fatalf("set application role: %v", err)
-	}
+	mustExec(t, pool, "set application role", `SET ROLE identity_app`)
 	_, updateErr := pool.Exec(ctx, `UPDATE audit_log SET action = 'tampered' WHERE id = $1`, id)
 	_, deleteErr := pool.Exec(ctx, `DELETE FROM audit_log WHERE id = $1`, id)
-	if _, err := pool.Exec(ctx, `RESET ROLE`); err != nil {
-		t.Fatalf("reset application role: %v", err)
-	}
+	mustExec(t, pool, "reset application role", `RESET ROLE`)
 	for operation, err := range map[string]error{"UPDATE": updateErr, "DELETE": deleteErr} {
-		if err == nil || !strings.Contains(err.Error(), "permission denied") {
-			t.Errorf("%s error = %v, want permission denied", operation, err)
-		}
+		requireErrorContaining(t, operation+" error", err, "permission denied")
 	}
 
-	if _, err := pool.Exec(ctx, `ALTER TABLE audit_log ENABLE TRIGGER audit_log_no_update`); err != nil {
-		t.Fatalf("re-enable update trigger: %v", err)
-	}
-	if _, err := pool.Exec(ctx, `ALTER TABLE audit_log ENABLE TRIGGER audit_log_no_delete`); err != nil {
-		t.Fatalf("re-enable delete trigger: %v", err)
-	}
+	mustExec(t, pool, "re-enable update trigger", `ALTER TABLE audit_log ENABLE TRIGGER audit_log_no_update`)
+	mustExec(t, pool, "re-enable delete trigger", `ALTER TABLE audit_log ENABLE TRIGGER audit_log_no_delete`)
 
-	if _, err := pool.Exec(ctx, `UPDATE audit_log SET action = 'tampered' WHERE id = $1`, id); err == nil || !strings.Contains(err.Error(), "append-only") {
-		t.Errorf("superuser update error = %v, want append-only trigger rejection", err)
+	_, err := pool.Exec(ctx, `UPDATE audit_log SET action = 'tampered' WHERE id = $1`, id)
+	requireErrorContaining(t, "superuser update error", err, "append-only")
+	_, err = pool.Exec(ctx, `DELETE FROM audit_log WHERE id = $1`, id)
+	requireErrorContaining(t, "superuser delete error", err, "append-only")
+}
+
+// mustExec runs a statement that has to succeed and fails the test with label otherwise.
+func mustExec(t *testing.T, pool *pgxpool.Pool, label, statement string) {
+	t.Helper()
+	if _, err := pool.Exec(context.Background(), statement); err != nil {
+		t.Fatalf("%s: %v", label, err)
 	}
-	if _, err := pool.Exec(ctx, `DELETE FROM audit_log WHERE id = $1`, id); err == nil || !strings.Contains(err.Error(), "append-only") {
-		t.Errorf("superuser delete error = %v, want append-only trigger rejection", err)
+}
+
+// requireErrorContaining reports (without stopping the test) unless err is non-nil and mentions want.
+func requireErrorContaining(t *testing.T, label string, err error, want string) {
+	t.Helper()
+	if err == nil || !strings.Contains(err.Error(), want) {
+		t.Errorf("%s = %v, want %s", label, err, want)
 	}
 }

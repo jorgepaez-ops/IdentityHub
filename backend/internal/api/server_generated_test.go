@@ -34,20 +34,27 @@ func TestRNF011_GeneratedServerContract(t *testing.T) {
 			t.Fatalf("ServerInterface methods = %d, want 32", contract.NumMethod())
 		}
 		for _, operation := range []string{"RefreshSession", "Logout"} {
-			method, ok := contract.MethodByName(operation)
-			if !ok {
-				t.Fatalf("ServerInterface is missing %s", operation)
-			}
-			if method.Type.NumIn() != 3 {
-				t.Fatalf("%s parameters = %d, want response writer, request, and cookie params", operation, method.Type.NumIn())
-			}
-			params := method.Type.In(2)
-			field, ok := params.FieldByName("RefreshToken")
-			if !ok || field.Tag.Get("form") != "refresh_token" {
-				t.Fatalf("%s must accept refresh_token as a cookie parameter", operation)
-			}
+			assertRefreshTokenIsCookieParam(t, contract, operation)
 		}
 	})
+}
+
+// assertRefreshTokenIsCookieParam checks that operation takes (writer, request, params) and that
+// params binds RefreshToken from the refresh_token cookie.
+func assertRefreshTokenIsCookieParam(t *testing.T, contract reflect.Type, operation string) {
+	t.Helper()
+	method, ok := contract.MethodByName(operation)
+	if !ok {
+		t.Fatalf("ServerInterface is missing %s", operation)
+	}
+	if method.Type.NumIn() != 3 {
+		t.Fatalf("%s parameters = %d, want response writer, request, and cookie params", operation, method.Type.NumIn())
+	}
+	params := method.Type.In(2)
+	field, ok := params.FieldByName("RefreshToken")
+	if !ok || field.Tag.Get("form") != "refresh_token" {
+		t.Fatalf("%s must accept refresh_token as a cookie parameter", operation)
+	}
 }
 
 func TestRNF012_ErrorDeBindingEsProblemJSONSinDetalleInterno(t *testing.T) {

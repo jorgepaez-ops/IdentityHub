@@ -171,37 +171,42 @@ func TestBootstrap_AdminBloqueadoODeshabilitadoHaceNoOp(t *testing.T) {
 		t.Skip("integration test requires a PostgreSQL server")
 	}
 	for _, status := range []string{"locked", "disabled"} {
-		t.Run(status, func(t *testing.T) {
-			pool := testdb.New(t)
-			repository, err := store.NewWithPool(pool)
-			if err != nil {
-				t.Fatalf("NewWithPool: %v", err)
-			}
-			publisher := &integrationPublisher{}
-			service := New(repository, publisher, integrationHasher{}, rand.Reader, time.Now)
-			ctx := context.Background()
-			const email = "first-admin@example.test"
-			if _, err := service.Ensure(ctx, email); err != nil {
-				t.Fatalf("Ensure: %v", err)
-			}
-			if _, err := pool.Exec(ctx, `UPDATE users SET status = $2 WHERE email = $1`, email, status); err != nil {
-				t.Fatalf("set status: %v", err)
-			}
-			// A different configured email must not create a second admin.
-			outcome, err := service.Ensure(ctx, "another-admin@example.test")
-			if err != nil || outcome != OutcomeAdminExists {
-				t.Fatalf("Ensure = %q, %v; want admin_exists", outcome, err)
-			}
-			var users int
-			if err := pool.QueryRow(ctx, `SELECT count(*) FROM users`).Scan(&users); err != nil || users != 1 {
-				t.Fatalf("users = %d, err %v; want 1", users, err)
-			}
-			publisher.mu.Lock()
-			defer publisher.mu.Unlock()
-			if publisher.events != 1 {
-				t.Fatalf("published invitations = %d, want 1", publisher.events)
-			}
-		})
+		t.Run(status, func(t *testing.T) { requireNoSecondAdminWhenFirstIs(t, status) })
+	}
+}
+
+// requireNoSecondAdminWhenFirstIs bootstraps an admin, moves it to status and checks that a
+// second Ensure with another email creates nothing and publishes no new invitation.
+func requireNoSecondAdminWhenFirstIs(t *testing.T, status string) {
+	t.Helper()
+	pool := testdb.New(t)
+	repository, err := store.NewWithPool(pool)
+	if err != nil {
+		t.Fatalf("NewWithPool: %v", err)
+	}
+	publisher := &integrationPublisher{}
+	service := New(repository, publisher, integrationHasher{}, rand.Reader, time.Now)
+	ctx := context.Background()
+	const email = "first-admin@example.test"
+	if _, err := service.Ensure(ctx, email); err != nil {
+		t.Fatalf("Ensure: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE users SET status = $2 WHERE email = $1`, email, status); err != nil {
+		t.Fatalf("set status: %v", err)
+	}
+	// A different configured email must not create a second admin.
+	outcome, err := service.Ensure(ctx, "another-admin@example.test")
+	if err != nil || outcome != OutcomeAdminExists {
+		t.Fatalf("Ensure = %q, %v; want admin_exists", outcome, err)
+	}
+	var users int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM users`).Scan(&users); err != nil || users != 1 {
+		t.Fatalf("users = %d, err %v; want 1", users, err)
+	}
+	publisher.mu.Lock()
+	defer publisher.mu.Unlock()
+	if publisher.events != 1 {
+		t.Fatalf("published invitations = %d, want 1", publisher.events)
 	}
 }
 
