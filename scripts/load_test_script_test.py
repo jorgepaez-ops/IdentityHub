@@ -1,0 +1,111 @@
+#!/usr/bin/env python3
+"""Stdlib-only test of scripts/load-test.sh: the production guard and the exit status of the cleanup trap.
+
+docker is replaced by a stub placed first on PATH, so no stack, k6 image or database is needed. The stub
+appends every call to a log, records the SQL it receives on stdin, and its "run" (k6) behavior is chosen
+with STUB_RUN: "ok", "fail" (exit 7) or "slow" (waits for a go-file, then sleeps 1 s and succeeds).
+"""
+from __future__ import annotations
+
+import os
+import pathlib
+import signal
+import subprocess
+import sys
+import tempfile
+import time
+import unittest
+
+# Avoid leaving scripts/__pycache__/ behind (spec-drift requires a clean tree).
+sys.dont_write_bytecode = True
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+SCRIPT = ROOT / "scripts" / "load-test.sh"
+STUB = r"""#!/usr/bin/env bash
+echo "docker $*" >> "$STUB_LOG"
+case " $* " in
+  *" exec "*) cat >> "$STUB_LOG"; exit 0 ;;
+esac
+if [ "$1" = "run" ]; then
+  case "$STUB_RUN" in
+    fail) exit 7 ;;
+    slow) touch "$STUB_STARTED"; sleep 1; exit 0 ;;
+  esac
+fi
+exit 0
+"""
+
+
+class LoadTestScriptTests(unittest.TestCase):
+    def setUp(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.tmp = pathlib.Path(tmp.name)
+        bin_dir = self.tmp / "bin"
+        bin_dir.mkdir()
+        (bin_dir / "docker").write_text(STUB, encoding="utf-8")
+        (bin_dir / "docker").chmod(0o755)
+        self.log = self.tmp / "calls.log"
+        self.started = self.tmp / "started"
+        self.env = {
+            **os.environ,
+            "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
+            "STUB_LOG": str(self.log),
+            "STUB_STARTED": str(self.started),
+            "STUB_RUN": "ok",
+            "COMPOSE": "docker compose --env-file .env -f deploy/docker-compose.yml",
+        }
+        self.env.pop("COMPOSE_FILE", None)
+
+    def calls(self) -> str:
+        return self.log.read_text(encoding="utf-8") if self.log.exists() else ""
+
+    def run_script(self, **overrides: str) -> subprocess.CompletedProcess[str]:
+        env = {**self.env, **overrides}
+        return subprocess.run(["bash", str(SCRIPT)], env=env, capture_output=True, text=True, timeout=60)
+
+    def test_refuses_the_simulated_production_compose_command(self) -> None:
+        result = self.run_script(COMPOSE="docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.prod.yml")
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertEqual(self.calls(), "")
+
+    def test_refuses_production_selected_through_compose_file(self) -> None:
+        result = self.run_script(COMPOSE_FILE="deploy/docker-compose.yml:deploy/docker-compose.prod.yml")
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertEqual(self.calls(), "")
+
+    def test_passes_and_disables_the_seeded_account(self) -> None:
+        result = self.run_script()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("SET status = 'disabled'", self.calls())
+
+    def test_a_failing_k6_run_keeps_its_status_and_still_cleans_up(self) -> None:
+        result = self.run_script(STUB_RUN="fail")
+        self.assertEqual(result.returncode, 7, result.stderr)
+        self.assertIn("SET status = 'disabled'", self.calls())
+
+    def _interrupt(self, sig: signal.Signals) -> tuple[int, str]:
+        process = subprocess.Popen(
+            ["bash", str(SCRIPT)], env={**self.env, "STUB_RUN": "slow"},
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        deadline = time.time() + 30
+        while not self.started.exists() and time.time() < deadline:
+            time.sleep(0.05)
+        self.assertTrue(self.started.exists(), "the k6 stub never started")
+        process.send_signal(sig)  # only the script: bash runs the trap once the child ends (with status 0)
+        return process.wait(timeout=30), self.calls()
+
+    def test_an_interrupted_run_exits_non_zero_and_cleans_up(self) -> None:
+        status, calls = self._interrupt(signal.SIGINT)
+        self.assertEqual(status, 130)
+        self.assertIn("SET status = 'disabled'", calls)
+
+    def test_a_terminated_run_exits_non_zero_and_cleans_up(self) -> None:
+        status, calls = self._interrupt(signal.SIGTERM)
+        self.assertEqual(status, 143)
+        self.assertIn("SET status = 'disabled'", calls)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -9,13 +9,18 @@
 # Al terminar (pase o falle) la cuenta sembrada queda deshabilitada (status 'disabled'), como hace el
 # teardown de E2E con e2e-*: no se borra porque audit_log es append-only y sus filas referencian a
 # users con ON DELETE SET NULL, que es un UPDATE y el disparador lo rechaza. Se niega a correr contra
-# la producción simulada (docker-compose.prod.yml): siembra una cuenta con SQL directo.
+# la producción simulada (docker-compose.prod.yml): siembra una cuenta con SQL directo. La guarda mira
+# COMPOSE y COMPOSE_FILE por nombre de archivo; no puede comprobar que el contenedor db sea el de
+# desarrollo porque la producción simulada comparte el nombre de proyecto (identity-hub) y el servicio db.
+#
+# Señales: INT y TERM salen con 130 y 143 (nunca con 0 aunque k6 ya hubiera terminado) y la limpieza
+# corre en EXIT conservando el código real de salida.
 #
 # Uso: COMPOSE="docker compose --env-file .env -f deploy/docker-compose.yml" scripts/load-test.sh
 set -euo pipefail
 
 : "${COMPOSE:?COMPOSE es obligatorio}"
-case "$COMPOSE" in
+case "$COMPOSE ${COMPOSE_FILE:-}" in
   *docker-compose.prod.yml*) echo "ERROR: make load-test no corre contra la producción simulada (siembra una cuenta con SQL directo)." >&2; exit 2 ;;
 esac
 cd "$(dirname "$0")/.."
@@ -39,7 +44,7 @@ PY
 # La cuenta se deshabilita al salir aunque la siembra o k6 fallen (si no llegó a crearse, no toca nada).
 cleanup() {
   status=$?
-  trap - EXIT INT TERM
+  trap - EXIT
   # shellcheck disable=SC2086 # COMPOSE es un comando con argumentos, se parte a propósito.
   if ! $COMPOSE exec -T db psql -U "$db_user" -d "$db_name" -X -q -v ON_ERROR_STOP=1 -v "email=$email" >/dev/null \
     <<<"UPDATE users SET status = 'disabled' WHERE email = :'email' AND status <> 'disabled';"; then
@@ -47,7 +52,9 @@ cleanup() {
   fi
   exit "$status"
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 # shellcheck disable=SC2086
 $COMPOSE exec -T db psql -U "$db_user" -d "$db_name" -X -q -v ON_ERROR_STOP=1 \
