@@ -268,5 +268,76 @@ class ControlsTests(unittest.TestCase):
         self.assertIn("cuatro columnas de evidencia", rendered)
 
 
+class NonFunctionalVerificationTests(unittest.TestCase):
+    """Every @RNF-only scenario links, via "# Verificación:", to a test that really exists."""
+
+    FEATURE = (
+        "Característica: NFR\n"
+        "  # Verificación: scripts/x_test.py (RnfOne), job spec-drift de CI\n"
+        "  @RNF-001\n"
+        "  Escenario: Uno\n"
+        '  # Verificación: tests/load/a.js vía "make load-test", paso "Pruebas X" del job e2e de CI\n'
+        "  @RNF-002 @p1\n"
+        "  Escenario: Dos\n"
+    )
+    FILES = {
+        "scripts/x_test.py": "class RnfOne:\n    pass\n",
+        "tests/load/a.js": "export default 1\n",
+        ".github/workflows/ci.yml": "jobs:\n  spec-drift:\n    steps:\n  e2e:\n    steps:\n      - name: Pruebas X\n",
+        "Makefile": "load-test: ## x\n\t@true\n",
+    }
+
+    def errors(self, feature: str | None = None, files: dict[str, str] | None = None) -> list[str]:
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            (root / "specs" / "06-acceptance").mkdir(parents=True)
+            (root / "specs" / "06-acceptance" / "nfr.feature").write_text(feature or self.FEATURE, encoding="utf-8")
+            for name, text in (files or self.FILES).items():
+                (root / name).parent.mkdir(parents=True, exist_ok=True)
+                (root / name).write_text(text, encoding="utf-8")
+            previous_root = traceability.ROOT
+            self.addCleanup(setattr, traceability, "ROOT", previous_root)
+            traceability.ROOT = root
+            return traceability.verification_errors(traceability.load_gherkin_scenarios())
+
+    def test_accepts_references_that_exist(self) -> None:
+        self.assertEqual(self.errors(), [])
+
+    def test_reports_a_missing_test_file(self) -> None:
+        files = {k: v for k, v in self.FILES.items() if k != "scripts/x_test.py"}
+        self.assertIn("scripts/x_test.py", "\n".join(self.errors(files=files)))
+
+    def test_reports_a_missing_test_class_job_step_and_make_target(self) -> None:
+        files = dict(self.FILES)
+        files["scripts/x_test.py"] = "class Other:\n    pass\n"
+        files[".github/workflows/ci.yml"] = "jobs:\n  e2e:\n    steps:\n      - name: Otro\n"
+        files["Makefile"] = "other: ## x\n"
+        text = "\n".join(self.errors(files=files))
+        for expected in ("RnfOne", "job spec-drift", "paso Pruebas X", "make load-test"):
+            self.assertIn(expected, text)
+
+    def test_reports_a_scenario_without_a_verification_line_or_without_a_named_test(self) -> None:
+        feature = "Característica: NFR\n  @RNF-001\n  Escenario: Sin enlace\n  # Verificación: scripts/x_test.py\n  @RNF-002\n  Escenario: Solo archivo\n"
+        text = "\n".join(self.errors(feature))
+        self.assertIn("RNF-001 Sin enlace", text)
+        self.assertIn("RNF-002 Solo archivo", text)
+
+    def test_a_verification_line_does_not_leak_to_the_next_scenario_and_rf_scenarios_are_exempt(self) -> None:
+        feature = (
+            "Característica: NFR\n"
+            "  # Verificación: scripts/x_test.py (RnfOne)\n"
+            "  @RNF-001\n  Escenario: Uno\n"
+            "  @RNF-002\n  Escenario: Dos hereda?\n"
+            "  @RF-001 @RNF-003\n  Escenario: Con RF\n"
+        )
+        text = "\n".join(self.errors(feature))
+        self.assertIn("RNF-002 Dos hereda?", text)
+        self.assertNotIn("Con RF", text)
+        self.assertNotIn("RNF-001 Uno", text)
+
+    def test_the_real_feature_is_machine_checked(self) -> None:
+        self.assertEqual(traceability.verification_errors(traceability.load_gherkin_scenarios()), [])
+
+
 if __name__ == "__main__":
     unittest.main()

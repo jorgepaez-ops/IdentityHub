@@ -49,9 +49,12 @@ class Scenario(NamedTuple):
     source: str
     tags: tuple[str, ...] = ()
     line: int = 0
+    verification: str = ""
 
 
 GHERKIN_SCENARIO = re.compile(r"(Escenario|Esquema del escenario):")
+VERIFICATION_COMMENT = "# Verificación:"
+FILE_REFERENCE = re.compile(r"[\w./-]+\.(?:py|js|ts|sh|yml|yaml|go)\b")
 
 
 class Control(NamedTuple):
@@ -173,8 +176,11 @@ def load_gherkin_scenarios() -> list[Scenario]:
     scenarios: list[Scenario] = []
     for path in sorted((ROOT / "specs" / "06-acceptance").glob("*.feature")):
         pending: list[str] = []
+        verification = ""
         for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
             stripped = line.strip()
+            if stripped.startswith(VERIFICATION_COMMENT):
+                verification = stripped[len(VERIFICATION_COMMENT) :].strip()
             if not stripped or stripped.startswith("#"):
                 continue
             if stripped.startswith("@"):
@@ -183,11 +189,14 @@ def load_gherkin_scenarios() -> list[Scenario]:
                 name = stripped.split(":", 1)[1].strip()
                 first_rf = next((tag for tag in pending if tag.startswith("RF-")), "")
                 if pending:
-                    scenarios.append(Scenario(first_rf, name, path.name, tuple(pending), number))
+                    scenarios.append(Scenario(first_rf, name, path.name, tuple(pending), number, verification))
                 pending = []
+                verification = ""
             else:
                 # Scope keywords, steps, tables and docstrings all end the tag run.
                 pending = []
+                verification = ""
+
     return scenarios
 
 
@@ -235,6 +244,61 @@ def computed_requirement_titles() -> list[str]:
             line = text.count("\n", 0, match.start()) + 1
             locations.append(f"{path.relative_to(base)}:{line}")
     return locations
+
+
+def verification_errors(scenarios: list[Scenario]) -> list[str]:
+    """Machine-check the "# Verificación:" line of every scenario tagged only with @RNF-NNN.
+
+    These scenarios are not derived into Playwright specs, so the free-text comment is their only link
+    to the test that runs them. The line must name (a) an existing file and (b) something inside the
+    repository that exists by name: a ``(TestClass)``/``(test_function)`` in a referenced file, a
+    ``job <id>`` or a quoted ``paso "<name>"`` (``- name:`` step) in ci.yml, or a ``make <target>``
+    (Makefile). Every named reference must resolve; a scenario with no file or no named reference fails.
+    Scenarios that carry any @RF tag are exempt (their link is the E2E title, checked elsewhere).
+    """
+    errors: list[str] = []
+
+    def read(relative: str) -> str:
+        path = ROOT / relative
+        return path.read_text(encoding="utf-8") if path.is_file() else ""
+
+    for scenario in scenarios:
+        if not scenario.tags or any(tag.startswith("RF-") for tag in scenario.tags):
+            continue
+        label = f"{', '.join(scenario.tags)} {scenario.name} ({scenario.source}:{scenario.line})"
+        text = scenario.verification
+        if not text:
+            errors.append(f"{label}: falta la línea «# Verificación:» justo encima de las etiquetas")
+            continue
+        problems: list[str] = []
+        files = FILE_REFERENCE.findall(text)
+        file_texts = {f: read(f) for f in files if (ROOT / f).is_file()}
+        problems += [f"el archivo {f} no existe" for f in files if f not in file_texts]
+        if not files:
+            problems.append("no nombra ningún archivo de prueba")
+        named = 0
+        for name in re.findall(r"\((\w+)\)", text):
+            named += 1
+            pattern = rf"(?:class|def|function)\s+{re.escape(name)}\b|['\"`]{re.escape(name)}"
+            if not any(re.search(pattern, body) for body in file_texts.values()):
+                problems.append(f"{name} no está definido en {', '.join(files) or 'ningún archivo'}")
+        ci = read(".github/workflows/ci.yml")
+        for job in re.findall(r"\bjob (\S+)", text):
+            named += 1
+            if not re.search(rf"^  {re.escape(job)}:", ci, re.M):
+                problems.append(f"el job {job} no existe en ci.yml")
+        for quoted in re.findall(r'"([^"]+)"', text):
+            named += 1
+            if quoted.startswith("make "):
+                target = quoted.split()[1]
+                if not re.search(rf"^{re.escape(target)}:", read("Makefile"), re.M):
+                    problems.append(f"el objetivo make {target} no existe en el Makefile")
+            elif not re.search(rf"^\s*- name: {re.escape(quoted)}\s*$", ci, re.M):
+                problems.append(f"el paso {quoted} no existe en ci.yml")
+        if not named:
+            problems.append("no nombra ninguna prueba concreta (clase/función, job, paso o make)")
+        errors += [f"{label}: {problem}" for problem in problems]
+    return errors
 
 
 def e2e_correspondence_errors(scenarios: list[Scenario]) -> list[str]:
@@ -375,6 +439,11 @@ def main() -> int:
     errors = e2e_correspondence_errors(gherkin)
     if errors:
         print("\n".join(errors), file=sys.stderr)
+        return 1
+
+    errors = verification_errors(gherkin)
+    if errors:
+        print("\n".join(["Escenarios @RNF sin enlace verificable a su prueba («# Verificación:»):", *(f"  - {e}" for e in errors)]), file=sys.stderr)
         return 1
 
     errors = control_errors(load_controls(), load_requirements())
