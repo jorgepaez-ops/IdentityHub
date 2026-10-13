@@ -211,10 +211,9 @@ services:
     tmpfs:
       - /tmp
 
-  # ── Observabilidad (perfil aparte) ──────────────────────────────────────
-  # Se arranca con:  docker compose --profile observability up -d
-  # Fuera del perfil por defecto para no cargar cuatro contenedores más en cada
-  # ciclo de desarrollo.
+  # ── Observabilidad (perfil observability) ───────────────────────────────
+  # make up la incluye (docker compose --profile observability up -d).
+  # make up-app levanta solo la aplicación, sin este perfil (lo usa CI).
   prometheus:
     # prom/prometheus v3.15.0, con soporte, fijado por digest real.
     image: prom/prometheus@sha256:efd719c99d83b060d9daefdcf00360461adf279f45ef5391f8d111892118753e
