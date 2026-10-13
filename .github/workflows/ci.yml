@@ -17,7 +17,8 @@
 #  corriendo los baratos que alimentan checks obligatorios o SARIF (spec-drift,
 #  secrets, sast, semgrep, iac-scan, iac-checkov). Cualquier otra ruta (incluidos
 #  .github/**, Makefile, scripts/** y specs/**) cuenta como código, y ante la menor
-#  duda (lista vacía, error de git, workflow_dispatch) se corre todo.
+#  duda (lista vacía, error de git, workflow_dispatch o falla del propio job 0) se
+#  corre todo: los jobs gateados comparan con != 'false' y usan !cancelled().
 #  No se usa paths-ignore a nivel de workflow ni de job: el ruleset "Protect main"
 #  exige estos checks por nombre y un check que no se ejecuta queda en "Expected —
 #  waiting" para siempre; además, el job image es una matriz cuyos nombres
@@ -189,7 +190,7 @@ jobs:
   lint:
     name: 2 · Lint y tipos
     needs: [changes]
-    if: needs.changes.outputs.code == 'true'
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -331,7 +332,7 @@ jobs:
   sca:
     name: 5 · Dependencias vulnerables
     needs: [changes]
-    if: needs.changes.outputs.code == 'true'
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -394,7 +395,7 @@ jobs:
   test-unit:
     name: 6 · Pruebas unitarias
     needs: [changes]
-    if: needs.changes.outputs.code == 'true'
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -442,7 +443,7 @@ jobs:
   test-integration:
     name: 6b · Pruebas de integración
     needs: [changes]
-    if: needs.changes.outputs.code == 'true'
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     outputs:
       coverage: ${{ steps.coverage.outputs.coverage }}
@@ -578,7 +579,7 @@ jobs:
   e2e:
     name: 7 · E2E (Playwright)
     needs: [changes]
-    if: needs.changes.outputs.code == 'true'
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -675,7 +676,7 @@ jobs:
     # matriz existan y resuelvan; en docs cada paso se omite con su propio if. Un lint
     # fallido sigue deteniendo las imágenes; lint omitido (docs) no las detiene.
     needs: [lint, changes]
-    if: ${{ !cancelled() && needs.changes.result == 'success' && (needs.lint.result == 'success' || needs.lint.result == 'skipped') }}
+    if: ${{ !cancelled() && (needs.lint.result == 'success' || needs.lint.result == 'skipped') }}
     permissions:
       contents: read
       security-events: write
@@ -701,13 +702,13 @@ jobs:
             target: web
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        if: needs.changes.outputs.code == 'true'
+        if: needs.changes.outputs.code != 'false'
 
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-        if: needs.changes.outputs.code == 'true'
+        if: needs.changes.outputs.code != 'false'
 
       - name: Construir ${{ matrix.name }}
-        if: needs.changes.outputs.code == 'true'
+        if: needs.changes.outputs.code != 'false'
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: ${{ matrix.context }}
@@ -719,7 +720,7 @@ jobs:
           cache-to: type=gha,scope=${{ matrix.name }},mode=max
 
       - name: Trivy sobre la imagen (informe)
-        if: needs.changes.outputs.code == 'true'
+        if: needs.changes.outputs.code != 'false'
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: identity-hub/${{ matrix.name }}:${{ github.sha }}
@@ -729,7 +730,7 @@ jobs:
           exit-code: "0"
 
       - uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
-        if: always() && needs.changes.outputs.code == 'true'
+        if: always() && needs.changes.outputs.code != 'false'
         with:
           sarif_file: trivy-${{ matrix.name }}.sarif
           category: trivy-image-${{ matrix.name }}
@@ -738,7 +739,7 @@ jobs:
       # disponible. Bloquear por un CVE sin arreglo no protege de nada y
       # entrena al equipo a ignorar el rojo.
       - name: Romper la build si hay CVE corregibles
-        if: needs.changes.outputs.code == 'true'
+        if: needs.changes.outputs.code != 'false'
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: identity-hub/${{ matrix.name }}:${{ github.sha }}
@@ -755,7 +756,7 @@ jobs:
   dast:
     name: 11 · DAST (OWASP ZAP)
     needs: [changes]
-    if: needs.changes.outputs.code == 'true'
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
