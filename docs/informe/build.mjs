@@ -28,7 +28,7 @@ const SOURCE = path.join(here, 'informe-tecnico.md')
 const OUTPUT = path.join(here, 'informe-tecnico.pdf')
 const MERMAID_JS = require.resolve('mermaid/dist/mermaid.min.js')
 
-const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+const esc = (s) => s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;')
 const slug = (s) =>
   s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 
@@ -78,14 +78,14 @@ function redactedReport(rel, max) {
 
 function expandDirectives(body) {
   let out = body.replace(/^\{\{mermaid:([^#|}]+)#(\d+)(?:\|([^}]*))?\}\}$/gm, (_, rel, n, cap) => {
-    const land = cap && cap.startsWith('@L ')
+    const land = cap?.startsWith('@L ')
     const text = land ? cap.slice(3) : cap
     return '```mermaid\n' + (land ? '%%landscape\n' : '') + (text ? `%%caption: ${text}\n` : '') + mermaidBlock(rel, Number(n)) + '\n```\n'
   })
   out = out.replace(/^\{\{code:([^:}]+):([^:}]+):(\d+-\d+)\}\}$/gm, (_, lang, rel, range) => {
     return '```' + lang + '\n' + codeLines(rel, range) + '\n```\n\n' + `<p class="src">Fuente: <code>${rel}</code>, líneas ${range}.</p>\n`
   })
-  out = out.replace(/^\{\{redact:([^|}]+)\|?([^}]*)\}\}$/gm, (_, rel) => {
+  out = out.replace(/^\{\{redact:([^|}]+)(?:\|[^}]*)?\}\}$/gm, (_, rel) => {
     return '```json\n' + redactedReport(rel, 1) + '\n```\n\n' + `<p class="src">Fuente: <code>${rel}</code> (primer hallazgo de doce; <code>Secret</code> y <code>Match</code> enmascarados).</p>\n`
   })
   return out
@@ -119,7 +119,7 @@ function render(body) {
       }
     } else {
       counters[1] += 1
-      num = inAnnex ? `${String.fromCharCode(64 + annexIdx)}.${counters[1]}` : `${counters[0]}.${counters[1]}`
+      num = inAnnex ? `${String.fromCodePoint(64 + annexIdx)}.${counters[1]}` : `${counters[0]}.${counters[1]}`
     }
     const id = slug(`${num} ${plain}`)
     headings.push({ level: depth, num, title: plain, id })
@@ -130,12 +130,12 @@ function render(body) {
   renderer.code = ({ text, lang }) => {
     if (lang === 'mermaid') {
       figN += 1
-      let src = text
-      let land = false
-      let cap = ''
-      src = src.replace(/^%%landscape\n/m, () => ((land = true), ''))
-      src = src.replace(/^%%caption: (.*)\n/m, (_, c) => ((cap = c), ''))
-      const fig = `<figure class="diagrama"><div class="mermaid">${esc(src)}</div>${cap ? `<figcaption>Figura ${figN}. ${esc(cap)}</figcaption>` : ''}</figure>\n`
+      const land = /^%%landscape\n/m.test(text)
+      const withoutLandscape = text.replace(/^%%landscape\n/m, '')
+      const cap = /^%%caption: (.*)\n/m.exec(withoutLandscape)?.[1] ?? ''
+      const src = withoutLandscape.replace(/^%%caption: (.*)\n/m, '')
+      const caption = cap ? `<figcaption>Figura ${figN}. ${esc(cap)}</figcaption>` : ''
+      const fig = `<figure class="diagrama"><div class="mermaid">${esc(src)}</div>${caption}</figure>\n`
       return land ? `<div class="apaisada">${fig}</div>\n` : fig
     }
     return `<pre class="code"><code class="lang-${lang || 'text'}">${esc(text)}</code></pre>\n`
@@ -154,7 +154,8 @@ function render(body) {
 
   renderer.table = function (token) {
     const head = token.header.map((c) => `<th>${this.parser.parseInline(c.tokens)}</th>`).join('')
-    const rows = token.rows.map((r) => `<tr>${r.map((c) => `<td>${this.parser.parseInline(c.tokens)}</td>`).join('')}</tr>`).join('')
+    const cells = (r) => r.map((c) => `<td>${this.parser.parseInline(c.tokens)}</td>`).join('')
+    const rows = token.rows.map((r) => `<tr>${cells(r)}</tr>`).join('')
     const idcol = token.header[0].text === 'Id' ? ' class="idcol"' : ''
     return `<div class="tabla"><table${idcol}><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>\n`
   }
@@ -294,14 +295,13 @@ async function printPdf(browser, html, outFile) {
       flowchart: { htmlLabels: true, useMaxWidth: true },
       sequence: { useMaxWidth: true, mirrorActors: false },
     })
+    // One run renders every diagram in document order; on failure it still renders the rest and rethrows the first error.
     const bad = []
-    for (const el of document.querySelectorAll('.mermaid')) {
-      try {
-        // eslint-disable-next-line no-undef
-        await mermaid.run({ nodes: [el] })
-      } catch (e) {
-        bad.push(String(e).slice(0, 200))
-      }
+    try {
+      // eslint-disable-next-line no-undef
+      await mermaid.run({ nodes: [...document.querySelectorAll('.mermaid')] })
+    } catch (e) {
+      bad.push(String(e).slice(0, 200))
     }
     await document.fonts.ready
     return bad
@@ -317,11 +317,10 @@ async function pageOfHeadings(pdfFile) {
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
   const doc = await pdfjs.getDocument({ data: new Uint8Array(fs.readFileSync(pdfFile)), useSystemFonts: true }).promise
   const norm = (s) => s.replace(/\s+/g, '').toLowerCase()
-  const texts = []
-  for (let i = 1; i <= doc.numPages; i++) {
-    const tc = await (await doc.getPage(i)).getTextContent()
-    texts.push(norm(tc.items.map((it) => it.str).join(' ')))
-  }
+  const texts = await Promise.all(Array.from({ length: doc.numPages }, async (_, index) => {
+    const tc = await (await doc.getPage(index + 1)).getTextContent()
+    return norm(tc.items.map((it) => it.str).join(' '))
+  }))
   // The cover and the table of contents come first: start the search after the last page that
   // still holds TOC entries (the one right before the first body heading, a page break follows).
   const first = headings[0]
