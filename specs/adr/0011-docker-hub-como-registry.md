@@ -1,6 +1,6 @@
 # 0011 — Docker Hub como registry de las imágenes publicadas
 
-Estado: aceptada · 2026-09-27 · Sustituye la parte de registry de la ADR 0008
+Estado: aceptada, implementada el 2026-10-12 (C3) · 2026-09-27 · Sustituye la parte de registry de la ADR 0008
 
 ## Contexto
 
@@ -29,3 +29,7 @@ orquestador, permisos mínimos por job, SARIF en code scanning, Cosign keyless) 
 - Docker Hub impone límites de descarga a usuarios anónimos; para quien clone el repositorio y
   levante el stack no cambia nada, porque el compose construye las imágenes localmente.
 - La ADR 0008 queda en estado "sustituida parcialmente por 0011" en lo que toca al registry.
+
+## Estado de implementación
+
+Implementada el 2026-10-12 en `.github/workflows/release.yml` (tarea C3). El workflow se dispara solo con tags `vX.Y.Z`; el job `gate` construye y escanea `api`, `worker` y `web`, y el job `publish` (único con el *environment* protegido `dockerhub`, restringido a tags `v*`) sube las mismas imágenes escaneadas a `docker.io/jorgeivp/identity-hub-api`, `-worker` y `-web` con `vX.Y.Z` y `latest`, adjunta el SBOM CycloneDX (Syft) como atestación y firma el digest con Cosign keyless. Validada con el tag `v0.9.0` (ejecución 38319904991). Cosign v3 guarda firma y atestación como referrers OCI, por lo que la verificación exige Cosign v3.

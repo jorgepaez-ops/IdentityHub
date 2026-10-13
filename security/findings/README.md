@@ -17,7 +17,9 @@ resumir mecánicamente en `docs/security-report.md`.
 ## Estados
 
 `abierto` · `en remediación` · `remediado` · `aceptado` (con entrada en
-`security/.trivyignore`, justificación y fecha de expiración)
+`security/.trivyignore`, justificación y fecha de expiración) · `no afectado` (el aviso
+coincide a nivel de módulo, pero el código vulnerable no está presente; con evidencia de
+`go list -deps` y exclusión permanente en `osv-scanner.toml`)
 
 ## Plantilla
 

@@ -532,7 +532,7 @@ footer p { margin-bottom: 0.5rem; }
 <div class="doc">
 
   <header class="masthead">
-    <p class="eyebrow">Identity Hub · Proyecto final de materia · Versión 4</p>
+    <p class="eyebrow">Identity Hub · Proyecto final de materia · Versión 4 · revisión 2026-10-12</p>
     <h1>Informe de seguridad de la línea base</h1>
     <p class="standfirst">
       Qué encontró el pipeline cuando se le dio, a propósito, algo real que
@@ -544,7 +544,8 @@ footer p { margin-bottom: 0.5rem; }
       <div><dt>Medida</dt><dd>2026-09-05 · 053e15f</dd></div>
       <div><dt>Remediado</dt><dd>v0.1.0-hardened</dd></div>
       <div><dt>Medido</dt><dd>2026-10-06 · 924b581</dd></div>
-      <div><dt>Fichas</dt><dd>31 · 30 remediadas · 1 aceptada</dd></div>
+      <div><dt>Fichas</dt><dd>31 · 30 remediadas · 1 no afectada</dd></div>
+      <div><dt>Publicado</dt><dd>v0.9.0 · Docker Hub</dd></div>
     </dl>
   </header>
 
@@ -1000,7 +1001,7 @@ footer p { margin-bottom: 0.5rem; }
     <ul class="plain">
       <li><strong>Imágenes:</strong> Trivy 0.56.2 midió 0 CVE corregibles <span class="mono">HIGH</span>/<span class="mono">CRITICAL</span> en <code>api</code> y <code>worker</code> al pasar a <code>static-debian12</code>, y en <code>web</code>; la web conserva 67 CVE sin parche del proveedor.</li>
       <li><strong>Secretos:</strong> <code>.gitleaks.toml</code> y <code>.gitleaksignore</code> dejan 0 hallazgos; los 12 secretos sembrados siguen en el historial público y se suprimen por huella, no se eliminaron (VULN-023).</li>
-      <li><strong>Dependencias:</strong> <code>govulncheck</code> deja 0 vulnerabilidades alcanzables. GO-2026-5932 sigue requerida pero no alcanzable ni parcheada; es el riesgo aceptado VULN-028 y permanece filtrada en <code>backend/osv-scanner.toml</code> hasta 2026-12-25.</li>
+      <li><strong>Dependencias:</strong> <code>govulncheck</code> deja 0 vulnerabilidades alcanzables. GO-2026-5932 no tiene versión corregida y el código vulnerable (<code>x/crypto/openpgp*</code>) no está presente; es VULN-028, no afectado, y permanece filtrada de forma permanente en <code>backend/osv-scanner.toml</code>.</li>
       <li><strong>Imágenes del compose (VULN-019):</strong> el <code>baseline-scan.yml</code> ejecutado como <code>workflow_dispatch</code> sobre <code>924b581</code> (run 37473616659) reduce las ocho imágenes de infraestructura de 710 a 108 hallazgos <span class="mono">HIGH</span>/<span class="mono">CRITICAL</span>. Las ocho imágenes están actualizadas y fijadas por digest; los 108 avisos residuales son componentes o paquetes que los proveedores aún no incorporan. El desglose está en <code>security/evidence/actions-37473616659/README.md</code> y la ficha en <code>security/findings/VULN-019-imagenes-base-antiguas-compose.md</code>.</li>
       <li><strong>Contenedores y endurecimiento:</strong> los tres contenedores de aplicación usan UID 65532, 65532 y 101; la infraestructura queda fuera de esta métrica. Nginx emite CSP, HSTS, <code>X-Content-Type-Options</code>, <code>X-Frame-Options</code> y <code>Referrer-Policy</code>, y oculta la versión de <code>Server</code>. Las tres imágenes, incluidos sus builders, se fijan por <code>sha256</code>.</li>
     </ul>
@@ -1038,6 +1039,21 @@ trivy image --severity HIGH,CRITICAL identity-hub-api:latest
   </section>
 
   <section>
+    <h2>Revisión del 2026-10-12: avisos posteriores y procedencia de las imágenes</h2>
+    <p class="section-note">
+      La tabla de hallazgos y las cifras de las versiones anteriores no cambian,
+      salvo que VULN-028 pasó de riesgo aceptado a no afectado; esta revisión
+      añade lo ocurrido después de la medición del 2026-10-06.
+    </p>
+    <ul class="plain">
+      <li><strong>Avisos posteriores a la línea base, sin identificador VULN:</strong> el 2026-10-12, con <code>main</code> en verde desde el 2026-10-07, aparecieron avisos publicados después de ese CI: biblioteca estándar de Go 1.26.8 (<code>net/http</code>, <code>net/textproto</code> y <code>crypto/tls</code>), <code>tiff</code> 4.7.1 en la base <code>nginx-unprivileged</code> (CVE-2026-4775) y <code>golang.org/x/net</code> 0.59.0 en <code>tools/go.mod</code>. Los gates bloquearon el release tal como están diseñados. El PR 31 los resolvió con Go 1.26.9, <code>tiff</code> 4.7.2 y <code>golang.org/x/net</code> 0.60.0. Por decisión del equipo no se les asignó ficha VULN.</li>
+      <li><strong>Procedencia de las imágenes:</strong> <code>release.yml</code> publica <code>api</code>, <code>worker</code> y <code>web</code> en <code>docker.io/jorgeivp/identity-hub-*</code> con las etiquetas <code>vX.Y.Z</code> y <code>latest</code>. Publica la misma imagen que escaneó el gate de Trivy, la firma con Cosign keyless (OIDC de GitHub) sobre el digest y le adjunta un SBOM CycloneDX generado con Syft como atestación. Con ello AM-008, AM-009 y AM-022 pasan a mitigadas; no persiste ningún riesgo residual aceptado: VULN-028 se reclasificó como no afectado (ver abajo).</li>
+      <li><strong>Tag de validación <code>v0.9.0</code>:</strong> sobre <span class="mono">0ea0ea3</span> (merge del PR 30), run Release 38319904991 en verde (6 jobs). <code>cosign verify</code> y <code>cosign verify-attestation --type cyclonedx</code> pasan sobre las tres imágenes con Cosign v3; Cosign v3 guarda firma y atestación como referrers OCI, así que no aparecen como etiquetas en Docker Hub y Cosign v2 no las encuentra.</li>
+      <li><strong>VULN-028 reclasificada como no afectada:</strong> GO-2026-5932 (<code>golang.org/x/crypto/openpgp*</code>) no tiene versión corregida ni la tendrá (osv.dev: afecta desde la versión 0, paquete abandonado por diseño). <code>go list -deps</code> no encuentra <code>x/crypto/openpgp</code> en el backend (solo <code>argon2</code> y <code>blake2b</code>) ni en las cuatro herramientas de <code>tools/</code>, y <code>govulncheck</code> no lo reporta. Deja de ser un riesgo aceptado con expiración; la exclusión de <code>osv-scanner</code> es permanente.</li>
+    </ul>
+  </section>
+
+  <section>
     <h2>Limitaciones de este informe</h2>
     <p class="section-note">
       Lo que todavía no se ha medido, dicho antes de que lo pregunte quien lo lea.
@@ -1046,7 +1062,7 @@ trivy image --severity HIGH,CRITICAL identity-hub-api:latest
       <li>GitHub Actions sí se ejecutó: runs de línea base 35476102444 y 35534898422; runs finales en verde 36283211113, 36284740966 y, sobre el tag corregido, 36329751647.</li>
       <li>El CI ejecuta CodeQL con <code>security-extended</code> para Go y JavaScript/TypeScript, y Semgrep con las reglas OWASP; este último rompe la build ante hallazgos de severidad <code>ERROR</code>. El informe no sustituye la revisión de las alertas SARIF publicadas.</li>
       <li>Los gates DAST de OWASP ZAP y E2E de Playwright ya están cableados. El run 37065094942 terminó con 15/15 jobs en verde; ZAP dejó en PASS 10055, 30002 y 40018.</li>
-      <li>VULN-019 está remediada: las ocho imágenes del compose se actualizaron y se fijaron por digest; los 108 avisos residuales dependen de componentes de proveedor pendientes de una imagen posterior. VULN-028 es un riesgo aceptado mientras GO-2026-5932 siga no alcanzable y filtrada hasta 2026-12-25.</li>
+      <li>VULN-019 está remediada: las ocho imágenes del compose se actualizaron y se fijaron por digest; los 108 avisos residuales dependen de componentes de proveedor pendientes de una imagen posterior. VULN-028 (GO-2026-5932) es no afectado: el código vulnerable no está presente y la exclusión en <code>backend/osv-scanner.toml</code> es permanente.</li>
       <li>No se ha hecho modelado de amenazas de la cadena de suministro del propio pipeline más allá de restringir los permisos por job.</li>
     </ul>
   </section>
@@ -1057,7 +1073,7 @@ trivy image --severity HIGH,CRITICAL identity-hub-api:latest
       Cifras medidas el 2026-09-05 sobre <span class="mono">v0.0.0-vuln-baseline</span>
       (<span class="mono">053e15f</span>). Versión 2: remediación medida el 2026-09-27 sobre
       <span class="mono">c6fa5d6</span>, mismo código que <span class="mono">v0.1.0-hardened</span>
-      (<span class="mono">2ee59e2</span>). Versión 3 (2026-10-05): incorpora VULN-030 y VULN-031, y los gates DAST y E2E verificados en el run 37065094942. Versión 4 final (2026-10-06): VULN-019 queda remediada con el run 37473616659 sobre <span class="mono">924b581</span>; las ocho imágenes del compose pasan de 710 a 108 hallazgos HIGH/CRITICAL.
+      (<span class="mono">2ee59e2</span>). Versión 3 (2026-10-05): incorpora VULN-030 y VULN-031, y los gates DAST y E2E verificados en el run 37065094942. Versión 4 final (2026-10-06): VULN-019 queda remediada con el run 37473616659 sobre <span class="mono">924b581</span>; las ocho imágenes del compose pasan de 710 a 108 hallazgos HIGH/CRITICAL. Revisión 2026-10-12: avisos posteriores sin identificador VULN (PR 31), VULN-028 reclasificada como no afectada y procedencia de las imágenes publicadas (tag <span class="mono">v0.9.0</span>, run 38319904991).
     </p>
     <p>
       Documentos relacionados: <span class="mono">specs/05-security/threat-model.md</span> ·
