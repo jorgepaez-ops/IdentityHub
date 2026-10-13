@@ -198,7 +198,25 @@ Tras 5 intentos fallidos en 15 minutos, la cuenta se bloquea 15 minutos.
   falla mientras dure el bloqueo.
 
 ### RF-018 — Claves de servicio · P2
-Un admin emite claves de API para integraciones máquina a máquina.
+Un admin emite claves de API para integraciones máquina a máquina. Caso de uso concreto: un SIEM
+o sistema de reportes consulta el audit log sin sesión humana. Diseño en ADR 0014.
+- Solo un admin (access token) emite, lista y revoca claves: `POST`, `GET` y `DELETE`
+  `/api/v1/admin/service-keys[/{id}]`. Una clave de servicio nunca administra claves.
+- La emisión exige `name` (1 a 100 caracteres), `scopes` (lista cerrada, hoy solo `audit-log:read`)
+  y `expiresInDays` (1 a 365; no existen claves sin vencimiento).
+- La respuesta de emisión (`201`) devuelve la clave completa `ihk_<publicId>_<secret>` una sola vez; el
+  listado devuelve solo metadatos (id, nombre, alcances, prefijo, fechas y autor), nunca el secreto
+  ni su hash. Se guarda únicamente el SHA-256 del secreto.
+- La revocación es lógica e idempotente (`204` también si ya estaba revocada).
+- Una clave solo se acepta en las operaciones que declaran su alcance: hoy `GET /api/v1/admin/audit-log`
+  con `audit-log:read`. En cualquier otra operación responde `401`. El comportamiento con access token
+  humano no cambia.
+- Una clave desconocida, con secreto incorrecto, expirada o revocada recibe el mismo `401`, sin pistas
+  sobre cuál fue la causa.
+- La emisión, la revocación y cada uso rechazado se registran en auditoría (`service_key_created`,
+  `service_key_revoked`, `service_key_rejected`) con el `publicId`, nunca con el secreto.
+- **Aceptación:** un admin emite una clave `audit-log:read`, la usa para listar el audit log (`200`),
+  la revoca y el siguiente uso devuelve `401`; la misma clave no abre `GET /api/v1/admin/users`.
 
 ### RF-019 — Exportación del audit log · P2
 Un admin exporta el registro de auditoría filtrado en CSV o JSON.
