@@ -346,6 +346,17 @@ Mañana (2026-10-13), en este orden:
    - Verificar que `CodeQL`, `Trivy` y `Semgrep OSS` (checks de code scanning por SARIF) no queden pendientes
      cuando su job se salta; probarlo con un PR documental real antes de dar la tarea por cerrada.
    - Regla de trabajo: notas de fin de día van en rama local; sin push ni PR hasta que el usuario lo pida.
+   - **Implementado en el PR #43 (merge `e209138`, 2026-10-13).** Ruta: delegada (Sonnet) + correcciones
+     inline. Diferencias con el diseño: los jobs gateados usan `!cancelled() && code != 'false'` (si el job 0
+     falla se corre todo, porque *skipped* cuenta como aprobado); el job `image` arranca siempre y gatea cada
+     paso (los nombres expandidos de la matriz son obligatorios); `git diff --no-renames`; `.github/`, `specs/`
+     y `scripts/` cuentan como código aunque sean `.md`; `sast`, `semgrep`, `iac-scan` e `iac-checkov` también
+     corren siempre (alimentan los checks SARIF). Verificación: actionlint limpio, zizmor sin hallazgos nuevos,
+     clasificador probado en local, CI completo verde en #43, revisión nativa aprobada (3 pasadas).
+   - Pendiente para cerrar: este PR (#42, solo documentación) debe saltarse los jobs pesados y resolver todos
+     los checks obligatorios, incluido `Trivy` sin los SARIF de las imágenes.
+   - Seguimiento (advertencias no bloqueantes de la revisión): mover el clasificador a `scripts/` con prueba;
+     la guarda repetida en cada paso de `image` depende de que cada paso nuevo la incluya.
 1. Validar F7 con un tag `v0.9.1` sobre `main`: `latest` se mueve recién después de firmar y atestar; `cosign verify`
    (Cosign v3) de las tres imágenes; prompt de capturas para Claude Desktop.
 2. C2: `make informe` (incluir en el informe lo hecho en F1-F4, F6-F10 y los hallazgos de arriba), revisión del PDF
