@@ -159,7 +159,6 @@ jobs:
           retry cosign attest --yes --type cyclonedx --predicate "${SBOM}" "${IMAGE}@${DIGEST}"
 
       # Verificación posterior a la firma: si falla, el job termina aquí y latest no se mueve.
-      # Mismos parámetros que el comando que documenta el resumen (identidad del workflow + emisor OIDC).
       - name: Verificar firma y atestación
         # La identidad se restringe a este workflow en un tag: una firma hecha desde otro workflow
         # o rama del repositorio no pasa. Probado contra v0.9.1 (y rechaza la identidad de ci.yml).
