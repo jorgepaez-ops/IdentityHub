@@ -11,8 +11,8 @@
 | **Sembrada** | no |
 | **Evidencia antes** | `make scan-dast` local y reproducción manual documentados en `odd/tasks/idp-semana-3.md`, T15 |
 | **Commit de remediación** | `4afd563` |
-| **Evidencia después** | pendiente |
-| **Run de Actions (antes/después)** | sin run de CI "antes": se detectó al llevar el escaneo de API a `:8081`, ya con el arreglo en preparación; el antes es la evidencia local / pendiente |
+| **Evidencia después** | `docs/evidencia/VULN-031/evidencia.json` — run 37065094942 (`16ab347`): `PASS: Format String Error [30002]` en el escaneo de API |
+| **Run de Actions (antes/después)** | sin run de CI "antes": se detectó al llevar el escaneo de API a `:8081`, ya con el arreglo en preparación; el antes es la evidencia local / https://github.com/jorgepaez-ops/IdentityHub/actions/runs/37065094942 |
 
 ## Evidencia
 
@@ -36,4 +36,5 @@ T15c trata `password.InvalidPasswordError` como credenciales inválidas tanto pa
 como inexistentes. El camino de cuenta existente conserva el registro de fallo y la evaluación de
 bloqueo. El handler devuelve el problema genérico `invalid-credentials` y registra únicamente el
 error y el identificador de petición cuando existe un fallo interno inesperado. Remediación en
-`4afd563`; la evidencia después queda pendiente del run de CI en verde.
+`4afd563`. El run 37065094942 (`16ab347`, CI en verde) la confirma: el escaneo de API del job 11
+informa `PASS: Format String Error [30002]` y `Gate passed: no alerts of severity Medium or higher.`
