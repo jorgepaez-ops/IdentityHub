@@ -10,8 +10,12 @@ const BOM = '﻿'
 
 // jsdom has no object URLs: capture the Blob handed to the anchor and the file name it downloads.
 const downloads: { name: string; text: string }[] = []
+// Each capture gets a generation: a FileReader still running from an earlier test must not
+// push into the array a later test just emptied.
+let generation = 0
 function captureDownloads() {
   downloads.length = 0
+  const current = ++generation
   const blobs = new Map<string, Blob>()
   let next = 0
   Object.assign(URL, {
@@ -26,7 +30,7 @@ function captureDownloads() {
     const blob = blobs.get(this.getAttribute('href') ?? '')
     if (!blob) return
     const reader = new FileReader()
-    reader.onload = () => downloads.push({ name: this.download, text: new TextDecoder('utf-8', { ignoreBOM: true }).decode(reader.result as ArrayBuffer) })
+    reader.onload = () => current === generation && downloads.push({ name: this.download, text: new TextDecoder('utf-8', { ignoreBOM: true }).decode(reader.result as ArrayBuffer) })
     reader.readAsArrayBuffer(blob)
   })
 }
@@ -163,6 +167,7 @@ describe('audit log server-side export', () => {
     await openAuditWithExport(() => exportFile('[]', 'application/json', 'audit-log-x.json', true))
     fireEvent.click(screen.getByRole('button', { name: 'Exportar JSON' }))
     expect(await screen.findByText('Exportación recortada a 10 000 eventos; acota los filtros para el resto')).toBeInTheDocument()
+    expect((await exported()).name).toBe('audit-log-x.json')
   })
 
   it('TestRF019_ShowsAnErrorAndDownloadsNothingWhenTheExportFails', async () => {
