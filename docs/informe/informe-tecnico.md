@@ -50,7 +50,7 @@ Identity Hub es un conjunto de contenedores orquestados por Docker Compose. La t
 | PostgreSQL 16 | Usuarios, sesiones, roles, permisos y auditoría; la aplicación usa un rol de mínimo privilegio sin permiso de `UPDATE`/`DELETE` sobre la auditoría. |
 | RabbitMQ 4 | Eventos persistentes con confirmación de publicación entre la API y el worker, con cola de mensajes muertos (DLQ). |
 | Mailpit | Captura el SMTP local: en desarrollo los correos no salen a Internet. Exige STARTTLS y autenticación con una CA local que genera `make certs`. |
-| Prometheus, Loki, Alloy, Falco y Grafana | Métricas, logs y detección de comportamiento anómalo en ejecución, bajo el perfil `observability` de Compose. |
+| Prometheus, Loki, Alloy, Falco y Grafana | Métricas, logs y detección de comportamiento anómalo en ejecución, bajo el perfil `observability` de Compose, que `make up` activa. |
 
 Los flujos entre dominios son: navegador a `web` a `api` por HTTP; `api` a PostgreSQL por SQL (consultas generadas por `sqlc`); `api` a RabbitMQ a `worker` por AMQP; `worker` a Mailpit por SMTP con STARTTLS; y Hub a Contabilidad por OAuth 2.0 Authorization Code con PKCE sobre dos orígenes (`identityhub.localhost` y `contabilidad.localhost`). Las decisiones más relevantes están registradas como ADR (0001 a 0014): stack y contenerización, IdP propio en lugar de Keycloak, OpenAPI 3.0.3 como fuente de verdad, Argon2id, refresh tokens rotativos con familia, publicación directa sin outbox, línea base vulnerable deliberada, GitHub Actions, SSO con PKCE, MFA por correo, Docker Hub como registry, arquitectura de referencia en AWS, roles y permisos configurables por aplicación y claves de servicio para integraciones máquina a máquina.
 
@@ -350,7 +350,7 @@ La observabilidad (sección 7) y el reescaneo semanal cierran el ciclo. `schedul
 
 {{code:yaml:.github/workflows/scheduled-scan.yml:9-12}}
 
-**Detección en ejecución (Falco).** El perfil `observability` incluye Falco 0.45.0, fijado por digest, con el driver modern eBPF; funciona en Docker Desktop sin ejecutarse como `privileged`. Evalúa cuatro reglas propias, solo sobre `api`, `worker` y `web` (los contenedores de solo lectura y sin capacidades de AM-020): un shell dentro del contenedor, la escritura en directorios del sistema, un gestor de paquetes o descargador (`apk`, `apt`, `pip`, `npm`, `curl`, `wget`) y una conexión saliente a una dirección pública. Las excepciones son deliberadas: el shell del entrypoint de `web` y la sonda de salud con `wget` contra `127.0.0.1`. Sus alertas llegan a Loki por Alloy, activan una regla de Grafana («Falco detectó actividad anómala en un contenedor», con prioridad `Warning` o superior en los últimos 5 minutos) y tienen runbook (`docs/runbooks/falco-alerta.md`); `make falco-test` dispara eventos inofensivos para comprobarlo. La revisión encontró dos huecos que se cerraron y se verificaron con Falco: una evasión de la excepción de `wget` y la falta de detección de `connect` no bloqueantes. Falco no forma parte de CI, porque exige un kernel Linux con BTF.
+**Detección en ejecución (Falco).** `make up` incluye Falco 0.45.0 (perfil `observability`), fijado por digest, con el driver modern eBPF; funciona en Docker Desktop sin ejecutarse como `privileged`. Evalúa cuatro reglas propias, solo sobre `api`, `worker` y `web` (los contenedores de solo lectura y sin capacidades de AM-020): un shell dentro del contenedor, la escritura en directorios del sistema, un gestor de paquetes o descargador (`apk`, `apt`, `pip`, `npm`, `curl`, `wget`) y una conexión saliente a una dirección pública. Las excepciones son deliberadas: el shell del entrypoint de `web` y la sonda de salud con `wget` contra `127.0.0.1`. Sus alertas llegan a Loki por Alloy, activan una regla de Grafana («Falco detectó actividad anómala en un contenedor», con prioridad `Warning` o superior en los últimos 5 minutos) y tienen runbook (`docs/runbooks/falco-alerta.md`); `make falco-test` dispara eventos inofensivos para comprobarlo. La revisión encontró dos huecos que se cerraron y se verificaron con Falco: una evasión de la excepción de `wget` y la falta de detección de `connect` no bloqueantes. Falco no forma parte de CI, porque exige un kernel Linux con BTF.
 
 ## Escaneo de la línea base
 
@@ -377,7 +377,7 @@ La observabilidad (sección 7) y el reescaneo semanal cierran el ciclo. `schedul
 | Pruebas | 11 | OWASP ZAP 2.17.0 | `zap-gate.py` falla con riesgo medio o alto |
 | Despliegue | release.yml | Syft, Cosign | SBOM y firma keyless; `latest` se mueve solo tras firmar y atestar |
 | Operación | scheduled-scan | govulncheck | Abre una incidencia automática |
-| Operación | `make up-obs` | Falco | Reglas propias; alertas a Loki y Grafana (no corre en CI) |
+| Operación | `make up` | Falco | Reglas propias; alertas a Loki y Grafana (no corre en CI) |
 | Externo | PR | SonarCloud | Gate de calidad del código nuevo; no está definido en `ci.yml` |
 
 # Resultados de Seguridad
@@ -514,7 +514,7 @@ El cambio de SMTP merece una nota propia: el worker abre la sesión explícitame
 
 ## Stack y cómo se activa
 
-El perfil `observability` del Compose añade cinco servicios, todos con imágenes fijadas por digest:
+El perfil `observability` del Compose añade cinco servicios a la aplicación, todos con imágenes fijadas por digest:
 
 | Servicio | Función | Puerto del host |
 |---|---|---|
@@ -524,7 +524,7 @@ El perfil `observability` del Compose añade cinco servicios, todos con imágene
 | Grafana | Visualiza ambas fuentes; datasources y dashboard aprovisionados desde `deploy/observability/grafana/` | 3000 |
 | Falco | Detección de comportamiento anómalo en tiempo de ejecución (driver modern eBPF); sus alertas llegan a Loki por Alloy | sin puerto publicado |
 
-Se activa con `make up-obs` y las credenciales de Grafana viven en `.env` (`GRAFANA_ADMIN_USER` y `GRAFANA_ADMIN_PASSWORD`, generadas por `make setup`). Los logs de la API y del worker son JSON estructurado; Alloy los etiqueta con el servicio (`api`, `worker`, `broker`, `db`, `web`, etc.). Las capturas de esta sección se tomaron con el stack real levantado y después de ejecutar la suite E2E (`make e2e`, 52 pruebas), que genera inicios de sesión correctos y fallidos, MFA, invitaciones y eventos, de modo que las consultas muestran datos reales. El script de captura (`docs/informe/capturas-grafana.mjs`) abre la sesión de Grafana por HTTP, sin mostrar jamás el formulario de acceso, de modo que ninguna captura contiene credenciales.
+Forma parte de `make up`, el único comando para levantar el stack completo; `make up-app` levanta solo la aplicación, sin estos cinco servicios (es lo que usa CI). Sin kernel con BTF, Falco falla y se reinicia, pero la aplicación y el resto de la observabilidad funcionan. Las credenciales de Grafana viven en `.env` (`GRAFANA_ADMIN_USER` y `GRAFANA_ADMIN_PASSWORD`, generadas por `make setup`). Los logs de la API y del worker son JSON estructurado; Alloy los etiqueta con el servicio (`api`, `worker`, `broker`, `db`, `web`, etc.). Las capturas de esta sección se tomaron con el stack real levantado y después de ejecutar la suite E2E (`make e2e`, 52 pruebas), que genera inicios de sesión correctos y fallidos, MFA, invitaciones y eventos, de modo que las consultas muestran datos reales. El script de captura (`docs/informe/capturas-grafana.mjs`) abre la sesión de Grafana por HTTP, sin mostrar jamás el formulario de acceso, de modo que ninguna captura contiene credenciales.
 
 ## Dashboard «Identity Hub — Seguridad»
 
@@ -554,7 +554,7 @@ La página de objetivos de Prometheus confirma que la API, el worker, RabbitMQ y
 
 ## Alcance de la observabilidad
 
-Falco, que el enunciado menciona para la detección de comportamiento anómalo en tiempo de ejecución, se incorporó en la tarea F3 (ver «Fase 6: Operación y monitoreo»), de modo que el bonus de observabilidad queda completo en el perfil local. Su alcance es acotado: corre solo con `make up-obs`, necesita un kernel Linux con BTF y no se ejecuta en CI. La DLQ (AM-019) tiene alerta versionada y runbook (`deploy/observability/grafana/alerting/dlq.yml`, `docs/runbooks/dlq-notificaciones.md`), y Falco tiene la suya (`deploy/observability/grafana/alerting/falco.yml`, `docs/runbooks/falco-alerta.md`).
+Falco, que el enunciado menciona para la detección de comportamiento anómalo en tiempo de ejecución, se incorporó en la tarea F3 (ver «Fase 6: Operación y monitoreo»), de modo que el bonus de observabilidad queda completo en el perfil local. Su alcance es acotado: corre con `make up` (no con `make up-app`), necesita un kernel Linux con BTF y no se ejecuta en CI. La DLQ (AM-019) tiene alerta versionada y runbook (`deploy/observability/grafana/alerting/dlq.yml`, `docs/runbooks/dlq-notificaciones.md`), y Falco tiene la suya (`deploy/observability/grafana/alerting/falco.yml`, `docs/runbooks/falco-alerta.md`).
 
 # Conclusiones
 
@@ -632,7 +632,7 @@ git clone https://github.com/jorgepaez-ops/IdentityHub.git
 cd IdentityHub
 
 make setup                # 1. genera .env con secretos aleatorios (scripts/setup_env.py)
-make up                   # 2. construye y levanta el stack de desarrollo
+make up                   # 2. construye y levanta el stack completo (aplicación y observabilidad)
 # equivalente desde la raíz:  docker compose up -d
 make ps                   # 3. estado de los contenedores
 ```
@@ -651,9 +651,9 @@ make ps                   # 3. estado de los contenedores
 | Métricas del worker | `http://localhost:9091/metrics` |
 | Mailpit (buzón de pruebas) | `http://localhost:8025` |
 | RabbitMQ (administración) | `http://localhost:15672` (credenciales en `.env`) |
-| Grafana (con `make up-obs`) | `http://localhost:3000` (credenciales en `.env`) |
-| Prometheus (con `make up-obs`) | `http://localhost:9090` |
-| Loki (con `make up-obs`) | `http://localhost:3100` |
+| Grafana (incluido en `make up`) | `http://localhost:3000` (credenciales en `.env`) |
+| Prometheus (incluido en `make up`) | `http://localhost:9090` |
+| Loki (incluido en `make up`) | `http://localhost:3100` |
 
 Los dominios `*.localhost` se resuelven a `127.0.0.1` en los navegadores modernos sin editar `/etc/hosts` ni instalar certificados.
 
@@ -665,11 +665,11 @@ Los dominios `*.localhost` se resuelven a `127.0.0.1` en los navegadores moderno
 |---|---|
 | `make setup` | Genera `.env` con secretos aleatorios (no sobrescribe uno existente) |
 | `make certs` | Genera la CA local, el certificado de Mailpit y sus credenciales SMTP (`deploy/certs/`; `make up` lo invoca) |
-| `make up` / `make down` | Levanta el stack de desarrollo / lo detiene conservando los volúmenes |
+| `make up` / `make down` | Levanta el stack completo, observabilidad y Falco incluidos / lo detiene conservando los volúmenes |
 | `make clean` | Detiene el stack y **borra los volúmenes** de datos |
 | `make ps`, `make logs S=api`, `make restart S=api`, `make build` | Estado, logs de un servicio, reconstruir y reiniciar un servicio, construir las tres imágenes |
-| `make up-obs` | Levanta el stack con el perfil de observabilidad (Grafana, Prometheus, Loki, Alloy y Falco) |
-| `make falco-test` | Dispara eventos inofensivos que activan las reglas de Falco (requiere `make up-obs`) |
+| `make up-app` | Levanta solo la aplicación, sin observabilidad (lo usa CI) |
+| `make falco-test` | Dispara eventos inofensivos que activan las reglas de Falco (requiere `make up`) |
 | `make up-prod` / `make down-prod` | Producción simulada (imágenes por digest, sin build, solo `web` publica puerto) / su detención |
 | `make test`, `make test-go`, `make test-integration`, `make test-front` | Pruebas unitarias de Go y del frontend, integración con PostgreSQL |
 | `make e2e` | Suite E2E de Playwright contra el stack levantado (sube y restaura el límite de fallos por IP) |
@@ -759,7 +759,7 @@ Qué demuestra: el Hub emite en el token solo los permisos marcados en la grilla
 ## Cómo regenerar este informe
 
 ```bash
-make up-obs        # solo para volver a capturar Grafana
+make up            # incluye Grafana; solo para volver a capturarlo
 make e2e           # genera tráfico real para los paneles (opcional)
 cd docs/informe && npm install --ignore-scripts && node capturas-grafana.mjs --out /tmp/informe-grafana
 # copie a mano las capturas revisadas a docs/informe/img/

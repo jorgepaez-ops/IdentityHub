@@ -1,6 +1,6 @@
 # Despliegue local con Docker Compose
 
-La topología representa el archivo Compose actual: todos los servicios usan la red predeterminada `identity-hub_default` con subred `172.28.0.0/16`; los componentes de observabilidad se habilitan mediante el perfil `observability`.
+La topología representa el archivo Compose actual: todos los servicios usan la red predeterminada `identity-hub_default` con subred `172.28.0.0/16`; los componentes de observabilidad pertenecen al perfil `observability`, que `make up` activa; `make up-app` levanta solo la aplicación (lo usa CI).
 
 ```mermaid
 flowchart TB
@@ -91,6 +91,6 @@ flowchart TB
     RuntimeTmpfs --> Web
 ```
 
-Mailpit exige STARTTLS y autenticación con los archivos que genera `make certs` (idempotente; `make up` y `make up-obs` lo ejecutan primero) y el worker confía en la CA local mediante `SMTP_CA_FILE`. Falco observa las llamadas al sistema de todos los contenedores del host, pero solo evalúa sus reglas sobre `api`, `worker` y `web`. La referencia de despliegue en nube para producción está en el [despliegue AWS](despliegue-aws.md); este diagrama solo representa el entorno local.
+Mailpit exige STARTTLS y autenticación con los archivos que genera `make certs` (idempotente; `make up` y `make up-app` lo ejecutan primero) y el worker confía en la CA local mediante `SMTP_CA_FILE`. Falco observa las llamadas al sistema de todos los contenedores del host, pero solo evalúa sus reglas sobre `api`, `worker` y `web`. La referencia de despliegue en nube para producción está en el [despliegue AWS](despliegue-aws.md); este diagrama solo representa el entorno local.
 
 Fuente: `deploy/docker-compose.yml`, `frontend/Dockerfile`, `frontend/nginx/default.conf`, `scripts/gen-smtp-certs.sh` y `docs/runbooks/falco-alerta.md`.

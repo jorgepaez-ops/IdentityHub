@@ -37,8 +37,8 @@ e2e/tests/      pruebas Playwright (59 pruebas en 10 archivos, `make e2e`)
 | Qué | Comando |
 |---|---|
 | Ayuda | `make help` |
-| Levantar / bajar stack | `make up` (ejecuta antes `make certs`) · `make up-obs` (con observabilidad y Falco) · `make down` · `make clean` (borra volúmenes) |
-| Certificados SMTP / Falco | `make certs` (CA y certificado de Mailpit, idempotente) · `make falco-test` (requiere `make up-obs`) |
+| Levantar / bajar stack | `make up` (stack completo con observabilidad y Falco; ejecuta antes `make certs`) · `make up-app` (solo la aplicación, lo usa CI) · `make down` · `make clean` (borra volúmenes) |
+| Certificados SMTP / Falco | `make certs` (CA y certificado de Mailpit, idempotente) · `make falco-test` (requiere `make up`) |
 | Primer arranque | `make setup` (no toca un `.env` existente) y `make up`; si `make certs` dice «falta SMTP_PASSWORD» en un `.env` anterior a F2: `grep -q '^SMTP_PASSWORD=' .env \|\| printf '\nSMTP_PASSWORD=%s\n' "$(openssl rand -hex 24)" >> .env`; nunca `setup_env.py --force` sobre un entorno existente (rompe la autenticación de los volúmenes) |
 | E2E | `make e2e` (Playwright contra el stack levantado) |
 | Un servicio | `make restart S=api` · `make logs S=api` · `make ps` · `make build` |

@@ -25,15 +25,15 @@ El equipo puede intercambiar estos papeles sin alterar el contenido ni los tiemp
 
 ## Checklist de preparación
 
-Complete esta lista antes de grabar. El orden de arranque no es intercambiable: primero **make setup** y después **make up** o **make up-obs**.
+Complete esta lista antes de grabar. El orden de arranque no es intercambiable: primero **make setup** (solo en un clon nuevo) y después **make up**, que ya incluye Grafana y Falco.
 
 - [ ] Decidir si se necesita un reinicio limpio. Solo si se acepta perder los datos locales, ejecutar **make clean** antes del arranque; este objetivo borra los volúmenes.
 - [ ] Desde la raíz, ejecutar **make setup**. No mostrar el archivo .env generado ni sus valores; si ya existe, el objetivo no lo sobrescribe.
-- [ ] Después de setup, ejecutar **make up-obs** para la demostración completa. Si no se mostrará observabilidad, usar **make up**. Confirmar el estado con **make ps**.
+- [ ] Después de setup, ejecutar **make up**, que levanta el stack completo con observabilidad. Confirmar el estado con **make ps**.
 - [ ] Antes del primer arranque, identificar en .env la dirección de bootstrap mediante el nombre de variable **BOOTSTRAP_ADMIN_EMAIL**. No mostrar su valor ni una contraseña: la invitación crea una cuenta pendiente y la persona elige su contraseña.
 - [ ] Preparar, sin revelar contraseñas ni códigos, una cuenta administradora y una cuenta de empleado. La persona empleada debe tener una invitación disponible, poder definir su contraseña y después participar en RF-021. Verificar que el rol de demostración no exista antes de crearlo.
 - [ ] Abrir Mailpit en http://localhost:8025 y confirmar que los mensajes de prueba pueden leerse allí. Mantener ocultos el cuerpo de los correos, enlaces de invitación y códigos MFA.
-- [ ] Abrir Grafana en http://localhost:3000 y Prometheus en http://localhost:9090 cuando se use el perfil de observabilidad. Iniciar la sesión antes de grabar y no mostrar las credenciales, que viven en .env.
+- [ ] Abrir Grafana en http://localhost:3000 y Prometheus en http://localhost:9090 (los levanta make up). Iniciar la sesión antes de grabar y no mostrar las credenciales, que viven en .env.
 - [ ] Antes de la escena de observabilidad, generar tráfico visible con una ejecución autorizada de **make e2e** contra el stack levantado; este comando eleva y restaura el límite de fallos por IP. Confirmar que los paneles contienen datos antes de iniciar la grabación. Para la escena 12, ejecutar **make falco-test** uno o dos minutos antes de mostrar el panel Alertas de Falco, y confirmar antes que Falco corre (**make ps**); requiere un kernel Linux con eBPF o Docker Desktop. Para la escena 6, la clave de servicio se copia a una variable de la terminal sin mostrarla y se revoca en la misma escena.
 - [ ] Dejar abiertas las pestañas del Hub, Contabilidad, Mailpit, Grafana, Prometheus, el workflow de CI y los documentos referenciados por cada escena.
 - [ ] Configurar navegador y aplicación de videollamada para compartir solo la ventana necesaria. Como recomendación de grabación, usar 1920 × 1080, un tamaño de letra legible y zoom consistente; ocultar marcadores personales, notificaciones, historial y pestañas ajenas.
@@ -102,8 +102,8 @@ Complete esta lista antes de grabar. El orden de arranque no es intercambiable: 
 | Campo | Indicación |
 |---|---|
 | Presentador | William Ricardo Niño Pico |
-| Pantalla exacta | Terminal en la raíz con la salida ya preparada de **make setup**, **make up-obs** y **make ps**; después Hub, Mailpit y la [guía de despliegue](../manuales/despliegue-y-operacion.md). |
-| Narración | “El arranque local es reproducible. Primero ejecutamos make setup, que genera .env local sin sobrescribirlo; después make up-obs construye y levanta el stack con observabilidad. make ps confirma los contenedores. Mailpit recibe el correo local sin enviar mensajes a Internet. Evitamos mostrar .env, contraseñas, códigos y enlaces porque son datos sensibles incluso en un entorno de demostración. La guía documenta también cuándo usar make clean: solo para borrar voluntariamente los volúmenes y reiniciar desde cero.” |
+| Pantalla exacta | Terminal en la raíz con la salida ya preparada de **make setup**, **make up** y **make ps**; después Hub, Mailpit y la [guía de despliegue](../manuales/despliegue-y-operacion.md). |
+| Narración | “El arranque local es reproducible. Primero ejecutamos make setup, que genera .env local sin sobrescribirlo; después make up construye y levanta el stack completo, con observabilidad. make ps confirma los contenedores. Mailpit recibe el correo local sin enviar mensajes a Internet. Evitamos mostrar .env, contraseñas, códigos y enlaces porque son datos sensibles incluso en un entorno de demostración. La guía documenta también cuándo usar make clean: solo para borrar voluntariamente los volúmenes y reiniciar desde cero.” |
 
 ### 9. Producción simulada con imágenes publicadas — 09:40 a 10:30
 
@@ -127,7 +127,7 @@ Complete esta lista antes de grabar. El orden de arranque no es intercambiable: 
 |---|---|
 | Presentador | Milena Rocío Ramírez Espinosa |
 | Pantalla exacta | Grafana: dashboard Identity Hub — Seguridad; Grafana Explore con Loki; Grafana Explore con Prometheus; página Targets de Prometheus. Como respaldo, [sección de observabilidad del informe](../informe/informe-tecnico.md#monitoreo-y-observabilidad). |
-| Narración | “Con make up-obs, Prometheus recoge métricas y Loki recibe los logs estructurados mediante Grafana Alloy. En el dashboard de seguridad, los intentos de inicio de sesión por resultado se alinean con AM-001, los reusos de refresh token con AM-002 y la profundidad de la DLQ con AM-019. También aparecen latencia p95 y eventos publicados frente a consumidos. En Explore, Loki permite seguir los logs del worker sin exponer secretos. La fuente Prometheus permite consultar las métricas por tipo de evento. Finalmente, Targets confirma que API, worker, RabbitMQ y Prometheus están disponibles. AM-001, AM-002 y AM-019 figuran como mitigadas; la de la DLQ cuenta además con una regla de alerta versionada de Grafana y un runbook de atención y purga. Estas pantallas deben contener tráfico generado por una ejecución autorizada de la suite E2E o por la operación local, nunca tokens o cuerpos de mensajes.” |
+| Narración | “Con make up, Prometheus recoge métricas y Loki recibe los logs estructurados mediante Grafana Alloy. En el dashboard de seguridad, los intentos de inicio de sesión por resultado se alinean con AM-001, los reusos de refresh token con AM-002 y la profundidad de la DLQ con AM-019. También aparecen latencia p95 y eventos publicados frente a consumidos. En Explore, Loki permite seguir los logs del worker sin exponer secretos. La fuente Prometheus permite consultar las métricas por tipo de evento. Finalmente, Targets confirma que API, worker, RabbitMQ y Prometheus están disponibles. AM-001, AM-002 y AM-019 figuran como mitigadas; la de la DLQ cuenta además con una regla de alerta versionada de Grafana y un runbook de atención y purga. Estas pantallas deben contener tráfico generado por una ejecución autorizada de la suite E2E o por la operación local, nunca tokens o cuerpos de mensajes.” |
 
 ### 12. Detección en ejecución con Falco — 13:15 a 13:50
 
@@ -173,7 +173,7 @@ La duración total es 15 minutos, en el límite superior del rango exigido de 10
 - Tener capturas aprobadas del manual y del informe como respaldo si una interfaz local no responde. Identificarlas como evidencia capturada, no como estado en vivo.
 - Ocultar marcadores y notificaciones; nunca mostrar .env, contraseña de Grafana, tokens, códigos MFA, enlaces de invitación ni cuerpos de correo. Enmascarar la vista previa de Mailpit si contiene datos de una cuenta.
 - Si Mailpit no contiene el correo esperado, no revelar otro mensaje ni repetir credenciales: pausar la escena, mostrar la captura correspondiente del manual y explicar que el buzón es local.
-- Si Grafana no tiene datos, verificar que el perfil de observabilidad está levantado y usar las capturas del informe; no inventar series ni afirmar que un panel contiene tráfico que no se ve.
-- Si el arranque requiere limpieza, explicar que make clean borra volúmenes y repetir el orden seguro: make setup y después make up-obs.
+- Si Grafana no tiene datos, verificar con make ps que Grafana y Prometheus están levantados (make up los incluye) y usar las capturas del informe; no inventar series ni afirmar que un panel contiene tráfico que no se ve.
+- Si el arranque requiere limpieza, explicar que make clean borra volúmenes y repetir el orden seguro: make setup y después make up.
 - Si en el equipo de grabación no están configurados los digests o el relay SMTP, mantener la escena 9 como explicación con la configuración y la evidencia ya verificada; no ejecutar ni simular un despliegue de producción.
 - Si Terraform validate o Checkov no están disponibles en el equipo de grabación, mostrar la evidencia ya verificada y el ADR 0012; no ejecutar apply ni usar credenciales cloud.
