@@ -53,7 +53,7 @@ func New(t *testing.T) *pgxpool.Pool {
 	}
 	defer adminConn.Release()
 	lock := acquireMigrationLock(t, ctx, adminConn)
-	defer lock.releaseIfHeld()
+	defer lock.releaseIfHeld(ctx)
 
 	databaseName := temporaryDatabaseName(t)
 	testPool := createTemporaryDatabase(t, ctx, adminPool, adminConfig, databaseName)
@@ -62,7 +62,7 @@ func New(t *testing.T) *pgxpool.Pool {
 	registerCleanup(t, ctx, testPool, adminPool, databaseName)
 
 	applyMigrations(t, ctx, testPool)
-	lock.release()
+	lock.release(ctx)
 	return testPool
 }
 
@@ -70,7 +70,6 @@ func New(t *testing.T) *pgxpool.Pool {
 // migrations across concurrently created test databases.
 type migrationLock struct {
 	t    *testing.T
-	ctx  context.Context
 	conn *pgxpool.Conn
 	held bool
 }
@@ -81,25 +80,25 @@ func acquireMigrationLock(t *testing.T, ctx context.Context, conn *pgxpool.Conn)
 	if _, err := conn.Exec(ctx, "SELECT pg_advisory_lock($1)", migrationAdvisoryLockID); err != nil {
 		t.Fatalf("acquire migration advisory lock: %v", err)
 	}
-	return &migrationLock{t: t, ctx: ctx, conn: conn, held: true}
+	return &migrationLock{t: t, conn: conn, held: true}
 }
 
 // release unlocks on the success path and fails the test if unlocking fails.
-func (l *migrationLock) release() {
+func (l *migrationLock) release(ctx context.Context) {
 	l.t.Helper()
 
-	if _, err := l.conn.Exec(l.ctx, "SELECT pg_advisory_unlock($1)", migrationAdvisoryLockID); err != nil {
+	if _, err := l.conn.Exec(ctx, "SELECT pg_advisory_unlock($1)", migrationAdvisoryLockID); err != nil {
 		l.t.Fatalf("release migration advisory lock: %v", err)
 	}
 	l.held = false
 }
 
 // releaseIfHeld is the deferred safety net for early exits.
-func (l *migrationLock) releaseIfHeld() {
+func (l *migrationLock) releaseIfHeld(ctx context.Context) {
 	if !l.held {
 		return
 	}
-	if _, err := l.conn.Exec(l.ctx, "SELECT pg_advisory_unlock($1)", migrationAdvisoryLockID); err != nil {
+	if _, err := l.conn.Exec(ctx, "SELECT pg_advisory_unlock($1)", migrationAdvisoryLockID); err != nil {
 		l.t.Errorf("release migration advisory lock: %v", err)
 	}
 }
@@ -117,7 +116,7 @@ func createTemporaryDatabase(t *testing.T, ctx context.Context, adminPool *pgxpo
 	testConfig.ConnConfig.Database = databaseName
 	testPool, err := pgxpool.NewWithConfig(ctx, testConfig)
 	if err != nil {
-		dropDatabase(ctx, adminPool, databaseName)
+		_ = dropDatabase(ctx, adminPool, databaseName) // best effort: the connection failure is the error that matters
 		t.Fatalf("connect temporary database: %v", err)
 	}
 	return testPool
