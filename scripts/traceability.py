@@ -8,6 +8,8 @@ mano. Aquí se deriva de las cuatro fuentes que ya existen:
   · specs/03-api/openapi.yaml   x-requirement -> operationId
   · specs/06-acceptance/*.feature   etiquetas @RF-NNN
   · backend/**/*_test.go, e2e/tests/*.spec.ts   nombres TestRFNNN_ / 'RF-NNN ...'
+  · specs/07-controls.yaml      controles de CI/pipeline que hacen cumplir cada RNF; cada
+                                referencia se verifica contra el archivo real o --check falla
 
 Uso:
     python3 scripts/traceability.py            # escribe el archivo
@@ -24,6 +26,7 @@ from typing import NamedTuple
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 OUT = ROOT / "specs" / "07-traceability.md"
+CONTROLS = "specs/07-controls.yaml"
 
 RF_HEADING = re.compile(r"^### (R[FN]-\d{3}) — (.+?) · (P\d)$", re.M)
 RF_TAG = re.compile(r"\b((?:RNF|RF)-\d{3})\b")
@@ -52,6 +55,92 @@ class Scenario(NamedTuple):
 
 
 GHERKIN_SCENARIO = re.compile(r"(Escenario|Esquema del escenario):")
+
+
+class Control(NamedTuple):
+    """A CI/pipeline control that enforces a requirement.
+
+    ``section`` is a workflow job id, a compose service, a Makefile target or any other
+    ``key:`` line; empty means the whole file. ``text`` must appear in that section.
+    """
+
+    file: str
+    section: str
+    text: str
+
+
+def load_controls() -> dict[str, list[Control]]:
+    """RNF-NNN -> controls, from specs/07-controls.yaml.
+
+    Restricted YAML subset, read as text like the OpenAPI file (no PyYAML): ``RNF-NNN:``
+    headers followed by ``- <file> | <section or -> | <text>`` entries.
+    """
+    controls: dict[str, list[Control]] = defaultdict(list)
+    current = None
+    for number, raw in enumerate((ROOT / CONTROLS).read_text(encoding="utf-8").splitlines(), start=1):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if m := re.fullmatch(r"((?:RNF|RF)-\d{3}):", line):
+            current = m.group(1)
+        elif line.startswith("- ") and current:
+            parts = [part.strip() for part in line[2:].split(" | ")]
+            if len(parts) != 3 or not all(parts):
+                raise ValueError(f"{CONTROLS}:{number}: se esperaba '- archivo | sección o - | texto'")
+            file, section, text = parts
+            controls[current].append(Control(file, "" if section == "-" else section, text))
+        else:
+            raise ValueError(f"{CONTROLS}:{number}: línea no reconocida: {raw!r}")
+    return dict(controls)
+
+
+def section_block(lines: list[str], section: str) -> list[str] | None:
+    """Lines of the shallowest ``<section>:`` key and everything nested under it, or None.
+
+    The shallowest match wins so a job id like ``image`` is not confused with an
+    ``image:`` key nested in some other job's services.
+    """
+    pattern = re.compile(rf"^(\s*){re.escape(section)}:")
+    matches = [(len(m.group(1)), i) for i, line in enumerate(lines) if (m := pattern.match(line))]
+    if not matches:
+        return None
+    indent, start = min(matches)
+    block = [lines[start]]
+    for follower in lines[start + 1 :]:
+        if follower.strip() and not follower.lstrip().startswith("#"):
+            if len(follower) - len(follower.lstrip()) <= indent:
+                break
+        block.append(follower)
+    return block
+
+
+def control_errors(controls: dict[str, list[Control]], reqs: dict[str, tuple[str, str]]) -> list[str]:
+    """Every declared control must point at something that really exists."""
+    errors: list[str] = []
+    for rid, entries in controls.items():
+        if rid not in reqs:
+            errors.append(f"{CONTROLS}: {rid} no es un requisito de specs/01-requirements.md")
+        for control in entries:
+            path = ROOT / control.file
+            if not path.is_file():
+                errors.append(f"{rid}: el archivo {control.file} no existe")
+                continue
+            lines = path.read_text(encoding="utf-8").splitlines()
+            if control.section:
+                block = section_block(lines, control.section)
+                if block is None:
+                    errors.append(f"{rid}: {control.file} no tiene la sección '{control.section}'")
+                    continue
+                lines = block
+            if not any(control.text in line for line in lines):
+                where = f"la sección '{control.section}' de " if control.section else ""
+                errors.append(f"{rid}: {where}{control.file} no contiene '{control.text}'")
+    return errors
+
+
+def control_label(control: Control) -> str:
+    name = pathlib.PurePosixPath(control.file).name
+    return f"`{name}#{control.section}`" if control.section else f"`{control.file}`"
 
 
 def load_requirements() -> dict[str, tuple[str, str]]:
@@ -202,6 +291,7 @@ def render(gherkin: list[Scenario]) -> str:
     reqs = load_requirements()
     ops = load_operations()
     scenarios = load_scenarios(gherkin)
+    controls = load_controls()
 
     # Los nombres Go usan TestRF003_ / TestRNF012_, sin guion; aquí se normalizan.
     go_by_req: dict[str, list[str]] = defaultdict(list)
@@ -228,8 +318,8 @@ def render(gherkin: list[Scenario]) -> str:
         "tabla existe para que esa afirmación sea comprobable de un vistazo y no una",
         "declaración de buenas intenciones.",
         "",
-        "| Requisito | Título | Pri | Operaciones de la API | Escenarios | Pruebas Go | E2E | Estado |",
-        "|---|---|---|---|---|---|---|---|",
+        "| Requisito | Título | Pri | Operaciones de la API | Escenarios | Pruebas Go | E2E | Controles CI | Estado |",
+        "|---|---|---|---|---|---|---|---|---|",
     ]
 
     counts = {"completo": 0, "parcial": 0, "sin cubrir": 0, "diferido": 0}
@@ -239,14 +329,16 @@ def render(gherkin: list[Scenario]) -> str:
         s = str(len(scenarios.get(rid, []))) if scenarios.get(rid) else "—"
         g = str(len(go_by_req.get(rid, []))) if go_by_req.get(rid) else "—"
         e = str(len(e2e_by_req.get(rid, []))) if e2e_by_req.get(rid) else "—"
-        covered = sum(x != "—" for x in (s, g, e))
+        labels = list(dict.fromkeys(control_label(c) for c in controls.get(rid, [])))
+        c = ", ".join(labels) or "—"
+        covered = sum(x != "—" for x in (s, g, e, c))
         if rid in DEFERRED:
             state = "⏳ diferido (semana 4)"
             counts["diferido"] += 1
         else:
             state = "✅ completo" if covered >= 2 else ("🟡 parcial" if covered == 1 else "🔴 sin cubrir")
             counts["completo" if covered >= 2 else ("parcial" if covered == 1 else "sin cubrir")] += 1
-        lines.append(f"| **{rid}** | {title} | {prio} | {o} | {s} | {g} | {e} | {state} |")
+        lines.append(f"| **{rid}** | {title} | {prio} | {o} | {s} | {g} | {e} | {c} | {state} |")
 
     total = sum(counts.values())
     lines += [
@@ -255,9 +347,15 @@ def render(gherkin: list[Scenario]) -> str:
         f"{counts['completo']} completos · {counts['parcial']} parciales · "
         f"{counts['sin cubrir']} sin cubrir · {counts['diferido']} diferidos (semana 4).",
         "",
-        "Leyenda de estado: *completo* = verificado por al menos dos de las tres",
-        "columnas de prueba · *parcial* = una sola · *sin cubrir* = ninguna · "
+        "Leyenda de estado: *completo* = verificado por al menos dos de las",
+        "cuatro columnas de evidencia (Escenarios, Pruebas Go, E2E, Controles CI) · *parcial* = una sola ·",
+        "*sin cubrir* = ninguna · "
         "*diferido (semana 4)* = backlog de semana 4 por decisión Q14.",
+        "",
+        "*Controles CI* lista los jobs, pasos o ajustes que hacen cumplir el requisito de forma",
+        "automática (`archivo#sección`). Se declaran en `specs/07-controls.yaml` y `--check` falla",
+        "si alguno apunta a algo que no existe; varios controles en la misma celda cuentan como",
+        "una sola fuente de evidencia.",
         "",
         "## Escenarios de aceptación por requisito",
         "",
@@ -279,6 +377,11 @@ def main() -> int:
     errors = e2e_correspondence_errors(gherkin)
     if errors:
         print("\n".join(errors), file=sys.stderr)
+        return 1
+
+    errors = control_errors(load_controls(), load_requirements())
+    if errors:
+        print("\n".join(["Controles de specs/07-controls.yaml no verificables:", *(f"  - {e}" for e in errors)]), file=sys.stderr)
         return 1
 
     content = render(gherkin)
