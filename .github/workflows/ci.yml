@@ -146,6 +146,10 @@ jobs:
       - name: Pruebas del clasificador de cambios
         run: python3 scripts/ci_changes_test.py
 
+      # Prometheus, Loki y Grafana no pueden publicar puertos fuera de 127.0.0.1 (lee docker compose config).
+      - name: Prueba de puertos de observabilidad en loopback
+        run: python3 scripts/compose_ports_test.py
+
       - name: Regenerar la matriz de trazabilidad
         run: python3 scripts/traceability.py
 

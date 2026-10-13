@@ -47,9 +47,13 @@ con esos temas abiertos.
   guardas por paso (una acción compuesta sacaría las acciones fijadas por SHA del alcance de Dependabot,
   `directory: "/"` no recorre `.github/actions/*`, y el checkout debe quedar fuera) y la prueba falla si un
   paso de `image` no tiene la guarda; documentado en el encabezado de `ci.yml`.
-- [ ] **S3 — Prueba de los puertos de observabilidad en loopback.** Prueba (en CI, job barato) que lea
+- [x] **S3 — Prueba de los puertos de observabilidad en loopback.** Prueba (en CI, job barato) que lea
   `docker compose config` y falle si Prometheus, Loki o Grafana publican sin `host_ip: 127.0.0.1`.
   Aclarar en la guía el caso de `localhost` resuelto a `::1`.
+  Evidencia: RED = `python3 scripts/compose_ports_test.py` con 4 errores (`unsafe_ports` aún sin implementar,
+  `NotImplementedError`); GREEN = 4 pruebas OK contra `docker compose config` real. Mutación comprobada: quitar
+  `127.0.0.1:` del puerto 9090 en una copia del compose hace fallar la prueba (`host_ip=None`). Corre en el job 1
+  (`spec-drift`, siempre activo) y en `make spec-drift`.
 - [ ] **S4 — Limpieza menor.** Bloque de URLs repetido entre `up` y `up-app` del Makefile; sección
   «Levantar el stack» duplicada entre `README.md` y `docs/guia-desarrollo.md` (una fuente y un enlace).
 - [ ] **S5 — RNF-010 (latencia) con prueba de carga.** Prueba de carga mínima y reproducible contra el
@@ -88,8 +92,8 @@ Estrategia: `ask-on-risk` → `stacked-to-main` (usuario, 2026-10-13). Cortes: P
 | Tarea | Ruta | Estado | Commit | Revisión |
 |---|---|---|---|---|
 | S1 | delegado (Sonnet) | hecho | 118192d | — |
-| S2 | delegado (Sonnet) | hecho | (SHA en el commit siguiente) | — |
-| S3 | — | pendiente | — | — |
+| S2 | delegado (Sonnet) | hecho | e2701fd | — |
+| S3 | delegado (Sonnet) | hecho | (SHA en el commit siguiente) | — |
 | S4 | — | pendiente | — | — |
 | S5 | — | pendiente | — | — |
 | S6 | — | pendiente | — | — |
