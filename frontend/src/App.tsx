@@ -2,13 +2,14 @@ import { FormEvent, useCallback, useEffect, useState } from 'react'
 import { BrowserRouter, Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { LoadingSkeleton } from './components/LoadingSkeleton'
 import { ThemeToggle } from './components/ThemeToggle'
-import { AccountIcon, AuditIcon, HomeIcon, LogoutIcon, ShieldIcon, UsersIcon } from './components/icons'
+import { AccountIcon, AuditIcon, HomeIcon, KeyIcon, LogoutIcon, ShieldIcon, UsersIcon } from './components/icons'
 import { safeContinueTarget } from './features/account/continueTarget'
 import { redirectTo } from './navigation'
 import { MyAccountPage } from './features/account/MyAccountPage'
 import { AuditLogPage } from './features/admin/AuditLogPage'
 import { HomePage } from './features/admin/HomePage'
 import { RolesPage } from './features/admin/RolesPage'
+import { ServiceKeysPage } from './features/admin/ServiceKeysPage'
 import { UsersPage } from './features/admin/UsersPage'
 import { AcceptInvitationPage, ForgotPasswordPage, ResetPasswordPage } from './features/account/PublicPages'
 import { ApiProblemError, clearSession, type CurrentUser, type MfaChallenge, getCurrentUser, login, logout, refreshSession, resendMfaCode, verifyMfa } from './api/client'
@@ -178,6 +179,7 @@ function AppShell({ user, onLogout, onUserChange, onSessionEnded }: Readonly<{ u
           {isAdmin && <NavLink to="/usuarios"><UsersIcon />Usuarios</NavLink>}
           {isAdmin && <NavLink to="/roles"><ShieldIcon />Roles</NavLink>}
           {isAdmin && <NavLink to="/auditoria"><AuditIcon />Auditoría</NavLink>}
+          {isAdmin && <NavLink to="/claves"><KeyIcon />Claves de servicio</NavLink>}
           <NavLink to="/me"><AccountIcon />Mi cuenta</NavLink>
         </nav>
         <div className="connected-apps"><strong>Aplicaciones conectadas</strong><a href="http://contabilidad.localhost:8080">Contabilidad</a></div>
@@ -189,6 +191,7 @@ function AppShell({ user, onLogout, onUserChange, onSessionEnded }: Readonly<{ u
           <Route path="/usuarios" element={isAdmin ? <UsersPage currentUserId={user.id} onSessionEnded={onSessionEnded} /> : <Navigate to="/me" replace />} />
           <Route path="/roles" element={isAdmin ? <RolesPage currentRoles={user.roles} onSessionEnded={onSessionEnded} /> : <Navigate to="/me" replace />} />
           <Route path="/auditoria" element={isAdmin ? <AuditLogPage onSessionEnded={onSessionEnded} /> : <Navigate to="/me" replace />} />
+          <Route path="/claves" element={isAdmin ? <ServiceKeysPage onSessionEnded={onSessionEnded} /> : <Navigate to="/me" replace />} />
           <Route path="/me" element={<MyAccountPage user={user} onUserChange={onUserChange} onSessionEnded={onSessionEnded} />} />
           <Route path="*" element={<Navigate to={home} replace />} />
         </Routes>

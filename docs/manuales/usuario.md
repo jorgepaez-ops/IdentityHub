@@ -5,7 +5,7 @@ Esta guía explica cómo usar Identity Hub y la aplicación conectada Contabilid
 | Si usted es... | Lea | Qué hace |
 |---|---|---|
 | Empleado | [sección 2](#2-empleado) | Activa su cuenta, inicia sesión con código por correo, recupera su contraseña y gestiona su perfil y sesiones. |
-| Administrador | [sección 3](#3-administrador-consola-del-hub) | Ve el resumen del Hub, invita y administra usuarios, configura roles y permisos, consulta y exporta la auditoría. |
+| Administrador | [sección 3](#3-administrador-consola-del-hub) | Ve el resumen del Hub, invita y administra usuarios, configura roles y permisos, consulta y exporta la auditoría, y emite claves de servicio para integraciones. |
 | Usuario de Contabilidad | [sección 4](#4-contabilidad-sso-con-identity-hub) | Entra a Contabilidad con su cuenta del Hub, ve gráficos y movimientos, y actúa según lo que su rol permite. |
 
 > **Perfiles y roles no son lo mismo.** La tabla de arriba lista *perfiles de lector* de este manual (qué sección le toca leer a cada persona), no roles del sistema. Identity Hub tiene exactamente **dos roles de sistema**, `admin` y `user`, fijos en el código y que nadie edita desde la consola. Además existen los **roles de aplicación** (por ejemplo `contabilidad.senior`, `contabilidad.analista` o el `contabilidad.auditor` de la historia de la sección 5): los crea un administrador **sin límite** en **Roles**, eligiendo qué permisos lleva cada uno ([sección 3.4](#34-roles-y-permisos)). Una misma persona puede tener `user` y varios roles de aplicación a la vez.
@@ -142,7 +142,7 @@ En el menú lateral, pulse **Cerrar sesión**: vuelve al formulario de inicio de
 
 ## 3. Administrador (consola del Hub)
 
-Los administradores ven en el menú lateral cinco entradas: **Inicio**, **Usuarios**, **Roles**, **Auditoría** y **Mi cuenta**. Las cuatro primeras solo existen para el rol `admin`; un empleado que escriba esas direcciones es devuelto a **Mi cuenta**. Inicie sesión como se explica en la sección 2.2: entrará directamente a **Inicio**.
+Los administradores ven en el menú lateral seis entradas: **Inicio**, **Usuarios**, **Roles**, **Auditoría**, **Claves de servicio** y **Mi cuenta**. Las cinco primeras solo existen para el rol `admin`; un empleado que escriba esas direcciones es devuelto a **Mi cuenta**. Inicie sesión como se explica en la sección 2.2: entrará directamente a **Inicio**.
 
 ### 3.0 Inicio
 
@@ -270,6 +270,17 @@ Cada creación, cambio y eliminación de un rol queda registrado en la auditorí
 ![Fila de auditoría con sus metadatos desplegados](img/usuario/administrador-21-auditoria-metadatos.png)
 
 **Exportar CSV.** Igual que en Usuarios, **Exportar CSV** descarga los eventos **cargados** bajo los filtros actuales (siete columnas: fecha, acción, actor, tipo e ID de recurso, IP y metadatos, con el actor como correo y los metadatos como `clave=valor; ...`). Si hay más páginas, un aviso lo indica; pulse **Cargar más** antes de exportar para incluir el resto.
+
+### 3.7 Claves de servicio
+
+**Claves de servicio** emite credenciales para integraciones máquina a máquina, por ejemplo un SIEM o un sistema de reportes que lee el registro de auditoría sin una sesión humana. Cada clave tiene un nombre, un alcance (hoy solo `audit-log:read`, de solo lectura) y una vigencia obligatoria de 1 a 365 días. La clave solo sirve para leer el registro de auditoría: no abre ninguna otra pantalla ni operación de la consola.
+
+1. En **Emitir una clave**, escriba el **Nombre de la clave** (qué integración la usará), deje marcado el alcance y fije la **Vigencia en días**; pulse **Emitir clave**.
+2. Aparece el aviso **Clave emitida** con la clave completa. **No se volverá a mostrar**: pulse **Copiar clave**, guárdela en el gestor de secretos de la integración y luego pulse **Ya la copié**. Si la pierde, revoque esa clave y emita otra.
+3. La tabla **Claves de servicio** muestra nombre, prefijo (la parte pública, que identifica la clave en la auditoría), alcances, vencimiento, último uso y estado (**Vigente**, **Expirada** o **Revocada**). Nunca muestra el secreto.
+4. **Revocar** pide confirmación (**Confirmar revocación de ...**) y deja la clave inutilizable de inmediato. Revocar dos veces es inofensivo.
+
+La emisión, la revocación y cada uso rechazado quedan en la auditoría (`service_key_created`, `service_key_revoked`, `service_key_rejected`). El formato de la clave y cómo usarla desde la integración están en la [guía de claves de servicio](claves-de-servicio.md).
 
 ---
 

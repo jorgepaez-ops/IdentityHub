@@ -16,6 +16,10 @@ export type Role = components['schemas']['Role']
 export type Application = components['schemas']['Application']
 export type ApplicationRole = components['schemas']['ApplicationRole']
 export type Permission = components['schemas']['Permission']
+export type ServiceKey = components['schemas']['ServiceKey']
+export type CreatedServiceKey = components['schemas']['CreatedServiceKey']
+export type ServiceKeyScope = components['schemas']['ServiceKeyScope']
+type CreateServiceKeyRequest = components['schemas']['CreateServiceKeyRequest']
 type CreateApplicationRoleRequest = components['schemas']['CreateApplicationRoleRequest']
 type UpdateApplicationRoleRequest = components['schemas']['UpdateApplicationRoleRequest']
 export type UserStatus = components['schemas']['UserStatus']
@@ -193,6 +197,13 @@ export const updateApplicationRole = (applicationId: string, roleId: string, inp
   authenticatedRequest<ApplicationRole>(`${rolesPath(applicationId)}/${encodeURIComponent(roleId)}`, { method: 'PATCH', body: JSON.stringify(input) })
 export const deleteApplicationRole = (applicationId: string, roleId: string) =>
   authenticatedRequest<void>(`${rolesPath(applicationId)}/${encodeURIComponent(roleId)}`, { method: 'DELETE' })
+
+const serviceKeysPath = '/api/v1/admin/service-keys'
+export const listServiceKeys = () => authenticatedRequest<ServiceKey[]>(serviceKeysPath)
+export const createServiceKey = (input: CreateServiceKeyRequest) =>
+  authenticatedRequest<CreatedServiceKey>(serviceKeysPath, { method: 'POST', body: JSON.stringify(input) })
+export const revokeServiceKey = (serviceKeyId: string) =>
+  authenticatedRequest<void>(`${serviceKeysPath}/${encodeURIComponent(serviceKeyId)}`, { method: 'DELETE' })
 
 export async function logout(): Promise<void> {
   try {

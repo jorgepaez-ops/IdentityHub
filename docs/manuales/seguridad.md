@@ -39,6 +39,10 @@ Los SARIF de Semgrep, Trivy y Checkov se cargan a Code Scanning. Los artefactos 
 4. Las capturas externas se referencian desde `docs/evidencia/VULN-XXX/evidencia.json`; el repositorio no sustituye esa captura por una afirmación sin fuente.
 5. Un hallazgo fuera de alcance se registra para decisión posterior; no se corrige silenciosamente ni se debilita un gate.
 
+## Claves de servicio
+
+Las credenciales máquina a máquina de RF-018 (amenaza AM-023, [ADR 0014](../../specs/adr/0014-claves-de-servicio-para-integraciones-maquina.md)) se describen en la [guía de claves de servicio](claves-de-servicio.md): solo se guarda el SHA-256 del secreto, vencen siempre, tienen alcance mínimo y se auditan sin registrar nunca el secreto.
+
 ## Excepciones y reglas
 
 | Archivo | Política actual |

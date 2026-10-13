@@ -383,7 +383,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Consultar el registro de auditoría */
+        /**
+         * Consultar el registro de auditoría
+         * @description Acepta el access token de un administrador o una clave de servicio con el alcance
+         *     `audit-log:read` (RF-018). Una clave inválida, expirada o revocada devuelve el mismo `401`.
+         */
         get: operations["listAuditLog"];
         put?: never;
         post?: never;
@@ -448,6 +452,51 @@ export interface paths {
          * @description El nombre no se puede cambiar. Un administrador no puede cambiar los permisos de un rol que él tiene (403).
          */
         patch: operations["updateApplicationRole"];
+        trace?: never;
+    };
+    "/api/v1/admin/service-keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Listar las claves de servicio (solo metadatos)
+         * @description Nunca devuelve el secreto ni su hash.
+         */
+        get: operations["listServiceKeys"];
+        put?: never;
+        /**
+         * Emitir una clave de servicio
+         * @description Devuelve la clave completa una sola vez; no se puede recuperar después. Solo un
+         *     administrador con access token puede emitirla (una clave de servicio no emite claves).
+         */
+        post: operations["createServiceKey"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/service-keys/{serviceKeyId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revocar una clave de servicio
+         * @description Revocación lógica e idempotente; revocar una clave ya revocada también devuelve 204.
+         */
+        delete: operations["revokeServiceKey"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
 }
@@ -556,6 +605,44 @@ export interface components {
         UpdateApplicationRoleRequest: {
             description?: string;
             permissionKeys?: string[];
+        };
+        /**
+         * @description Lista cerrada de alcances. Hoy solo `audit-log:read`.
+         * @enum {string}
+         */
+        ServiceKeyScope: "audit-log:read";
+        CreateServiceKeyRequest: {
+            /** @example SIEM de seguridad */
+            name: string;
+            scopes: components["schemas"]["ServiceKeyScope"][];
+            expiresInDays: number;
+        };
+        /** @description Metadatos de una clave de servicio. Nunca incluye el secreto ni su hash. */
+        ServiceKey: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            scopes: components["schemas"]["ServiceKeyScope"][];
+            /**
+             * @description Parte pública de la clave (`ihk_<publicId>`); sirve para identificarla
+             * @example ihk_3f9a1c07d2b84e65
+             */
+            prefix: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: uuid */
+            createdBy: string | null;
+            /** Format: date-time */
+            expiresAt: string;
+            /** Format: date-time */
+            lastUsedAt?: string | null;
+            /** Format: date-time */
+            revokedAt?: string | null;
+        };
+        /** @description Metadatos más la clave completa, que se muestra una sola vez. */
+        CreatedServiceKey: components["schemas"]["ServiceKey"] & {
+            /** @description Clave completa `ihk_<publicId>_<secret>`; no se puede recuperar después */
+            key: string;
         };
         User: {
             /** Format: uuid */
@@ -737,6 +824,7 @@ export interface components {
     parameters: {
         ApplicationId: string;
         RoleId: string;
+        ServiceKeyId: string;
         UserId: string;
         SessionId: string;
         /** @description Búsqueda parcial por correo o nombre */
@@ -1577,6 +1665,78 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listServiceKeys: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Claves de servicio, las más recientes primero */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceKey"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createServiceKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateServiceKeyRequest"];
+            };
+        };
+        responses: {
+            /** @description Clave emitida; `key` solo aparece en esta respuesta */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatedServiceKey"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    revokeServiceKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                serviceKeyId: components["parameters"]["ServiceKeyId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Clave revocada */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };

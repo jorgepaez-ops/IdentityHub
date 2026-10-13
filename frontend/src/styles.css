@@ -186,6 +186,11 @@ select { width: 100%; padding: .7rem .75rem; color: var(--ink); background: var(
 .role-grid td input:not([type="checkbox"]) { min-width: 11rem; margin: 0; }
 .role-actions .secondary-button, .role-actions .danger-button { width: auto; margin-top: 0; padding: .4rem .8rem; }
 .danger-button { color: var(--accent-ink); background: var(--danger); font-weight: 600; }
+.warn-box { margin-bottom: 1rem; padding: 1rem; color: var(--ink); background: var(--warn-soft); border: 1px solid var(--warn); border-radius: .55rem; }
+.warn-box h3 { margin: 0 0 .5rem; font-family: var(--display); font-size: 1rem; }
+.warn-box h3 svg { vertical-align: -.2em; color: var(--warn); }
+.warn-box p { margin: 0 0 .75rem; }
+.key-secret { display: block; width: 100%; margin-bottom: .75rem; overflow-wrap: anywhere; }
 .new-role-form { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--line); max-width: 32rem; }
 .new-role-form h3 { margin: 0; font-family: var(--display); font-size: 1rem; }
 .permission-legend { display: grid; gap: .25rem; margin: 1rem 0 0; }
