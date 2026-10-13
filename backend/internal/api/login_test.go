@@ -306,47 +306,51 @@ func TestRF017_BloqueoNoSeEvitaFalsificandoXForwardedFor(t *testing.T) {
 }
 
 func TestRF017_RotarXForwardedForNoEvadeElLimitePorIP(t *testing.T) {
-	t.Run("untrusted peer", func(t *testing.T) {
-		authenticator := &rf017RouteAuthenticator{byIP: true, threshold: 2, counts: make(map[string]int)}
-		server := NewServer(nil, "test", nil)
-		server.SetLoginService(authenticator)
-		handler := server.Routes()
-		for attempt := 1; attempt <= 3; attempt++ {
-			response := httptest.NewRecorder()
-			handler.ServeHTTP(response, rf017RouteRequest("198.51.100."+strconv.Itoa(attempt)))
-			want := http.StatusUnauthorized
-			if attempt == 3 {
-				want = http.StatusLocked
-			}
-			if response.Code != want {
-				t.Fatalf("attempt %d status = %d, want %d", attempt, response.Code, want)
-			}
-		}
-	})
-	t.Run("trusted proxy separates clients", func(t *testing.T) {
-		authenticator := &rf017RouteAuthenticator{byIP: true, threshold: 2, counts: make(map[string]int)}
-		server := NewServer(nil, "test", nil)
-		server.SetLoginService(authenticator)
-		server.SetTrustedProxies([]netip.Prefix{netip.MustParsePrefix("203.0.113.0/24")})
-		handler := server.Routes()
-		for _, header := range []string{"198.51.100.1", "198.51.100.2", "198.51.100.1"} {
-			response := httptest.NewRecorder()
-			handler.ServeHTTP(response, rf017RouteRequest(header))
-			if response.Code != http.StatusUnauthorized {
-				t.Fatalf("header %s status = %d, want 401", header, response.Code)
-			}
-		}
+	t.Run("untrusted peer", rf017UntrustedPeerCannotRotateTheLimit)
+	t.Run("trusted proxy separates clients", rf017TrustedProxySeparatesClients)
+}
+
+func rf017UntrustedPeerCannotRotateTheLimit(t *testing.T) {
+	authenticator := &rf017RouteAuthenticator{byIP: true, threshold: 2, counts: make(map[string]int)}
+	server := NewServer(nil, "test", nil)
+	server.SetLoginService(authenticator)
+	handler := server.Routes()
+	for attempt := 1; attempt <= 3; attempt++ {
 		response := httptest.NewRecorder()
-		handler.ServeHTTP(response, rf017RouteRequest("198.51.100.1"))
-		if response.Code != http.StatusLocked {
-			t.Fatalf("third client-1 failure status = %d, want 423", response.Code)
+		handler.ServeHTTP(response, rf017RouteRequest("198.51.100."+strconv.Itoa(attempt)))
+		want := http.StatusUnauthorized
+		if attempt == 3 {
+			want = http.StatusLocked
 		}
-		response = httptest.NewRecorder()
-		handler.ServeHTTP(response, rf017RouteRequest("198.51.100.2"))
+		if response.Code != want {
+			t.Fatalf("attempt %d status = %d, want %d", attempt, response.Code, want)
+		}
+	}
+}
+
+func rf017TrustedProxySeparatesClients(t *testing.T) {
+	authenticator := &rf017RouteAuthenticator{byIP: true, threshold: 2, counts: make(map[string]int)}
+	server := NewServer(nil, "test", nil)
+	server.SetLoginService(authenticator)
+	server.SetTrustedProxies([]netip.Prefix{netip.MustParsePrefix("203.0.113.0/24")})
+	handler := server.Routes()
+	for _, header := range []string{"198.51.100.1", "198.51.100.2", "198.51.100.1"} {
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, rf017RouteRequest(header))
 		if response.Code != http.StatusUnauthorized {
-			t.Fatalf("independent client-2 status = %d, want 401", response.Code)
+			t.Fatalf("header %s status = %d, want 401", header, response.Code)
 		}
-	})
+	}
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, rf017RouteRequest("198.51.100.1"))
+	if response.Code != http.StatusLocked {
+		t.Fatalf("third client-1 failure status = %d, want 423", response.Code)
+	}
+	response = httptest.NewRecorder()
+	handler.ServeHTTP(response, rf017RouteRequest("198.51.100.2"))
+	if response.Code != http.StatusUnauthorized {
+		t.Fatalf("independent client-2 status = %d, want 401", response.Code)
+	}
 }
 
 func TestRF014_LaEmisionLimitadaDeLoginDevuelve429ProblemJSON(t *testing.T) {
@@ -430,8 +434,6 @@ func TestRNF007_LoginAttemptsCuentaResultadosDeAutenticacion(t *testing.T) {
 	loginRequest := func() *http.Request {
 		return httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", strings.NewReader(`{"email":"ada@example.com","password":"correct horse battery"}`))
 	}
-	results := []string{"mfa_required", "failed", "locked", "succeeded"}
-
 	for _, testCase := range []struct {
 		name   string
 		result string
@@ -475,33 +477,41 @@ func TestRNF007_LoginAttemptsCuentaResultadosDeAutenticacion(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			before := make(map[string]float64, len(results))
-			for _, result := range results {
-				before[result] = testutil.ToFloat64(observability.LoginAttempts.WithLabelValues(result))
-			}
+			before := loginAttemptCounts()
 			testCase.call()
-			for _, result := range results {
-				want := before[result]
-				if result == testCase.result {
-					want++
-				}
-				if got := testutil.ToFloat64(observability.LoginAttempts.WithLabelValues(result)); got != want {
-					t.Fatalf("contador %s = %v; se esperaba %v", result, got, want)
-				}
-			}
+			assertLoginAttemptDelta(t, before, testCase.result)
 		})
 	}
 
 	server := NewServer(nil, "test", nil)
 	server.SetLoginService(loginStub{err: login.ErrIPRateLimited})
-	before := make(map[string]float64, len(results))
-	for _, result := range results {
-		before[result] = testutil.ToFloat64(observability.LoginAttempts.WithLabelValues(result))
-	}
+	before := loginAttemptCounts()
 	server.Login(httptest.NewRecorder(), loginRequest())
-	for _, result := range results {
-		if got := testutil.ToFloat64(observability.LoginAttempts.WithLabelValues(result)); got != before[result] {
-			t.Fatalf("contador %s = %v; se esperaba que un límite previo no lo cambiara desde %v", result, got, before[result])
+	assertLoginAttemptDelta(t, before, "")
+}
+
+var loginAttemptResults = []string{"mfa_required", "failed", "locked", "succeeded"}
+
+// loginAttemptCounts snapshots the login_attempts counter for every result label.
+func loginAttemptCounts() map[string]float64 {
+	counts := make(map[string]float64, len(loginAttemptResults))
+	for _, result := range loginAttemptResults {
+		counts[result] = testutil.ToFloat64(observability.LoginAttempts.WithLabelValues(result))
+	}
+	return counts
+}
+
+// assertLoginAttemptDelta checks that only the counter for incremented grew, by one; an empty
+// incremented means no counter may change (a limit hit before authentication is not counted).
+func assertLoginAttemptDelta(t *testing.T, before map[string]float64, incremented string) {
+	t.Helper()
+	for _, result := range loginAttemptResults {
+		want := before[result]
+		if result == incremented {
+			want++
+		}
+		if got := testutil.ToFloat64(observability.LoginAttempts.WithLabelValues(result)); got != want {
+			t.Fatalf("contador %s = %v; se esperaba %v (desde %v, incrementado=%q)", result, got, want, before[result], incremented)
 		}
 	}
 }

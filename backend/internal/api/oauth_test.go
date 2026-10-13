@@ -135,23 +135,30 @@ func TestRF020_CORSSiempreVaryOriginYNuncaCredenciales(t *testing.T) {
 	for _, path := range []string{"/oauth/token", "/.well-known/jwks.json"} {
 		for _, origin := range []string{client.Origin, "https://evil.example", ""} {
 			for _, method := range []string{http.MethodGet, http.MethodPost, http.MethodOptions} {
-				request := httptest.NewRequest(method, path, nil)
-				if origin != "" {
-					request.Header.Set("Origin", origin)
-				}
-				response := httptest.NewRecorder()
-				server.Routes().ServeHTTP(response, request)
-				if !strings.Contains(response.Header().Get("Vary"), "Origin") {
-					t.Fatalf("%s %s origin=%q Vary=%q", method, path, origin, response.Header().Values("Vary"))
-				}
-				if response.Header().Get("Access-Control-Allow-Credentials") != "" {
-					t.Fatalf("%s %s origin=%q enabled credentials", method, path, origin)
-				}
-				if origin != client.Origin && response.Header().Get("Access-Control-Allow-Origin") != "" {
-					t.Fatalf("%s %s origin=%q allowed", method, path, origin)
-				}
+				assertCORSHeaders(t, server, method, path, origin, client.Origin)
 			}
 		}
+	}
+}
+
+// assertCORSHeaders sends one request and checks Vary: Origin is always present, credentials are
+// never enabled and only the registered origin is ever allowed.
+func assertCORSHeaders(t *testing.T, server *Server, method, path, origin, allowedOrigin string) {
+	t.Helper()
+	request := httptest.NewRequest(method, path, nil)
+	if origin != "" {
+		request.Header.Set("Origin", origin)
+	}
+	response := httptest.NewRecorder()
+	server.Routes().ServeHTTP(response, request)
+	if !strings.Contains(response.Header().Get("Vary"), "Origin") {
+		t.Fatalf("%s %s origin=%q Vary=%q", method, path, origin, response.Header().Values("Vary"))
+	}
+	if response.Header().Get("Access-Control-Allow-Credentials") != "" {
+		t.Fatalf("%s %s origin=%q enabled credentials", method, path, origin)
+	}
+	if origin != allowedOrigin && response.Header().Get("Access-Control-Allow-Origin") != "" {
+		t.Fatalf("%s %s origin=%q allowed", method, path, origin)
 	}
 }
 
