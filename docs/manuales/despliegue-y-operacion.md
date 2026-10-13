@@ -1,6 +1,6 @@
 # Manual de despliegue y operación
 
-Este manual describe el entorno local actual con Docker Compose. No afirma soporte de producción: la referencia cloud y `docker-compose.prod.yml` se incorporan en las tareas T7–T9 de la semana 4.
+Este manual describe el entorno local actual con Docker Compose. No afirma soporte de producción: la referencia cloud y `docker-compose.prod.yml` ya están incorporadas (referencia cloud como IaC y compose de producción simulada) y las imágenes se publican en Docker Hub con `release.yml`.
 
 ## Inicio rápido
 
@@ -59,9 +59,19 @@ make logs S=worker
 
 Grafana carga por aprovisionamiento la alerta **DLQ de notificaciones con mensajes** (`deploy/observability/grafana/alerting/dlq.yml`); su procedimiento de atención está en [`../runbooks/dlq-notificaciones.md`](../runbooks/dlq-notificaciones.md).
 
+### Detección en tiempo de ejecución (Falco)
+
+El perfil `observability` también levanta **Falco** (AM-020): observa las llamadas al sistema de los contenedores con el driver modern eBPF y evalúa `deploy/observability/falco/rules.d/identity-hub.yaml` sobre `api`, `worker` y `web` (shell, escritura en directorios del sistema, gestor de paquetes o descargador, conexión saliente a una IP pública). Escribe cada alerta como JSON en su salida estándar; Alloy la envía a Loki con las etiquetas `rule` y `priority`, el tablero «Identity Hub — Seguridad» la muestra y Grafana aprovisiona la alerta **Falco detectó actividad anómala en un contenedor** (`deploy/observability/grafana/alerting/falco.yml`). Atención y triaje en [`../runbooks/falco-alerta.md`](../runbooks/falco-alerta.md).
+
+```bash
+make falco-test   # dispara eventos inofensivos y dice dónde ver la alerta
+```
+
+Falco corre sin `privileged`, solo con las capacidades `BPF`, `PERFMON`, `SYS_RESOURCE` y `SYS_PTRACE`, y monta `/proc` y el socket de Docker en solo lectura. Es un control del stack desplegado: **no forma parte del CI** (los runners de GitHub no ofrecen eBPF equivalente) y requiere un kernel Linux con BTF (Docker Desktop o Linux moderno). La imagen está fijada por digest (0.45.0).
+
 ### Backups, restauración y rotación
 
-No existe un procedimiento versionado de backup/restauración ni de rotación de claves de firma. No los ejecute por suposición. El compose de producción y sus secretos gestionados no existen todavía; corresponden a T7–T9. La publicación y firma de imágenes con Docker Hub llegan en T17.
+No existe un procedimiento versionado de backup/restauración ni de rotación de claves de firma. No los ejecute por suposición. El compose de producción de referencia (`deploy/docker-compose.prod.yml`) existe, pero no hay gestión de secretos de producción. Las imágenes se publican y firman en Docker Hub con `release.yml` (tarea C3).
 
 ## Operaciones comunes
 
@@ -130,7 +140,7 @@ Variables obligatorias en `.env`, además de las del desarrollo (el comando fall
 
 | Variable | Contenido |
 |---|---|
-| `IDENTITY_HUB_API_IMAGE`, `IDENTITY_HUB_WORKER_IMAGE`, `IDENTITY_HUB_WEB_IMAGE` | Digest de cada imagen publicada en Docker Hub (`nombre@sha256:...`). Las publica T17; hasta entonces no hay imágenes que referenciar. |
+| `IDENTITY_HUB_API_IMAGE`, `IDENTITY_HUB_WORKER_IMAGE`, `IDENTITY_HUB_WEB_IMAGE` | Digest de cada imagen publicada en Docker Hub (`nombre@sha256:...`). Las publica `release.yml` en `docker.io/jorgeivp/identity-hub-api`, `identity-hub-worker` e `identity-hub-web` con cada tag `vX.Y.Z` (validado con `v0.9.0`); use el digest de la publicación, que figura en el resumen del run. |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM` | Relay SMTP y remitente de producción. |
 | `SMTP_USERNAME`, `SMTP_PASSWORD` | Credenciales del relay (con SES, las credenciales SMTP derivadas de una clave IAM). El worker las presenta solo tras STARTTLS. |
 
@@ -146,4 +156,4 @@ Límites conocidos:
 
 - Los secretos siguen llegando como variables de entorno desde `.env`: la API no soporta variables `*_FILE`, así que no hay secretos por archivo.
 - El worker autentica por SMTP y exige STARTTLS (`SMTP_TLS=starttls`, puerto 587). La CA local de desarrollo no se monta aquí: el relay se verifica con las raíces del sistema.
-- Hasta T17 no hay imágenes publicadas, de modo que la validación sin arrancar se limita a `docker compose ... config`.
+- Las imágenes ya están publicadas en Docker Hub; sin tener a mano sus digests, la validación sin arrancar se limita a `docker compose ... config`.

@@ -246,6 +246,40 @@ services:
       - "--server.http.listen-addr=0.0.0.0:12345"
       - "/etc/alloy/config.river"
 
+  falco:
+    # falcosecurity/falco 0.45.0 (2026-09-21), fijado por digest real (índice multi-arquitectura).
+    # Detección en tiempo de ejecución (AM-020): ve las llamadas al sistema de TODOS los contenedores
+    # del host mediante el driver modern eBPF y evalúa deploy/observability/falco/rules.d. Escribe
+    # alertas JSON en stdout; Alloy las envía a Loki y Grafana alerta sobre ellas. Requiere un kernel
+    # Linux con BTF (Docker Desktop y Linux modernos); no es parte del CI (ver docs/runbooks/falco-alerta.md).
+    image: falcosecurity/falco@sha256:788f1129c542171813083d4afc61b16730a47dde8c23d9c39370acef996349b6
+    profiles: ["observability"]
+    # Sin `privileged`: modern eBPF solo necesita cuatro capacidades. BPF y PERFMON cargan y asocian
+    # los programas eBPF; SYS_RESOURCE sube el límite de memoria bloqueada para los mapas; SYS_PTRACE
+    # permite leer /proc/<pid> de procesos de otros contenedores. AppArmor unconfined evita que el perfil
+    # por defecto de Docker bloquee bpf(2) en hosts Linux con AppArmor.
+    cap_drop: [ALL]
+    cap_add: [BPF, PERFMON, SYS_RESOURCE, SYS_PTRACE]
+    security_opt: ["apparmor=unconfined", "no-new-privileges:true"]
+    environment:
+      HOST_ROOT: /host
+    command:
+      - falco
+      - -r
+      - /etc/falco/rules.d
+      - -o
+      - engine.kind=modern_ebpf
+      - -o
+      - json_output=true
+      - -o
+      - stdout_output.enabled=true
+    volumes:
+      # Socket de solo lectura: el plugin de contenedores lo usa para resolver nombre e imagen.
+      - /var/run/docker.sock:/host/var/run/docker.sock:ro
+      - /proc:/host/proc:ro
+      - ./observability/falco/rules.d:/etc/falco/rules.d:ro
+    restart: unless-stopped
+
   grafana:
     # grafana/grafana 13.2.3, con soporte, fijado por digest real.
     image: grafana/grafana@sha256:b28bae15e219c998fb0e0424ed724930cc61b1f61fb404d47c862f9a23f9e572

@@ -10,14 +10,14 @@ Identity Hub es un proveedor de identidad desarrollado desde cero, comparable en
 [![Versión](https://img.shields.io/github/v/tag/jorgepaez-ops/IdentityHub?label=versi%C3%B3n)](https://github.com/jorgepaez-ops/IdentityHub/tags)
 [![Licencia](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-<!-- El badge de cobertura queda pendiente de un servicio que publique el resultado. -->
+[![Cobertura de integración](https://img.shields.io/badge/cobertura%20de%20integraci%C3%B3n-gate%20%E2%89%A5%2070%20%25-brightgreen.svg)](https://github.com/jorgepaez-ops/IdentityHub/actions/workflows/ci.yml)
 
 ## 3. Estado del proyecto
 
 - **Semana 2 cerrada:** 47 de 47 tareas completadas; el tag
   `v0.1.0-hardened` identifica el estado remediado en `main`, con CI verde.
 - **Semana 3 cerrada:** SSO entre dominios, MFA por correo, alta de empleados y frontend funcional.
-- **Semana 4:** documentación, IaC de referencia, grilla de roles, manual, informe y guion terminados; quedan la publicación de Docker Hub (T17), el tag, el release y la grabación del video. El seguimiento está en [`odd/tasks/idp-semana-4.md`](odd/tasks/idp-semana-4.md).
+- **Semana 4:** documentación, IaC de referencia, grilla de roles, manual, informe y guion terminados. Las imágenes ya están publicadas en Docker Hub (`docker.io/jorgeivp/identity-hub-api`, `-worker` y `-web`, firmadas con Cosign y con SBOM adjunto; validadas con el tag `v0.9.0`). Quedan el tag de entrega y el release de GitHub con el informe, y la grabación del video, que hace el equipo. El seguimiento está en [`odd/tasks/idp-semana-4.md`](odd/tasks/idp-semana-4.md).
 
 ## 4. Tecnologías
 
@@ -26,12 +26,12 @@ Identity Hub es un proveedor de identidad desarrollado desde cero, comparable en
 | Backend y procesamiento asíncrono | Go 1.26 para API y worker |
 | Frontend | React, TypeScript, Vite y Nginx |
 | Datos y mensajería | PostgreSQL 16, RabbitMQ 4 y Mailpit |
-| Observabilidad | Prometheus, Loki, Grafana Alloy y Grafana |
+| Observabilidad | Prometheus, Loki, Grafana Alloy, Grafana y Falco (detección en tiempo de ejecución) |
 | Seguridad en CI | Gitleaks, CodeQL, Semgrep, gosec mediante golangci-lint, govulncheck, npm audit, osv-scanner, Hadolint y Trivy |
 
 El backend está escrito en Go por decisión del proyecto: el profesor permitió elegir el stack siempre que se cumplieran los requisitos de DevSecOps y de gestor de identidad. Las alternativas mostradas en el material del curso eran sugerencias, no una restricción.
 
-La cobertura de integración tiene un gate mínimo de 70 % en el job **`6b · Pruebas de integración`** del workflow de CI. No existe todavía un servicio que publique esa cobertura como badge.
+La cobertura de integración tiene un gate mínimo de 70 % en el job **`6b · Pruebas de integración`** del workflow de CI. El badge de cobertura muestra el gate que CI exige (no el valor medido); el valor de cada ejecución está en el log de ese job.
 
 ## 5. Arquitectura
 
@@ -66,7 +66,7 @@ El compose real vive en `deploy/` y el de la raíz lo incluye, de modo que un cl
 ## 7. Seguridad y evidencia DevSecOps
 
 - [Informe de seguridad](docs/security-report.html): versión final de la evidencia versionada, incluida la remediación de VULN-019.
-- [Fichas de vulnerabilidades](security/findings/): 31 fichas, de VULN-001 a VULN-031 (VULN-001 a VULN-019 sembradas en la línea base); 30 remediadas y VULN-028 como riesgo aceptado hasta 2026-12-25.
+- [Fichas de vulnerabilidades](security/findings/): 31 fichas, de VULN-001 a VULN-031 (VULN-001 a VULN-019 sembradas en la línea base); 30 remediadas y VULN-028 como no afectado (GO-2026-5932, código vulnerable no presente).
 - [Evidencia por vulnerabilidad](docs/evidencia/): archivos `evidencia.json` por hallazgo; la [evidencia cruda de escáneres](security/evidence/) se conserva por ejecución.
 - [Modelo de amenazas](specs/05-security/threat-model.md): riesgos y mitigaciones por componente.
 - [ADR 0007](specs/adr/0007-linea-base-vulnerable-deliberada.md): explica la línea base vulnerable deliberada. El tag `v0.0.0-vuln-baseline` nunca debe desplegarse; `v0.1.0-hardened` representa el estado remediado.
@@ -79,7 +79,7 @@ Estado de las alertas de code scanning en `main` una vez integradas las correcci
 
 | Herramienta | Regla | Ubicación | Motivo | Justificación o control compensatorio |
 |---|---|---|---|---|
-| Trivy | GO-2026-5932 | `golang.org/x/crypto` v0.56.0 en la imagen `api` | El aviso cubre el paquete `openpgp` y sus subpaquetes, que no tiene versión corregida; el módulo sigue haciendo falta para Argon2id (ADR 0004) | VULN-028, riesgo aceptado hasta 2026-12-25 (`backend/osv-scanner.toml`): ningún paquete propio ni dependencia importa `openpgp`; osv-scanner y govulncheck lo marcan no alcanzable |
+| Trivy | GO-2026-5932 | `golang.org/x/crypto` v0.56.0 en la imagen `api` | El aviso cubre el paquete `openpgp` y sus subpaquetes, que no tiene versión corregida; el módulo sigue haciendo falta para Argon2id (ADR 0004) | VULN-028, no afectado (`backend/osv-scanner.toml`, exclusión permanente): ningún paquete propio ni dependencia importa `openpgp` (`go list -deps`); osv-scanner solo lo marca por coincidencia a nivel de módulo y govulncheck no lo reporta |
 | Trivy | DLA-4792-1 | `tzdata` 2026b en las imágenes `api` y `worker` (base `distroless/static-debian12`) | Debian publicó 2026c, pero la imagen distroless fijada todavía no lo incluye; severidad sin clasificar (UNKNOWN) | Solo son datos de zonas horarias. Se actualizará el digest de la base cuando upstream la reconstruya (el escaneo semanal lo detecta) |
 
 Falsos positivos de secretos en SonarCloud (2026-10-07): `security/evidence/**` se excluye del análisis con `.sonarcloud.properties` porque son salidas almacenadas de los escáneres, conservadas como evidencia "antes" (VULN-001), no código; y el ejemplo literal del comentario de `.gitleaks.toml` (regla `secrets:S2068`) se reescribió sin un valor con forma de credencial. Justificación: los valores son sembrados, nunca reales ni reutilizados (confirmado por el responsable el 2026-10-06).

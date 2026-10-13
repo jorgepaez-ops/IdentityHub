@@ -486,7 +486,7 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   servicio de CI (`924b581`, Trivy local 117 → 88, con parche 51 → 22; base sana, `/readyz` 200,
   `make e2e` 52/52) y se relanza el run (37473616659 reemplaza a 37471823657). R2-002: el párrafo de T30
   queda marcado como histórico. R3-002 (forma de `captura` en null): sigue el protocolo de evidencia.
-- [ ] **T17 — Docker Hub.** Workflow de release en tag `vX.Y.Z`: imágenes con `vX.Y.Z` y `latest`,
+- [x] **T17 — Docker Hub.** Hecho como C3 (2026-10-12; ver `odd/tasks/cierre-entrega.md`). Workflow de release en tag `vX.Y.Z`: imágenes con `vX.Y.Z` y `latest`,
   SBOM con Syft y firma con Cosign (ADR 0011, Q1).
   Pospuesta al final de la fase 4 por decisión del usuario (2026-10-06), a la espera de Q1 (namespace
   y token de Docker Hub). Propuesta de Claude: repositorios `api`, `worker` y `web` (`web` ya sirve el
@@ -570,7 +570,8 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   de contingencia. Verificación (Codex): 22 enlaces relativos existen, los objetivos de make citados
   existen, tiempos 13:00. Revisión de Claude: escenas 1 a 5 leídas; `docs/README.md` conserva el guion
   de la demo en vivo (`guion-demo.md`, ~5 min) junto al del video. Pendiente: grabar (Q3).
-- [ ] **T21 — Cierre.** Bitácora, matriz, informe de seguridad final, tag de versión y PR.
+- [ ] **T21 — Cierre.** Bitácora, matriz, informe de seguridad final, tag de versión y PR. Documentación hecha
+  como E (2026-10-12); tag `v1.0.0`, release y PR finales en C2 (`odd/tasks/cierre-entrega.md`).
   Decisión del usuario (2026-10-06): dejar todo terminado y verificado antes de Docker Hub; T17, el tag
   `vX.Y.Z` y el release (con el PDF del informe adjunto) se hacen al final, en vivo frente al equipo.
   - [x] **T21a — Codificación de los correos.** `buildRawMessage` declara `MIME-Version`,

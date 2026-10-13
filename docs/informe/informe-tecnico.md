@@ -19,7 +19,7 @@ El enunciado del trabajo final deja claro que la aplicación es el vehículo y e
 
 La aplicación se completa con una **segunda aplicación cliente, Contabilidad**, que delega su inicio de sesión en el Hub mediante SSO (OAuth 2.0 Authorization Code con PKCE). Esa pareja permite demostrar, de punta a punta, un caso real: un administrador define un rol y sus permisos en el Hub, se lo asigna a un empleado, y Contabilidad lo respeta sin cambiar código ni redesplegar.
 
-La elección del lenguaje merece una nota. El backend está escrito en **Go** (API y worker) y no en Python o Node.js como sugería el enunciado. La decisión se documentó en el ADR 0001: Go reduce la superficie de las imágenes (binarios estáticos sobre bases mínimas), aporta criptografía en su biblioteca estándar y `govulncheck` con análisis de alcanzabilidad. El README del proyecto recoge que las alternativas del material del curso eran sugerencias. El repositorio no contiene, sin embargo, una validación escrita del docente; esa pregunta (Q4 de la semana 4) permanece abierta y se señala como limitación en las conclusiones.
+La elección del lenguaje merece una nota. El backend está escrito en **Go** (API y worker) y no en Python o Node.js como sugería el enunciado. La decisión se documentó en el ADR 0001: Go reduce la superficie de las imágenes (binarios estáticos sobre bases mínimas), aporta criptografía en su biblioteca estándar y `govulncheck` con análisis de alcanzabilidad. El enunciado deja al equipo la libertad de elegir el stack siempre que se cumplan los requisitos de DevSecOps y de gestor de identidad, y las alternativas del material del curso eran sugerencias, no una restricción.
 
 ## Objetivos
 
@@ -34,7 +34,7 @@ La elección del lenguaje merece una nota. El backend está escrito en **Go** (A
 
 Identity Hub incluye registro por invitación por correo, contraseñas con Argon2id, JWT firmados con Ed25519 y publicados por JWKS, refresh tokens rotativos, MFA obligatorio por código enviado al correo, roles, una grilla de roles y permisos por aplicación, auditoría append-only y SSO hacia Contabilidad. Quedan fuera por decisión documentada: federación con proveedores externos, multi-tenancy efectivo, alta disponibilidad, TOTP y WebAuthn. El objetivo de despliegue es un único host con Docker Compose; la nube es una arquitectura de referencia.
 
-A la fecha de este documento están completas las semanas 1 a 3 y las tareas de la semana 4 salvo tres. Quedan pendientes, y así se declaran a lo largo del informe, la publicación de las imágenes en Docker Hub con firma y SBOM (T17, a la espera de decisiones del usuario sobre la cuenta y el token), el guion del video (T20) y el cierre con el tag de versión y el PR (T21).
+A la fecha de este documento están completas las semanas 1 a 3 y la semana 4, incluida la publicación de las imágenes en Docker Hub con SBOM y firma Cosign mediante el workflow `release.yml` (validado con el tag `v0.9.0`). El tag de entrega es `v1.0.0`: el workflow de release publica cada tag `vX.Y.Z`, de modo que el resultado no depende de que ese tag ya exista al leer este informe. Lo que todavía no existe se declara en las secciones de limitaciones y trabajo futuro.
 
 # Arquitectura
 
@@ -242,8 +242,8 @@ Las 23 amenazas se reparten así: 6 de suplantación (Spoofing), 4 de manipulaci
 | Spoofing | AM-017 (MFA) | Adivinar códigos MFA | Desafío SHA-256/HMAC-SHA256, uso único, vencimiento y límite de intentos | Mitigated |
 | Tampering | AM-006 | Inyección SQL | Consultas parametrizadas generadas por `sqlc` | Mitigated |
 | Tampering | AM-007 | Roles obsoletos en el token | Roles consultados en la base de datos en peticiones sensibles | Mitigated |
-| Tampering | AM-008 | Imagen manipulada en la cadena de suministro | Firma Cosign keyless y despliegue por digest | **Open** |
-| Tampering | AM-009 | Dependencia comprometida | SBOM CycloneDX, osv-scanner, Dependabot y lockfiles | **Open** (parcial) |
+| Tampering | AM-008 | Imagen manipulada en la cadena de suministro | Firma Cosign keyless (OIDC de GitHub) sobre el digest y despliegue por digest | Mitigated |
+| Tampering | AM-009 | Dependencia comprometida | SBOM CycloneDX por imagen (Syft, adjunto como atestación), osv-scanner, Dependabot y lockfiles | Mitigated (VULN-028 no afectado) |
 | Repudiation | AM-010 | Acciones sin rastro | Audit log append-only con actor, IP y user-agent; sin `UPDATE`/`DELETE` | Mitigated |
 | Repudiation | AM-011 | Borrado de logs | Rol de aplicación sin borrado y envío de logs a Loki | Mitigated |
 | Information disclosure | AM-012 | Secretos en imágenes o repositorio | Secretos por entorno, sin valores por defecto, `.env` fuera de Git | Mitigated |
@@ -256,23 +256,24 @@ Las 23 amenazas se reparten así: 6 de suplantación (Spoofing), 4 de manipulaci
 | Denial of service | AM-019 | Cola de notificaciones saturada | Regla de alerta de Grafana versionada (`deploy/observability/grafana/alerting/dlq.yml`) y runbook (`docs/runbooks/dlq-notificaciones.md`) | Mitigated |
 | Elevation of privilege | AM-020 | Contenedor comprometido | Usuario no root, capacidades eliminadas, raíz de solo lectura, base distroless | Mitigated |
 | Elevation of privilege | AM-021 | Acceso a rutas administrativas | Autorización por ruta comprobada en el servidor | Mitigated |
-| Elevation of privilege | AM-022 | Permisos excesivos del pipeline | Permisos mínimos por job y OIDC keyless | **Open** (parcial) |
+| Elevation of privilege | AM-022 | Permisos excesivos del pipeline | Permisos mínimos por job, OIDC keyless y environment protegido `dockerhub` restringido a tags `v*` | Mitigated |
 
 Nota de transparencia: la especificación original repite el id AM-017 para dos amenazas distintas (códigos MFA y Argon2id como amplificador); el modelo de Threat Dragon las distingue como «AM-017 (MFA)» y «AM-017». Y la compuerta que la especificación cita para AM-014 («Trivy config sobre el compose de producción») no existe, porque Trivy config no analiza archivos de Docker Compose; la evidencia real es la comprobación `docker compose config` de la producción simulada, que confirma que ningún servicio salvo `web` publica puertos.
 
-## Amenazas que siguen abiertas y por qué
+## Amenazas que estaban abiertas y cómo se cerraron
 
-Tres amenazas permanecen *Open*, y todas dependen de una misma tarea pendiente:
+Ninguna de las 23 amenazas queda en estado *Open*. Las tres que lo estaban se cerraron con el workflow de publicación (`release.yml`, tarea C3):
 
-- **AM-008 (firma de imágenes) y AM-022 (OIDC keyless):** requieren el workflow de publicación (`cd.yml`), la firma con Cosign y el OIDC hacia Docker Hub. Hoy las imágenes solo se construyen y escanean en CI. Es la tarea T17, pospuesta al final de la fase 4 hasta que el usuario decida la cuenta, el namespace y el token de Docker Hub (pregunta Q1). Lo que sí está implementado de AM-022: permisos mínimos por job (`permissions: contents: read` por defecto en `ci.yml`).
-- **AM-009 (cadena de suministro):** osv-scanner, govulncheck, npm audit y lockfiles están activos en CI y el riesgo de VULN-028 se aceptó formalmente; falta el SBOM CycloneDX por imagen, que también llega con T17.
+- **AM-008 (firma de imágenes) y AM-022 (OIDC keyless):** el job `publish` firma cada imagen con Cosign keyless (identidad OIDC de GitHub, sin claves de larga vida) sobre el digest, y es el único job con el environment protegido `dockerhub`, restringido a tags `v*`. Además se mantienen los permisos mínimos por job (`permissions: contents: read` por defecto en `ci.yml`).
+- **AM-009 (cadena de suministro):** además de osv-scanner, govulncheck, npm audit y lockfiles, cada imagen publicada lleva un SBOM CycloneDX generado con Syft y adjunto como atestación firmada. No queda riesgo residual: VULN-028 (GO-2026-5932, sin versión corregida) se reclasificó el 2026-10-12 como no afectado, porque `go list -deps` no encuentra `x/crypto/openpgp` ni en el backend ni en las herramientas.
+
 AM-019 (DLQ) quedó mitigada: además del panel «Profundidad de la DLQ», hay una regla de alerta aprovisionada (`deploy/observability/grafana/alerting/dlq.yml`, se dispara con cualquier mensaje en la cola durante 2 minutos y también si faltan las métricas del broker) y un runbook de atención y purga (`docs/runbooks/dlq-notificaciones.md`). Se probó publicando un mensaje a `identity.dlx`: la regla pasó por inactive, pending y firing, y volvió a inactive al vaciar la cola.
 
 # Implementación del Pipeline
 
 ## Visión general
 
-Hay tres workflows en `.github/workflows/`: `ci.yml` (el pipeline principal, cuyos gates rompen la build), `baseline-scan.yml` (escaneo en modo informe de la línea base vulnerable) y `scheduled-scan.yml` (reescaneo semanal). Además, una acción compuesta local (`.github/actions/stack-up`) levanta el stack con un `.env` desechable para los jobs que necesitan la aplicación en ejecución. Una regla de diseño del `Makefile` mantiene coherente todo: lo que corre en CI tiene que poder correrse localmente con el mismo nombre, de modo que `make scan` y el pipeline no divergen.
+Hay cuatro workflows en `.github/workflows/`: `ci.yml` (el pipeline principal, cuyos gates rompen la build), `baseline-scan.yml` (escaneo en modo informe de la línea base vulnerable), `scheduled-scan.yml` (reescaneo semanal) y `release.yml` (publicación de imágenes, solo con tags `vX.Y.Z`). Además, una acción compuesta local (`.github/actions/stack-up`) levanta el stack con un `.env` desechable para los jobs que necesitan la aplicación en ejecución. Una regla de diseño del `Makefile` mantiene coherente todo: lo que corre en CI tiene que poder correrse localmente con el mismo nombre, de modo que `make scan` y el pipeline no divergen.
 
 El workflow principal se dispara en `push` a `main`, en cada `pull_request` y manualmente; cancela las ejecuciones previas de la misma rama, y el token por defecto solo lee (el principio de mínimo privilegio responde a la amenaza AM-022).
 
@@ -324,11 +325,15 @@ El modelado de amenazas con Threat Dragon y STRIDE se describe en la sección an
 
 ## Fase 5: Despliegue
 
-El despliegue de referencia en AWS se describió en la sección de arquitectura y se valida con Checkov y `terraform validate`. Para el entorno de producción simulado que exige el enunciado, `deploy/docker-compose.prod.yml` es un *override* del Compose base: imágenes por digest y sin `build`, solo `web` publica un puerto, Mailpit no arranca, `restart: unless-stopped`, rotación de logs, límites de memoria y CPU, y se conserva el endurecimiento del Compose base (`read_only`, `cap_drop: ALL`, `no-new-privileges`, `tmpfs`). Se levanta con `make up-prod` y se detiene con `make down-prod`; en esta fecha no hay imágenes publicadas que referenciar, por lo que su validación completa espera a T17.
+El despliegue de referencia en AWS se describió en la sección de arquitectura y se valida con Checkov y `terraform validate`. Para el entorno de producción simulado que exige el enunciado, `deploy/docker-compose.prod.yml` es un *override* del Compose base: imágenes por digest y sin `build`, solo `web` publica un puerto, Mailpit no arranca, `restart: unless-stopped`, rotación de logs, límites de memoria y CPU, y se conserva el endurecimiento del Compose base (`read_only`, `cap_drop: ALL`, `no-new-privileges`, `tmpfs`). Se levanta con `make up-prod` y se detiene con `make down-prod`. Las imágenes ya existen en Docker Hub (`docker.io/jorgeivp/identity-hub-api`, `identity-hub-worker` e `identity-hub-web`), de modo que `IDENTITY_HUB_API_IMAGE`, `IDENTITY_HUB_WORKER_IMAGE` e `IDENTITY_HUB_WEB_IMAGE` pueden apuntar a ellas por digest.
+
+**Publicación (`release.yml`).** El workflow se dispara solo con tags `vX.Y.Z` y tiene dos fases. El job `gate` construye `api`, `worker` y `web`, ejecuta el mismo gate de Trivy que CI y guarda cada imagen como artefacto. El job `publish` depende de `gate`, es el único con el environment protegido `dockerhub` (restringido a tags `v*`), carga la misma imagen ya escaneada, la publica con las etiquetas `vX.Y.Z` y `latest`, genera un SBOM CycloneDX con Syft, firma con Cosign keyless (OIDC de GitHub) y adjunta el SBOM como atestación, todo sobre el digest. Se validó con el tag `v0.9.0` (ejecución 38319904991, en verde, 6 jobs); el tag de entrega es `v1.0.0` y el workflow publica cada tag de la misma manera.
+
+**Verificación.** `cosign verify` y `cosign verify-attestation --type cyclonedx` pasan sobre las tres imágenes con Cosign v3. Cosign v3 guarda la firma y la atestación como referrers OCI (formato *bundle*), por lo que no aparecen como etiquetas `.sig` o `.att` en Docker Hub y Cosign v2 no las encuentra: la verificación debe hacerse con Cosign v3.
 
 ## Fase 6: Operación y monitoreo
 
-La observabilidad (sección 7) y el reescaneo semanal cierran el ciclo. `scheduled-scan.yml` se ejecuta los lunes a las 06:00 UTC y ejecuta `govulncheck`; si aparecen vulnerabilidades en código que no cambió, abre automáticamente una incidencia con la salida. Es la parte «continua» del DevSecOps: una dependencia segura el lunes puede tener un aviso publicado el jueves sin que nadie toque el repositorio.
+La observabilidad (sección 7) y el reescaneo semanal cierran el ciclo. `scheduled-scan.yml` se ejecuta los lunes a las 06:00 UTC y ejecuta `govulncheck`; si aparecen vulnerabilidades en código que no cambió, abre automáticamente una incidencia con la salida. Es la parte «continua» del DevSecOps: una dependencia segura el lunes puede tener un aviso publicado el jueves sin que nadie toque el repositorio. Ocurrió el 2026-10-12, con `main` en verde: aparecieron avisos en la biblioteca estándar de Go (net/http, net/textproto y crypto/tls, detectados por govulncheck y Trivy), en libtiff de la base de nginx y en una dependencia del módulo de herramientas (osv-scanner), y los gates bloquearon el release tal como están diseñados. El PR 31 los resolvió subiendo Go de 1.26.8 a 1.26.9, tiff de 4.7.1 a 4.7.2 en la base `nginx-unprivileged` (CVE-2026-4775) y `golang.org/x/net` de 0.59.0 a 0.60.0 en `tools/go.mod`. Por decisión del equipo no recibieron identificador VULN.
 
 {{code:yaml:.github/workflows/scheduled-scan.yml:9-12}}
 
@@ -424,7 +429,7 @@ Un ejemplo compacto de antes y después sin intermediarios: las cabeceras de la 
 
 ## Tabla de hallazgos VULN-001 a VULN-031
 
-Estados: **Resuelto** (remediado con commit y evidencia), **Aceptado** (riesgo aceptado con expiración) y **Mitigado**. «No informada» significa que ningún escáner asignó severidad al hallazgo; en esos casos se detectó por revisión o por comparación manual. Cada ficha completa está en `security/findings/`.
+Estados: **Resuelto** (remediado con commit y evidencia), **Aceptado** (riesgo aceptado con expiración), **No afectado** (el aviso coincide a nivel de módulo, pero el código vulnerable no está presente) y **Mitigado**. «No informada» significa que ningún escáner asignó severidad al hallazgo; en esos casos se detectó por revisión o por comparación manual. Cada ficha completa está en `security/findings/`.
 
 | Id | Hallazgo | Severidad | Detectado por | Estado | Justificación |
 |---|---|---|---|---|---|
@@ -455,12 +460,12 @@ Estados: **Resuelto** (remediado con commit y evidencia), **Aceptado** (riesgo a
 | VULN-025 | axios 0.21.1 y lodash 4.17.15 | HIGH | npm audit, osv-scanner | Resuelto | T25: ambos retirados (no se importaban). |
 | VULN-026 | `golang.org/x/text` (GO-2026-5970) | No informada | govulncheck | Resuelto | T24: actualizado a v0.41.0. |
 | VULN-027 | Dependencias de build/frontend (vite, minimatch, react-router, undici) | CRITICAL y HIGH | npm audit | Resuelto | T34a: subidas a la versión que corrige cada aviso. |
-| VULN-028 | `golang.org/x/crypto` desactualizado | No informada; no alcanzable | osv-scanner | **Aceptado** (parcial) | GO-2026-6354 y GO-2026-6355 resueltos con x/crypto 0.56.0 (T34b). GO-2026-5932 no tiene versión corregida, no es alcanzable (análisis de llamadas de osv-scanner y govulncheck) y se acepta hasta el **2026-12-25**, con registro en `backend/osv-scanner.toml`. |
+| VULN-028 | `golang.org/x/crypto` desactualizado | No informada; no alcanzable | osv-scanner | **No afectado** (parcial) | GO-2026-6354 y GO-2026-6355 resueltos con x/crypto 0.56.0 (T34b). GO-2026-5932 no tiene versión corregida ni la tendrá (paquete `openpgp` abandonado); `go list -deps` no lo encuentra en el backend ni en las herramientas y `govulncheck` no lo reporta. Se reclasificó el 2026-10-12 como no afectado, con exclusión permanente en `backend/osv-scanner.toml`. |
 | VULN-029 | `google.golang.org/protobuf` desactualizado | HIGH (no alcanzable) | osv-scanner | Resuelto | T34b: actualizado de 1.31.0 a 1.36.12. |
 | VULN-030 | CSP sin `form-action` | MEDIUM | ZAP baseline (10055) | Resuelto | T15b: `form-action 'self'` en ambos bloques `server` de Nginx. |
 | VULN-031 | Login devuelve 500 con contraseña larga | MEDIUM | ZAP API scan (30002) | Resuelto | T15c: contraseña inválida se trata como credenciales inválidas, con el mismo camino de bloqueo y sin 500. |
 
-Resumen: de los 31 hallazgos, 30 están resueltos y 1 (VULN-028) mantiene un riesgo residual aceptado con fecha de expiración. Ningún hallazgo quedó sin ficha y ningún gate se debilitó para lograr un verde. VULN-030 y VULN-031 amplían el rango pedido (001 a 029) porque ZAP, ya integrado como gate, los encontró después.
+Resumen: de los 31 hallazgos, 30 están resueltos y 1 (VULN-028) está no afectado (el código vulnerable no está presente). Ningún hallazgo quedó sin ficha y ningún gate se debilitó para lograr un verde. VULN-030 y VULN-031 amplían el rango pedido (001 a 029) porque ZAP, ya integrado como gate, los encontró después.
 
 ## Endurecimiento adicional de la rama de pulido
 
@@ -471,7 +476,7 @@ Además de la interfaz, la rama cerró las alertas de *code scanning* que quedab
 - **Imagen `web` con nginx parcheado.** Un nuevo digest de `stable-alpine` (nginx 1.30.5) corrige libpng, nghttp2 y pcre2, y Trivy sobre la imagen pasó de 3 hallazgos a 0.
 - **Cabecera Host hacia la API fija.** Nginx envía el nombre del bloque `server` (`$server_name`) y no la cabecera Host del cliente, que quien llama controla (regla `request-host-used` de Semgrep); la API no lee esa cabecera.
 - **Checkov filtrado en el SARIF.** Las 27 alertas de Checkov eran omisiones ya justificadas en línea (`#checkov:skip`); GitHub las mostraba aunque llevaran `suppressions`, así que CI las filtra con `jq` antes de subir el SARIF. El gate no cambia, y el filtro no oculta un fallo de Checkov.
-- **Alertas abiertas conocidas.** El `README.md` tiene una sección con las alertas que siguen abiertas y su justificación: GO-2026-5932 (riesgo aceptado de VULN-028) y `tzdata` en las imágenes distroless, a la espera de un nuevo digest de la base.
+- **Alertas abiertas conocidas.** El `README.md` tiene una sección con las alertas que siguen abiertas y su justificación: GO-2026-5932 (VULN-028, no afectado) y `tzdata` en las imágenes distroless, a la espera de un nuevo digest de la base.
 
 # Monitoreo y Observabilidad
 
@@ -523,23 +528,21 @@ Falco, que el enunciado menciona para la detección de comportamiento anómalo e
 ## Desafíos encontrados
 
 - **Una línea base vulnerable es un instrumento delicado.** Sembrar vulnerabilidades reales permite medir cada gate, pero obliga a proteger la evidencia: alguien puede «arreglar» una vulnerabilidad sembrada y destruirla. Se mitigó con el ADR 0007, avisos en los archivos afectados y un tag inmutable. Además, la imagen `api` del tag vulnerable ya no se puede construir hoy: su `apt-get install` sobre Debian 11 falla con 404 porque los repositorios retiraron esos paquetes (la propia base sembrada envejeció), por lo que parte del «antes» se obtuvo con escaneos de la época y con construcciones parciales (por ejemplo, solo el target `web`).
-- **Los falsos positivos de los gates también son hallazgos.** Gitleaks detectó referencias de Terraform (`random_password.*.result`) como secretos y, al construir la plantilla `.env`, una regla de `.gitleaks.toml` cruzaba saltos de línea. Se resolvió registrando huellas puntuales (nunca exclusiones amplias) y anotando el ajuste de la regla como trabajo posterior.
+- **Los falsos positivos de los gates también son hallazgos.** Gitleaks detectó referencias de Terraform (`random_password.*.result`) como secretos y, al construir la plantilla `.env`, una regla de `.gitleaks.toml` cruzaba saltos de línea. Se resolvió registrando huellas puntuales (nunca exclusiones amplias) y, después, ajustando la regla `contrasena-en-variable-de-entorno` para que ya no cruce saltos de línea (tarea D1).
 - **El repositorio vive en una carpeta sincronizada con iCloud.** Aparecieron unas 135 copias sin seguimiento con sufijo « 2» (por ejemplo `gen 2.go`) que rompían `go build` por símbolos duplicados, y en T18 iCloud renombró o borró 15 capturas del manual. Se adoptó una rutina: al iniciar cada sesión buscar los archivos `* 2*`, compararlos con el original con `cmp`, borrar solo los idénticos e informar siempre qué se borró; y los binarios generados (PNG, PDF) se producen en una carpeta temporal fuera del repositorio y se copian una sola vez al final.
 - **Los límites de las herramientas delegadas.** El agente Codex trabaja en un sandbox sin red saliente y sin el socket de Docker; fallaron tareas que necesitaban `go get`, `govulncheck`, `docker build` o `make up`. Se estableció una regla: lo que necesita red o Docker (dependencias, escaneos, E2E, capturas, publicación) lo cierra directamente el orquestador. Y todo job delegado se monitorea de forma activa en vez de esperar a que alguien pregunte.
 - **Los gates tienen interacciones que no se ven a primera vista.** El límite de 20 fallos por IP (RF-017) bloqueaba el navegador del desarrollador después de una corrida de E2E o de DAST, porque todas las pruebas salen de la misma IP y el `audit_log` es append-only. Se resolvió con un envoltorio (`scripts/with-raised-login-limit.sh`) que sube solo el límite por IP mientras corre la suite y lo restaura con un `trap`, y con un aviso al terminar. Del mismo modo, `make test-integration` sin `TEST_DATABASE_URL` omite en silencio las pruebas contra la base: «pasa» pero la cobertura cae, lo que ocultaba errores hasta que se levantó un PostgreSQL desechable igual al de CI.
-- **Defecto de codificación en los correos (T18).** Al fotografiar el manual de usuario se detectó que el worker no declara la codificación del correo: `buildRawMessage` no envía `MIME-Version` ni `Content-Type: text/plain; charset=utf-8` ni codifica el asunto (RFC 2047), de modo que Mailpit muestra «GÃ³mez» en lugar de «Gómez». Es un error funcional, no de seguridad, anotado sin corregir; falta decidir la tarea que lo remedie.
+- **Defecto de codificación en los correos (T18), encontrado y corregido.** Al fotografiar el manual de usuario se detectó que el worker no declaraba la codificación del correo: `buildRawMessage` no enviaba `MIME-Version` ni `Content-Type: text/plain; charset=utf-8` ni codificaba el asunto (RFC 2047), de modo que Mailpit mostraba «GÃ³mez» en lugar de «Gómez». Era un error funcional, no de seguridad. La tarea T21a lo corrigió: el worker envía ahora `MIME-Version`, `Content-Type: text/plain; charset=utf-8`, el asunto codificado según RFC 2047 y elimina CR y LF de las cabeceras.
+- **Avisos nuevos con `main` en verde (2026-10-12).** Una dependencia, la biblioteca estándar de Go y la base de nginx publicaron avisos después del último verde; los gates bloquearon el release y se remedió en el PR 31 (ver «Fase 6: Operación y monitoreo»).
 
 ## Limitaciones
 
-- **Docker Hub pendiente (T17).** Las imágenes aún no están publicadas, no hay SBOM ni firma Cosign, y por eso permanecen abiertas AM-008, AM-009 y AM-022 y no se ha ejecutado el Compose de producción con imágenes reales. Es una entrega obligatoria del enunciado y la siguiente prioridad.
-- **El stack Go no tiene validación escrita del docente** (Q4 abierta), y el enunciado sugería Python o Node.js.
-- **Observabilidad parcial:** sin Falco; la DLQ (AM-019) ya tiene alerta y runbook.
+- **Observabilidad parcial:** sin Falco todavía; la DLQ (AM-019) ya tiene alerta y runbook.
 - **La nube es solo una referencia:** el Terraform no se aplica; el worker envía SMTP sin autenticación ni TLS, por lo que SES real exigiría cambiar código; los hosts `*.localhost` y el cliente OAuth (`contabilidad`) están fijos en el código.
 - **Un solo cliente OAuth y sin OpenID Connect:** la guía de integración de terceros enumera lo que falta (registro dinámico, refresh tokens para aplicaciones, cierre de sesión único, revocación).
 - **Sin outbox transaccional** (ADR 0006): la publicación al broker usa *publisher confirms*, pero no hay garantía transaccional conjunta entre la base de datos y el broker; el outbox es trabajo futuro deliberado.
-- **Riesgo aceptado vigente:** VULN-028 (GO-2026-5932) hasta el 2026-12-25; debe revisarse antes de esa fecha.
-- **El video de 10 a 15 minutos (T20) y el cierre (T21)** aún no se han completado.
-- **El badge de cobertura** del README sigue pendiente de un servicio que publique el resultado.
+- **Sin riesgo aceptado vigente:** VULN-028 (GO-2026-5932) se reclasificó el 2026-10-12 como no afectado; solo se reabriría si algún paquete empezara a importar `x/crypto/openpgp`.
+- **Funciones diferidas en la matriz:** claves de servicio (RF-018) y exportación del audit log (RF-019).
 
 ## Diferencias conocidas entre especificación y código
 
@@ -552,7 +555,7 @@ La revisión de la rama de pulido encontró tres diferencias entre lo que decía
 ## Lecciones aprendidas
 
 1. **Un gate que nunca falló no prueba nada.** La línea base vulnerable convirtió cada control en algo verificable y, de paso, expuso un control mal configurado (VULN-023).
-2. **La alcanzabilidad vale más que el volumen.** `govulncheck` y el análisis de llamadas de osv-scanner redujeron el ruido de cientos de avisos a los que de verdad importan, y permitieron aceptar un riesgo (VULN-028) con una justificación concreta y una fecha de expiración.
+2. **La alcanzabilidad vale más que el volumen.** `govulncheck` y el análisis de llamadas de osv-scanner redujeron el ruido de cientos de avisos a los que de verdad importan, y permitieron clasificar un aviso (VULN-028) como no afectado con una justificación concreta y verificable.
 3. **Los hallazgos no previstos son la mejor evidencia.** Los VULN-020 en adelante (chi, `pgx`, ZAP) demostraron que el pipeline informa algo que el equipo no sabía; por eso se registran sin inventar identificadores ni arreglarlos de paso.
 4. **Lo que corre en CI debe correr en local con el mismo nombre.** El `Makefile` (`make scan`, `make e2e`, `make scan-dast`) evitó que el pipeline fuera una sorpresa.
 5. **La composición real importa más que las pruebas aisladas.** Dos manejadores HTTP pasaron todas sus pruebas aisladas pero devolvían `501` en el enrutador real durante dos tareas; desde entonces se verifica que cada manejador quede compuesto en `Server.Routes()`.
@@ -561,13 +564,10 @@ La revisión de la rama de pulido encontró tres diferencias entre lo que decía
 
 ## Trabajo futuro
 
-1. **Publicar en Docker Hub (T17):** workflow de release en el tag `vX.Y.Z` con etiquetas `vX.Y.Z` y `latest`, SBOM con Syft y firma con Cosign (ADR 0011); con ello se cierran AM-008, AM-009 y AM-022. Propuesta: repositorios `api`, `worker` y `web`, environment protegido `dockerhub`, tag de prueba `v0.9.0` y `v1.0.0` en el cierre.
-2. **Cierre de la entrega (T20 y T21):** guion del video de 10 a 15 minutos, bitácora, matriz de trazabilidad, informe de seguridad final, tag de versión y PR.
-3. Corregir la codificación de los correos del worker y afinar la regla de Gitleaks que cruza saltos de línea.
-4. **Falco** para detección en ejecución, si hay tiempo (la alerta y el runbook de la DLQ, AM-019, ya están hechos).
-5. **Soporte SMTP autenticado con STARTTLS** en el worker y hosts configurables, para poder aplicar de verdad la arquitectura de AWS.
-6. Evolucionar la integración de terceros: clientes OAuth en base de datos, OpenID Connect, refresh tokens por cliente, introspección y revocación; y reemplazar la publicación directa por un **outbox transaccional**.
-7. Funciones diferidas en la matriz: claves de servicio (RF-018) y exportación del audit log (RF-019).
+1. **Falco** para detección en ejecución (la alerta y el runbook de la DLQ, AM-019, ya están hechos).
+2. **Soporte SMTP autenticado con STARTTLS** en el worker y hosts configurables, para poder aplicar de verdad la arquitectura de AWS.
+3. Evolucionar la integración de terceros: clientes OAuth en base de datos, OpenID Connect, refresh tokens por cliente, introspección y revocación; y reemplazar la publicación directa por un **outbox transaccional**.
+4. Funciones diferidas en la matriz: claves de servicio (RF-018) y exportación del audit log (RF-019).
 
 # Anexo A — Puesta en marcha y operación
 
@@ -660,7 +660,7 @@ make up-prod     # docker compose ... -f deploy/docker-compose.yml -f deploy/doc
 make down-prod   # detiene conservando los volúmenes
 ```
 
-Exige en `.env`, además de las variables de desarrollo: `IDENTITY_HUB_API_IMAGE`, `IDENTITY_HUB_WORKER_IMAGE` e `IDENTITY_HUB_WEB_IMAGE` (digest `nombre@sha256:...` de cada imagen publicada) y `SMTP_HOST`, `SMTP_PORT` y `SMTP_FROM` del relay real. Límites conocidos: los secretos siguen llegando como variables de entorno (la API no soporta `*_FILE`), el worker envía SMTP sin autenticación ni TLS, y hasta T17 no hay imágenes publicadas que referenciar.
+Exige en `.env`, además de las variables de desarrollo: `IDENTITY_HUB_API_IMAGE`, `IDENTITY_HUB_WORKER_IMAGE` e `IDENTITY_HUB_WEB_IMAGE` (digest `nombre@sha256:...` de cada imagen publicada en Docker Hub; se obtiene del run de `release.yml` o con `docker buildx imagetools inspect`) y `SMTP_HOST`, `SMTP_PORT` y `SMTP_FROM` del relay real. Límites conocidos: los secretos siguen llegando como variables de entorno (la API no soporta `*_FILE`), el worker envía SMTP sin autenticación ni TLS, y las imágenes publicadas en Docker Hub (`docker.io/jorgeivp/identity-hub-api`, `identity-hub-worker` e `identity-hub-web`) se referencian por digest.
 
 ## Guía de desarrollo (resumen)
 
@@ -731,7 +731,7 @@ La tabla relaciona cada requisito del enunciado con el artefacto versionado, sig
 | `LICENSE` | `LICENSE` (Apache-2.0) | Hecho |
 | README con propósito, tecnologías, licencia, insignias e inicio rápido | `README.md` | Hecho |
 | `docker-compose.yml` | `docker-compose.yml` (raíz, incluye `deploy/docker-compose.yml`) | Hecho |
-| `.github/workflows/` | `ci.yml`, `baseline-scan.yml`, `scheduled-scan.yml` y la acción `stack-up` | Hecho |
+| `.github/workflows/` | `ci.yml`, `baseline-scan.yml`, `scheduled-scan.yml`, `release.yml` y la acción `stack-up` | Hecho |
 | `infraestructura/` | `infraestructura/terraform/` (referencia en AWS) | Hecho (T8) |
 | `orquestacion/` | `deploy/`, incluida la producción simulada `deploy/docker-compose.prod.yml` | Hecho (T9) |
 | `servicios/` | `backend/`, `frontend/`, `contabilidad/` y `e2e/` | Hecho |
@@ -739,7 +739,7 @@ La tabla relaciona cada requisito del enunciado con el artefacto versionado, sig
 | UML: componentes, despliegue, secuencia y casos de uso | `docs/diagramas/uml/` | Hecho (T2) |
 | DFD nivel 0 y 1 con Threat Dragon | `docs/threat-model/identity-hub.json` | Hecho (T3) |
 | Manual de desarrollo | `docs/guia-desarrollo.md` | Hecho (T4) |
-| Manual de despliegue y operación | `docs/manuales/despliegue-y-operacion.md` | Parcial: producción pendiente de T17 |
+| Manual de despliegue y operación | `docs/manuales/despliegue-y-operacion.md` | Hecho |
 | Manual de seguridad | `docs/manuales/seguridad.md` | Hecho (T4) |
 | Manual de usuario con capturas | `docs/manuales/usuario.md` y `docs/manuales/img/usuario/` | Hecho (T18) |
 | Guía de integración de terceros | `docs/manuales/integracion-terceros.md` | Completa |
@@ -751,8 +751,7 @@ La tabla relaciona cada requisito del enunciado con el artefacto versionado, sig
 | Fase 6: métricas y logs | `deploy/observability/` | Parcial: sin Falco |
 | Fichas y evidencia de vulnerabilidades | `security/findings/`, `docs/evidencia/`, `security/evidence/` | Hecho |
 | Informe técnico en PDF | `docs/informe/informe-tecnico.md`; el PDF se genera con `make informe` y se adjunta al release de GitHub (no se versiona por tamaño) | Hecho (T19) |
-| Imágenes en Docker Hub | ADR 0011 | Pendiente (T17) |
-| Video-demostración | `docs/guion-demo.md` | Parcial (T20) |
-| Repositorio público de GitHub | `README.md` y `.github/workflows/` | Parcial (T21) |
+| Imágenes en Docker Hub | ADR 0011 y `.github/workflows/release.yml` (imágenes `jorgeivp/identity-hub-*`, SBOM y firma Cosign) | Hecho (C3) |
+| Repositorio público de GitHub | `README.md` y `.github/workflows/` | Hecho |
 
 Otros artefactos de apoyo: `specs/` (visión, requisitos, contrato OpenAPI, ADR 0001 a 0013, escenarios de aceptación y matriz de trazabilidad), `docs/BITACORA.md` (decisiones y avances), `docs/security-report.html` (informe de seguridad) y `odd/tasks/` (tareas y seguimiento de las semanas 2 a 4).

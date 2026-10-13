@@ -1,6 +1,6 @@
 # Guion de demostración: ciclo DevSecOps de Identity Hub
 
-Este guion orienta una demostración de aproximadamente 13 minutos. Muestra una historia de autorización distinta de la autenticación, el pipeline con su evidencia de seguridad, los despliegues local y de referencia, y la operación observable. La grabación sigue pendiente: este documento solo prepara la demostración.
+Este guion orienta una demostración de aproximadamente 13 minutos. Muestra una historia de autorización distinta de la autenticación, el pipeline con su evidencia de seguridad, los despliegues local y de referencia, y la operación observable. La grabación la realiza el equipo: este documento solo prepara la demostración.
 
 ## Propósito, duración y equipo
 
@@ -89,13 +89,13 @@ Complete esta lista antes de grabar. El orden de arranque no es intercambiable: 
 | Pantalla exacta | Terminal en la raíz con la salida ya preparada de **make setup**, **make up-obs** y **make ps**; después Hub, Mailpit y la [guía de despliegue](../manuales/despliegue-y-operacion.md). |
 | Narración | “El arranque local es reproducible. Primero ejecutamos make setup, que genera .env local sin sobrescribirlo; después make up-obs construye y levanta el stack con observabilidad. make ps confirma los contenedores. Mailpit recibe el correo local sin enviar mensajes a Internet. Evitamos mostrar .env, contraseñas, códigos y enlaces porque son datos sensibles incluso en un entorno de demostración. La guía documenta también cuándo usar make clean: solo para borrar voluntariamente los volúmenes y reiniciar desde cero.” |
 
-### 7. Producción simulada y escena condicional de T17 — 08:15 a 09:05
+### 7. Producción simulada con imágenes publicadas — 08:15 a 09:05
 
 | Campo | Indicación |
 |---|---|
 | Presentador | Jorge Iván Páez Rincón |
 | Pantalla exacta | [Sección de producción del manual](../manuales/despliegue-y-operacion.md#producción) y [ADR 0011](../../specs/adr/0011-docker-hub-como-registry.md). |
-| Narración | “La producción simulada usa make up-prod con imágenes por digest, sin build, y solo publica el puerto del servicio web. **[si T17 está publicada]** mostramos el comando y su resultado únicamente cuando existen las imágenes publicadas y están configurados sus digests y el relay SMTP. **[si T17 no está publicada]** no ejecutamos ni simulamos la publicación: mostramos la configuración, explicamos que falta decidir el namespace y el token de Docker Hub, y declaramos que la validación completa queda pendiente. T17 es la tarea que agrega la publicación versionada, el SBOM y la firma.” |
+| Narración | “La producción simulada usa make up-prod con imágenes por digest, sin build, y solo publica el puerto del servicio web. Las imágenes ya están publicadas en Docker Hub, con etiquetas de versión y latest, firmadas con Cosign keyless y con un SBOM adjunto como atestación; mostramos el comando y su resultado únicamente cuando están configurados sus digests y el relay SMTP.” |
 
 ### 8. Infraestructura de referencia, sin apply — 09:05 a 09:55
 
@@ -119,7 +119,7 @@ Complete esta lista antes de grabar. El orden de arranque no es intercambiable: 
 |---|---|
 | Presentador | Milena Rocío Ramírez Espinosa |
 | Pantalla exacta | [Modelo de amenazas](../threat-model/README.md), [conclusiones del informe](../informe/informe-tecnico.md#conclusiones), [manual de usuario](../manuales/usuario.md) y [índice de documentación](../README.md). |
-| Narración | “El modelo de amenazas usa STRIDE y evidencia de mitigaciones por componente. El resultado es una historia de permisos verificable, un pipeline que produce evidencia y una operación observable. La principal lección es que un gate debe fallar de forma controlada para demostrar que protege; por eso conservamos la línea base y su comparación con el estado endurecido. Declaramos los límites: Falco no está incluido; T17 sigue pendiente si no hay publicación; y el correo del worker tiene un defecto de charset documentado, que puede mostrar caracteres mal codificados en Mailpit. El trabajo futuro incluye publicar imágenes con SBOM y firma, corregir el charset del correo y evaluar Falco. Las tres diferencias entre especificación y código que halló la revisión ya están resueltas: la especificación ahora dice que las cuentas sin verificar no se purgan (la invitación vence a las 24 h y el administrador la reenvía), que el bloqueo manual de un administrador no vence y que solo lo levanta un administrador o un restablecimiento de contraseña, y el worker ya no recibe DATABASE_URL porque no la usa. La ubicación de cada resultado está en docs/README.md, el informe técnico y los manuales. Gracias.” |
+| Narración | “El modelo de amenazas usa STRIDE y evidencia de mitigaciones por componente. El resultado es una historia de permisos verificable, un pipeline que produce evidencia y una operación observable. La principal lección es que un gate debe fallar de forma controlada para demostrar que protege; por eso conservamos la línea base y su comparación con el estado endurecido. Declaramos los límites: Falco no está incluido. Las imágenes ya están publicadas en Docker Hub con SBOM y firma, y no queda ninguna amenaza en estado abierto; el trabajo futuro incluye evaluar Falco. Las tres diferencias entre especificación y código que halló la revisión ya están resueltas: la especificación ahora dice que las cuentas sin verificar no se purgan (la invitación vence a las 24 h y el administrador la reenvía), que el bloqueo manual de un administrador no vence y que solo lo levanta un administrador o un restablecimiento de contraseña, y el worker ya no recibe DATABASE_URL porque no la usa. La ubicación de cada resultado está en docs/README.md, el informe técnico y los manuales. Gracias.” |
 
 ## Tabla de tiempos
 
@@ -148,5 +148,5 @@ La duración total es 13 minutos, dentro del rango exigido de 10 a 15 minutos.
 - Si Mailpit no contiene el correo esperado, no revelar otro mensaje ni repetir credenciales: pausar la escena, mostrar la captura correspondiente del manual y explicar que el buzón es local.
 - Si Grafana no tiene datos, verificar que el perfil de observabilidad está levantado y usar las capturas del informe; no inventar series ni afirmar que un panel contiene tráfico que no se ve.
 - Si el arranque requiere limpieza, explicar que make clean borra volúmenes y repetir el orden seguro: make setup y después make up-obs.
-- Si T17 no está completo, mantener la escena 7 como declaración transparente de pendiente; no ejecutar ni simular la publicación, la firma o un despliegue de producción.
+- Si en el equipo de grabación no están configurados los digests o el relay SMTP, mantener la escena 7 como explicación con la configuración y la evidencia ya verificada; no ejecutar ni simular un despliegue de producción.
 - Si Terraform validate o Checkov no están disponibles en el equipo de grabación, mostrar la evidencia ya verificada y el ADR 0012; no ejecutar apply ni usar credenciales cloud.

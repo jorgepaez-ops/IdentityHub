@@ -12,9 +12,53 @@ retomar el trabajo no exija reconstruir el contexto desde cero.
 
 ---
 
+## 2026-10-12 · Cierre — publicación en Docker Hub (C3), avisos nuevos e informe actualizado
+
+Cierra C3 y la parte documental del cierre. El detalle por tarea y la evidencia trazable permanecen en `odd/tasks/cierre-entrega.md`.
+
+### Hecho
+
+- **C3 (Docker Hub):** `.github/workflows/release.yml` se dispara solo con tags `vX.Y.Z`. El job `gate` construye `api`, `worker` y `web` y aplica el mismo gate de Trivy que CI; el job `publish` (único con el environment protegido `dockerhub`, restringido a tags `v*`) sube las mismas imágenes ya escaneadas a `docker.io/jorgeivp/identity-hub-api`, `identity-hub-worker` e `identity-hub-web` con `vX.Y.Z` y `latest`, adjunta un SBOM CycloneDX (Syft) como atestación de Cosign y firma cada digest con Cosign keyless (OIDC de GitHub). Se fusionó con el PR #30.
+- **Tag de validación `v0.9.0`** sobre `0ea0ea3` (merge del PR #30): ejecución 38319904991 en verde, 6 jobs. `cosign verify` y `cosign verify-attestation --type cyclonedx` pasan sobre las tres imágenes con **Cosign v3**.
+- **Avisos publicados después del último CI verde de `main` (PR #31, fusionado):** biblioteca estándar de Go 1.26.8 a 1.26.9 (`net/http`, `net/textproto`, `crypto/tls`), `tiff` 4.7.1 a 4.7.2 en la base `nginx-unprivileged` (CVE-2026-4775) y `golang.org/x/net` 0.59.0 a 0.60.0 en `tools/go.mod`. Por decisión del usuario no reciben identificador VULN.
+- **Informe técnico actualizado** (`docs/informe/informe-tecnico.md`): Docker Hub hecho, AM-008, AM-009 y AM-022 mitigadas, avisos del PR #31 y nota de Cosign v3. Esta misma rama documental propaga el cambio al README, los manuales, el ADR 0011, el informe de seguridad, el modelo de amenazas y el guion del video.
+
+### Verificado contra la evidencia versionada
+
+| Comprobación | Resultado |
+|---|---|
+| Release `v0.9.0` | run 38319904991 en verde (6 jobs) sobre `0ea0ea3` |
+| Digest `api` | `sha256:52f2988ccee6f62a3bcd1ba7aa2c9f1b270d9dfbef7d99ec67b1198e707a86a3` |
+| Digest `worker` | `sha256:f9b5443d5335e8005dfc33530da78d6f41e09a66b3907f7a9a52a054c57bd03c` |
+| Digest `web` | `sha256:fcca1f1c96479c0c94ee266960d74c88cb4c2555d084f38253e143b06a586005` |
+| Amenazas abiertas | ninguna; AM-009 conserva el riesgo residual aceptado de VULN-028 (reclasificado después como no afectado, ver Decisiones) |
+
+### Decisiones tomadas sobre la marcha
+
+- Un release no publica nada si alguna de las tres imágenes falla el gate, y publica la misma imagen que escaneó (sin reconstruirla). Un fallo de red durante `publish` todavía puede dejar una imagen sin subir; su corrección quedó planificada (F8).
+- Cosign v3 guarda la firma y la atestación como referrers OCI (formato bundle), no como etiquetas `.sig`/`.att`: no aparecen en la pestaña Tags de Docker Hub y Cosign v2 no las encuentra.
+
+- VULN-028 (GO-2026-5932) pasa de riesgo aceptado hasta 2026-12-25 a **no afectado** (decisión del usuario, F9): no tiene versión corregida ni la tendrá, y `go list -deps` no encuentra `x/crypto/openpgp` ni en el backend ni en las herramientas; la exclusión de `osv-scanner` pasa a ser permanente.
+
+### Hallazgos
+
+- Los gates bloquearon el release tal como están diseñados: aparecieron avisos publicados después del último CI verde, sin que nadie tocara el código.
+
+### Estado
+
+- Docker Hub queda cerrado; el tag `v1.0.0` y el release de GitHub con el PDF del informe aún no existen.
+- La grabación del video la hace el equipo.
+
+### Siguiente paso
+
+1. 2026-10-13, tareas F: RF-019 (exportación del audit log), SMTP con STARTTLS y hosts configurables, Falco y RF-018 (claves de servicio).
+2. Crear el tag `v1.0.0` (dispara `release.yml`) y el release de GitHub con el PDF adjunto.
+
+---
+
 ## 2026-10-06 · Semana 4 — Documentación, IaC de referencia, grilla de roles y cierre
 
-Cierra el trabajo verificable de la semana 4 antes de la publicación en Docker Hub. El detalle por tarea y la evidencia trazable permanecen en `odd/tasks/idp-semana-4.md`; esta entrada resume el estado para el equipo que hará el cierre en vivo.
+Cierra el trabajo verificable de la semana 4 antes de la publicación en Docker Hub. *(La publicación se hizo después, el 2026-10-12: ver la entrada de arriba.)* El detalle por tarea y la evidencia trazable permanecen en `odd/tasks/idp-semana-4.md`; esta entrada resume el estado para el equipo que hará el cierre en vivo.
 
 ### Hecho
 
@@ -43,12 +87,12 @@ Cierra el trabajo verificable de la semana 4 antes de la publicación en Docker 
 
 ### Estado
 
-- Permanecen pendientes T17 (publicación en Docker Hub), el tag `vX.Y.Z` y el release de GitHub con el PDF adjunto: el equipo los hará en vivo al final.
+- Al cierre de esta entrada estaban pendientes T17 (publicación en Docker Hub), el tag `vX.Y.Z` y el release de GitHub con el PDF adjunto. *Actualización 2026-10-12: Docker Hub quedó hecho con C3; tag y release siguen pendientes.*
 - La grabación del video sigue pendiente; el guion de 13 minutos está listo.
 
 ### Siguiente paso
 
-1. Resolver Q1 y publicar las imágenes de T17 en Docker Hub durante el cierre en vivo.
+1. ~~Resolver Q1 y publicar las imágenes de T17 en Docker Hub~~ (hecho el 2026-10-12, C3).
 2. Crear el tag `vX.Y.Z` y el release de GitHub con el PDF del informe adjunto.
 3. Grabar el video con el guion versionado.
 
