@@ -235,12 +235,13 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
     positivo de Sonar S7552 en `gen-smtp-certs.sh`, prueba de frontend de F1 no aislada (FileReader colado).
   - Merges: PR #32 a #41 en `main`. Ramas restantes: solo `main` y `badges`; worktrees y volúmenes de prueba
     borrados. Matriz: 33 requisitos, 25 completos, 7 parciales, 1 sin cubrir (RNF-010), 0 diferidos.
-- [ ] **C2 — Tag `v1.0.0` y release** con el PDF del informe adjunto (`make informe`; el PDF no se
+- [x] **C2 — Tag `v1.0.0` y release** con el PDF del informe adjunto (`make informe`; el PDF no se
   versiona). En vivo frente al equipo (T21 de `idp-semana-4.md`). Requiere el merge del PR #20.
   Pasos: (1) merge del PR #20 y `main` local al día con CI en verde; (2) `make informe` y revisión del PDF;
   (3) notas del release revisadas por el usuario; (4) en vivo: `git tag -a v1.0.0` sobre el merge,
   `git push origin v1.0.0` (dispara el workflow de C3), `gh release create v1.0.0` con el PDF adjunto;
   (5) evidencia: URL del release y de las imágenes en Docker Hub, en T17, T21 y aquí.
+  Cerrada el 2026-10-13: tag sobre `06b6e01`, run 38460792159, release con el PDF (detalle en "Siguiente paso", punto 2).
 
 - [x] **D — Hallazgos sueltos y deuda de Sonar (decisión del usuario, 2026-10-07: «soluciona el 4 y 5 y luego
   merge del PR20»).** Cambio posterior del usuario: el PR #20 se fusiona solo con C1 y la tarea D va en un PR nuevo. Ejecutor: Sonnet; revisión de Opus; un commit por
@@ -286,6 +287,8 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
     `go test ./...` con Postgres real: 27 paquetes ok; `./internal/api` 160 PASS, 0 SKIP; `golangci-lint` 0;
     osv-scanner v2.3.5 sobre `./tools` exit 0; actionlint 0. Hallazgo aparte (sin id): osv-scanner local v2.3.5
     marca 21 avisos de stdlib en `backend/go.mod` (`go 1.26.0`) que el v2.6.0 de CI no marca; pendiente de decidir.
+    Decisión (2026-10-13): la referencia es el osv-scanner v2.6.0 fijado en CI, que no los marca; el v2.3.5 local
+    estaba desactualizado. No queda acción abierta.
     Revisión nativa del rango `3d0de78..8f57c76` (alto, 20 archivos, 4 lentes): **aprobada** y acusada
     (`review-1a76f102a78bff85`), 10 avisos no bloqueantes: el de parámetros requeridos vacíos en `/oauth/authorize`
     lo cubre `ValidateAuthorizeInput` (`oauth.go:180-187`); `omitempty` verificado en los clientes; `AGENTS.md:49`
@@ -387,5 +390,18 @@ Mañana (2026-10-13), en este orden:
      del PDF por el usuario, PR de documentación, notas del release, tag `v1.0.0` y release con el PDF.
 3. Entorno local del usuario: agregar `SMTP_PASSWORD` al `.env` (`openssl rand -hex 24`) y correr `make certs`
    antes de `make up`.
+   - **Cerrada (2026-10-13).** `SMTP_PASSWORD` agregada; `make up` ya corre `make certs` y levanta también la
+     observabilidad (`make up-app` queda para CI).
+4. Seguimiento del release y del informe formal (2026-10-13).
+   - **PR #50** (merge `9f60e43`, CI de `main` 18/18 en verde): el paso de verificación de `release.yml` ya no imprime
+     el SBOM (el run de `v1.0.0` tardó ~7 min por eso), la identidad y el emisor OIDC se definen una sola vez, y
+     `scripts/informe_excerpts_test.py` comprueba que los extractos `{{code:...}}` del informe caigan en límites de
+     bloque. Se ejercita en el próximo tag; no se saca `v1.0.1` solo para probarlo (decisión del usuario).
+   - Reconciliación de Claude Desktop: el informe formal pasó de 28 a 31 hallazgos (faltaban VULN-011, 015 y 024,
+     sin gate en CI ni capturas). Las fichas de VULN-030 y VULN-031 seguían con la evidencia "después" pendiente,
+     aunque sus `evidencia.json` ya citaban el run 37065094942 (`16ab347`, CI en verde con los dos arreglos);
+     corregidas en este PR. VULN-019 se mantiene "remediado" según la ficha (residual de 108 en imágenes de terceros).
+   - Queda solo F5 como trabajo futuro. Opcional: marcar en SonarCloud los 11 falsos positivos tras el próximo
+     análisis de `main`.
 Notas operativas: Codex ya no está disponible (la delegación va a Sonnet); `gh pr merge --delete-branch` también
 borra el worktree local de esa rama; Engram rechazó guardados en la sesión del 2026-10-12 (consola nueva).
