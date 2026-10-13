@@ -348,7 +348,7 @@ El umbral de 300 ms deja un margen de dos órdenes de magnitud respecto de lo me
 
 **DAST (job 11).** OWASP ZAP 2.17.0 corre en tres escaneos: *baseline* del Hub, *baseline* de Contabilidad y escaneo de API a partir del contrato OpenAPI, todos contra el stack levantado. ZAP se ejecuta con `-I` (no decide él); el único punto de decisión es `scripts/zap-gate.py`, que rompe la build ante alertas de riesgo medio o alto, salvo una entrada `IGNORE` justificada en `.zap/rules.tsv`. Los informes JSON y HTML se suben como artefacto aunque el job falle.
 
-{{code:yaml:.github/workflows/ci.yml:742-763}}
+{{code:yaml:.github/workflows/ci.yml:742-782}}
 
 **Evidencia de los requisitos no funcionales.** La matriz de trazabilidad (`specs/07-traceability.md`) da por cubierto un requisito cuando tiene al menos dos de cuatro fuentes de evidencia (escenarios, pruebas de Go, pruebas E2E, controles de CI). Los siete requisitos que antes solo tenían una fuente, más RNF-010, se respaldan con las pruebas de la tabla. Los escenarios `@RNF-NNN` no se derivan en un spec de Playwright: cada uno nombra en un comentario `# Verificación:` la prueba que lo ejecuta, y `scripts/traceability.py` comprueba por máquina que el archivo, la clase, el job, el paso o el objetivo `make` citados existen (`make spec-drift`, job 1).
 

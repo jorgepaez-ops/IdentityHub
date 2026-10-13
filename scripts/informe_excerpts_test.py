@@ -29,8 +29,26 @@ def blank(line: str) -> bool:
     return not line.strip()
 
 
+STARTER = re.compile(r"^\s*(- |#|[\w.-]+:)")  # a YAML key, a list item or a comment
+
+
+def neighbour(lines: list[str], i: int, step: int) -> str | None:
+    """First line from index i moving by step that is neither blank nor a comment."""
+    while 0 <= i < len(lines):
+        if not blank(lines[i]) and not lines[i].lstrip().startswith("#"):
+            return lines[i]
+        i += step
+    return None
+
+
 def check_excerpt(lines: list[str], a: int, b: int) -> list[str]:
-    """Devuelve un mensaje por cada regla que el rango A-B (1-based, inclusivo) incumple."""
+    """Devuelve un mensaje por cada regla que el rango A-B (1-based, inclusivo) incumple.
+
+    Inicio: la línea A abre algo (clave YAML, ítem de lista o comentario) y la línea significativa
+    anterior es su padre (menos indentada y terminada en «:») o el final de un bloque hermano.
+    Fin: la siguiente línea significativa tras B no está más indentada que A (los blancos de un
+    bloque `run: |` no cuentan como límite).
+    """
     n = len(lines)
     if not 1 <= a <= b <= n:
         return [f"rango {a}-{b} fuera de 1..{n}"]
@@ -40,16 +58,15 @@ def check_excerpt(lines: list[str], a: int, b: int) -> list[str]:
         problems.append(f"la línea {a} (inicio) está en blanco")
     if blank(last):
         problems.append(f"la línea {b} (fin) está en blanco")
-    if problems:
-        return problems
-    if b < n:
-        after = lines[b]
-        if not blank(after) and indent(after) > indent(first):
-            problems.append(f"termina a mitad de bloque: la línea {b + 1} sigue más indentada que la {a}: {after.strip()!r}")
-    if a > 1:
-        before = lines[a - 2]
-        if not (blank(before) or before.lstrip().startswith("#") or indent(before) <= indent(first)):
-            problems.append(f"empieza a mitad de bloque: la línea {a - 1} está más indentada que la {a}: {before.strip()!r}")
+    after = neighbour(lines, b, 1)
+    if after is not None and indent(after) > indent(first):
+        problems.append(f"termina a mitad de bloque: sigue {after.strip()!r}, más indentada que la línea {a}")
+    before = neighbour(lines, a - 2, -1)
+    if before is not None:
+        parent = indent(before) < indent(first) and before.rstrip().endswith(":")
+        sibling = indent(before) >= indent(first) and STARTER.match(first) is not None
+        if not (parent or sibling):
+            problems.append(f"empieza a mitad de bloque: la línea {a} sigue a {before.strip()!r}")
     return problems
 
 
@@ -89,10 +106,23 @@ class CheckerTest(unittest.TestCase):
         src = ["a:", "  b:", "      # nota", "    c: 1"]
         self.assertEqual(check_excerpt(src, 4, 4), [])
 
+    def test_start_dropping_the_step_name_fails(self):
+        src = ["steps:", "  - name: Paso", "    uses: x/y@1", "    with:", "      k: v"]
+        self.assertEqual(check_excerpt(src, 2, 5), [])
+        self.assertTrue(check_excerpt(src, 3, 5))  # empieza en uses: y deja fuera el - name:
+
+    def test_cut_inside_a_block_scalar_after_a_blank_fails(self):
+        src = ["- name: Script", "  run: |", "    echo uno", "", "    echo dos", "- name: Otro", "  run: true"]
+        self.assertEqual(check_excerpt(src, 1, 5), [])
+        self.assertTrue(check_excerpt(src, 1, 3))  # corta el run: | antes del blanco
+        self.assertTrue(check_excerpt(src, 5, 7))  # empieza a mitad del run: |
+
 
 class ReportExcerptsTest(unittest.TestCase):
     def test_report_has_directives(self):
-        self.assertTrue(directives(REPORT.read_text(encoding="utf-8")), "el informe ya no incrusta código")
+        text = REPORT.read_text(encoding="utf-8")
+        self.assertTrue(directives(text), "el informe ya no incrusta código")
+        self.assertEqual(text.count("{{code:"), len(directives(text)), "hay directivas {{code:...}} mal formadas o no aisladas en su línea")
 
     def test_every_excerpt_is_block_aligned(self):
         failures: list[str] = []
