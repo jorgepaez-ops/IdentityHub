@@ -6,7 +6,7 @@ import { psql } from './db'
  * deleted (audit_log references them); the pattern is the only thing the statement can touch, and
  * the target database is the one support/db.ts points at.
  */
-export default async function globalTeardown(): Promise<void> {
+export default function globalTeardown(): void {
   try {
     psql(
       `UPDATE users SET status = 'disabled'

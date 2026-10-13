@@ -111,7 +111,8 @@ async function namedUser(
 
 /** The Mailpit message list for one recipient: subjects only, no body, so no code or link shows. */
 async function shotMailbox(page: Page, email: string, name: string): Promise<void> {
-  await page.goto(`${mailpitUrl}/search?q=${encodeURIComponent(`to:${email}`)}`)
+  const recipient = `to:${email}`
+  await page.goto(`${mailpitUrl}/search?q=${encodeURIComponent(recipient)}`)
   await expect(page.getByText(email).first()).toBeVisible()
   // The list preview repeats the first line of each body (a one-time code, a link): mask it.
   await shot(page, name, { mask: [page.locator('.message .col-lg-6 > div.small')] })
@@ -495,7 +496,7 @@ test('Capturas del manual de usuario', async ({ browser }) => {
   } finally {
     await adminSide.context.close()
     await employeeSide.context.close()
-    for (const context of extraContexts) await context.close()
+    await Promise.all(extraContexts.map((context) => context.close()))
     for (const role of [AUDITOR_ROLE, TEMPORARY_ROLE]) {
       try {
         purgeRole(role)
