@@ -154,14 +154,28 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
     guion y `cd.yml` sin coincidencias en el informe.
 - [ ] **F — Mejoras de complejidad media y alta (decisión del usuario, 2026-10-12: se anotan hoy y se hacen
   mañana, 2026-10-13; `v1.0.0` sale después).** Estimación de Claude (2026-10-12):
-  - [ ] F1 RF-019 exportación del audit log en CSV/JSON (media-baja, ~300 líneas: endpoint spec-first sobre el
+  - [x] F1 RF-019 exportación del audit log en CSV/JSON (media-baja, ~300 líneas: endpoint spec-first sobre el
     listado existente, botón en la UI, pruebas).
-  - [ ] F2 SMTP autenticado con STARTTLS en el worker y hosts configurables (media, ~400 líneas): hoy
+    Evidencia (2026-10-12): rama `feat/f1-rf019-audit-export` (`bacd7ca`, `62a0a4e`), ruta delegada a Sonnet.
+    `GET /api/v1/admin/audit-log/export?format=csv|json`, tope 10 000 filas, CSV protegido contra fórmulas,
+    exportación auditada; pruebas RED→GREEN con Postgres real, cobertura 80,6 %, golangci-lint 0, vitest 257;
+    E2E 54/54 con stack real; revisión nativa aprobada. Sin push.
+  - [x] F2 SMTP autenticado con STARTTLS en el worker y hosts configurables (media, ~400 líneas): hoy
     `smtp.SendMail` sin TLS (`backend/cmd/worker/main.go:204`) y cliente OAuth/hosts fijos
     (`backend/internal/config/config.go:66-68`); un `.sh` genera CA y certificado locales (como en el ejemplo
     de la app de mascotas) y Mailpit exige STARTTLS y autenticación. Hace aplicable la arquitectura de AWS (SES).
-  - [ ] F3 Falco (media, ~300 líneas): servicio en el perfil de observabilidad (modern eBPF), 2-3 reglas propias,
+    Evidencia (2026-10-12): rama `feat/f2-smtp-starttls` (`2561a74`, `b10771c`, `eaf7cc1`, `d9fd3d2`), ruta delegada a
+    Sonnet. STARTTLS obligatorio y AUTH solo tras TLS, `scripts/gen-smtp-certs.sh` + `make certs`, Mailpit con
+    STARTTLS y credenciales, SES en Terraform, cliente OAuth por variables. E2E 52/52; envío en claro rechazado
+    (530). Revisión aprobada; Claude corrigió las comillas del archivo de credenciales. Sin push. Requiere
+    `SMTP_PASSWORD` en `.env` viejos. Siguen fijos: `server_name` de Nginx, constantes de Contabilidad y la fila
+    del cliente en la BD (documentado).
+  - [x] F3 Falco (media, ~300 líneas): servicio en el perfil de observabilidad (modern eBPF), 2-3 reglas propias,
     falcosidekick hacia Loki y una alerta. Riesgo a verificar primero: soporte en Docker Desktop de macOS.
+    Evidencia (2026-10-12): rama `feat/f3-falco` (`7a86ae9`, `0697dfe`), ruta delegada a Sonnet. Falco 0.45.0 por digest
+    con modern eBPF en Docker Desktop sin `privileged`; 4 reglas propias (AM-020), alertas a Loki vía Alloy, alerta
+    y paneles en Grafana, runbook y `make falco-test`. Revisión aprobada; Claude cerró la evasión de la excepción
+    de `wget` y la detección de `connect` no bloqueante, verificado con Falco. Sin push.
   - [ ] F4 RF-018 claves de servicio (media-alta, ~800 líneas): migración, endpoints, hash de la clave,
     middleware de autenticación por clave, UI de administración, pruebas y E2E.
   - [x] F5 Decidido por el usuario (2026-10-12): **queda como trabajo futuro** (exposición del proyecto en 5 días;
@@ -169,14 +183,23 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
     §9.1. Antes: integración de terceros (clientes OAuth en BD, OpenID Connect, refresh tokens
     por cliente, introspección, revocación) y outbox transaccional (alta, >2 000 líneas). Recomendación de
     Claude: dejarlo como trabajo futuro justificado (toca el núcleo de autenticación ya probado).
-  - [ ] F6 Matriz: RNF-001, 002, 006, 008 y 010 salen "sin cubrir" porque el generador solo cuenta pruebas Go,
+  - [x] F6 Matriz: RNF-001, 002, 006, 008 y 010 salen "sin cubrir" porque el generador solo cuenta pruebas Go,
     Gherkin y E2E; enlazarlos con su evidencia de CI y del release (origen: revisión de E2).
-  - [ ] F7 Release: `latest` solo después de firmar y atestar (decisión del usuario, 2026-10-12: «latest no puede
+    Evidencia (2026-10-12): rama `feat/f6-rnf-evidence` (`86c5d85`, `313dc82`). Columna "Controles CI" desde
+    `specs/07-controls.yaml`, verificada contra workflows/compose/Makefile (sin comentarios); de 5 RNF sin cubrir a 1
+    (RNF-010, sin prueba de latencia). Revisión aprobada. Sin push.
+  - [x] F7 Release: `latest` solo después de firmar y atestar (decisión del usuario, 2026-10-12: «latest no puede
     subir antes de la firma»). Hoy `publish` sube `vX.Y.Z` y `latest` y después firma; pasa a subir solo `vX.Y.Z`,
     firmar y atestar el digest, y recién entonces mover `latest` a ese mismo digest. Se prueba con un tag de
     validación (`v0.9.1`) antes de `v1.0.0`.
-  - [ ] F8 Release: reintento ante fallos de red en `publish` (push con reintentos acotados) y retención de los
+    Evidencia (2026-10-12): rama `fix/f7-f8-release-latest-and-retries` (`4784bab`, `63a1f98`), ruta inline (Claude).
+    `publish` sube solo `vX.Y.Z`, firma y atesta, y luego mueve `latest` si es el tag más alto, verificando el
+    digest. actionlint/shellcheck y zizmor sin hallazgos; revisión aprobada. Pendiente: probar con `v0.9.1`
+    (requiere push, mañana).
+  - [x] F8 Release: reintento ante fallos de red en `publish` (push con reintentos acotados) y retención de los
     artefactos de imagen suficiente para repetir solo el job fallido (hoy 1 día; el usuario no acepta el riesgo).
+    Evidencia (2026-10-12): mismo commit que F7. Reintentos (3) en push, cosign y consulta de tags; artefactos 7 días
+    (repositorio público: sin costo). Revisión aprobada.
   - [x] F9 VULN-028 (GO-2026-5932): verificado el 2026-10-12 que **no tiene versión corregida ni la tendrá**
     (osv.dev: afecta a `golang.org/x/crypto` desde la versión 0, sin `fixed`; el paquete `openpgp` está abandonado
     por diseño). `go list -deps` no encuentra `x/crypto/openpgp` ni en `backend/` ni en las herramientas de
