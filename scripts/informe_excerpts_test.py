@@ -74,6 +74,15 @@ def check_excerpt(lines: list[str], a: int, b: int) -> list[str]:
     return problems
 
 
+def excerpt_problems(lang: str, lines: list[str], a: int, b: int) -> list[str]:
+    """Reglas de bloque para YAML; para cualquier otro lenguaje solo se valida el rango."""
+    if lang in ("yaml", "yml"):
+        return check_excerpt(lines, a, b)
+    if 1 <= a <= b <= len(lines):
+        return []
+    return [f"rango {a}-{b} fuera de 1..{len(lines)}"]
+
+
 def directives(text: str) -> list[tuple[str, str, int, int]]:
     return [(m[0], m[1], int(m[2]), int(m[3])) for m in DIRECTIVE.findall(text)]
 
@@ -100,6 +109,11 @@ class CheckerTest(unittest.TestCase):
         self.assertTrue(check_excerpt(self.SRC, 3, 7))  # termina en blanco
         self.assertTrue(check_excerpt(self.SRC, 2, 5))  # corta el bloque env
         self.assertTrue(check_excerpt(self.SRC, 4, 5))  # corta el bloque env
+
+    def test_non_yaml_excerpts_only_check_the_range(self):
+        src = ["def f():", "    return 1", "", "x = 2"]
+        self.assertEqual(excerpt_problems("python", src, 2, 3), [])  # sin reglas de bloque
+        self.assertTrue(excerpt_problems("python", src, 3, 9))
 
     def test_out_of_range_fails(self):
         self.assertTrue(check_excerpt(self.SRC, 8, 11))
@@ -140,10 +154,7 @@ class ReportExcerptsTest(unittest.TestCase):
                 failures.append(f"{rel}:{a}-{b}: el archivo no existe")
                 continue
             lines = path.read_text(encoding="utf-8").splitlines()
-            # Las reglas de bloque son de YAML; para otros lenguajes solo se valida el rango.
-            problems = check_excerpt(lines, a, b) if lang in ("yaml", "yml") else (
-                [] if 1 <= a <= b <= len(lines) else [f"rango {a}-{b} fuera de 1..{len(lines)}"])
-            failures += [f"{rel}:{a}-{b}: {p}" for p in problems]
+            failures += [f"{rel}:{a}-{b}: {p}" for p in excerpt_problems(lang, lines, a, b)]
         self.assertEqual(failures, [], "\n" + "\n".join(failures))
 
 
