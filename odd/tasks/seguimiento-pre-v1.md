@@ -241,7 +241,7 @@ Fuente: `api/issues/search` (CODE_SMELL, sin resolver), 123 al momento de la con
 | javascript | javascript:S878 | MAJOR | `docs/informe/build.mjs:136` | Unexpected use of comma operator. | corregido `6841cf1` |
 | javascript | javascript:S878 | MAJOR | `docs/informe/build.mjs:137` | Unexpected use of comma operator. | corregido `6841cf1` |
 | javascript | javascript:S8786 | MAJOR | `docs/informe/build.mjs:88` | Simplify this regular expression to reduce its runtime, as it has super-linear performance due to backtracking. | corregido `6841cf1` |
-| javascript | javascript:S9382 | MINOR | `docs/informe/build.mjs:301` | Unexpected `await` inside a loop. | corregido `6841cf1` |
+| javascript | javascript:S9382 | MINOR | `docs/informe/build.mjs:301` | Unexpected `await` inside a loop. | falso positivo (revertido tras la revisión nativa): el render secuencial deja el orden estable y reporta cada diagrama roto; la llamada única solo informaba el primer error |
 | javascript | javascript:S9382 | MINOR | `docs/informe/build.mjs:322` | Unexpected `await` inside a loop. | corregido `6841cf1` |
 | javascript | javascript:S9382 | MINOR | `docs/informe/build.mjs:322` | Unexpected `await` inside a loop. | corregido `6841cf1` |
 | plsql | plsql:OrderByExplicitAscCheck | MINOR | `db/queries/roles.sql:6` | Add ASC in order to make the order explicit. | pendiente |
@@ -313,3 +313,5 @@ Fuente: `api/issues/search` (CODE_SMELL, sin resolver), 123 al momento de la con
 | typescript | typescript:S9382 | MINOR | `e2e/support/mailpit.ts:33` | Unexpected `await` inside a loop. | falso positivo: bucle de sondeo con reintento; cada intento depende del anterior |
 | typescript | typescript:S9382 | MINOR | `e2e/support/mailpit.ts:39` | Unexpected `await` inside a loop. | falso positivo: bucle de sondeo con reintento; cada intento depende del anterior |
 | typescript | typescript:S9382 | MINOR | `e2e/support/mailpit.ts:74` | Unexpected `await` inside a loop. | falso positivo: bucle de sondeo con espera entre intentos (`sleep`); no es paralelizable |
+
+Revisión nativa del lote 2 (2026-10-13): aprobada (28 archivos, 492 líneas). Correcciones posteriores: `build.mjs` vuelve a renderizar Mermaid diagrama por diagrama (la llamada única perdía diagnósticos; S9382 en esa línea pasa a falso positivo); el comentario de seguridad de `ServiceKeysPage.tsx` vuelve a quedar sobre `RevealedKey`.

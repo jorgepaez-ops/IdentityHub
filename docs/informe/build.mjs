@@ -295,13 +295,16 @@ async function printPdf(browser, html, outFile) {
       flowchart: { htmlLabels: true, useMaxWidth: true },
       sequence: { useMaxWidth: true, mirrorActors: false },
     })
-    // One run renders every diagram in document order; on failure it still renders the rest and rethrows the first error.
+    // Sequential on purpose (Sonar S9382 does not apply): one run per diagram keeps the render order stable,
+    // so the page count does not change between builds, and records every broken diagram, not only the first.
     const bad = []
-    try {
-      // eslint-disable-next-line no-undef
-      await mermaid.run({ nodes: [...document.querySelectorAll('.mermaid')] })
-    } catch (e) {
-      bad.push(String(e).slice(0, 200))
+    for (const el of document.querySelectorAll('.mermaid')) {
+      try {
+        // eslint-disable-next-line no-undef
+        await mermaid.run({ nodes: [el] })
+      } catch (e) {
+        bad.push(String(e).slice(0, 200))
+      }
     }
     await document.fonts.ready
     return bad
