@@ -150,6 +150,14 @@ jobs:
       - name: Prueba de puertos de observabilidad en loopback
         run: python3 scripts/compose_ports_test.py
 
+      # RNF-001, RNF-002, RNF-006 y RNF-008 contra los archivos reales (compose renderizado, Dockerfile, workflows).
+      - name: Pruebas de los requisitos no funcionales del pipeline y los contenedores
+        run: python3 scripts/pipeline_controls_test.py
+
+      # RNF-010: guarda de producción y estado de salida de scripts/load-test.sh (docker simulado, sin red).
+      - name: Pruebas del script de la prueba de carga
+        run: python3 scripts/load_test_script_test.py
+
       - name: Regenerar la matriz de trazabilidad
         run: python3 scripts/traceability.py
 
@@ -581,6 +589,12 @@ jobs:
 
       - name: Pruebas E2E (make e2e)
         run: make e2e
+
+      # RNF-010: k6 (imagen fijada por digest) contra el mismo stack, después de las pruebas E2E. Rompe
+      # la build si el p95 de refresh, GET /me o JWKS supera 300 ms. make load-test sube el límite por IP
+      # como make e2e: los logins fallidos de la suite pueden seguir en la ventana de RF-017 al restaurarlo.
+      - name: Prueba de carga de latencia (make load-test)
+        run: make load-test
 
       - name: Subir informe y trazas de Playwright
         # cancelled(): al vencer timeout-minutes GitHub cancela el job (no lo marca como

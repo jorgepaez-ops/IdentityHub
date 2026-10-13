@@ -14,6 +14,7 @@ import unittest
 sys.dont_write_bytecode = True
 
 SCRIPT = pathlib.Path(__file__).with_name("traceability.py")
+REPO_ROOT = SCRIPT.parent.parent
 SPEC = importlib.util.spec_from_file_location("traceability", SCRIPT)
 if SPEC is None or SPEC.loader is None:
     raise RuntimeError("could not load traceability.py")
@@ -266,6 +267,178 @@ class ControlsTests(unittest.TestCase):
         self.assertIn("| **RNF-001** | Uno | P0 | — | — | — | — | — | 🔴 sin cubrir |", rendered)
         self.assertIn("**Resumen:** 3 requisitos · 0 completos · 0 parciales · 3 sin cubrir", rendered)
         self.assertIn("cuatro columnas de evidencia", rendered)
+
+
+class NonFunctionalVerificationTests(unittest.TestCase):
+    """Every @RNF-only scenario links, via "# Verificación:", to a test that really exists."""
+
+    FEATURE = (
+        "Característica: NFR\n"
+        "  # Verificación: scripts/x_test.py (RnfOne), job spec-drift de CI\n"
+        "  @RNF-001\n"
+        "  Escenario: Uno\n"
+        '  # Verificación: tests/load/a.js vía "make load-test", paso "Pruebas X" del job e2e de CI\n'
+        "  @RNF-002 @p1\n"
+        "  Escenario: Dos\n"
+    )
+    FILES = {
+        "scripts/x_test.py": "class RnfOne:\n    pass\n",
+        "tests/load/a.js": "export default 1\n",
+        ".github/workflows/ci.yml": "jobs:\n  spec-drift:\n    steps:\n  e2e:\n    steps:\n      - name: Pruebas X\n",
+        "Makefile": "load-test: ## x\n\t@true\n",
+        "e2e/tests/a.spec.ts": "test('RNF-010 Un título', async () => {});\n",
+    }
+
+    def errors(self, feature: str | None = None, files: dict[str, str] | None = None) -> list[str]:
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            (root / "specs" / "06-acceptance").mkdir(parents=True)
+            (root / "specs" / "06-acceptance" / "nfr.feature").write_text(feature or self.FEATURE, encoding="utf-8")
+            for name, text in (files or self.FILES).items():
+                (root / name).parent.mkdir(parents=True, exist_ok=True)
+                (root / name).write_text(text, encoding="utf-8")
+            previous_root = traceability.ROOT
+            self.addCleanup(setattr, traceability, "ROOT", previous_root)
+            traceability.ROOT = root
+            return traceability.verification_errors(traceability.load_gherkin_scenarios())
+
+    def test_accepts_references_that_exist(self) -> None:
+        self.assertEqual(self.errors(), [])
+
+    def test_reports_a_missing_test_file(self) -> None:
+        files = {k: v for k, v in self.FILES.items() if k != "scripts/x_test.py"}
+        self.assertIn("scripts/x_test.py", "\n".join(self.errors(files=files)))
+
+    def test_reports_a_missing_test_class_job_step_and_make_target(self) -> None:
+        files = dict(self.FILES)
+        files["scripts/x_test.py"] = "class Other:\n    pass\n"
+        files[".github/workflows/ci.yml"] = "jobs:\n  e2e:\n    steps:\n      - name: Otro\n"
+        files["Makefile"] = "other: ## x\n"
+        text = "\n".join(self.errors(files=files))
+        for expected in ("RnfOne", "job spec-drift", "paso Pruebas X", "make load-test"):
+            self.assertIn(expected, text)
+
+    def test_reports_a_scenario_without_a_verification_line_or_without_a_named_test(self) -> None:
+        feature = "Característica: NFR\n  @RNF-001\n  Escenario: Sin enlace\n  # Verificación: scripts/x_test.py\n  @RNF-002\n  Escenario: Solo archivo\n"
+        text = "\n".join(self.errors(feature))
+        self.assertIn("RNF-001 Sin enlace", text)
+        self.assertIn("RNF-002 Solo archivo", text)
+
+    def test_a_verification_line_does_not_leak_to_the_next_scenario_and_rf_scenarios_are_exempt(self) -> None:
+        feature = (
+            "Característica: NFR\n"
+            "  # Verificación: scripts/x_test.py (RnfOne)\n"
+            "  @RNF-001\n  Escenario: Uno\n"
+            "  @RNF-002\n  Escenario: Dos hereda?\n"
+            "  @RF-001 @RNF-003\n  Escenario: Con RF\n"
+        )
+        text = "\n".join(self.errors(feature))
+        self.assertIn("RNF-002 Dos hereda?", text)
+        self.assertNotIn("Con RF", text)
+        self.assertNotIn("RNF-001 Uno", text)
+
+    def test_a_quoted_e2e_title_is_not_read_as_a_ci_step_name(self) -> None:
+        feature = self.FEATURE.replace('paso "Pruebas X" del job e2e de CI', 'y e2e "RNF-010 Un título" del job e2e')
+        self.assertEqual(self.errors(feature), [])
+        missing = self.FEATURE.replace('paso "Pruebas X"', 'e2e "RNF-010 Otro"')
+        self.assertIn("título E2E RNF-010 Otro", "\n".join(self.errors(missing)))
+
+    def test_a_bare_quoted_string_is_an_error(self) -> None:
+        feature = self.FEATURE.replace('paso "Pruebas X"', 'y "RNF-010 Un título"')
+        text = "\n".join(self.errors(feature))
+        self.assertIn('sin prefijo: "RNF-010 Un título"', text)
+        self.assertIn('paso "…"', text)
+
+    def with_make(self, replacement: str) -> str:
+        return self.FEATURE.replace('vía "make load-test"', replacement)
+
+    def test_a_make_target_is_checked_bare_in_backticks_or_in_double_quotes(self) -> None:
+        for form in ("vía make {}", "vía `make {}`", 'vía "make {}"'):
+            self.assertEqual(self.errors(self.with_make(form.format("load-test"))), [], form)
+            text = "\n".join(self.errors(self.with_make(form.format("no-existe"))))
+            self.assertIn("make no-existe", text, form)
+
+    def test_prose_make_is_not_allowed_because_a_bare_make_is_a_reference(self) -> None:
+        text = "\n".join(self.errors(self.with_make("make sure de que corra")))
+        self.assertIn("make sure", text)
+
+    def test_mismatched_make_delimiters_are_an_error(self) -> None:
+        for form in ('vía "make load-test`', 'vía `make load-test"', 'vía "make load-test', "vía `make load-test"):
+            text = "\n".join(self.errors(self.with_make(form)))
+            self.assertIn("comilla sin cerrar o delimitadores distintos", text, form)
+
+    def test_backticks_around_a_path_or_a_job_are_formatting(self) -> None:
+        self.assertEqual(traceability.tokenize_verification("`scripts/load-test.sh` vía `job e2e`")[1], [])
+
+    def test_every_real_verification_line_tokenizes_without_problems(self) -> None:
+        lines = [
+            (path.name, number, line.split("# Verificación:", 1)[1])
+            for path in sorted((REPO_ROOT / "specs" / "06-acceptance").glob("*.feature"))
+            for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1)
+            if "# Verificación:" in line
+        ]
+        self.assertTrue(lines)
+        for name, number, text in lines:
+            self.assertEqual(traceability.tokenize_verification(text)[1], [], f"{name}:{number}")
+
+    def test_the_grammar_copies_match_the_docstring(self) -> None:
+        doc = traceability.verification_errors.__doc__
+        if doc is None:
+            self.skipTest("docstrings removidos (python -OO)")
+        bullets = [line.strip() for line in doc.splitlines() if line.strip().startswith("- ")]
+        self.assertTrue(bullets)
+        for copy in (REPO_ROOT / "specs" / "06-acceptance" / "README.md", REPO_ROOT / "scripts" / "README.md"):
+            text = copy.read_text(encoding="utf-8")
+            for bullet in bullets:
+                self.assertIn(bullet, text, f"{copy.relative_to(REPO_ROOT)}: falta «{bullet[:60]}…»")
+
+    def test_an_e2e_title_resolves_with_any_quote_style_and_test_modifier(self) -> None:
+        cases = {
+            "It's ok": ('test("RNF-010 It\'s ok", async () => {});', "test(`RNF-010 It's ok`, async () => {});"),
+            "Un título": ("test.only('RNF-010 Un título', async () => {});", "test.skip('RNF-010 Un título', async () => {});"),
+        }
+        for title, declarations in cases.items():
+            feature = self.FEATURE.replace('paso "Pruebas X"', f'e2e "RNF-010 {title}"')
+            for declaration in declarations:
+                files = {**self.FILES, "e2e/tests/a.spec.ts": declaration + "\n"}
+                self.assertEqual(self.errors(feature, files), [], declaration)
+
+    def test_unknown_quoted_text_is_an_error_naming_the_accepted_prefixes(self) -> None:
+        text = "\n".join(self.errors(self.FEATURE.replace('paso "Pruebas X"', 'y "algo suelto"')))
+        for expected in ('sin prefijo: "algo suelto"', "paso", "e2e", "make"):
+            self.assertIn(expected, text)
+
+    def test_a_job_id_followed_by_punctuation_resolves(self) -> None:
+        for suffix in (",", ".", ")", ";"):
+            feature = self.FEATURE.replace("job spec-drift de CI", f"job spec-drift{suffix} de CI")
+            self.assertEqual(self.errors(feature), [], suffix)
+
+    def test_a_double_quoted_missing_make_target_is_reported(self) -> None:
+        feature = self.FEATURE.replace('vía "make load-test"', "vía \"make no-existe\"")
+        self.assertIn("make no-existe", "\n".join(self.errors(feature)))
+
+    def test_a_partial_class_name_does_not_match(self) -> None:
+        files = dict(self.FILES)
+        files["scripts/x_test.py"] = "class RnfOneExtended:\n    pass\n"
+        self.assertIn("RnfOne no está definido", "\n".join(self.errors(files=files)))
+        files["scripts/x_test.py"] = "x = 'RnfOneExtended'\n"
+        self.assertIn("RnfOne no está definido", "\n".join(self.errors(files=files)))
+        files["scripts/x_test.py"] = "x = 'RnfOne'\n"
+        self.assertEqual(self.errors(files=files), [])
+
+    def test_a_scenario_with_no_named_reference_lists_every_accepted_form(self) -> None:
+        feature = "Característica: NFR\n  # Verificación: scripts/x_test.py\n  @RNF-001\n  Escenario: Solo archivo\n"
+        text = "\n".join(self.errors(feature))
+        for form in ("clase/función", "job", "paso", "e2e", "make"):
+            self.assertIn(form, text)
+
+    def test_a_partial_step_name_does_not_match(self) -> None:
+        files = dict(self.FILES)
+        files[".github/workflows/ci.yml"] = "jobs:\n  spec-drift:\n  e2e:\n    steps:\n      - name: Pruebas X y más\n"
+        self.assertIn("paso Pruebas X", "\n".join(self.errors(files=files)))
+
+    def test_the_real_feature_is_machine_checked(self) -> None:
+        self.assertEqual(traceability.verification_errors(traceability.load_gherkin_scenarios()), [])
 
 
 if __name__ == "__main__":

@@ -18,7 +18,7 @@ SQLC_VERSION := v1.31.1
 SQLC         ?= sqlc
 
 .DEFAULT_GOAL := help
-.PHONY: help setup certs up down informe logs ps restart build test test-go test-integration test-front e2e _e2e-run capturas _capturas-run scan-dast _scan-dast-run spec-drift lint fmt gen scan scan-secrets scan-deps scan-image scan-config scan-iac migrate psql rabbit mail clean up-app up-prod down-prod falco-test
+.PHONY: help setup certs up down informe logs ps restart build test test-go test-integration test-front e2e load-test _load-test-run _e2e-run capturas _capturas-run scan-dast _scan-dast-run spec-drift lint fmt gen scan scan-secrets scan-deps scan-image scan-config scan-iac migrate psql rabbit mail clean up-app up-prod down-prod falco-test
 
 help: ## Muestra esta ayuda
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -129,6 +129,16 @@ e2e: ## Pruebas de extremo a extremo contra el stack levantado
 _e2e-run:
 	cd e2e && npm ci --ignore-scripts && npx playwright test
 
+load-test: ## Prueba de carga de latencia (RNF-010, k6 en contenedor) contra el stack levantado; falla si el p95 supera 300 ms
+	@# Corre con el límite por IP elevado, como make e2e: tras make e2e los logins fallidos de la suite pueden
+	@# seguir dentro de la ventana de RF-017 y bloquear la IP del login de setup() de k6 al restaurar el límite.
+	@# WITH_RAISED_LIMIT envuelve un objetivo de make: el cuerpo (scripts/load-test.sh) vive en _load-test-run.
+	@$(WITH_RAISED_LIMIT) _load-test-run
+
+_load-test-run:
+	@# COMPOSE se pasa explícito: el script aborta si falta y no debe depender de que el sub-make lo herede del entorno.
+	COMPOSE='$(COMPOSE)' scripts/load-test.sh
+
 capturas: ## Regenera las capturas del manual de usuario (docs/manuales/img/usuario) contra el stack levantado
 	@$(WITH_RAISED_LIMIT) _capturas-run
 
@@ -172,6 +182,8 @@ spec-drift: ## Verifica sin red la matriz y escenarios Gherkin contra E2E
 	python3 scripts/setup_env_test.py
 	python3 scripts/ci_changes_test.py
 	python3 scripts/compose_ports_test.py
+	python3 scripts/pipeline_controls_test.py
+	python3 scripts/load_test_script_test.py
 	python3 scripts/traceability.py --check
 
 informe: ## Genera el informe técnico en PDF (docs/informe/informe-tecnico.pdf) con Chromium de Playwright

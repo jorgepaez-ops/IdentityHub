@@ -34,8 +34,9 @@ RNF-005:
   - .github/workflows/ci.yml | test-integration | Cobertura de internal/ (gate)
   - .github/workflows/ci.yml | test-integration | coverage + 0 < 70
 
-# SBOM CycloneDX (Syft) y firma Cosign keyless en la publicación. La verificación de la firma
-# al desplegar no está automatizada, por eso este requisito sigue parcial.
+# SBOM CycloneDX (Syft) y firma Cosign keyless en la publicación, con verificación posterior
+# antes de mover latest. La verificación al desplegar (arranque de la producción simulada) no está
+# automatizada.
 RNF-006:
   - .github/workflows/release.yml | publish | cosign sign --yes
   - .github/workflows/release.yml | publish | cosign attest --yes --type cyclonedx
@@ -67,4 +68,9 @@ RNF-011:
   - .github/workflows/ci.yml | spec-drift | git diff --exit-code
   - .github/workflows/ci.yml | spec-drift | Regenerar la API Go
 
-# RNF-007, RNF-010 y RNF-012: sin control de CI que haga cumplir su criterio (ver la matriz).
+# RNF-010: la prueba de carga corre en el job E2E, detrás de las pruebas, y rompe la build si el p95 supera 300 ms.
+RNF-010:
+  - .github/workflows/ci.yml | e2e | make load-test
+  - Makefile | load-test | scripts/load-test.sh
+
+# RNF-007 y RNF-012 no tienen control de CI propio: se verifican con pruebas E2E que leen /metrics y los logs reales.

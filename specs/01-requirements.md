@@ -313,6 +313,9 @@ Nginx emite `Content-Security-Policy`, `Strict-Transport-Security`, `X-Content-T
 ### RNF-010 — Latencia · P1
 El p95 de los endpoints de autenticación se mantiene por debajo de 300 ms en local, excluido
 el coste deliberado de Argon2id.
+- **Aceptación:** `make load-test` (k6, `tests/load/auth-latency.js`) mide `POST /api/v1/auth/refresh`,
+  `GET /api/v1/me` y `GET /.well-known/jwks.json` bajo carga y falla si el p95 de cualquiera supera
+  300 ms. El inicio de sesión no se mide: verifica la contraseña con Argon2id (~250 ms, deliberado).
 
 ### RNF-011 — Los specs son la fuente de verdad · P0
 El código de contratos se genera desde `specs/`. El job `spec-drift` regenera en CI y falla si
