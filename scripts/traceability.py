@@ -99,14 +99,19 @@ def load_controls() -> dict[str, list[Control]]:
         if m := re.fullmatch(r"((?:RNF|RF)-\d{3}):", line):
             current = m.group(1)
         elif line.startswith("- ") and current:
-            parts = [part.strip() for part in line[2:].split(" | ")]
-            if len(parts) != 3 or not all(parts):
-                raise ValueError(f"{CONTROLS}:{number}: se esperaba '- archivo | sección o - | texto'")
-            file, section, text = parts
-            controls[current].append(Control(file, "" if section == "-" else section, text))
+            controls[current].append(parse_control_entry(line, number))
         else:
             raise ValueError(f"{CONTROLS}:{number}: línea no reconocida: {raw!r}")
     return dict(controls)
+
+
+def parse_control_entry(line: str, number: int) -> Control:
+    """One ``- <file> | <section or -> | <text>`` entry of specs/07-controls.yaml."""
+    parts = [part.strip() for part in line[2:].split(" | ")]
+    if len(parts) != 3 or not all(parts):
+        raise ValueError(f"{CONTROLS}:{number}: se esperaba '- archivo | sección o - | texto'")
+    file, section, text = parts
+    return Control(file, "" if section == "-" else section, text)
 
 
 def section_block(lines: list[str], section: str) -> list[str] | None:
@@ -136,22 +141,28 @@ def control_errors(controls: dict[str, list[Control]], reqs: dict[str, tuple[str
         if rid not in reqs:
             errors.append(f"{CONTROLS}: {rid} no es un requisito de specs/01-requirements.md")
         for control in entries:
-            path = ROOT / control.file
-            if not path.is_file():
-                errors.append(f"{rid}: el archivo {control.file} no existe")
-                continue
-            lines = path.read_text(encoding="utf-8").splitlines()
-            if control.section:
-                block = section_block(lines, control.section)
-                if block is None:
-                    errors.append(f"{rid}: {control.file} no tiene la sección '{control.section}'")
-                    continue
-                lines = block
-            # Comment lines do not count: a control must be backed by real configuration.
-            if not any(control.text in line for line in lines if not line.lstrip().startswith("#")):
-                where = f"la sección '{control.section}' de " if control.section else ""
-                errors.append(f"{rid}: {where}{control.file} no contiene '{control.text}'")
+            problem = control_problem(control)
+            if problem:
+                errors.append(f"{rid}: {problem}")
     return errors
+
+
+def control_problem(control: Control) -> str | None:
+    """Why one declared control does not resolve against the real file, or ``None``."""
+    path = ROOT / control.file
+    if not path.is_file():
+        return f"el archivo {control.file} no existe"
+    lines = path.read_text(encoding="utf-8").splitlines()
+    if control.section:
+        block = section_block(lines, control.section)
+        if block is None:
+            return f"{control.file} no tiene la sección '{control.section}'"
+        lines = block
+    # Comment lines do not count: a control must be backed by real configuration.
+    if any(control.text in line for line in lines if not line.lstrip().startswith("#")):
+        return None
+    where = f"la sección '{control.section}' de " if control.section else ""
+    return f"{where}{control.file} no contiene '{control.text}'"
 
 
 def control_label(control: Control) -> str:
@@ -190,28 +201,31 @@ def load_gherkin_scenarios() -> list[Scenario]:
     """
     scenarios: list[Scenario] = []
     for path in sorted((ROOT / "specs" / "06-acceptance").glob("*.feature")):
-        pending: list[str] = []
-        verification = ""
-        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
-            stripped = line.strip()
-            if stripped.startswith(VERIFICATION_COMMENT):
-                verification = stripped[len(VERIFICATION_COMMENT) :].strip()
-            if not stripped or stripped.startswith("#"):
-                continue
-            if stripped.startswith("@"):
-                pending.extend(RF_TAG.findall(stripped))
-            elif GHERKIN_SCENARIO.match(stripped):
-                name = stripped.split(":", 1)[1].strip()
-                first_rf = next((tag for tag in pending if tag.startswith("RF-")), "")
-                if pending:
-                    scenarios.append(Scenario(first_rf, name, path.name, tuple(pending), number, verification))
-                pending = []
-                verification = ""
-            else:
-                # Scope keywords, steps, tables and docstrings all end the tag run.
-                pending = []
-                verification = ""
+        scenarios.extend(parse_feature(path))
+    return scenarios
 
+
+def parse_feature(path: pathlib.Path) -> list[Scenario]:
+    """The tagged scenarios of one ``.feature`` file."""
+    scenarios: list[Scenario] = []
+    pending: list[str] = []
+    verification = ""
+    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        stripped = line.strip()
+        if stripped.startswith(VERIFICATION_COMMENT):
+            verification = stripped[len(VERIFICATION_COMMENT) :].strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if stripped.startswith("@"):
+            pending.extend(RF_TAG.findall(stripped))
+            continue
+        if pending and GHERKIN_SCENARIO.match(stripped):
+            name = stripped.split(":", 1)[1].strip()
+            first_rf = next((tag for tag in pending if tag.startswith("RF-")), "")
+            scenarios.append(Scenario(first_rf, name, path.name, tuple(pending), number, verification))
+        # Scenarios, scope keywords, steps, tables and docstrings all end the tag run.
+        pending = []
+        verification = ""
     return scenarios
 
 
@@ -348,26 +362,29 @@ def verification_errors(scenarios: list[Scenario]) -> list[str]:
         if not scenario.tags or any(tag.startswith("RF-") for tag in scenario.tags):
             continue
         label = f"{', '.join(scenario.tags)} {scenario.name} ({scenario.source}:{scenario.line})"
-        if not scenario.verification:
-            errors.append(f"{label}: falta la línea «# Verificación:» justo encima de las etiquetas")
-            continue
-        references, problems = tokenize_verification(scenario.verification)
-        files = [value for kind, value in references if kind == "file"]
-        file_texts = {f: (ROOT / f).read_text(encoding="utf-8") for f in files if (ROOT / f).is_file()}
-        problems += [f"el archivo {f} no existe" for f in files if f not in file_texts]
-        if not files:
-            problems.append("no nombra ningún archivo de prueba")
-        named = [(kind, value) for kind, value in references if kind != "file"]
-        if not named:
-            problems.append("no nombra ninguna prueba concreta (clase/función entre paréntesis, job, paso, e2e o make)")
-        problems += [p for p in (reference_problem(k, v, sources, file_texts) for k, v in named) if p]
-        errors += [f"{label}: {problem}" for problem in problems]
+        errors += [f"{label}: {problem}" for problem in verification_problems(scenario, sources)]
     return errors
 
 
-def e2e_correspondence_errors(scenarios: list[Scenario]) -> list[str]:
-    """Return actionable errors for the scenario-to-E2E one-to-one mapping."""
-    titles = load_e2e_test_titles()
+def verification_problems(scenario: Scenario, sources: VerificationSources) -> list[str]:
+    """Everything wrong with the ``# Verificación:`` line of one @RNF-only scenario."""
+    if not scenario.verification:
+        return ["falta la línea «# Verificación:» justo encima de las etiquetas"]
+    references, problems = tokenize_verification(scenario.verification)
+    files = [value for kind, value in references if kind == "file"]
+    file_texts = {f: (ROOT / f).read_text(encoding="utf-8") for f in files if (ROOT / f).is_file()}
+    problems += [f"el archivo {f} no existe" for f in files if f not in file_texts]
+    if not files:
+        problems.append("no nombra ningún archivo de prueba")
+    named = [(kind, value) for kind, value in references if kind != "file"]
+    if not named:
+        problems.append("no nombra ninguna prueba concreta (clase/función entre paréntesis, job, paso, e2e o make)")
+    problems += [p for p in (reference_problem(k, v, sources, file_texts) for k, v in named) if p]
+    return problems
+
+
+def expected_e2e_titles(scenarios: list[Scenario]) -> tuple[dict[str, Scenario], list[tuple[str, Scenario, Scenario]]]:
+    """Expected E2E title -> scenario, plus the scenarios that repeat an earlier title."""
     expected: dict[str, Scenario] = {}
     duplicate_scenarios: list[tuple[str, Scenario, Scenario]] = []
     for scenario in scenarios:
@@ -378,6 +395,13 @@ def e2e_correspondence_errors(scenarios: list[Scenario]) -> list[str]:
             duplicate_scenarios.append((title, expected[title], scenario))
         else:
             expected[title] = scenario
+    return expected, duplicate_scenarios
+
+
+def e2e_correspondence_errors(scenarios: list[Scenario]) -> list[str]:
+    """Return actionable errors for the scenario-to-E2E one-to-one mapping."""
+    titles = load_e2e_test_titles()
+    expected, duplicate_scenarios = expected_e2e_titles(scenarios)
     computed = computed_requirement_titles()
 
     missing = [title for title in expected if title not in titles]
@@ -386,31 +410,80 @@ def e2e_correspondence_errors(scenarios: list[Scenario]) -> list[str]:
     if not (missing or orphan or duplicates or computed or duplicate_scenarios):
         return []
 
+    sections = [
+        ("Faltan pruebas E2E para escenarios:", [f"  - {title} ({expected[title].source})" for title in missing]),
+        (
+            "Títulos E2E con prefijo RF sin escenario:",
+            [f"  - {location}: {title}" for title in orphan for location in titles[title]],
+        ),
+        (
+            "Escenarios con más de una prueba E2E:",
+            [f"  - {title} ({expected[title].source}): {', '.join(titles[title])}" for title in duplicates],
+        ),
+        (
+            "Escenarios Gherkin repetidos (misma etiqueta RF y mismo nombre):",
+            [
+                f"  - {title}: {first.source}:{first.line}, {second.source}:{second.line}"
+                for title, first, second in duplicate_scenarios
+            ],
+        ),
+        (
+            "Títulos RF/RNF no literales (template o calculados), invisibles para este chequeo:",
+            [f"  - {location}" for location in computed],
+        ),
+    ]
+    return format_correspondence_report(sections)
+
+
+def format_correspondence_report(sections: list[tuple[str, list[str]]]) -> list[str]:
+    """Headline, every non-empty section (heading then items) and the closing hint."""
     errors = ["La correspondencia escenario↔prueba E2E no es uno a uno."]
-    if missing:
-        errors.append("Faltan pruebas E2E para escenarios:")
-        for title in missing:
-            scenario = expected[title]
-            errors.append(f"  - {title} ({scenario.source})")
-    if orphan:
-        errors.append("Títulos E2E con prefijo RF sin escenario:")
-        for title in orphan:
-            for location in titles[title]:
-                errors.append(f"  - {location}: {title}")
-    if duplicates:
-        errors.append("Escenarios con más de una prueba E2E:")
-        for title in duplicates:
-            scenario = expected[title]
-            errors.append(f"  - {title} ({scenario.source}): {', '.join(titles[title])}")
-    if duplicate_scenarios:
-        errors.append("Escenarios Gherkin repetidos (misma etiqueta RF y mismo nombre):")
-        for title, first, second in duplicate_scenarios:
-            errors.append(f"  - {title}: {first.source}:{first.line}, {second.source}:{second.line}")
-    if computed:
-        errors.append("Títulos RF/RNF no literales (template o calculados), invisibles para este chequeo:")
-        errors.extend(f"  - {location}" for location in computed)
+    for heading, items in sections:
+        if items:
+            errors += [heading, *items]
     errors.append("Usa títulos literales: 'RF-NNN <nombre exacto del escenario>'.")
     return errors
+
+
+def load_go_tests_by_requirement() -> dict[str, list[str]]:
+    """RF/RNF -> Go test names. Go uses TestRF003_ / TestRNF012_ (no dash); normalized here."""
+    go_by_req: dict[str, list[str]] = defaultdict(list)
+    base = ROOT / "backend"
+    if base.exists():
+        for path in sorted(base.rglob("*_test.go")):
+            for m in re.finditer(r"func (Test(RNF|RF)(\d{3})_\w+)", path.read_text(encoding="utf-8")):
+                go_by_req[f"{m.group(2)}-{m.group(3)}"].append(m.group(1))
+    return go_by_req
+
+
+def load_e2e_by_requirement() -> dict[str, list[str]]:
+    """RF/RNF -> ``file:line`` of its Playwright tests."""
+    e2e_by_req: dict[str, list[str]] = defaultdict(list)
+    for title, locations in load_e2e_test_titles().items():
+        requirement = title.split(" ", 1)[0]
+        e2e_by_req[requirement].extend(locations)
+    return e2e_by_req
+
+
+def count_or_dash(items: list[str] | None) -> str:
+    return str(len(items)) if items else "—"
+
+
+def requirement_state(rid: str, covered: int) -> str:
+    """Matrix state of one requirement and the counter it increments."""
+    if rid in DEFERRED:
+        return "diferido"
+    if covered >= 2:
+        return "completo"
+    return "parcial" if covered == 1 else "sin cubrir"
+
+
+STATE_LABELS = {
+    "diferido": "⏳ diferido (2026-10-13)",
+    "completo": "✅ completo",
+    "parcial": "🟡 parcial",
+    "sin cubrir": "🔴 sin cubrir",
+}
 
 
 def render(gherkin: list[Scenario]) -> str:
@@ -418,20 +491,8 @@ def render(gherkin: list[Scenario]) -> str:
     ops = load_operations()
     scenarios = load_scenarios(gherkin)
     controls = load_controls()
-
-    # Los nombres Go usan TestRF003_ / TestRNF012_, sin guion; aquí se normalizan.
-    go_by_req: dict[str, list[str]] = defaultdict(list)
-    for root in ["backend"]:
-        base = ROOT / root
-        if base.exists():
-            for path in sorted(base.rglob("*_test.go")):
-                for m in re.finditer(r"func (Test(RNF|RF)(\d{3})_\w+)", path.read_text(encoding="utf-8")):
-                    go_by_req[f"{m.group(2)}-{m.group(3)}"].append(m.group(1))
-
-    e2e_by_req: dict[str, list[str]] = defaultdict(list)
-    for title, locations in load_e2e_test_titles().items():
-        requirement = title.split(" ", 1)[0]
-        e2e_by_req[requirement].extend(locations)
+    go_by_req = load_go_tests_by_requirement()
+    e2e_by_req = load_e2e_by_requirement()
 
     lines = [
         "# 07 — Matriz de trazabilidad",
@@ -452,18 +513,13 @@ def render(gherkin: list[Scenario]) -> str:
     for rid in sorted(reqs):
         title, prio = reqs[rid]
         o = ", ".join(f"`{x}`" for x in ops.get(rid, [])) or "—"
-        s = str(len(scenarios.get(rid, []))) if scenarios.get(rid) else "—"
-        g = str(len(go_by_req.get(rid, []))) if go_by_req.get(rid) else "—"
-        e = str(len(e2e_by_req.get(rid, []))) if e2e_by_req.get(rid) else "—"
+        s, g, e = (count_or_dash(source.get(rid)) for source in (scenarios, go_by_req, e2e_by_req))
         labels = list(dict.fromkeys(control_label(c) for c in controls.get(rid, [])))
         c = ", ".join(labels) or "—"
         covered = sum(x != "—" for x in (s, g, e, c))
-        if rid in DEFERRED:
-            state = "⏳ diferido (2026-10-13)"
-            counts["diferido"] += 1
-        else:
-            state = "✅ completo" if covered >= 2 else ("🟡 parcial" if covered == 1 else "🔴 sin cubrir")
-            counts["completo" if covered >= 2 else ("parcial" if covered == 1 else "sin cubrir")] += 1
+        key = requirement_state(rid, covered)
+        counts[key] += 1
+        state = STATE_LABELS[key]
         lines.append(f"| **{rid}** | {title} | {prio} | {o} | {s} | {g} | {e} | {c} | {state} |")
 
     total = sum(counts.values())

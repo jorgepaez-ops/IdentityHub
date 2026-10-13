@@ -77,19 +77,51 @@ def load_alerts(path):
     return alerts
 
 
-def main(argv):
+def parse_args(argv):
+    """Return (rules_path, reports), or None when ``--rules`` has no value."""
     rules_path = DEFAULT_RULES
     reports = []
     args = list(argv)
     while args:
         arg = args.pop(0)
-        if arg == "--rules":
-            if not args:
-                print("--rules needs a path", file=sys.stderr)
-                return 2
+        if arg != "--rules":
+            reports.append(arg)
+        elif args:
             rules_path = args.pop(0)
         else:
-            reports.append(arg)
+            return None
+    return rules_path, reports
+
+
+def alert_status(risk, action):
+    """Gate status of one alert; BREAKS is the only one that fails the gate."""
+    if risk >= THRESHOLD:
+        return "IGNORED" if action == "IGNORE" else "BREAKS"
+    return "warning" if risk == 1 else "info"
+
+
+def print_report(path, alerts, rules):
+    """Print one report table and return how many of its alerts break the gate."""
+    print(f"\n== {path}")
+    print(f"{'RISK':<7} {'PLUGIN':<7} {'COUNT':>5}  {'STATUS':<8} NAME (first URL)")
+    broken = 0
+    for a in sorted(alerts, key=lambda x: (-x["risk"], x["plugin"])):
+        action, _ = rules.get(a["plugin"], ("", ""))
+        status = alert_status(a["risk"], action)
+        broken += status == "BREAKS"
+        print(f"{RISK_NAMES.get(a['risk'], '?'):<7} {a['plugin']:<7} {a['count']:>5}  "
+              f"{status:<8} {a['name']} ({a['url']})")
+    if not alerts:
+        print("(no alerts)")
+    return broken
+
+
+def main(argv):
+    parsed = parse_args(argv)
+    if parsed is None:
+        print("--rules needs a path", file=sys.stderr)
+        return 2
+    rules_path, reports = parsed
     if not reports:
         print(__doc__, file=sys.stderr)
         return 2
@@ -101,25 +133,7 @@ def main(argv):
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
 
-    broken = 0
-    for path, alerts in per_report:
-        print(f"\n== {path}")
-        print(f"{'RISK':<7} {'PLUGIN':<7} {'COUNT':>5}  {'STATUS':<8} NAME (first URL)")
-        for a in sorted(alerts, key=lambda x: (-x["risk"], x["plugin"])):
-            action, comment = rules.get(a["plugin"], ("", ""))
-            if a["risk"] >= THRESHOLD and action != "IGNORE":
-                status = "BREAKS"
-                broken += 1
-            elif a["risk"] >= THRESHOLD:
-                status = "IGNORED"
-            elif a["risk"] == 1:
-                status = "warning"
-            else:
-                status = "info"
-            print(f"{RISK_NAMES.get(a['risk'], '?'):<7} {a['plugin']:<7} {a['count']:>5}  "
-                  f"{status:<8} {a['name']} ({a['url']})")
-        if not alerts:
-            print("(no alerts)")
+    broken = sum(print_report(path, alerts, rules) for path, alerts in per_report)
 
     if broken:
         print(f"\nGATE BROKEN: {broken} alert(s) of severity Medium or higher.")
