@@ -250,10 +250,16 @@ def verification_errors(scenarios: list[Scenario]) -> list[str]:
     """Machine-check the "# Verificación:" line of every scenario tagged only with @RNF-NNN.
 
     These scenarios are not derived into Playwright specs, so the free-text comment is their only link
-    to the test that runs them. The line must name (a) an existing file and (b) something inside the
-    repository that exists by name: a ``(TestClass)``/``(test_function)`` in a referenced file, a
-    ``job <id>`` or a quoted ``paso "<name>"`` (``- name:`` step) in ci.yml, or a ``make <target>``
-    (Makefile). Every named reference must resolve; a scenario with no file or no named reference fails.
+    to the test that runs them. The line must name an existing file and at least one named reference,
+    written in this explicit grammar (anything else, such as a quoted test title, is plain prose and is
+    ignored):
+
+    - ``(Name)``: a class/function ``Name`` defined in a referenced file (whole-word match);
+    - ``job <id>``: a job ``<id>`` of ci.yml (letters, digits, ``_`` and ``-`` only, so trailing punctuation is not part of the id);
+    - ``paso "<step name>"``: a ``- name: <step name>`` step of ci.yml, exact match;
+    - ``make <target>`` (quotes optional, e.g. ``"make load-test"``): a target of the Makefile.
+
+    Every named reference must resolve; a scenario with no file or no named reference fails.
     Scenarios that carry any @RF tag are exempt (their link is the E2E title, checked elsewhere).
     """
     errors: list[str] = []
@@ -279,22 +285,22 @@ def verification_errors(scenarios: list[Scenario]) -> list[str]:
         named = 0
         for name in re.findall(r"\((\w+)\)", text):
             named += 1
-            pattern = rf"(?:class|def|function)\s+{re.escape(name)}\b|['\"`]{re.escape(name)}"
+            pattern = rf"(?:class|def|function)\s+{re.escape(name)}\b|(['\"`]){re.escape(name)}\1"
             if not any(re.search(pattern, body) for body in file_texts.values()):
                 problems.append(f"{name} no está definido en {', '.join(files) or 'ningún archivo'}")
         ci = read(".github/workflows/ci.yml")
-        for job in re.findall(r"\bjob (\S+)", text):
+        for job in re.findall(r"\bjob ([\w-]+)", text):
             named += 1
             if not re.search(rf"^  {re.escape(job)}:", ci, re.M):
                 problems.append(f"el job {job} no existe en ci.yml")
-        for quoted in re.findall(r'"([^"]+)"', text):
+        for target in re.findall(r"\bmake ([\w-]+)", text):
             named += 1
-            if quoted.startswith("make "):
-                target = quoted.split()[1]
-                if not re.search(rf"^{re.escape(target)}:", read("Makefile"), re.M):
-                    problems.append(f"el objetivo make {target} no existe en el Makefile")
-            elif not re.search(rf"^\s*- name: {re.escape(quoted)}\s*$", ci, re.M):
-                problems.append(f"el paso {quoted} no existe en ci.yml")
+            if not re.search(rf"^{re.escape(target)}:", read("Makefile"), re.M):
+                problems.append(f"el objetivo make {target} no existe en el Makefile")
+        for step in re.findall(r'\bpaso "([^"]+)"', text):
+            named += 1
+            if not re.search(rf"^\s*- name: {re.escape(step)}\s*$", ci, re.M):
+                problems.append(f"el paso {step} no existe en ci.yml")
         if not named:
             problems.append("no nombra ninguna prueba concreta (clase/función, job, paso o make)")
         errors += [f"{label}: {problem}" for problem in problems]

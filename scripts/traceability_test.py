@@ -335,6 +335,33 @@ class NonFunctionalVerificationTests(unittest.TestCase):
         self.assertNotIn("Con RF", text)
         self.assertNotIn("RNF-001 Uno", text)
 
+    def test_a_quoted_e2e_title_is_not_read_as_a_ci_step_name(self) -> None:
+        feature = self.FEATURE.replace('paso "Pruebas X" del job e2e de CI', 'y el test E2E "RNF-010 Un título" del job e2e')
+        self.assertEqual(self.errors(feature), [])
+
+    def test_a_job_id_followed_by_punctuation_resolves(self) -> None:
+        for suffix in (",", ".", ")", ";"):
+            feature = self.FEATURE.replace("job spec-drift de CI", f"job spec-drift{suffix} de CI")
+            self.assertEqual(self.errors(feature), [], suffix)
+
+    def test_an_unquoted_make_target_is_checked(self) -> None:
+        feature = self.FEATURE.replace('vía "make load-test"', "vía make no-existe")
+        self.assertIn("make no-existe", "\n".join(self.errors(feature)))
+
+    def test_a_partial_class_name_does_not_match(self) -> None:
+        files = dict(self.FILES)
+        files["scripts/x_test.py"] = "class RnfOneExtended:\n    pass\n"
+        self.assertIn("RnfOne no está definido", "\n".join(self.errors(files=files)))
+        files["scripts/x_test.py"] = "x = 'RnfOneExtended'\n"
+        self.assertIn("RnfOne no está definido", "\n".join(self.errors(files=files)))
+        files["scripts/x_test.py"] = "x = 'RnfOne'\n"
+        self.assertEqual(self.errors(files=files), [])
+
+    def test_a_partial_step_name_does_not_match(self) -> None:
+        files = dict(self.FILES)
+        files[".github/workflows/ci.yml"] = "jobs:\n  spec-drift:\n  e2e:\n    steps:\n      - name: Pruebas X y más\n"
+        self.assertIn("paso Pruebas X", "\n".join(self.errors(files=files)))
+
     def test_the_real_feature_is_machine_checked(self) -> None:
         self.assertEqual(traceability.verification_errors(traceability.load_gherkin_scenarios()), [])
 
