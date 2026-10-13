@@ -283,8 +283,8 @@ def tokenize_verification(text: str) -> tuple[list[tuple[str, str]], list[str]]:
     """Scan one ``# Verificación:`` line once, left to right.
 
     Returns the ``(kind, value)`` references in order plus the problems that are not references: a
-    double-quoted string without a prefix, and quote characters left unconsumed (an unclosed or
-    mismatched ``make`` delimiter).
+    double-quoted string without a prefix, a double quote left unconsumed, or an odd number of
+    backticks left in the free text (backticks around a path or a name are plain formatting).
     """
     references: list[tuple[str, str]] = []
     problems: list[str] = []
@@ -299,8 +299,9 @@ def tokenize_verification(text: str) -> tuple[list[tuple[str, str]], list[str]]:
         else:
             references.append(("make" if kind == "quoted_make" else kind, match.group(kind)))
     gaps.append(text[position:])
-    if any(quote in gap for gap in gaps for quote in '"`'):
-        problems.append('comilla sin cerrar o delimitadores distintos: `make <objetivo>` va con ``…``, con "…" o sin comillas, pero el mismo al abrir y cerrar')
+    free_text = "".join(gaps)
+    if '"' in free_text or free_text.count("`") % 2:
+        problems.append('comilla sin cerrar o delimitadores distintos fuera de una referencia reconocida: cada "…" necesita un prefijo (paso, e2e, make) y cada `…` debe cerrarse con el mismo carácter')
     return references, problems
 
 
@@ -325,8 +326,9 @@ def verification_errors(scenarios: list[Scenario]) -> list[str]:
     """Machine-check the "# Verificación:" line of every scenario tagged only with @RNF-NNN.
 
     These scenarios are not derived into Playwright specs, so the free-text comment is their only link
-    to the test that runs them. The line is tokenized once (``VERIFICATION_TOKEN``) and the grammar is
-    defined only here; other words are free text and ignored:
+    to the test that runs them. The line is tokenized once (``VERIFICATION_TOKEN``). This list is the
+    canonical grammar; specs/06-acceptance/README.md and scripts/README.md copy it verbatim and
+    ``test_the_grammar_copies_match_the_docstring`` keeps them in sync. Other words are free text:
 
     - una ruta de archivo (.py, .js, .ts, .sh, .yml, .yaml o .go) que debe existir;
     - `(Nombre)`: clase o función que debe existir como palabra completa en ese archivo;

@@ -365,13 +365,29 @@ class NonFunctionalVerificationTests(unittest.TestCase):
     def test_mismatched_make_delimiters_are_an_error(self) -> None:
         for form in ('vía "make load-test`', 'vía `make load-test"', 'vía "make load-test', "vía `make load-test"):
             text = "\n".join(self.errors(self.with_make(form)))
-            self.assertIn("comilla", text, form)
+            self.assertIn("comilla sin cerrar o delimitadores distintos", text, form)
 
-    def test_the_current_feature_files_have_no_prose_make(self) -> None:
-        for path in sorted((REPO_ROOT / "specs" / "06-acceptance").glob("*.feature")):
-            for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-                if not line.lstrip().startswith("# Verificación:"):
-                    self.assertNotRegex(line, r"\bmake\b", f"{path.name}:{number}")
+    def test_backticks_around_a_path_or_a_job_are_formatting(self) -> None:
+        self.assertEqual(self.errors(self.with_make("vía `make load-test` en `job e2e`")), [])
+
+    def test_every_real_verification_line_tokenizes_without_problems(self) -> None:
+        lines = [
+            (path.name, number, line.split("# Verificación:", 1)[1])
+            for path in sorted((REPO_ROOT / "specs" / "06-acceptance").glob("*.feature"))
+            for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1)
+            if "# Verificación:" in line
+        ]
+        self.assertTrue(lines)
+        for name, number, text in lines:
+            self.assertEqual(traceability.tokenize_verification(text)[1], [], f"{name}:{number}")
+
+    def test_the_grammar_copies_match_the_docstring(self) -> None:
+        bullets = [line.strip() for line in traceability.verification_errors.__doc__.splitlines() if line.strip().startswith("- ")]
+        self.assertTrue(bullets)
+        for copy in (REPO_ROOT / "specs" / "06-acceptance" / "README.md", REPO_ROOT / "scripts" / "README.md"):
+            text = copy.read_text(encoding="utf-8")
+            for bullet in bullets:
+                self.assertIn(bullet, text, f"{copy.relative_to(REPO_ROOT)}: falta «{bullet[:60]}…»")
 
     def test_an_e2e_title_resolves_with_any_quote_style_and_test_modifier(self) -> None:
         cases = {

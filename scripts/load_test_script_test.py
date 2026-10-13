@@ -24,7 +24,7 @@ sys.dont_write_bytecode = True
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "scripts" / "load-test.sh"
 POLL_INTERVAL_SECONDS = 0.05  # how often the "slow" k6 stub (and the test) poll for a file
-MAX_POLLS = 600  # 600 polls x 0.05 s = 30 s ceiling for the stub waiting on STUB_RELEASE
+MAX_POLLS = 600  # 600 polls x 0.05 s = 30 s: ceiling for the stub waiting on STUB_RELEASE and for the test waiting on STUB_STARTED
 # Exit status of the "slow" stub when STUB_RELEASE never appeared within MAX_POLLS: the test never released it.
 STUB_NEVER_RELEASED = 99
 STUB = rf"""#!/usr/bin/env bash
