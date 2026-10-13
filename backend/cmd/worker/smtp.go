@@ -141,5 +141,11 @@ func (m *smtpMailer) Send(ctx context.Context, from string, to []string, message
 	if err := w.Close(); err != nil {
 		return fmt.Errorf("cerrando DATA: %w", err)
 	}
-	return client.Quit()
+	// The server already accepted the message (250 to DATA). A failed QUIT (deadline, reset)
+	// must not be reported as a send failure: the worker would requeue the event and send the
+	// email twice. It is best-effort; Close releases the connection either way.
+	if err := client.Quit(); err != nil {
+		_ = client.Close()
+	}
+	return nil
 }
