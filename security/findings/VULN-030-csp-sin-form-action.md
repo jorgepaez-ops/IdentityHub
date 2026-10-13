@@ -11,8 +11,8 @@
 | **Sembrada** | no |
 | **Evidencia antes** | `docs/evidencia/VULN-030/evidencia.json` — run 37055543540 |
 | **Commit de remediación** | `61df987` |
-| **Evidencia después** | pendiente (run verde de CI posterior a la remediación) |
-| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/37055543540 / pendiente |
+| **Evidencia después** | `docs/evidencia/VULN-030/evidencia.json` — run 37065094942 (`16ab347`): `PASS: CSP [10055]` en las baselines del Hub y de Contabilidad |
+| **Run de Actions (antes/después)** | https://github.com/jorgepaez-ops/IdentityHub/actions/runs/37055543540 / https://github.com/jorgepaez-ops/IdentityHub/actions/runs/37065094942 |
 
 ## Evidencia
 
@@ -49,4 +49,5 @@ T15b añade `form-action 'self'` a la variable `$csp` de ambos bloques `server` 
 solicitudes programáticas; el flujo OAuth `/oauth/authorize` es una navegación y el canje
 del código usa `fetch`, por lo que no requiere permitir un `form-action` entre orígenes.
 
-La remediación está en `61df987`; la evidencia después queda pendiente del run de CI en verde.
+La remediación está en `61df987`. El run 37065094942 (`16ab347`, CI en verde) la confirma: el job 11
+informa `PASS: CSP [10055]` en ambas baselines y `Gate passed: no alerts of severity Medium or higher.`

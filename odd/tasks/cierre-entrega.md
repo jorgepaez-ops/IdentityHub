@@ -235,12 +235,16 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
     positivo de Sonar S7552 en `gen-smtp-certs.sh`, prueba de frontend de F1 no aislada (FileReader colado).
   - Merges: PR #32 a #41 en `main`. Ramas restantes: solo `main` y `badges`; worktrees y volúmenes de prueba
     borrados. Matriz: 33 requisitos, 25 completos, 7 parciales, 1 sin cubrir (RNF-010), 0 diferidos.
-- [ ] **C2 — Tag `v1.0.0` y release** con el PDF del informe adjunto (`make informe`; el PDF no se
+- [x] **C2 — Tag `v1.0.0` y release** con el PDF del informe adjunto (`make informe`; el PDF no se
   versiona). En vivo frente al equipo (T21 de `idp-semana-4.md`). Requiere el merge del PR #20.
   Pasos: (1) merge del PR #20 y `main` local al día con CI en verde; (2) `make informe` y revisión del PDF;
   (3) notas del release revisadas por el usuario; (4) en vivo: `git tag -a v1.0.0` sobre el merge,
   `git push origin v1.0.0` (dispara el workflow de C3), `gh release create v1.0.0` con el PDF adjunto;
   (5) evidencia: URL del release y de las imágenes en Docker Hub, en T17, T21 y aquí.
+  **Cerrada (2026-10-13).** Tag `v1.0.0` sobre `06b6e01`; run de `release.yml` 38460792159 en verde. Release con
+  `informe-tecnico.pdf` adjunto: https://github.com/jorgepaez-ops/IdentityHub/releases/tag/v1.0.0. Imágenes: `docker.io/jorgeivp/identity-hub-{api,worker,web}:v1.0.0` (y `latest`),
+  firmadas y con SBOM CycloneDX atestado; digests api `fa53d22a`, worker `9bd06633`, web `d5e81249`. Evidencia también
+  en T17 y T21 de `idp-semana-4.md`.
 
 - [x] **D — Hallazgos sueltos y deuda de Sonar (decisión del usuario, 2026-10-07: «soluciona el 4 y 5 y luego
   merge del PR20»).** Cambio posterior del usuario: el PR #20 se fusiona solo con C1 y la tarea D va en un PR nuevo. Ejecutor: Sonnet; revisión de Opus; un commit por
@@ -286,6 +290,8 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
     `go test ./...` con Postgres real: 27 paquetes ok; `./internal/api` 160 PASS, 0 SKIP; `golangci-lint` 0;
     osv-scanner v2.3.5 sobre `./tools` exit 0; actionlint 0. Hallazgo aparte (sin id): osv-scanner local v2.3.5
     marca 21 avisos de stdlib en `backend/go.mod` (`go 1.26.0`) que el v2.6.0 de CI no marca; pendiente de decidir.
+    Decisión (2026-10-13): la referencia es el osv-scanner v2.6.0 fijado en CI, que no los marca; el v2.3.5 local
+    estaba desactualizado. No queda acción abierta.
     Revisión nativa del rango `3d0de78..8f57c76` (alto, 20 archivos, 4 lentes): **aprobada** y acusada
     (`review-1a76f102a78bff85`), 10 avisos no bloqueantes: el de parámetros requeridos vacíos en `/oauth/authorize`
     lo cubre `ValidateAuthorizeInput` (`oauth.go:180-187`); `omitempty` verificado en los clientes; `AGENTS.md:49`
@@ -374,13 +380,32 @@ Mañana (2026-10-13), en este orden:
      independiente; recomendación (a) pasa a "automatizar cosign verify como paso posterior del release".
 2. C2: `make informe` (incluir en el informe lo hecho en F1-F4, F6-F10 y los hallazgos de arriba), revisión del PDF
    por el usuario, notas del release, tag `v1.0.0` en vivo y `gh release create v1.0.0` con el PDF.
-   - **Avance (2026-10-13).** Informe técnico actualizado (`b4bf102`, PDF 51 pp., sin versionar) y auditoría de toda
+   - **Cerrada (2026-10-13).** PR #44-#49 en `main`; tag `v1.0.0` sobre `06b6e01`, run de `release.yml`
+     38460792159 en verde (6 jobs); el paso «Verificar firma y atestación» corrió antes de «Mover latest» en las tres
+     imágenes. Verificación local con Cosign v3.1.3 e identidad fijada a `release.yml@refs/tags/v`: `verify` y
+     `verify-attestation` OK; `latest` = `v1.0.0` (api `fa53d22a`, worker `9bd06633`, web `d5e81249`). Release
+     publicado con el informe técnico (53 páginas) adjunto: https://github.com/jorgepaez-ops/IdentityHub/releases/tag/v1.0.0
+   - **Avance previo al cierre (2026-10-13, histórico).** Informe técnico actualizado (`b4bf102`, PDF 51 pp., sin versionar) y auditoría de toda
      la documentación; correcciones en 21 archivos (`ae016a1`, `55d330c`, `f9b43d4`, `82fb5c7`, `a8a93c2`): bitácora,
      READMEs, AGENTS/CLAUDE, guía de desarrollo (primer arranque y `.env` anterior a F2), diagramas (Falco, SMTP
      STARTTLS, claves de servicio), AM-023 en Threat Dragon (24 amenazas), controles de release (F7/F8) y escenas de
-     demo para exportación, claves de servicio y Falco (video en 15:00). Revisión nativa aprobada. Pendiente: revisión
-     del PDF por el usuario, PR de documentación, notas del release, tag `v1.0.0` y release con el PDF.
+     demo para exportación, claves de servicio y Falco (video en 15:00). Revisión nativa aprobada. Lo que quedaba
+     (revisión del PDF, PR de documentación, notas, tag y release) se cerró en el punto anterior.
 3. Entorno local del usuario: agregar `SMTP_PASSWORD` al `.env` (`openssl rand -hex 24`) y correr `make certs`
    antes de `make up`.
+   - **Cerrada (2026-10-13).** `SMTP_PASSWORD` agregada; `make up` ya corre `make certs` y levanta también la
+     observabilidad (`make up-app` queda para CI).
+4. Seguimiento del release y del informe formal.
+   - **Cerrada (2026-10-13).** Tres partes:
+   - **PR #50** (merge `9f60e43`, CI de `main` 18/18 en verde): el paso de verificación de `release.yml` ya no imprime
+     el SBOM (el run de `v1.0.0` tardó ~7 min por eso), la identidad y el emisor OIDC se definen una sola vez, y
+     `scripts/informe_excerpts_test.py` comprueba que los extractos `{{code:...}}` del informe caigan en límites de
+     bloque. Se ejercita en el próximo tag; no se saca `v1.0.1` solo para probarlo (decisión del usuario).
+   - **Reconciliación de hallazgos (PR #51).** Claude Desktop: el informe formal pasó de 28 a 31 hallazgos (faltaban VULN-011, 015 y 024,
+     sin gate en CI ni capturas). Las fichas de VULN-030 y VULN-031 seguían con la evidencia "después" pendiente,
+     aunque sus `evidencia.json` ya citaban el run 37065094942 (`16ab347`, CI en verde con los dos arreglos);
+     corregidas en este PR. VULN-019 se mantiene "remediado" según la ficha (residual de 108 en imágenes de terceros).
+   - **Estado final.** Queda solo F5 como trabajo futuro. Opcional: marcar en SonarCloud los 11 falsos positivos tras el próximo
+     análisis de `main`.
 Notas operativas: Codex ya no está disponible (la delegación va a Sonnet); `gh pr merge --delete-branch` también
 borra el worktree local de esa rama; Engram rechazó guardados en la sesión del 2026-10-12 (consola nueva).

@@ -488,6 +488,7 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   queda marcado como histórico. R3-002 (forma de `captura` en null): sigue el protocolo de evidencia.
 - [x] **T17 — Docker Hub.** Hecho como C3 (2026-10-12; ver `odd/tasks/cierre-entrega.md`). Workflow de release en tag `vX.Y.Z`: imágenes con `vX.Y.Z` y `latest`,
   SBOM con Syft y firma con Cosign (ADR 0011, Q1).
+  Publicación de entrega (2026-10-13): `docker.io/jorgeivp/identity-hub-{api,worker,web}:v1.0.0` (y `latest`), run 38460792159.
   Pospuesta al final de la fase 4 por decisión del usuario (2026-10-06), a la espera de Q1 (namespace
   y token de Docker Hub). Propuesta de Claude: repositorios `api`, `worker` y `web` (`web` ya sirve el
   Hub y Contabilidad), environment protegido `dockerhub`, tag de prueba `v0.9.0` y `v1.0.0` en T21.
@@ -570,10 +571,12 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
   de contingencia. Verificación (Codex): 22 enlaces relativos existen, los objetivos de make citados
   existen, tiempos 13:00. Revisión de Claude: escenas 1 a 5 leídas; `docs/README.md` conserva el guion
   de la demo en vivo (`guion-demo.md`, ~5 min) junto al del video. Pendiente: grabar (Q3).
-- [ ] **T21 — Cierre.** Bitácora, matriz, informe de seguridad final, tag de versión y PR. Documentación hecha
+- [x] **T21 — Cierre.** Bitácora, matriz, informe de seguridad final, tag de versión y PR. Documentación hecha
   como E (2026-10-12); tag `v1.0.0`, release y PR finales en C2 (`odd/tasks/cierre-entrega.md`).
   Decisión del usuario (2026-10-06): dejar todo terminado y verificado antes de Docker Hub; T17, el tag
   `vX.Y.Z` y el release (con el PDF del informe adjunto) se hacen al final, en vivo frente al equipo.
+  **Cerrada (2026-10-13).** Tag `v1.0.0` sobre `06b6e01` y release con el PDF: https://github.com/jorgepaez-ops/IdentityHub/releases/tag/v1.0.0
+  (detalle en C2 de `odd/tasks/cierre-entrega.md`).
   - [x] **T21a — Codificación de los correos.** `buildRawMessage` declara `MIME-Version`,
     `Content-Type: text/plain; charset=utf-8` y codifica el asunto (RFC 2047); prueba primero.
     Ruta: delegada (Codex), revisión de Claude. Evidencia (2026-10-06): RED con tres TestRF012_ (faltaba
@@ -609,8 +612,8 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
 | 1 — Documentación, UML e integración | T1 a T6 (6) | 6 (T1 a T6) — fase cerrada |
 | 2 — IaC de referencia | T7 a T10 (4) | 4 (T7 a T10) — fase cerrada |
 | 3 — Grilla de roles configurable | T11 a T15 (5) | 5 (T11 a T15) — fase cerrada |
-| 4 — Publicación y entrega | T16 a T21 (6) | 4 (T16, T18, T19 y T20) |
-| **Total** | **21** | **19** (T1 a T16 y T18 a T20) |
+| 4 — Publicación y entrega | T16 a T21 (6) | 6 (T16 a T21) — fase cerrada |
+| **Total** | **21** | **21** (T1 a T21) |
 
 ## Siguiente paso
 
@@ -618,6 +621,8 @@ terceros, las imágenes publicadas en Docker Hub, el informe técnico en PDF y e
 (VULN-019 remediado, capturas de Desktop incluidas). T17 pospuesta al final (Q1). T18 a T20 hechas, más la corrección de
 las métricas del dashboard. Siguiente: T21a a T21c; al final, en vivo, T17 con tag y release.
 Codex: cuota diaria limitada; Sonnet como respaldo.
+
+**2026-10-13.** T17 (como C3) y T21 cerradas: tag `v1.0.0` y release publicados. Las 21 tareas están hechas.
 
 ## Cambios de spec propuestos
 
