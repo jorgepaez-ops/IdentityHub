@@ -8,9 +8,10 @@
 #    1. gate    — construye y escanea cada imagen con el mismo gate de Trivy que
 #                 CI y la guarda como artefacto.
 #    2. publish — solo si las tres pasaron: carga la MISMA imagen escaneada (no
-#                 la reconstruye), la sube con vX.Y.Z y latest, la firma con
+#                 la reconstruye), la sube con vX.Y.Z, la firma con
 #                 Cosign keyless (OIDC del workflow) y le adjunta el SBOM
-#                 CycloneDX de Syft como atestación.
+#                 CycloneDX de Syft como atestación; recién entonces mueve
+#                 latest a ese digest (solo si es la versión más alta).
 #
 #  Credenciales: variable DOCKERHUB_NAMESPACE (repo) y secreto DOCKERHUB_TOKEN
 #  (environment protegido "dockerhub", restringido a tags v*). La fase 1 no
@@ -90,7 +91,9 @@ jobs:
           name: image-${{ matrix.name }}
           path: image-${{ matrix.name }}.tar
           if-no-files-found: error
-          retention-days: 1
+          # Margen para repetir solo el job de publicación si falla; en un repositorio
+          # público el almacenamiento de artefactos no tiene costo.
+          retention-days: 7
 
   publish:
     name: Publicar ${{ matrix.name }}
@@ -120,14 +123,15 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       # Se sube exactamente la imagen que pasó el gate: se carga del artefacto, no se reconstruye.
-      - name: Publicar ${{ matrix.name }}
+      # Solo vX.Y.Z: latest se mueve al final, cuando la firma y el SBOM ya están publicados.
+      # Los pasos de red se reintentan (3 intentos con espera creciente) ante fallos transitorios.
+      - name: Publicar ${{ matrix.name }}:${{ github.ref_name }}
         id: push
         run: |
+          retry() { for i in 1 2 3; do "$@" && return 0; echo "::warning::intento $i falló: $*"; sleep $((i * 15)); done; return 1; }
           docker load -i "image-${{ matrix.name }}.tar"
           docker tag "${LOCAL_TAG}" "${IMAGE}:${VERSION}"
-          docker tag "${LOCAL_TAG}" "${IMAGE}:latest"
-          docker push "${IMAGE}:${VERSION}"
-          docker push "${IMAGE}:latest"
+          retry docker push "${IMAGE}:${VERSION}"
           digest="$(docker inspect --format '{{index .RepoDigests 0}}' "${IMAGE}:${VERSION}")"
           digest="${digest#*@}"
           [[ "${digest}" == sha256:* ]] || { echo "::error::digest no encontrado"; exit 1; }
@@ -150,16 +154,40 @@ jobs:
           DIGEST: ${{ steps.push.outputs.digest }}
           SBOM: sbom-${{ matrix.name }}.cdx.json
         run: |
-          cosign sign --yes "${IMAGE}@${DIGEST}"
-          cosign attest --yes --type cyclonedx --predicate "${SBOM}" "${IMAGE}@${DIGEST}"
+          retry() { for i in 1 2 3; do "$@" && return 0; echo "::warning::intento $i falló: $*"; sleep $((i * 15)); done; return 1; }
+          retry cosign sign --yes "${IMAGE}@${DIGEST}"
+          retry cosign attest --yes --type cyclonedx --predicate "${SBOM}" "${IMAGE}@${DIGEST}"
+
+      # latest solo apunta a una imagen ya firmada y atestada, y solo si este tag es la versión
+      # más alta publicada: repetir el release de un tag viejo no hace retroceder latest.
+      - name: Mover latest al digest firmado
+        id: latest
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          retry() { for i in 1 2 3; do "$@" && return 0; echo "::warning::intento $i falló: $*"; sleep $((i * 15)); done; return 1; }
+          highest="$(git ls-remote --tags --refs "https://github.com/${GITHUB_REPOSITORY}.git" \
+            | sed 's|.*refs/tags/||' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1)"
+          if [[ "${highest}" != "${VERSION}" ]]; then
+            echo "moved=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::latest no se mueve: ${VERSION} no es la versión más alta (${highest})"
+            exit 0
+          fi
+          docker tag "${LOCAL_TAG}" "${IMAGE}:latest"
+          retry docker push "${IMAGE}:latest"
+          latest="$(docker buildx imagetools inspect "${IMAGE}:latest" --format '{{.Manifest.Digest}}')"
+          [[ "${latest}" == "${DIGEST}" ]] || { echo "::error::latest (${latest}) no coincide con el digest firmado (${DIGEST})"; exit 1; }
+          echo "moved=true" >> "$GITHUB_OUTPUT"
 
       - name: Resumen
         env:
           DIGEST: ${{ steps.push.outputs.digest }}
+          MOVED: ${{ steps.latest.outputs.moved }}
         run: |
+          tags="\`${VERSION}\`"; [[ "${MOVED}" == "true" ]] && tags="${tags}, \`latest\`"
           {
             echo "### ${IMAGE}"
-            echo "- Etiquetas: \`${VERSION}\`, \`latest\`"
+            echo "- Etiquetas: ${tags}"
             echo "- Digest: \`${DIGEST}\`"
             echo "- Firma y SBOM: \`cosign verify ${IMAGE}@${DIGEST} --certificate-identity-regexp '^https://github.com/${GITHUB_REPOSITORY}/' --certificate-oidc-issuer https://token.actions.githubusercontent.com\`"
           } >> "$GITHUB_STEP_SUMMARY"
