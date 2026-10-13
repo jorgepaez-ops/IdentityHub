@@ -9,8 +9,8 @@
 #                 CI y la guarda como artefacto.
 #    2. publish — solo si las tres pasaron: carga la MISMA imagen escaneada (no
 #                 la reconstruye), la sube con vX.Y.Z, la firma con
-#                 Cosign keyless (OIDC del workflow) y le adjunta el SBOM
-#                 CycloneDX de Syft como atestación; recién entonces mueve
+#                 Cosign keyless (OIDC del workflow), le adjunta el SBOM
+#                 CycloneDX de Syft como atestación, verifica ambas; recién entonces mueve
 #                 latest a ese digest (solo si es la versión más alta).
 #
 #  Credenciales: variable DOCKERHUB_NAMESPACE (repo) y secreto DOCKERHUB_TOKEN
@@ -157,6 +157,21 @@ jobs:
           retry() { for i in 1 2 3; do "$@" && return 0; echo "::warning::intento $i falló: $*"; [ "$i" -lt 3 ] && sleep $((i * 15)); done; return 1; }
           retry cosign sign --yes "${IMAGE}@${DIGEST}"
           retry cosign attest --yes --type cyclonedx --predicate "${SBOM}" "${IMAGE}@${DIGEST}"
+
+      # Verificación posterior a la firma: si falla, el job termina aquí y latest no se mueve.
+      - name: Verificar firma y atestación
+        # La identidad se restringe a este workflow en un tag: una firma hecha desde otro workflow
+        # o rama del repositorio no pasa. Probado contra v0.9.1 (y rechaza la identidad de ci.yml).
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+          OIDC_ISSUER: https://token.actions.githubusercontent.com
+        run: |
+          retry() { for i in 1 2 3; do "$@" && return 0; echo "::warning::intento $i falló: $*"; [ "$i" -lt 3 ] && sleep $((i * 15)); done; return 1; }
+          identity="^https://github.com/${GITHUB_REPOSITORY}/\\.github/workflows/release\\.yml@refs/tags/v"
+          retry cosign verify "${IMAGE}@${DIGEST}" \
+            --certificate-identity-regexp "${identity}" --certificate-oidc-issuer "${OIDC_ISSUER}"
+          retry cosign verify-attestation --type cyclonedx "${IMAGE}@${DIGEST}" \
+            --certificate-identity-regexp "${identity}" --certificate-oidc-issuer "${OIDC_ISSUER}"
 
       # latest solo apunta a una imagen ya firmada y atestada, y solo si este tag es el tag
       # vX.Y.Z más alto del repositorio: repetir el release de un tag viejo no hace retroceder latest.

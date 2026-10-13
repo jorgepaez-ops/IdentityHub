@@ -74,41 +74,7 @@ El `docker-compose.yml` de la raíz incluye `deploy/docker-compose.yml`; `make u
 
 ### Levantar el stack
 
-El flujo completo son dos comandos: `make setup` (solo en un clon nuevo; no sobrescribe un `.env` existente) y `make up`. No hay un segundo comando para la observabilidad.
-
-`make up` ejecuta antes `make certs` (CA y certificado SMTP locales, idempotente), construye las imágenes y levanta **todo** el stack:
-
-| Grupo | Servicios | Puertos publicados en el host |
-|---|---|---|
-| Aplicación | `db` (PostgreSQL), `broker` (RabbitMQ), `mailpit`, `migrate` (corre y termina), `api`, `worker`, `web` (Nginx) | `web` 8080 · `api` 8081 · `worker` 9091 (métricas) · `db` 5432 · `broker` 5672 y 15672 · `mailpit` 1025 y 8025 |
-| Observabilidad | `prometheus`, `loki`, `alloy`, `grafana`, `falco` | `prometheus` 9090 · `loki` 3100 · `grafana` 3000 · `alloy` y `falco` no publican puertos |
-
-Al terminar imprime estas direcciones:
-
-| Servicio | Dirección |
-|---|---|
-| Hub | <http://identityhub.localhost:8080> (<http://localhost:8080> también sirve el Hub) |
-| Contabilidad | <http://contabilidad.localhost:8080> |
-| API | <http://localhost:8081/healthz> |
-| RabbitMQ | <http://localhost:15672> |
-| Mailpit | <http://localhost:8025> |
-| Grafana | <http://localhost:3000> |
-| Prometheus | <http://localhost:9090> |
-
-Las credenciales de RabbitMQ y Grafana salen de `.env` (`RABBITMQ_DEFAULT_USER`/`RABBITMQ_DEFAULT_PASS` y `GRAFANA_ADMIN_USER`/`GRAFANA_ADMIN_PASSWORD`, generadas por `make setup`); no se imprimen ni se versionan.
-
-Tiempos de espera: la aplicación queda lista cuando `api` y `web` aparecen `healthy` en `make ps` (unos 30 a 60 s tras construir). Grafana responde en <http://localhost:3000/api/health> a los pocos segundos; sus paneles con datos tardan 1 a 2 minutos porque Prometheus raspa cada 15 s y Alloy descubre contenedores nuevos cada ~60 s. Una alerta de Falco tarda también 1 a 2 minutos en verse en Loki y Grafana (`make falco-test` la dispara).
-
-- **Solo la aplicación:** `make up-app` levanta únicamente los servicios del grupo Aplicación, sin Prometheus, Loki, Alloy, Grafana ni Falco. Es lo que usa CI (acción compuesta `stack-up`, jobs E2E y DAST) y sirve en un equipo con pocos recursos.
-- **Detener:** `make down` detiene todos los contenedores, observabilidad incluida, y **conserva los volúmenes** (`pgdata`, `rabbitdata`, `grafanadata`). `make clean` hace lo mismo y además **borra los volúmenes**: se pierden los datos y las contraseñas guardadas de Postgres y RabbitMQ.
-- **Estado y logs:** `make ps` lista todos los servicios, observabilidad incluida; `make logs S=<servicio>` sigue el log de uno (por ejemplo `make logs S=falco`).
-- **Falco y el kernel:** Falco usa el driver modern eBPF y necesita un kernel Linux con BTF (Linux moderno o Docker Desktop). Sin él, `make up` termina bien, la aplicación y el resto de la observabilidad funcionan y solo `falco` falla y se reinicia (`restart: unless-stopped`; nada depende de él). Se ve en `make ps` (estado `Restarting` o `Exited`) y la causa en `make logs S=falco`. Falco no corre en CI.
-
-Problemas frecuentes:
-
-1. `error: falta SMTP_PASSWORD en .env` (o `falta .env`): el `.env` es anterior a F2 o no existe. Ejecute `make setup` en un clon nuevo; en uno existente agregue solo la línea `SMTP_PASSWORD` como se explica más adelante, y repita `make up`.
-2. Puerto ocupado (`port is already allocated`, típico de 8080, 5432 o 3000): detenga el proceso que lo usa (`lsof -i :8080`) o un stack anterior (`make down`) y repita `make up`.
-3. `falco` en `Restarting`: revise `make logs S=falco`. Si el mensaje habla de BTF, eBPF o del driver, el kernel no lo soporta: el resto del stack funciona y puede ignorarlo, o usar `make up-app` para no verlo.
+`make up` levanta todo (aplicación y observabilidad) y `make up-app` solo la aplicación (lo usa CI); `make down` detiene conservando volúmenes y `make clean` los borra. Servicios y puertos publicados, tiempos de espera, Falco y el kernel, y los problemas frecuentes están en la guía: [Levantar el stack](docs/guia-desarrollo.md#levantar-el-stack).
 
 ### Si su `.env` es anterior a F2
 

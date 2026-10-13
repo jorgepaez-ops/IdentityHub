@@ -53,7 +53,7 @@ mitigación sin gate se degrada en cuanto alguien la borre sin darse cuenta.
 |---|---|---|---|---|
 | AM-006 | Inyección SQL en la búsqueda de usuarios | Consultas parametrizadas generadas por `sqlc`; nunca concatenación de cadenas | `gosec` G201/G202, CodeQL, Semgrep | RF-010 |
 | AM-007 | Escalada de privilegios alterando el claim `roles` del cliente | Los roles se leen de la base de datos en cada petición sensible, no del token; el token solo se cree tras verificar la firma | `test-integration` de RBAC; ZAP con token manipulado | RF-009 |
-| AM-008 | Imagen manipulada entre la construcción y el despliegue | Firma Cosign *keyless* y atestación del SBOM sobre el digest, y despliegue por digest, no por etiqueta mutable; la etiqueta móvil `latest` solo se mueve después de firmar y atestar | `release.yml`: el job `publish` firma y atesta cada digest y solo entonces mueve `latest` (verificado con el tag `v0.9.1`) | RNF-006 |
+| AM-008 | Imagen manipulada entre la construcción y el despliegue | Firma Cosign *keyless* y atestación del SBOM sobre el digest, y despliegue por digest, no por etiqueta mutable; la etiqueta móvil `latest` solo se mueve después de firmar, atestar y verificar ambas con `cosign verify`/`verify-attestation` | `release.yml`: el job `publish` firma, atesta y verifica cada digest y solo entonces mueve `latest`; el orden firma → `latest` se validó con el tag `v0.9.1` y el paso de verificación se ejecuta por primera vez con `v1.0.0` | RNF-006 |
 | AM-009 | Dependencia comprometida en la cadena de suministro | SBOM en CycloneDX por imagen, `osv-scanner`, Dependabot, lockfiles versionados | `sca`, `image-scan`, escaneo semanal | RNF-004 |
 
 ### Repudiation — repudio

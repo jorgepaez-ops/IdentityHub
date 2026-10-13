@@ -25,6 +25,13 @@
 #  exige estos checks por nombre y un check que no se ejecuta queda en "Expected —
 #  waiting" para siempre; además, el job image es una matriz cuyos nombres
 #  expandidos son los obligatorios, así que arranca siempre y omite sus pasos.
+#
+#  Clasificador: la lógica del job 0 vive en scripts/ci_changes.sh y se prueba en
+#  scripts/ci_changes_test.py (job 1). Guardas del job image: se evaluó una acción compuesta local
+#  que agrupara los pasos tras una sola guarda (S2, seguimiento-pre-v1) y se descartó: las acciones
+#  de terceros fijadas por SHA saldrían del alcance de Dependabot (directory "/" no recorre
+#  .github/actions/*) y el checkout debe quedar fuera para poder cargar la acción local. Se mantiene
+#  el if por paso y la misma prueba falla si algún paso del job image no lo tiene.
 # ═══════════════════════════════════════════════════════════════════════════
 name: CI
 
@@ -78,54 +85,8 @@ jobs:
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PUSH_BEFORE: ${{ github.event.before }}
           PUSH_SHA: ${{ github.sha }}
-        run: |
-          set -u
-          decide() {
-            echo "Decisión: code=$1 ($2)"
-            echo "code=$1" >> "$GITHUB_OUTPUT"
-            {
-              echo "### Detección de cambios"
-              echo "- Evento: $EVENT_NAME"
-              echo "- code=$1 ($2)"
-            } >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          }
-          files=""
-          case "$EVENT_NAME" in
-            pull_request)
-              files=$(git diff --no-renames --name-only "$PR_BASE_SHA...$PR_HEAD_SHA") || decide true "git diff falló"
-              ;;
-            push)
-              case "$PUSH_BEFORE" in
-                ""|*[!0]*) ;;
-                *) decide true "push sin commit previo" ;;
-              esac
-              files=$(git diff --no-renames --name-only "$PUSH_BEFORE..$PUSH_SHA") || decide true "git diff falló"
-              ;;
-            *)
-              decide true "evento $EVENT_NAME: se corre todo"
-              ;;
-          esac
-          if [ -z "$files" ]; then
-            decide true "lista de archivos vacía"
-          fi
-          echo "Archivos modificados:"
-          echo "$files"
-          {
-            echo "### Archivos modificados"
-            echo '```'
-            echo "$files"
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-          while IFS= read -r f; do
-            case "$f" in
-              # Rutas que gobiernan comportamiento: siempre código, aunque sean .md.
-              .github/*|specs/*|scripts/*) decide true "código: $f" ;;
-              *.md|odd/*|docs/*) ;;
-              *) decide true "código: $f" ;;
-            esac
-          done <<< "$files"
-          decide false "solo documentación"
+        # La lógica vive en scripts/ci_changes.sh y se prueba en scripts/ci_changes_test.py.
+        run: bash scripts/ci_changes.sh
 
   # ── 1. Los specs son la fuente de verdad ────────────────────────────────
   spec-drift:
@@ -180,6 +141,14 @@ jobs:
       # Pruebas del gate de ZAP (stdlib, sin red): el gate decide el job 11.
       - name: Pruebas del gate de ZAP
         run: python3 scripts/zap_gate_test.py
+
+      # Pruebas del clasificador del job 0 (repos git desechables) y lint de las guardas del job image.
+      - name: Pruebas del clasificador de cambios
+        run: python3 scripts/ci_changes_test.py
+
+      # Prometheus, Loki y Grafana no pueden publicar puertos fuera de 127.0.0.1 (lee docker compose config).
+      - name: Prueba de puertos de observabilidad en loopback
+        run: python3 scripts/compose_ports_test.py
 
       - name: Regenerar la matriz de trazabilidad
         run: python3 scripts/traceability.py

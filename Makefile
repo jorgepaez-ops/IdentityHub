@@ -7,6 +7,13 @@
 COMPOSE     := docker compose --env-file .env -f deploy/docker-compose.yml
 COMPOSE_OBS := $(COMPOSE) --profile observability
 COMPOSE_PROD := docker compose --env-file .env -f deploy/docker-compose.yml -f deploy/docker-compose.prod.yml
+# Direcciones de la aplicación que imprimen `make up` y `make up-app` (una sola copia).
+PRINT_APP_URLS := printf '%s\n' '' \
+	'  Hub             http://identityhub.localhost:8080  (localhost:8080 también sirve el Hub)' \
+	'  Contabilidad    http://contabilidad.localhost:8080' \
+	'  API             http://localhost:8081/healthz' \
+	'  RabbitMQ        http://localhost:15672   (credentials from .env)' \
+	'  Mailpit         http://localhost:8025'
 SQLC_VERSION := v1.31.1
 SQLC         ?= sqlc
 
@@ -27,12 +34,7 @@ certs: ## Genera la CA local, el certificado de Mailpit y sus credenciales SMTP 
 
 up: certs ## Levanta el stack completo, incluida la observabilidad (Grafana, Prometheus, Loki, Alloy y Falco)
 	$(COMPOSE_OBS) up -d --build
-	@echo ""
-	@echo "  Hub             http://identityhub.localhost:8080  (localhost:8080 también sirve el Hub)"
-	@echo "  Contabilidad    http://contabilidad.localhost:8080"
-	@echo "  API             http://localhost:8081/healthz"
-	@echo "  RabbitMQ        http://localhost:15672   (credentials from .env)"
-	@echo "  Mailpit         http://localhost:8025"
+	@$(PRINT_APP_URLS)
 	@echo "  Grafana         http://localhost:3000     (credentials from .env)"
 	@echo "  Prometheus      http://localhost:9090"
 	@echo ""
@@ -40,12 +42,7 @@ up: certs ## Levanta el stack completo, incluida la observabilidad (Grafana, Pro
 
 up-app: certs ## Levanta solo la aplicación, sin observabilidad (lo usa CI)
 	$(COMPOSE) up -d --build
-	@echo ""
-	@echo "  Hub             http://identityhub.localhost:8080  (localhost:8080 también sirve el Hub)"
-	@echo "  Contabilidad    http://contabilidad.localhost:8080"
-	@echo "  API             http://localhost:8081/healthz"
-	@echo "  RabbitMQ        http://localhost:15672   (credentials from .env)"
-	@echo "  Mailpit         http://localhost:8025"
+	@$(PRINT_APP_URLS)
 
 up-prod: ## Levanta la producción simulada (imágenes por digest, sin build ni puertos de desarrollo)
 	$(COMPOSE_PROD) up -d --no-build
@@ -173,6 +170,8 @@ spec-drift: ## Verifica sin red la matriz y escenarios Gherkin contra E2E
 	python3 scripts/traceability_test.py
 	python3 scripts/zap_gate_test.py
 	python3 scripts/setup_env_test.py
+	python3 scripts/ci_changes_test.py
+	python3 scripts/compose_ports_test.py
 	python3 scripts/traceability.py --check
 
 informe: ## Genera el informe técnico en PDF (docs/informe/informe-tecnico.pdf) con Chromium de Playwright
