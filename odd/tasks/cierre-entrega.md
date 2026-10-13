@@ -181,6 +181,9 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
     `tools/`. Propuesta: reclasificarlo de «riesgo aceptado con fecha» a «no afectado» (código vulnerable no
     presente), con esa evidencia, en la ficha, el informe, la matriz de hallazgos y `osv-scanner.toml`.
     Decisión del usuario pendiente.
+  - [ ] F10 Badge de cobertura con el valor medido: hoy es estático («gate ≥ 70 %», E3) y siempre se ve verde
+    aunque la cobertura real cambie (aviso de dos lentes de la revisión nativa del 2026-10-12). Publicar el
+    porcentaje que mide el job 6b sin servicio externo.
 - [ ] **C2 — Tag `v1.0.0` y release** con el PDF del informe adjunto (`make informe`; el PDF no se
   versiona). En vivo frente al equipo (T21 de `idp-semana-4.md`). Requiere el merge del PR #20.
   Pasos: (1) merge del PR #20 y `main` local al día con CI en verde; (2) `make informe` y revisión del PDF;
