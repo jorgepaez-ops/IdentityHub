@@ -352,6 +352,8 @@ jobs:
   test-integration:
     name: 6b · Pruebas de integración
     runs-on: ubuntu-latest
+    outputs:
+      coverage: ${{ steps.coverage.outputs.coverage }}
     env:
       # github.run_id is a per-run, throwaway service password, not a secret.
       TEST_DATABASE_URL: ${{ format('{0}{1}{2}', 'postgres://identity:', github.run_id, '@localhost:5432/identity?sslmode=disable') }}
@@ -399,6 +401,73 @@ jobs:
           }'
           echo "coverage=${COVERAGE}" >> "$GITHUB_OUTPUT"
         id: coverage
+
+  # ── 6c. Badge de cobertura (sin servicio externo) ───────────────────────
+  # Publica la cobertura medida en 6b como JSON de endpoint de shields.io en la rama
+  # huérfana `badges` (solo contiene coverage.json; nunca código). Es un job aparte a
+  # propósito: contents: write solo lo tiene este job, que no ejecuta código del PR ni
+  # hace checkout; solo corre en push a main y recibe el valor por outputs (AM-022).
+  coverage-badge:
+    name: 6c · Publicar badge de cobertura
+    needs: [test-integration]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      COVERAGE: ${{ needs.test-integration.outputs.coverage }}
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+    steps:
+      - name: Publicar coverage.json en la rama badges
+        run: |
+          set -euo pipefail
+          # El valor viene de un output de job: se valida antes de usarlo.
+          if ! [[ "$COVERAGE" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+            echo "Valor de cobertura inválido: '${COVERAGE}'" >&2
+            exit 1
+          fi
+          color=$(awk -v c="$COVERAGE" 'BEGIN { if (c + 0 >= 80) print "green"; else if (c + 0 >= 70) print "yellowgreen"; else print "red" }')
+          message=$(awk -v c="$COVERAGE" 'BEGIN { printf "%.1f %%", c }')
+
+          work=$(mktemp -d)
+          cd "$work"
+          git init --quiet
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add origin "https://github.com/${REPO}.git"
+          # El token viaja solo en este encabezado, nunca queda en .git/config.
+          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          echo "::add-mask::${auth}"
+          git_remote() { git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${auth}" "$@"; }
+
+          for attempt in 1 2 3 4 5; do
+            if git_remote fetch --quiet --depth=1 origin badges 2>/dev/null; then
+              git checkout --quiet -B badges FETCH_HEAD
+            else
+              # Primera ejecución: la rama no existe; se crea huérfana.
+              git checkout --quiet --orphan badges
+              git rm -rf --quiet . 2>/dev/null || true
+            fi
+
+            printf '{"schemaVersion":1,"label":"cobertura de integración","message":"%s","color":"%s"}\n' \
+              "$message" "$color" > coverage.json
+            git add coverage.json
+            if git diff --cached --quiet; then
+              echo "coverage.json sin cambios (${message}); no se publica."
+              exit 0
+            fi
+            git commit --quiet -m "chore(badges): coverage ${message}"
+            if git_remote push --quiet origin badges; then
+              echo "Badge publicado: ${message} (${color})."
+              exit 0
+            fi
+            echo "Push rechazado (intento ${attempt}/5); se reintenta." >&2
+            sleep $((attempt * 3))
+          done
+          echo "No se pudo publicar el badge tras 5 intentos." >&2
+          exit 1
 
   # ── 7. Pruebas de extremo a extremo ─────────────────────────────────────
   e2e:

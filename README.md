@@ -9,8 +9,7 @@ Identity Hub es un proveedor de identidad desarrollado desde cero, comparable en
 [![CI](https://github.com/jorgepaez-ops/IdentityHub/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/jorgepaez-ops/IdentityHub/actions/workflows/ci.yml)
 [![Versión](https://img.shields.io/github/v/tag/jorgepaez-ops/IdentityHub?label=versi%C3%B3n)](https://github.com/jorgepaez-ops/IdentityHub/tags)
 [![Licencia](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-
-<!-- El badge de cobertura queda pendiente de un servicio que publique el resultado. -->
+[![Cobertura de integración](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/jorgepaez-ops/IdentityHub/badges/coverage.json)](https://github.com/jorgepaez-ops/IdentityHub/actions/workflows/ci.yml)
 
 ## 3. Estado del proyecto
 
@@ -31,7 +30,7 @@ Identity Hub es un proveedor de identidad desarrollado desde cero, comparable en
 
 El backend está escrito en Go por decisión del proyecto: el profesor permitió elegir el stack siempre que se cumplieran los requisitos de DevSecOps y de gestor de identidad. Las alternativas mostradas en el material del curso eran sugerencias, no una restricción.
 
-La cobertura de integración tiene un gate mínimo de 70 % en el job **`6b · Pruebas de integración`** del workflow de CI. No existe todavía un servicio que publique esa cobertura como badge.
+La cobertura de integración tiene un gate mínimo de 70 % en el job **`6b · Pruebas de integración`** del workflow de CI. El badge de cobertura muestra el valor medido en la última ejecución de CI sobre `main` (el job `6c` lo publica como `coverage.json` en la rama `badges`, sin servicio externo); el gate sigue siendo 70 %.
 
 ## 5. Arquitectura
 
