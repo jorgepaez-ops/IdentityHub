@@ -138,7 +138,7 @@ helpers con `t.Helper()` (`mustExec`, `requireErrorContaining`, `countRows`) o u
 perdió ninguna. 631 pruebas de integración y 550 unitarias antes y después. Advertencias de A sobre la nota del lote 1
 (escrita antes del 1b) superadas por la nota del 1b y el apéndice. Sugerencia de C2 (`context.Background()` en helpers):
 no aplica, las pruebas padre ya usan `context.Background()`. Sugerencia de A (`smtp_test` reasigna `s.r` tras `upgrade`):
-pendiente de aplicar en el lote 2.
+aplicada (`upgrade` es el único que arma el lector en TLS implícito).
 
 ## Criterios de aceptación
 

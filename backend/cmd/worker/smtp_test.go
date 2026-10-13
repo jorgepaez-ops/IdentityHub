@@ -160,9 +160,10 @@ func (f *fakeSMTP) serve(raw net.Conn) {
 	_ = raw.SetDeadline(time.Now().Add(10 * time.Second))
 	s := &smtpSession{f: f, raw: raw, conn: raw}
 	if f.implicitTLS {
-		s.upgrade()
+		s.upgrade() // wraps the connection in TLS and owns the reader setup
+	} else {
+		s.r = textproto.NewReader(bufio.NewReader(s.conn))
 	}
-	s.r = textproto.NewReader(bufio.NewReader(s.conn))
 	s.reply("220 fake ESMTP")
 	for {
 		line, err := s.r.ReadLine()
