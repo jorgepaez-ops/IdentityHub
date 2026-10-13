@@ -42,15 +42,18 @@ command -v openssl >/dev/null 2>&1 || { echo "error: openssl no está instalado"
 umask 077
 mkdir -p "$dir"
 
+# env_value NOMBRE: último valor de NOMBRE en el .env, sin comentario final ni las
+# comillas que lo rodean (Compose las quita igual). Se lee con grep, no con ".".
+env_value() {
+  grep -E "^$1=" "$env_file" | tail -n 1 | cut -d= -f2- | sed -e 's/[[:space:]]*#.*$//' \
+    -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'$/\1/" || true
+}
+
 write_auth_file() {
   [ -n "$env_file" ] || return 0
   [ -f "$env_file" ] || { echo "error: no existe $env_file (corre make setup)" >&2; exit 1; }
-  # Se lee con grep y no con "." para no ejecutar ni interpolar el .env.
-  user=$(grep -E '^SMTP_USERNAME=' "$env_file" | tail -n 1 | cut -d= -f2- | sed 's/[[:space:]]*#.*$//' || true)
-  pass=$(grep -E '^SMTP_PASSWORD=' "$env_file" | tail -n 1 | cut -d= -f2- | sed 's/[[:space:]]*#.*$//' || true)
-  # Compose quita las comillas que rodean un valor del .env; aquí se hace lo mismo.
-  user=$(printf '%s' "$user" | sed -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'$/\1/")
-  pass=$(printf '%s' "$pass" | sed -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'$/\1/")
+  user=$(env_value SMTP_USERNAME)
+  pass=$(env_value SMTP_PASSWORD)
   user=${user:-identity-hub}
   if [ -z "$pass" ]; then
     echo "error: falta SMTP_PASSWORD en $env_file (make setup lo genera; en un .env viejo agrégala con: openssl rand -hex 24)" >&2
