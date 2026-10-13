@@ -243,7 +243,7 @@ Las 23 amenazas se reparten así: 6 de suplantación (Spoofing), 4 de manipulaci
 | Tampering | AM-006 | Inyección SQL | Consultas parametrizadas generadas por `sqlc` | Mitigated |
 | Tampering | AM-007 | Roles obsoletos en el token | Roles consultados en la base de datos en peticiones sensibles | Mitigated |
 | Tampering | AM-008 | Imagen manipulada en la cadena de suministro | Firma Cosign keyless (OIDC de GitHub) sobre el digest y despliegue por digest | Mitigated |
-| Tampering | AM-009 | Dependencia comprometida | SBOM CycloneDX por imagen (Syft, adjunto como atestación), osv-scanner, Dependabot y lockfiles | Mitigated (riesgo aceptado VULN-028) |
+| Tampering | AM-009 | Dependencia comprometida | SBOM CycloneDX por imagen (Syft, adjunto como atestación), osv-scanner, Dependabot y lockfiles | Mitigated (VULN-028 no afectado) |
 | Repudiation | AM-010 | Acciones sin rastro | Audit log append-only con actor, IP y user-agent; sin `UPDATE`/`DELETE` | Mitigated |
 | Repudiation | AM-011 | Borrado de logs | Rol de aplicación sin borrado y envío de logs a Loki | Mitigated |
 | Information disclosure | AM-012 | Secretos en imágenes o repositorio | Secretos por entorno, sin valores por defecto, `.env` fuera de Git | Mitigated |
@@ -265,7 +265,7 @@ Nota de transparencia: la especificación original repite el id AM-017 para dos 
 Ninguna de las 23 amenazas queda en estado *Open*. Las tres que lo estaban se cerraron con el workflow de publicación (`release.yml`, tarea C3):
 
 - **AM-008 (firma de imágenes) y AM-022 (OIDC keyless):** el job `publish` firma cada imagen con Cosign keyless (identidad OIDC de GitHub, sin claves de larga vida) sobre el digest, y es el único job con el environment protegido `dockerhub`, restringido a tags `v*`. Además se mantienen los permisos mínimos por job (`permissions: contents: read` por defecto en `ci.yml`).
-- **AM-009 (cadena de suministro):** además de osv-scanner, govulncheck, npm audit y lockfiles, cada imagen publicada lleva un SBOM CycloneDX generado con Syft y adjunto como atestación firmada. Persiste únicamente el riesgo residual de VULN-028, aceptado formalmente hasta el 2026-12-25 (GO-2026-5932, sin versión corregida y no alcanzable).
+- **AM-009 (cadena de suministro):** además de osv-scanner, govulncheck, npm audit y lockfiles, cada imagen publicada lleva un SBOM CycloneDX generado con Syft y adjunto como atestación firmada. No queda riesgo residual: VULN-028 (GO-2026-5932, sin versión corregida) se reclasificó el 2026-10-12 como no afectado, porque `go list -deps` no encuentra `x/crypto/openpgp` ni en el backend ni en las herramientas.
 
 AM-019 (DLQ) quedó mitigada: además del panel «Profundidad de la DLQ», hay una regla de alerta aprovisionada (`deploy/observability/grafana/alerting/dlq.yml`, se dispara con cualquier mensaje en la cola durante 2 minutos y también si faltan las métricas del broker) y un runbook de atención y purga (`docs/runbooks/dlq-notificaciones.md`). Se probó publicando un mensaje a `identity.dlx`: la regla pasó por inactive, pending y firing, y volvió a inactive al vaciar la cola.
 
@@ -429,7 +429,7 @@ Un ejemplo compacto de antes y después sin intermediarios: las cabeceras de la 
 
 ## Tabla de hallazgos VULN-001 a VULN-031
 
-Estados: **Resuelto** (remediado con commit y evidencia), **Aceptado** (riesgo aceptado con expiración) y **Mitigado**. «No informada» significa que ningún escáner asignó severidad al hallazgo; en esos casos se detectó por revisión o por comparación manual. Cada ficha completa está en `security/findings/`.
+Estados: **Resuelto** (remediado con commit y evidencia), **Aceptado** (riesgo aceptado con expiración), **No afectado** (el aviso coincide a nivel de módulo, pero el código vulnerable no está presente) y **Mitigado**. «No informada» significa que ningún escáner asignó severidad al hallazgo; en esos casos se detectó por revisión o por comparación manual. Cada ficha completa está en `security/findings/`.
 
 | Id | Hallazgo | Severidad | Detectado por | Estado | Justificación |
 |---|---|---|---|---|---|
@@ -460,12 +460,12 @@ Estados: **Resuelto** (remediado con commit y evidencia), **Aceptado** (riesgo a
 | VULN-025 | axios 0.21.1 y lodash 4.17.15 | HIGH | npm audit, osv-scanner | Resuelto | T25: ambos retirados (no se importaban). |
 | VULN-026 | `golang.org/x/text` (GO-2026-5970) | No informada | govulncheck | Resuelto | T24: actualizado a v0.41.0. |
 | VULN-027 | Dependencias de build/frontend (vite, minimatch, react-router, undici) | CRITICAL y HIGH | npm audit | Resuelto | T34a: subidas a la versión que corrige cada aviso. |
-| VULN-028 | `golang.org/x/crypto` desactualizado | No informada; no alcanzable | osv-scanner | **Aceptado** (parcial) | GO-2026-6354 y GO-2026-6355 resueltos con x/crypto 0.56.0 (T34b). GO-2026-5932 no tiene versión corregida, no es alcanzable (análisis de llamadas de osv-scanner y govulncheck) y se acepta hasta el **2026-12-25**, con registro en `backend/osv-scanner.toml`. |
+| VULN-028 | `golang.org/x/crypto` desactualizado | No informada; no alcanzable | osv-scanner | **No afectado** (parcial) | GO-2026-6354 y GO-2026-6355 resueltos con x/crypto 0.56.0 (T34b). GO-2026-5932 no tiene versión corregida ni la tendrá (paquete `openpgp` abandonado); `go list -deps` no lo encuentra en el backend ni en las herramientas y `govulncheck` no lo reporta. Se reclasificó el 2026-10-12 como no afectado, con exclusión permanente en `backend/osv-scanner.toml`. |
 | VULN-029 | `google.golang.org/protobuf` desactualizado | HIGH (no alcanzable) | osv-scanner | Resuelto | T34b: actualizado de 1.31.0 a 1.36.12. |
 | VULN-030 | CSP sin `form-action` | MEDIUM | ZAP baseline (10055) | Resuelto | T15b: `form-action 'self'` en ambos bloques `server` de Nginx. |
 | VULN-031 | Login devuelve 500 con contraseña larga | MEDIUM | ZAP API scan (30002) | Resuelto | T15c: contraseña inválida se trata como credenciales inválidas, con el mismo camino de bloqueo y sin 500. |
 
-Resumen: de los 31 hallazgos, 30 están resueltos y 1 (VULN-028) mantiene un riesgo residual aceptado con fecha de expiración. Ningún hallazgo quedó sin ficha y ningún gate se debilitó para lograr un verde. VULN-030 y VULN-031 amplían el rango pedido (001 a 029) porque ZAP, ya integrado como gate, los encontró después.
+Resumen: de los 31 hallazgos, 30 están resueltos y 1 (VULN-028) está no afectado (el código vulnerable no está presente). Ningún hallazgo quedó sin ficha y ningún gate se debilitó para lograr un verde. VULN-030 y VULN-031 amplían el rango pedido (001 a 029) porque ZAP, ya integrado como gate, los encontró después.
 
 ## Endurecimiento adicional de la rama de pulido
 
@@ -476,7 +476,7 @@ Además de la interfaz, la rama cerró las alertas de *code scanning* que quedab
 - **Imagen `web` con nginx parcheado.** Un nuevo digest de `stable-alpine` (nginx 1.30.5) corrige libpng, nghttp2 y pcre2, y Trivy sobre la imagen pasó de 3 hallazgos a 0.
 - **Cabecera Host hacia la API fija.** Nginx envía el nombre del bloque `server` (`$server_name`) y no la cabecera Host del cliente, que quien llama controla (regla `request-host-used` de Semgrep); la API no lee esa cabecera.
 - **Checkov filtrado en el SARIF.** Las 27 alertas de Checkov eran omisiones ya justificadas en línea (`#checkov:skip`); GitHub las mostraba aunque llevaran `suppressions`, así que CI las filtra con `jq` antes de subir el SARIF. El gate no cambia, y el filtro no oculta un fallo de Checkov.
-- **Alertas abiertas conocidas.** El `README.md` tiene una sección con las alertas que siguen abiertas y su justificación: GO-2026-5932 (riesgo aceptado de VULN-028) y `tzdata` en las imágenes distroless, a la espera de un nuevo digest de la base.
+- **Alertas abiertas conocidas.** El `README.md` tiene una sección con las alertas que siguen abiertas y su justificación: GO-2026-5932 (VULN-028, no afectado) y `tzdata` en las imágenes distroless, a la espera de un nuevo digest de la base.
 
 # Monitoreo y Observabilidad
 
@@ -541,7 +541,7 @@ Falco, que el enunciado menciona para la detección de comportamiento anómalo e
 - **La nube es solo una referencia:** el Terraform no se aplica; el worker envía SMTP sin autenticación ni TLS, por lo que SES real exigiría cambiar código; los hosts `*.localhost` y el cliente OAuth (`contabilidad`) están fijos en el código.
 - **Un solo cliente OAuth y sin OpenID Connect:** la guía de integración de terceros enumera lo que falta (registro dinámico, refresh tokens para aplicaciones, cierre de sesión único, revocación).
 - **Sin outbox transaccional** (ADR 0006): la publicación al broker usa *publisher confirms*, pero no hay garantía transaccional conjunta entre la base de datos y el broker; el outbox es trabajo futuro deliberado.
-- **Riesgo aceptado vigente:** VULN-028 (GO-2026-5932) hasta el 2026-12-25; debe revisarse antes de esa fecha.
+- **Sin riesgo aceptado vigente:** VULN-028 (GO-2026-5932) se reclasificó el 2026-10-12 como no afectado; solo se reabriría si algún paquete empezara a importar `x/crypto/openpgp`.
 - **Funciones diferidas en la matriz:** claves de servicio (RF-018) y exportación del audit log (RF-019).
 
 ## Diferencias conocidas entre especificación y código
@@ -555,7 +555,7 @@ La revisión de la rama de pulido encontró tres diferencias entre lo que decía
 ## Lecciones aprendidas
 
 1. **Un gate que nunca falló no prueba nada.** La línea base vulnerable convirtió cada control en algo verificable y, de paso, expuso un control mal configurado (VULN-023).
-2. **La alcanzabilidad vale más que el volumen.** `govulncheck` y el análisis de llamadas de osv-scanner redujeron el ruido de cientos de avisos a los que de verdad importan, y permitieron aceptar un riesgo (VULN-028) con una justificación concreta y una fecha de expiración.
+2. **La alcanzabilidad vale más que el volumen.** `govulncheck` y el análisis de llamadas de osv-scanner redujeron el ruido de cientos de avisos a los que de verdad importan, y permitieron clasificar un aviso (VULN-028) como no afectado con una justificación concreta y verificable.
 3. **Los hallazgos no previstos son la mejor evidencia.** Los VULN-020 en adelante (chi, `pgx`, ZAP) demostraron que el pipeline informa algo que el equipo no sabía; por eso se registran sin inventar identificadores ni arreglarlos de paso.
 4. **Lo que corre en CI debe correr en local con el mismo nombre.** El `Makefile` (`make scan`, `make e2e`, `make scan-dast`) evitó que el pipeline fuera una sorpresa.
 5. **La composición real importa más que las pruebas aisladas.** Dos manejadores HTTP pasaron todas sus pruebas aisladas pero devolvían `501` en el enrutador real durante dos tareas; desde entonces se verifica que cada manejador quede compuesto en `Server.Routes()`.

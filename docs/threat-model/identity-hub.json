@@ -951,7 +951,7 @@
                   "severity": "Unspecified",
                   "type": "Tampering",
                   "description": "Dependencia comprometida en la cadena de suministro",
-                  "mitigation": "SBOM en CycloneDX por imagen, `osv-scanner`, Dependabot, lockfiles versionados — Estado real: Implementado (C3): osv-scanner, govulncheck, npm audit y lockfiles en CI, y SBOM CycloneDX (Syft) adjunto a cada imagen publicada como atestación Cosign. Riesgo residual: VULN-028, aceptado hasta 2026-12-25.",
+                  "mitigation": "SBOM en CycloneDX por imagen, `osv-scanner`, Dependabot, lockfiles versionados — Estado real: Implementado (C3): osv-scanner, govulncheck, npm audit y lockfiles en CI, y SBOM CycloneDX (Syft) adjunto a cada imagen publicada como atestación Cosign. VULN-028 (GO-2026-5932) clasificado como no afectado el 2026-10-12: el código vulnerable no está presente.",
                   "modelType": "STRIDE",
                   "new": false,
                   "number": 6,

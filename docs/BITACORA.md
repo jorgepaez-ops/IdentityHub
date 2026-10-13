@@ -31,12 +31,14 @@ Cierra C3 y la parte documental del cierre. El detalle por tarea y la evidencia 
 | Digest `api` | `sha256:52f2988ccee6f62a3bcd1ba7aa2c9f1b270d9dfbef7d99ec67b1198e707a86a3` |
 | Digest `worker` | `sha256:f9b5443d5335e8005dfc33530da78d6f41e09a66b3907f7a9a52a054c57bd03c` |
 | Digest `web` | `sha256:fcca1f1c96479c0c94ee266960d74c88cb4c2555d084f38253e143b06a586005` |
-| Amenazas abiertas | ninguna; AM-009 conserva el riesgo residual aceptado de VULN-028 |
+| Amenazas abiertas | ninguna; AM-009 conserva el riesgo residual aceptado de VULN-028 (reclasificado después como no afectado, ver Decisiones) |
 
 ### Decisiones tomadas sobre la marcha
 
 - Un release no publica nada si alguna de las tres imágenes falla el gate, y publica la misma imagen que escaneó (sin reconstruirla). Un fallo de red durante `publish` todavía puede dejar una imagen sin subir; su corrección quedó planificada (F8).
 - Cosign v3 guarda la firma y la atestación como referrers OCI (formato bundle), no como etiquetas `.sig`/`.att`: no aparecen en la pestaña Tags de Docker Hub y Cosign v2 no las encuentra.
+
+- VULN-028 (GO-2026-5932) pasa de riesgo aceptado hasta 2026-12-25 a **no afectado** (decisión del usuario, F9): no tiene versión corregida ni la tendrá, y `go list -deps` no encuentra `x/crypto/openpgp` ni en el backend ni en las herramientas; la exclusión de `osv-scanner` pasa a ser permanente.
 
 ### Hallazgos
 

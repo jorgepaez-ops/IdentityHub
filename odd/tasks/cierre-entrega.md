@@ -175,12 +175,17 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
     validación (`v0.9.1`) antes de `v1.0.0`.
   - [ ] F8 Release: reintento ante fallos de red en `publish` (push con reintentos acotados) y retención de los
     artefactos de imagen suficiente para repetir solo el job fallido (hoy 1 día; el usuario no acepta el riesgo).
-  - [ ] F9 VULN-028 (GO-2026-5932): verificado el 2026-10-12 que **no tiene versión corregida ni la tendrá**
+  - [x] F9 VULN-028 (GO-2026-5932): verificado el 2026-10-12 que **no tiene versión corregida ni la tendrá**
     (osv.dev: afecta a `golang.org/x/crypto` desde la versión 0, sin `fixed`; el paquete `openpgp` está abandonado
     por diseño). `go list -deps` no encuentra `x/crypto/openpgp` ni en `backend/` ni en las herramientas de
     `tools/`. Propuesta: reclasificarlo de «riesgo aceptado con fecha» a «no afectado» (código vulnerable no
     presente), con esa evidencia, en la ficha, el informe, la matriz de hallazgos y `osv-scanner.toml`.
-    Decisión del usuario pendiente.
+    Decisión del usuario (2026-10-12): reclasificar. Hecho: `go -C backend list -deps ./... | grep x/crypto/openpgp` y
+    `go -C tools list -deps` de oapi-codegen, gosec, sqlc y govulncheck dan 0 resultados; backend solo usa `argon2` y
+    `blake2b`. Cambios: ambos `osv-scanner.toml` (exclusión permanente, sin `ignoreUntil`), ficha VULN-028 (estado
+    `no afectado`, leyenda en `security/findings/README.md`), `evidencia.json`, README, informe técnico, informe HTML,
+    threat model, manual de seguridad y BITACORA. Commit: `fix(security): reclassify VULN-028 as not affected` (hash en el
+    historial de la rama).
   - [ ] F10 Badge de cobertura con el valor medido: hoy es estático («gate ≥ 70 %», E3) y siempre se ve verde
     aunque la cobertura real cambie (aviso de dos lentes de la revisión nativa del 2026-10-12). Publicar el
     porcentaje que mide el job 6b sin servicio externo.
