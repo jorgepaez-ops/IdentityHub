@@ -100,9 +100,16 @@ class Rnf001Containerization(unittest.TestCase):
     def test_default_compose_up_runs_every_service_in_its_own_container(self) -> None:
         self.assertEqual(containerization_problems(render_config()), [])
 
-    def test_own_images_build_inside_containers_from_a_multi_stage_dockerfile(self) -> None:
-        for dockerfile, target in (("backend/Dockerfile", "builder"), ("frontend/Dockerfile", "builder")):
-            self.assertIn(target, dockerfile_stages(ROOT / dockerfile), f"{dockerfile} compiles outside a container")
+    def test_own_dockerfiles_have_a_builder_stage_and_a_distinct_final_stage(self) -> None:
+        # Proves the Dockerfiles are multi-stage (a named builder stage plus a different final stage), which is
+        # what "images are compiled inside a container" means here: compilation happens in the builder stage
+        # of a docker build, not on the host. Compose building these Dockerfiles is checked in
+        # containerization_problems (the build/target of api, worker and web).
+        for dockerfile in ("backend/Dockerfile", "frontend/Dockerfile"):
+            stages = list(dockerfile_stages(ROOT / dockerfile))
+            self.assertIn("builder", stages, f"{dockerfile} has no builder stage")
+            self.assertGreater(len(stages), 1, f"{dockerfile} is not multi-stage")
+            self.assertNotEqual(stages[-1], "builder", f"{dockerfile} ships its builder stage")
 
 
 # ── RNF-002 ──────────────────────────────────────────────────────────────────────────────────────
@@ -143,22 +150,38 @@ class Rnf002Pipeline(unittest.TestCase):
         publish = "\n".join(job_block(RELEASE, "publish"))
         for needle in ("format: cyclonedx-json", "cosign sign --yes", "docker push", "cosign attest --yes --type cyclonedx"):
             self.assertIn(needle, publish)
-        self.assertTrue(any("exit-code" in line and "1" in line for line in job_block(RELEASE, "gate")))
+        self.assertTrue(any('exit-code: "1"' in line for line in job_block(RELEASE, "gate")))
 
 
 # ── RNF-006 ──────────────────────────────────────────────────────────────────────────────────────
 def provenance_problems(publish: list[str]) -> list[str]:
-    """sign -> attest -> verify -> verify-attestation -> the only push of latest, in that order."""
-    wanted = ["cosign sign --yes", "cosign attest --yes --type cyclonedx", "cosign verify ", "cosign verify-attestation",
-              '"${IMAGE}:latest"']
-    positions = []
-    for needle in wanted:
-        hits = [i for i, line in enumerate(publish) if needle in line and "docker tag" not in line and "echo" not in line]
+    """sign -> attest -> verify -> verify-attestation, all before latest is pushed, and latest is pushed once.
+
+    Needle filters: lines that only print a command (`echo`, e.g. the job summary that shows how to verify)
+    or only tag locally (`docker tag`) are not the operation being ordered. "cosign verify " keeps its
+    trailing space so it does not also match "cosign verify-attestation". Every occurrence of each
+    verification step counts, so the latest push must come after the LAST sign/attest/verify, not just the first.
+    """
+    def real(needle: str) -> list[int]:
+        return [i for i, line in enumerate(publish) if needle in line and "docker tag" not in line and "echo" not in line]
+
+    steps = ["cosign sign --yes", "cosign attest --yes --type cyclonedx", "cosign verify ", "cosign verify-attestation"]
+    problems = []
+    firsts = []
+    for needle in steps:
+        hits = real(needle)
         if not hits:
             return [f"missing step: {needle}"]
-        positions.append(hits[0])
-    problems = [] if positions == sorted(positions) and len(set(positions)) == len(positions) else [
-        f"wrong order {dict(zip(wanted, positions))}"]
+        firsts.append(hits[0])
+    if firsts != sorted(firsts) or len(set(firsts)) != len(firsts):
+        problems.append(f"wrong order {dict(zip(steps, firsts))}")
+    pushes = [i for i in real("${IMAGE}:latest") if "docker push" in publish[i]]
+    if len(pushes) != 1:
+        problems.append(f"latest must be pushed exactly once, found {len(pushes)}")
+    else:
+        late = [needle for needle in steps if max(real(needle)) > pushes[0]]
+        if late:
+            problems.append(f"latest is pushed before the last of: {late}")
     for i, line in enumerate(publish):
         if "cosign verify" in line and "--certificate-identity" not in "\n".join(publish[i : i + 2]):
             problems.append(f"verification does not pin the signer identity: {line.strip()}")
@@ -171,6 +194,14 @@ class Rnf006Provenance(unittest.TestCase):
                  'cosign verify x --certificate-identity-regexp y', 'cosign verify-attestation x --certificate-identity-regexp y']
         self.assertTrue(provenance_problems(lines))
         self.assertTrue(provenance_problems(lines[:2]))
+
+    def test_flags_latest_pushed_twice_or_a_late_verification(self) -> None:
+        ok = ['cosign sign --yes x', 'cosign attest --yes --type cyclonedx x', 'cosign verify x --certificate-identity-regexp y',
+              'cosign verify-attestation x --certificate-identity-regexp y', 'docker push "${IMAGE}:latest"']
+        self.assertEqual(provenance_problems(ok), [])
+        self.assertIn("exactly once", "\n".join(provenance_problems([*ok, 'docker push "${IMAGE}:latest"'])))
+        late = [*ok, 'cosign verify z --certificate-identity-regexp y']
+        self.assertIn("before the last of", "\n".join(provenance_problems(late)))
 
     def test_release_signs_attests_and_verifies_before_moving_latest(self) -> None:
         self.assertEqual(provenance_problems(job_block(RELEASE, "publish")), [])
