@@ -325,3 +325,16 @@ Revisión nativa del lote 3 (2026-10-13): aprobada (13 archivos, 514 líneas). A
 Verificación visual del lote 2 (2026-10-13, Playwright, sin cambios en el repo): 76 capturas por lado (escritorio 1280×800 y móvil 390×844, tema claro y oscuro) de HEAD contra `06f48d2`, con diff por píxel. Las diferencias se deben solo a datos de prueba distintos entre los dos stacks (filas, correos, id de cuenta); drawer, diálogo de confirmación, `<output>` y `<fieldset>` sin cambio visual. Teclado: foco inicial dentro del diálogo, Tab/Shift+Tab dan la vuelta, Escape y clic afuera cierran; `getByRole('status')` y `role=group` siguen expuestos. Revisión manual de Opus de las capturas del drawer y del diálogo de Contabilidad.
 
 - Pulido del informe (2026-10-13): fecha del documento retirada, diagramas en vertical junto a su texto, secciones 2.4 y 3.1 reescritas y detalles de entorno local quitados del informe; 50 páginas.
+
+## Entrega (cortes de PR, 2026-10-13)
+
+Estrategia `stacked-to-main`; el usuario eligió 5 PR por tarea con `size:exception` justificada (cada uno es una
+tarea cerrada y revisada por partes con la revisión nativa):
+
+| PR | Rama | Commits | Líneas (sin generado) |
+|---|---|---|---|
+| 1 | `docs/notas-2026-10-13` | `32e8359..d885617` (documentación de cierre + `make up`) | ~770 |
+| 2 | `feat/seguimiento-s1-s4` | `d885617..75550fa` | ~620 |
+| 3 | `feat/seguimiento-s5-s6` | `75550fa..fb568d5` | ~1 590 |
+| 4 | `feat/seguimiento-s7-go` | `fb568d5..06f48d2` | ~1 300 |
+| 5 | `feat/seguimiento-pre-v1` | `06f48d2..HEAD` (S7 resto + informe final) | ~1 170 |
