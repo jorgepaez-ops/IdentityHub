@@ -8,9 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"mime"
-	"net"
 	"net/http"
-	"net/smtp"
 	"os"
 	"os/signal"
 	"strings"
@@ -72,7 +70,14 @@ func run() error {
 		_ = metricsSrv.Shutdown(shutdownCtx)
 	}()
 
-	w := &worker{logger: logger, cfg: cfg, seen: make(map[string]time.Time)}
+	// Fail fast on an unusable SMTP_CA_FILE instead of on the first email.
+	mailer, err := newSMTPMailer(cfg)
+	if err != nil {
+		return err
+	}
+	logger.Info("SMTP configurado", "host", cfg.SMTPHost, "port", cfg.SMTPPort, "tls", mailer.mode, "authenticated", mailer.username != "")
+
+	w := &worker{logger: logger, cfg: cfg, seen: make(map[string]time.Time), sendMail: mailer.Send}
 	logger.Info("esperando eventos", "queue", events.QueueNotify)
 
 	for {
@@ -89,7 +94,7 @@ func run() error {
 	}
 }
 
-type smtpSender func(string, smtp.Auth, string, []string, []byte) error
+type smtpSender func(ctx context.Context, from string, to []string, message []byte) error
 
 type worker struct {
 	logger *slog.Logger
@@ -190,23 +195,23 @@ func (w *worker) deliver(ctx context.Context, env events.Envelope, body []byte) 
 	if err != nil {
 		return fmt.Errorf("renderizando la notificación: %w", err)
 	}
-	// net/smtp no admite contexto, así que un SendMail en curso no se puede
-	// interrumpir; esto evita arrancar uno nuevo una vez iniciado el apagado.
+	// Evita arrancar un envío nuevo una vez iniciado el apagado.
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 
-	addr := net.JoinHostPort(w.cfg.SMTPHost, fmt.Sprint(w.cfg.SMTPPort))
-	// Mailpit no exige autenticación ni TLS; en un entorno real aquí irían
-	// credenciales y STARTTLS.
 	send := w.sendMail
 	if send == nil {
-		send = smtp.SendMail
+		mailer, err := newSMTPMailer(w.cfg)
+		if err != nil {
+			return err
+		}
+		send = mailer.Send
 	}
-	return send(addr, nil, w.cfg.SMTPFrom, []string{message.To}, buildRawMessage(w.cfg.SMTPFrom, message))
+	return send(ctx, w.cfg.SMTPFrom, []string{message.To}, buildRawMessage(w.cfg.SMTPFrom, message))
 }
 
-// buildRawMessage arma las cabeceras RFC 5322 y el cuerpo que espera smtp.SendMail.
+// buildRawMessage arma las cabeceras RFC 5322 y el cuerpo que espera el cliente SMTP.
 func buildRawMessage(from string, message notify.Message) []byte {
 	subject := mime.QEncoding.Encode("utf-8", "[Identity Hub] "+sanitizeHeaderValue(message.Subject))
 	// quoted-printable canonicalizes LF as CRLF; 8bit preserves rendered body text exactly.
