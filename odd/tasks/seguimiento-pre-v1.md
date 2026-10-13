@@ -100,6 +100,11 @@ con esos temas abiertos.
   - RNF-007: playwright ya es `workers: 1`, pero el contador es global al proceso; ahora `>= antes + 1`. Variable `titles` renombrada a `panels` (91404ff).
   - Job 7: `make load-test` ahora corre bajo `scripts/with-raised-login-limit.sh` como `make e2e` (dea7d27). Comprobado: justo
     después de `make e2e` (IP con 36 fallos > límite 20) pasó el load test. Actualizados comentario de ci.yml (mismo número de líneas) y guía.
+  Segunda ronda de la revisión nativa (S5/S6):
+  - `traceability.py`: gramática explícita de `# Verificación:` (`(Nombre)`, `job <id>`, `paso "<nombre>"`, `make <objetivo>` con o sin comillas); el id de job ya no arrastra puntuación, el nombre de clase/función exige palabra completa o comilla de cierre y las comillas que no son `paso "..."` se ignoran; 5 pruebas negativas nuevas (RED 4 fallos, luego 21 OK); docstring y README de specs/06-acceptance alineados (da7afbf).
+  - `load-test.sh`: la guarda de producción mira también `COMPOSE_FILE`; límite documentado (prod comparte proyecto `identity-hub` y servicio `db`, no se puede distinguir el contenedor); trap EXIT separado de INT/TERM (130/143, limpieza conserva el código); nueva `scripts/load_test_script_test.py` con docker simulado en PATH, enganchada a `make spec-drift` y al job spec-drift (RED 3 fallos, luego 6 OK) (1d4b874).
+  - `Makefile`: `load-test` usa `WITH_RAISED_LIMIT` mediante el objetivo privado `_load-test-run`; `with-raised-login-limit.sh` ya restaura con trap EXIT y conserva el código (comprobado con un compose simulado y un comando que sale con 9: restauró y devolvió 9) (1521894).
+  - `scripts/README.md`: catálogo de scripts y pruebas, enlazado desde la guía y el README.
   - `scripts/load-test.sh`: secretos por nombre (`-e LOAD_PW`), cuenta `load-*` deshabilitada al salir (no se borra: la FK
     `ON DELETE SET NULL` de `audit_log` es un UPDATE que el disparador append-only rechaza) y rechazo de `docker-compose.prod.yml` (dea7d27).
   - `auth-latency.js`: constantes con comentario para los reintentos del código MFA y los 2 s de desfase de relojes (dea7d27).
