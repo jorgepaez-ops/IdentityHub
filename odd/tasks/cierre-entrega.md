@@ -374,6 +374,12 @@ Mañana (2026-10-13), en este orden:
      independiente; recomendación (a) pasa a "automatizar cosign verify como paso posterior del release".
 2. C2: `make informe` (incluir en el informe lo hecho en F1-F4, F6-F10 y los hallazgos de arriba), revisión del PDF
    por el usuario, notas del release, tag `v1.0.0` en vivo y `gh release create v1.0.0` con el PDF.
+   - **Avance (2026-10-13).** Informe técnico actualizado (`b4bf102`, PDF 51 pp., sin versionar) y auditoría de toda
+     la documentación; correcciones en 21 archivos (`ae016a1`, `55d330c`, `f9b43d4`, `82fb5c7`, `a8a93c2`): bitácora,
+     READMEs, AGENTS/CLAUDE, guía de desarrollo (primer arranque y `.env` anterior a F2), diagramas (Falco, SMTP
+     STARTTLS, claves de servicio), AM-023 en Threat Dragon (24 amenazas), controles de release (F7/F8) y escenas de
+     demo para exportación, claves de servicio y Falco (video en 15:00). Revisión nativa aprobada. Pendiente: revisión
+     del PDF por el usuario, PR de documentación, notas del release, tag `v1.0.0` y release con el PDF.
 3. Entorno local del usuario: agregar `SMTP_PASSWORD` al `.env` (`openssl rand -hex 24`) y correr `make certs`
    antes de `make up`.
 Notas operativas: Codex ya no está disponible (la delegación va a Sonnet); `gh pr merge --delete-branch` también
