@@ -413,6 +413,8 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Un fallo al publicar el badge no debe dejar main en rojo: el gate real es 6b.
+    continue-on-error: true
     permissions:
       contents: write
     env:
@@ -443,12 +445,23 @@ jobs:
           git_remote() { git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${auth}" "$@"; }
 
           for attempt in 1 2 3 4 5; do
-            if git_remote fetch --quiet --depth=1 origin badges 2>/dev/null; then
+            # ls-remote --exit-code devuelve 2 solo si la rama no existe; cualquier otro
+            # fallo (red, permisos) se reintenta en vez de confundirse con "no existe".
+            status=0
+            git_remote ls-remote --exit-code --heads origin badges > /dev/null || status=$?
+            if [[ $status -eq 0 ]]; then
+              if ! git_remote fetch --quiet --depth=1 origin badges; then
+                echo "Fetch fallido (intento ${attempt}/5); se reintenta." >&2
+                sleep $((attempt * 3)); continue
+              fi
               git checkout --quiet -B badges FETCH_HEAD
-            else
-              # Primera ejecución: la rama no existe; se crea huérfana.
-              git checkout --quiet --orphan badges
+            elif [[ $status -eq 2 ]]; then
+              # Primera ejecución: la rama no existe; se crea huérfana desde cero.
+              git checkout --quiet --orphan "badges-${attempt}"
               git rm -rf --quiet . 2>/dev/null || true
+            else
+              echo "ls-remote fallido (intento ${attempt}/5); se reintenta." >&2
+              sleep $((attempt * 3)); continue
             fi
 
             printf '{"schemaVersion":1,"label":"cobertura de integración","message":"%s","color":"%s"}\n' \
@@ -459,7 +472,7 @@ jobs:
               exit 0
             fi
             git commit --quiet -m "chore(badges): coverage ${message}"
-            if git_remote push --quiet origin badges; then
+            if git_remote push --quiet origin HEAD:refs/heads/badges; then
               echo "Badge publicado: ${message} (${color})."
               exit 0
             fi
