@@ -11,12 +11,14 @@
 #  rompe con riesgo medio o más) en T15a. Los de release (SBOM, firma,
 #  publicación) se incorporan en la semana 3.
 #
-#  Cambios solo de documentación: si TODOS los archivos modificados terminan en .md
-#  o están bajo odd/ o docs/, el job 0 (changes) marca code=false y se omiten los
+#  Cambios solo de documentación: si TODOS los archivos modificados (renombres
+#  incluidos, se listan origen y destino) terminan en .md o están bajo odd/ o docs/,
+#  y ninguno está bajo .github/, specs/ o scripts/ (que cuentan como código aunque
+#  sean .md), el job 0 (changes) marca code=false y se omiten los
 #  jobs pesados (lint, sca, pruebas, e2e, dast y los pasos de las imágenes). Siguen
 #  corriendo los baratos que alimentan checks obligatorios o SARIF (spec-drift,
-#  secrets, sast, semgrep, iac-scan, iac-checkov). Cualquier otra ruta (incluidos
-#  .github/**, Makefile, scripts/** y specs/**) cuenta como código, y ante la menor
+#  secrets, sast, semgrep, iac-scan, iac-checkov). Cualquier otra ruta (Makefile,
+#  backend/, frontend/, etc.) cuenta como código, y ante la menor
 #  duda (lista vacía, error de git, workflow_dispatch o falla del propio job 0) se
 #  corre todo: los jobs gateados comparan con != 'false' y usan !cancelled().
 #  No se usa paths-ignore a nivel de workflow ni de job: el ruleset "Protect main"
