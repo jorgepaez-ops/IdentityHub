@@ -12,6 +12,19 @@ Los escenarios de `requisitos-no-funcionales.feature` solo llevan etiquetas `@RN
 en un spec de Playwright y cada uno nombra, en un comentario `# Verificación:`, la prueba o el
 control que lo ejecuta de verdad (por ejemplo `scripts/pipeline_controls_test.py` o `make load-test`).
 
+Ese enlace se verifica por máquina (`verification_errors` en `scripts/traceability.py`, parte de
+`make spec-drift` y de `traceability.py --check`): la línea `# Verificación:` va justo encima de las
+etiquetas y debe nombrar (1) un archivo existente y (2) algo concreto que exista por nombre: una clase o
+función entre paréntesis en ese archivo (`scripts/x_test.py (ClaseDePrueba)`), un `job <id>` de `ci.yml`,
+un paso entre comillas (`paso "Nombre"`, línea `- name:` de `ci.yml`) o un `"make <objetivo>"` del
+Makefile. Cualquier referencia que no resuelva, o un escenario `@RNF` sin la línea, rompe el build. Los
+escenarios con alguna etiqueta `@RF` quedan fuera (los cubre la correspondencia con el título E2E) y la
+matriz sigue contando igual.
+
+Para añadir un escenario `@RNF`: escribe la línea `# Verificación:` justo encima de sus etiquetas con la
+prueba que lo ejecuta (archivo existente más clase/función, job, paso o `make`), y esa prueba debe existir
+antes de dejar el escenario; `make spec-drift` lo comprueba.
+
 Convención de etiquetas:
 
 - `@RF-NNN` — requisito que verifica

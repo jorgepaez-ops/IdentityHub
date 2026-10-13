@@ -245,12 +245,35 @@ make load-test   # k6 en un contenedor (imagen fijada por digest); falla si el p
   `GET /.well-known/jwks.json` (50 r/s cada uno, 20 s). El login con Argon2id queda fuera de la
   medición: se hace una sola vez en `setup()` y el requisito lo excluye.
 - `scripts/load-test.sh` siembra una cuenta `load-*@example.test` desechable con una invitación
-  pendiente (como las pruebas E2E) y k6 la acepta, inicia sesión y lee el código MFA en Mailpit. No
-  falla ningún login, así que no hay bloqueo por IP (RF-017) que esquivar; el refresh va por debajo
-  de los 5 r/s de Nginx. Por eso no usa `scripts/with-raised-login-limit.sh`.
+  pendiente (como las pruebas E2E) y k6 la acepta, inicia sesión y lee el código MFA en Mailpit. La
+  contraseña y el token de invitación se pasan a k6 por nombre de variable (no en la línea de comandos).
+  `make load-test` corre bajo `scripts/with-raised-login-limit.sh` (como `make e2e`): tras la suite E2E los
+  logins fallidos pueden seguir dentro de la ventana de RF-017 y bloquear la IP del login de `setup()`.
+  Al terminar, la cuenta queda `disabled` (no se borra: `audit_log` es append-only y sus filas
+  referencian a `users`). El script se niega a correr contra `docker-compose.prod.yml`.
 - Los umbrales viven en `tests/load/auth-latency.js` (`P95_MS`, por defecto 300; `DURATION`, por defecto
   20s) y hacen que k6 termine con código distinto de cero. La imagen se cambia con `K6_IMAGE`.
 - CI lo corre en el job `7 · E2E (Playwright)`, después de `make e2e` y sobre el mismo stack.
+
+### Verificar los requisitos no funcionales
+
+Tres comandos, de menor a mayor costo; los tres corren también en CI:
+
+```bash
+make spec-drift   # sin stack ni red salvo docker compose config; trazabilidad y controles del pipeline
+make e2e          # con el stack levantado; incluye las pruebas RNF-007 y RNF-012
+make load-test    # con el stack levantado; RNF-010
+```
+
+- `make spec-drift` ejecuta `scripts/traceability_test.py`, `scripts/pipeline_controls_test.py` (RNF-001,
+  RNF-002, RNF-006 y RNF-008 contra el compose renderizado, los Dockerfile y los workflows) y
+  `scripts/traceability.py --check`, que además comprueba que cada escenario `@RNF` apunta con
+  `# Verificación:` a una prueba que existe.
+- `make e2e` cubre RF-008 (perfil propio), RNF-007 (métricas Prometheus, logs JSON y tablero) y RNF-012 (ningún
+  secreto en los logs de api ni worker).
+- `make load-test` cubre RNF-010 y falla si el p95 de refresh, `/me` o JWKS supera 300 ms.
+- Qué prueba verifica qué, y cómo se comprobó que falla, está en la tabla «Evidencia de los requisitos no
+  funcionales» de la fase de pruebas del informe técnico.
 
 ### DAST con ZAP
 
