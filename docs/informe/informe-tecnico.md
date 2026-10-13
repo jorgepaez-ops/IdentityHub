@@ -340,7 +340,7 @@ El despliegue de referencia en AWS se describió en la sección de arquitectura 
 
 **Publicación (`release.yml`).** El workflow se dispara solo con tags `vX.Y.Z` y tiene dos fases. El job `gate` construye `api`, `worker` y `web`, ejecuta el mismo gate de Trivy que CI y guarda cada imagen como artefacto. El job `publish` depende de `gate`, es el único con el environment protegido `dockerhub` (restringido a tags `v*`), carga la misma imagen ya escaneada y la publica solo con la etiqueta `vX.Y.Z`; después genera un SBOM CycloneDX con Syft, firma con Cosign keyless (OIDC de GitHub) y adjunta el SBOM como atestación, todo sobre el digest. Solo entonces un paso final mueve `latest` a ese mismo digest, y únicamente si el tag es el `vX.Y.Z` más alto del repositorio (repetir el release de un tag viejo no hace retroceder `latest`), y verifica que el digest de `latest` coincida con el firmado. Este orden (tarea F7) corrige el diseño original, que subía `latest` antes de firmar y dejaba una ventana en la que la etiqueta apuntaba a una imagen sin firma. Los pasos de red (push, firma, atestación y consulta de tags) se reintentan hasta tres veces con espera creciente, y los artefactos de imagen se retienen 7 días en lugar de 1 para poder repetir solo el job de publicación si falla (F8). El workflow se validó con el tag `v0.9.0` (ejecución 38319904991, en verde, 6 jobs) y el orden nuevo con el tag `v0.9.1` sobre el commit `32e8359` (ejecución 38405885275, en verde): en las tres imágenes el paso «Mover latest» empezó después de terminar «Firmar y atestar», y `latest` quedó apuntando a `v0.9.1` en Docker Hub. El tag de entrega es `v1.0.0` y el workflow publica cada tag de la misma manera.
 
-{{code:yaml:.github/workflows/release.yml:161-182}}
+{{code:yaml:.github/workflows/release.yml:163-198}}
 
 **Verificación.** `cosign verify` y `cosign verify-attestation --type cyclonedx` pasan sobre las tres imágenes con Cosign v3. Cosign v3 guarda la firma y la atestación como referrers OCI (formato *bundle*), por lo que no aparecen como etiquetas `.sig` o `.att` en Docker Hub y Cosign v2 no las encuentra: la verificación debe hacerse con Cosign v3. La verificación se repitió de forma independiente el 13 de octubre con Cosign v3.1.3 sobre `v0.9.0` y `v0.9.1`, con la identidad `^https://github.com/jorgepaez-ops/IdentityHub/` y el emisor OIDC de GitHub Actions: `cosign verify` y `cosign verify-attestation --type cyclonedx` resultaron correctos en las tres imágenes de ambas versiones. Esa comprobación manual ya es un paso del workflow: tras firmar y atestar, el job `publish` ejecuta `cosign verify` y `cosign verify-attestation --type cyclonedx` sobre el digest con la identidad del workflow y el emisor OIDC de Actions, y solo si ambos pasan mueve `latest` (paso «Verificar firma y atestación»; su primera prueba real es el tag `v1.0.0`).
 
@@ -579,7 +579,6 @@ Falco, que el enunciado menciona para la detección de comportamiento anómalo e
 - **Sin outbox transaccional** (ADR 0006): la publicación al broker usa *publisher confirms*, pero no hay garantía transaccional conjunta entre la base de datos y el broker; el outbox es trabajo futuro deliberado.
 - **Sin riesgo aceptado vigente:** VULN-028 (GO-2026-5932) se reclasificó el 2026-10-12 como no afectado; solo se reabriría si algún paquete empezara a importar `x/crypto/openpgp`.
 - **Cobertura de la matriz de trazabilidad:** de 33 requisitos, 25 están completos, 7 son parciales (RF-008, RNF-001, RNF-002, RNF-006, RNF-007, RNF-008 y RNF-012, con una sola fuente de evidencia) y RNF-010 (latencia) no tiene prueba, porque no hay prueba de carga. No queda ningún requisito diferido.
-- **El clasificador del job 0 no tiene pruebas automatizadas:** vive como script embebido en el workflow y se probó en local y con PR reales; el seguimiento previsto es moverlo a `scripts/` con una prueba. Además, la guarda repetida en cada paso del job de imágenes depende de que cada paso nuevo la incluya.
 - **Las claves de servicio tienen un único alcance:** `audit-log:read`, solo en el listado del audit log.
 
 ## Diferencias conocidas entre especificación y código
@@ -605,10 +604,9 @@ La revisión de la rama de pulido encontró tres diferencias entre lo que decía
 
 ## Trabajo futuro
 
-1. **Mover el clasificador del job 0 a `scripts/` con una prueba** y sustituir la guarda repetida en el job de imágenes por una forma que no dependa de cada paso nuevo.
-2. Evolucionar la integración de terceros: clientes OAuth en base de datos, OpenID Connect, refresh tokens por cliente, introspección y revocación; y reemplazar la publicación directa por un **outbox transaccional**.
-3. **Medir la latencia (RNF-010)** con una prueba de carga y completar la evidencia de los requisitos que la matriz marca como parciales.
-4. Ampliar los alcances de las claves de servicio más allá de la lectura del audit log.
+1. Evolucionar la integración de terceros: clientes OAuth en base de datos, OpenID Connect, refresh tokens por cliente, introspección y revocación; y reemplazar la publicación directa por un **outbox transaccional**.
+2. **Medir la latencia (RNF-010)** con una prueba de carga y completar la evidencia de los requisitos que la matriz marca como parciales.
+3. Ampliar los alcances de las claves de servicio más allá de la lectura del audit log.
 
 # Anexo A — Puesta en marcha y operación
 

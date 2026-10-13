@@ -161,16 +161,18 @@ jobs:
       # Verificación posterior a la firma: si falla, el job termina aquí y latest no se mueve.
       # Mismos parámetros que el comando que documenta el resumen (identidad del workflow + emisor OIDC).
       - name: Verificar firma y atestación
+        # La identidad se restringe a este workflow en un tag: una firma hecha desde otro workflow
+        # o rama del repositorio no pasa. Probado contra v0.9.1 (y rechaza la identidad de ci.yml).
         env:
           DIGEST: ${{ steps.push.outputs.digest }}
+          OIDC_ISSUER: https://token.actions.githubusercontent.com
         run: |
           retry() { for i in 1 2 3; do "$@" && return 0; echo "::warning::intento $i falló: $*"; [ "$i" -lt 3 ] && sleep $((i * 15)); done; return 1; }
+          identity="^https://github.com/${GITHUB_REPOSITORY}/\\.github/workflows/release\\.yml@refs/tags/v"
           retry cosign verify "${IMAGE}@${DIGEST}" \
-            --certificate-identity-regexp "^https://github.com/${GITHUB_REPOSITORY}/" \
-            --certificate-oidc-issuer https://token.actions.githubusercontent.com
+            --certificate-identity-regexp "${identity}" --certificate-oidc-issuer "${OIDC_ISSUER}"
           retry cosign verify-attestation --type cyclonedx "${IMAGE}@${DIGEST}" \
-            --certificate-identity-regexp "^https://github.com/${GITHUB_REPOSITORY}/" \
-            --certificate-oidc-issuer https://token.actions.githubusercontent.com
+            --certificate-identity-regexp "${identity}" --certificate-oidc-issuer "${OIDC_ISSUER}"
 
       # latest solo apunta a una imagen ya firmada y atestada, y solo si este tag es el tag
       # vX.Y.Z más alto del repositorio: repetir el release de un tag viejo no hace retroceder latest.
