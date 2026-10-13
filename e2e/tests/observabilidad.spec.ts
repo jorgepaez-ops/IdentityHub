@@ -47,8 +47,11 @@ test('RNF-007 La API y el worker exponen métricas Prometheus, logs JSON y el pa
   // Un intento fallido real incrementa el contador que alimenta el panel de logins fallidos.
   const failedBefore = counter(before, 'identity_login_attempts_total', 'result="failed"')
   expect((await api('POST', '/api/v1/auth/login', { json: loginBody(email, `incorrecta-${strongPassword}`) })).status).toBe(401)
+  // El contador es global al proceso de la API y no se reinicia entre archivos de prueba: se exige que suba
+  // al menos 1 (no exactamente 1), así otro login fallido concurrente o rezagado no vuelve frágil la prueba;
+  // si la métrica no reaccionara al intento, el valor se quedaría en failedBefore y esto fallaría.
   const failedAfter = counter(await metrics(apiMetricsUrl), 'identity_login_attempts_total', 'result="failed"')
-  expect(failedAfter).toBe(failedBefore + 1)
+  expect(failedAfter).toBeGreaterThanOrEqual(failedBefore + 1)
 
   // El worker consume el evento del correo de la invitación/MFA: su contador aparece en /metrics.
   await expect
@@ -64,8 +67,8 @@ test('RNF-007 La API y el worker exponen métricas Prometheus, logs JSON y el pa
   }
 
   // El panel de Grafana presenta las cuatro señales que pide el requisito.
-  const titles = (JSON.parse(readFileSync(dashboardPath, 'utf8')) as { panels: { title: string; targets?: { expr: string }[] }[] }).panels
-  const exprs = titles.flatMap((panel) => (panel.targets ?? []).map((target) => target.expr)).join('\n')
+  const panels = (JSON.parse(readFileSync(dashboardPath, 'utf8')) as { panels: { title: string; targets?: { expr: string }[] }[] }).panels
+  const exprs = panels.flatMap((panel) => (panel.targets ?? []).map((target) => target.expr)).join('\n')
   expect(exprs).toContain('identity_login_attempts_total')
   expect(exprs).toContain('identity_http_request_duration_seconds_bucket')
   expect(exprs).toContain('notifications.dlq')
