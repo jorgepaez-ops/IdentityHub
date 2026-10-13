@@ -773,7 +773,7 @@ WHERE ($1::text = ''
        OR display_name ILIKE '%' || $1::text || '%')
   AND ($2::user_status IS NULL OR status = $2::user_status)
   AND ($3::uuid IS NULL OR id > $3::uuid)
-ORDER BY id
+ORDER BY id ASC
 LIMIT $4::bigint
 `
 
@@ -827,7 +827,7 @@ SELECT roles.name
 FROM user_roles
 JOIN roles ON roles.id = user_roles.role_id
 WHERE user_roles.user_id = $1
-ORDER BY roles.name
+ORDER BY roles.name ASC
 `
 
 func (q *Queries) ListRolesForUser(ctx context.Context, userID uuid.UUID) ([]string, error) {
@@ -856,7 +856,7 @@ FROM users u
 JOIN user_roles ur ON ur.user_id = u.id
 JOIN roles r ON r.id = ur.role_id
 WHERE u.status = 'active' AND r.name = 'admin'
-ORDER BY u.id
+ORDER BY u.id ASC
 FOR UPDATE OF u
 `
 

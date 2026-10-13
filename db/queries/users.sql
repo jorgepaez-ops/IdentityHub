@@ -21,7 +21,7 @@ WHERE (sqlc.arg(query)::text = ''
        OR display_name ILIKE '%' || sqlc.arg(query)::text || '%')
   AND (sqlc.narg(status)::user_status IS NULL OR status = sqlc.narg(status)::user_status)
   AND (sqlc.narg(cursor)::uuid IS NULL OR id > sqlc.narg(cursor)::uuid)
-ORDER BY id
+ORDER BY id ASC
 LIMIT sqlc.arg(limit_count)::bigint;
 
 -- name: GetUserByIDForUpdate :one
@@ -36,7 +36,7 @@ FROM users u
 JOIN user_roles ur ON ur.user_id = u.id
 JOIN roles r ON r.id = ur.role_id
 WHERE u.status = 'active' AND r.name = 'admin'
-ORDER BY u.id
+ORDER BY u.id ASC
 FOR UPDATE OF u;
 
 -- name: UpdateAdminUserStatus :one
@@ -114,7 +114,7 @@ SELECT roles.name
 FROM user_roles
 JOIN roles ON roles.id = user_roles.role_id
 WHERE user_roles.user_id = $1
-ORDER BY roles.name;
+ORDER BY roles.name ASC;
 
 -- name: UpdatePasswordHash :exec
 -- Transparent Argon2id rehash after a verified password (RF-003).
