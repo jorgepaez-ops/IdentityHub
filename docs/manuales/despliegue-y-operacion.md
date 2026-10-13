@@ -140,7 +140,7 @@ Variables obligatorias en `.env`, además de las del desarrollo (el comando fall
 
 | Variable | Contenido |
 |---|---|
-| `IDENTITY_HUB_API_IMAGE`, `IDENTITY_HUB_WORKER_IMAGE`, `IDENTITY_HUB_WEB_IMAGE` | Digest de cada imagen publicada en Docker Hub (`nombre@sha256:...`). Las publica `release.yml` en `docker.io/jorgeivp/identity-hub-api`, `identity-hub-worker` e `identity-hub-web` con cada tag `vX.Y.Z` (validado con `v0.9.0`); use el digest de la publicación, que figura en el resumen del run. |
+| `IDENTITY_HUB_API_IMAGE`, `IDENTITY_HUB_WORKER_IMAGE`, `IDENTITY_HUB_WEB_IMAGE` | Digest de cada imagen publicada en Docker Hub (`nombre@sha256:...`). Las publica `release.yml` en `docker.io/jorgeivp/identity-hub-api`, `identity-hub-worker` e `identity-hub-web` con cada tag `vX.Y.Z` (validado con `v0.9.0` y `v0.9.1`); solo después de firmar y atestar mueve `latest` al digest firmado, y únicamente para el `vX.Y.Z` más alto. Los pasos de red se reintentan hasta tres veces y los artefactos de imagen se retienen 7 días. Use el digest de la publicación, que figura en el resumen del run. |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM` | Relay SMTP y remitente de producción. |
 | `SMTP_USERNAME`, `SMTP_PASSWORD` | Credenciales del relay (con SES, las credenciales SMTP derivadas de una clave IAM). El worker las presenta solo tras STARTTLS. |
 

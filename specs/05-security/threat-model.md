@@ -53,7 +53,7 @@ mitigación sin gate se degrada en cuanto alguien la borre sin darse cuenta.
 |---|---|---|---|---|
 | AM-006 | Inyección SQL en la búsqueda de usuarios | Consultas parametrizadas generadas por `sqlc`; nunca concatenación de cadenas | `gosec` G201/G202, CodeQL, Semgrep | RF-010 |
 | AM-007 | Escalada de privilegios alterando el claim `roles` del cliente | Los roles se leen de la base de datos en cada petición sensible, no del token; el token solo se cree tras verificar la firma | `test-integration` de RBAC; ZAP con token manipulado | RF-009 |
-| AM-008 | Imagen manipulada entre la construcción y el despliegue | Firma Cosign *keyless* y despliegue por digest, no por etiqueta mutable | `cd.yml` no despliega si `cosign verify` falla | RNF-006 |
+| AM-008 | Imagen manipulada entre la construcción y el despliegue | Firma Cosign *keyless* y atestación del SBOM sobre el digest, y despliegue por digest, no por etiqueta mutable; la etiqueta móvil `latest` solo se mueve después de firmar y atestar | `release.yml`: el job `publish` firma y atesta cada digest y solo entonces mueve `latest` (verificado con el tag `v0.9.1`) | RNF-006 |
 | AM-009 | Dependencia comprometida en la cadena de suministro | SBOM en CycloneDX por imagen, `osv-scanner`, Dependabot, lockfiles versionados | `sca`, `image-scan`, escaneo semanal | RNF-004 |
 
 ### Repudiation — repudio
@@ -85,7 +85,7 @@ mitigación sin gate se degrada en cuanto alguien la borre sin darse cuenta.
 
 | ID | Amenaza | Mitigación | Gate del pipeline | Requisito |
 |---|---|---|---|---|
-| AM-020 | Escape de contenedor desde un proceso comprometido | Usuario no-root, `cap_drop: ALL`, `no-new-privileges`, raíz en solo lectura, base distroless sin shell | **Hadolint** + **Trivy config**; una regla falla ante `USER root` | RNF-008 |
+| AM-020 | Escape de contenedor desde un proceso comprometido | Usuario no-root, `cap_drop: ALL`, `no-new-privileges`, raíz en solo lectura, base distroless sin shell; detección en ejecución con Falco (cuatro reglas propias sobre `api`, `worker` y `web`, alertas a Loki y a Grafana, runbook `docs/runbooks/falco-alerta.md`) | **Hadolint** + **Trivy config**; una regla falla ante `USER root`. En ejecución, Falco y su alerta de Grafana (perfil `observability`, `make falco-test`) | RNF-008 |
 | AM-021 | Un `user` accede a endpoints de administración | Middleware de autorización por ruta, verificado del lado del servidor | `test-integration` recorre todas las rutas `/admin/*` con un token de `user` y exige `403` | RF-009 |
 | AM-022 | Token de CI con permisos excesivos publica en el registry | `permissions:` mínimas por job en cada workflow; OIDC *keyless* en vez de credenciales de larga vida | Revisión del workflow; `actionlint` en el job de lint | RNF-006 |
 

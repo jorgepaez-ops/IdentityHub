@@ -1081,7 +1081,7 @@
                   "severity": "Unspecified",
                   "type": "Elevation of privilege",
                   "description": "Escape de contenedor desde un proceso comprometido",
-                  "mitigation": "Usuario no-root, `cap_drop: ALL`, `no-new-privileges`, raíz en solo lectura, base distroless sin shell",
+                  "mitigation": "Usuario no-root, `cap_drop: ALL`, `no-new-privileges`, raíz en solo lectura, base distroless sin shell; detección en ejecución con Falco (cuatro reglas propias, alerta en Grafana y runbook)",
                   "modelType": "STRIDE",
                   "new": false,
                   "number": 10,
@@ -2676,6 +2676,19 @@
                   "new": false,
                   "number": 17,
                   "score": ""
+                },
+                {
+                  "id": "eb246c19-a744-4818-ad66-c2238bc436b9",
+                  "title": "AM-023 — Robo o fuerza bruta de una clave de servicio (credencial máquina a máquina de larga vida)",
+                  "status": "Mitigated",
+                  "severity": "Unspecified",
+                  "type": "Spoofing",
+                  "description": "Robo o fuerza bruta de una clave de servicio (credencial máquina a máquina de larga vida)",
+                  "mitigation": "Secreto de 256 bits aleatorios con solo su SHA-256 guardado, comparación en tiempo constante, mismo `401` para toda causa de rechazo, vencimiento obligatorio de 1 a 365 días, alcance mínimo `audit-log:read` aceptado solo donde la operación lo declara, revocación inmediata y auditoría con el `publicId`, nunca el secreto",
+                  "modelType": "STRIDE",
+                  "new": false,
+                  "number": 24,
+                  "score": ""
                 }
               ]
             },
@@ -3317,6 +3330,6 @@
     ],
     "diagramTop": 1,
     "reviewer": "Equipo de seguridad de Identity Hub",
-    "threatTop": 23
+    "threatTop": 24
   }
 }
