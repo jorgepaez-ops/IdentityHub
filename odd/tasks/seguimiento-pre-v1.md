@@ -125,8 +125,8 @@ Estrategia: `ask-on-risk` → `stacked-to-main` (usuario, 2026-10-13). Cortes: P
 | S2 | delegado (Sonnet) | hecho | e2701fd | — |
 | S3 | delegado (Sonnet) | hecho | fa6b8fe | — |
 | S4 | delegado (Sonnet) | hecho | aeeb74e | — |
-| S5 | delegado (Sonnet) | hecho | pendiente de SHA | — |
-| S6 | delegado (Sonnet) | hecho | pendiente de SHA | — |
+| S5 | delegado (Sonnet) | hecho | d64043a | — |
+| S6 | delegado (Sonnet) | hecho | df56da3 | — |
 | S7 | — | pendiente | — | — |
 
 Revisión nativa de S1-S4 (2026-10-13): aprobada (4 lentes, 15 archivos). Correcciones posteriores, también
