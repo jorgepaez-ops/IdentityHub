@@ -10,17 +10,17 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-type deferredConfirmation interface {
+type confirmationWaiter interface {
 	WaitContext(context.Context) (bool, error)
 }
 
 type eventPublisher interface {
-	PublishWithDeferredConfirmWithContext(context.Context, string, string, bool, bool, amqp.Publishing) (deferredConfirmation, error)
+	PublishWithDeferredConfirmWithContext(context.Context, string, string, bool, bool, amqp.Publishing) (confirmationWaiter, error)
 }
 
 type amqpEventPublisher struct{ channel *amqp.Channel }
 
-func (p amqpEventPublisher) PublishWithDeferredConfirmWithContext(ctx context.Context, exchange, key string, mandatory, immediate bool, message amqp.Publishing) (deferredConfirmation, error) {
+func (p amqpEventPublisher) PublishWithDeferredConfirmWithContext(ctx context.Context, exchange, key string, mandatory, immediate bool, message amqp.Publishing) (confirmationWaiter, error) {
 	return p.channel.PublishWithDeferredConfirmWithContext(ctx, exchange, key, mandatory, immediate, message)
 }
 

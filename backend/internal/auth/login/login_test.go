@@ -30,7 +30,7 @@ func (i testMFAIssuer) Issue(_ context.Context, user mfa.User) (mfa.Challenge, e
 	}
 	return mfa.Challenge{Token: "mfa-token", ExpiresIn: 300}, nil
 }
-func withMFA(repository Repository) *Service {
+func withMFA(repository LoginTransactor) *Service {
 	return New(repository).WithMFA(testMFAIssuer{})
 }
 

@@ -37,7 +37,8 @@ type Writer interface {
 	InsertAuditEvent(context.Context, AuditEvent) error
 }
 
-type Repository interface {
+// LogoutTransactor is the persistence boundary: it runs one unit of work in a single transaction.
+type LogoutTransactor interface {
 	WithinLogoutTransaction(context.Context, func(Writer) error) error
 }
 
@@ -47,9 +48,9 @@ type Revoker interface {
 	Logout(context.Context, Input) error
 }
 
-type Service struct{ repository Repository }
+type Service struct{ repository LogoutTransactor }
 
-func New(repository Repository) *Service { return &Service{repository: repository} }
+func New(repository LogoutTransactor) *Service { return &Service{repository: repository} }
 
 func (s *Service) Logout(ctx context.Context, input Input) error {
 	if s.repository == nil || input.RefreshToken == "" {

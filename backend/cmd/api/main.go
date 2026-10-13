@@ -64,11 +64,11 @@ func healthcheckURL() string {
 	return fmt.Sprintf("http://127.0.0.1:%s/healthz", port)
 }
 
-type healthcheckHTTPClient interface {
+type healthcheckRequester interface {
 	Do(*http.Request) (*http.Response, error)
 }
 
-func runHealthcheck(client healthcheckHTTPClient, url string) int {
+func runHealthcheck(client healthcheckRequester, url string) int {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -240,7 +240,7 @@ type passwordHasher struct{}
 
 func (passwordHasher) Hash(value string) (string, error) { return password.Hash(value) }
 
-type userLookup interface {
+type userByIDGetter interface {
 	GetUserByID(context.Context, uuid.UUID) (store.User, error)
 }
 
@@ -252,7 +252,7 @@ type eventPublisher interface {
 // data required by the notification worker. A missing user is non-fatal because the
 // lockout transaction has already committed.
 type loginSecurityEventPublisher struct {
-	users     userLookup
+	users     userByIDGetter
 	publisher eventPublisher
 	logger    *slog.Logger
 }
@@ -286,7 +286,7 @@ func (p loginSecurityEventPublisher) lookupUser(ctx context.Context, userID uuid
 // refreshSecurityEventPublisher is deliberately separate from the login adapter:
 // the two services expose different SecurityEvent types despite sharing delivery.
 type refreshSecurityEventPublisher struct {
-	users     userLookup
+	users     userByIDGetter
 	publisher eventPublisher
 	logger    *slog.Logger
 }

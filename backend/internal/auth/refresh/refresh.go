@@ -74,7 +74,8 @@ type Writer interface {
 	InsertAuditEvent(context.Context, AuditEvent) error
 }
 
-type Repository interface {
+// RefreshTransactor is the persistence boundary: it runs one unit of work in a single transaction.
+type RefreshTransactor interface {
 	WithinRefreshTransaction(context.Context, func(Writer) error) error
 }
 
@@ -102,14 +103,14 @@ type Result struct {
 }
 
 type Service struct {
-	repository Repository
+	repository RefreshTransactor
 	tokens     *token.Service
 	publisher  EventPublisher
 	refreshTTL time.Duration
 	now        func() time.Time
 }
 
-func New(repository Repository, tokens *token.Service, refreshTTL time.Duration) *Service {
+func New(repository RefreshTransactor, tokens *token.Service, refreshTTL time.Duration) *Service {
 	return &Service{repository: repository, tokens: tokens, refreshTTL: refreshTTL, now: time.Now}
 }
 

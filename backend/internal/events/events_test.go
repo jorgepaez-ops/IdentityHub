@@ -165,11 +165,11 @@ func TestRNF007_PublishCuentaFalloDeSerializacion(t *testing.T) {
 }
 
 type publisherStub struct {
-	confirmation deferredConfirmation
+	confirmation confirmationWaiter
 	err          error
 }
 
-func (p publisherStub) PublishWithDeferredConfirmWithContext(context.Context, string, string, bool, bool, amqp.Publishing) (deferredConfirmation, error) {
+func (p publisherStub) PublishWithDeferredConfirmWithContext(context.Context, string, string, bool, bool, amqp.Publishing) (confirmationWaiter, error) {
 	return p.confirmation, p.err
 }
 

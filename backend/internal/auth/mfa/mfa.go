@@ -157,7 +157,8 @@ type Writer interface {
 	UpdateLastLogin(context.Context, uuid.UUID) error
 }
 
-type Repository interface {
+// MFATransactor is the persistence boundary: it runs one unit of work in a single transaction.
+type MFATransactor interface {
 	WithinMFATransaction(context.Context, func(Writer) error) error
 }
 
@@ -174,7 +175,7 @@ type Authenticator interface {
 }
 
 type Service struct {
-	repository    Repository
+	repository    MFATransactor
 	publisher     Publisher
 	random        io.Reader
 	now           func() time.Time
@@ -207,7 +208,7 @@ func (s *Service) WithLockout(policy lockout.Config) *Service {
 	return s
 }
 
-func New(repository Repository, publisher Publisher, random io.Reader, now func() time.Time) *Service {
+func New(repository MFATransactor, publisher Publisher, random io.Reader, now func() time.Time) *Service {
 	if random == nil {
 		random = rand.Reader
 	}

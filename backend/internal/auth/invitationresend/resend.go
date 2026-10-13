@@ -29,7 +29,9 @@ const invitationTTL = 24 * time.Hour
 type Publisher interface {
 	Publish(context.Context, string, any) error
 }
-type Repository interface {
+
+// InvitationResendTransactor is the persistence boundary: it runs one unit of work in a single transaction.
+type InvitationResendTransactor interface {
 	WithinInvitationResendTransaction(context.Context, func(store.InvitationResendWriter) error) error
 }
 type Input struct {
@@ -38,13 +40,13 @@ type Input struct {
 	UserAgent           *string
 }
 type Service struct {
-	repository Repository
+	repository InvitationResendTransactor
 	publisher  Publisher
 	random     io.Reader
 	now        func() time.Time
 }
 
-func New(repository Repository, publisher Publisher, random io.Reader, now func() time.Time) *Service {
+func New(repository InvitationResendTransactor, publisher Publisher, random io.Reader, now func() time.Time) *Service {
 	if now == nil {
 		now = time.Now
 	}
