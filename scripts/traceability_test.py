@@ -218,6 +218,16 @@ class ControlsTests(unittest.TestCase):
         self.assertIn("no/such/file.yml", errors)
         self.assertIn("RNF-777", errors)
 
+    def test_text_found_only_in_a_comment_does_not_verify_the_control(self) -> None:
+        workflow = "jobs:\n  secrets:\n    steps:\n      # TODO: gitleaks-action\n      - run: echo none\n"
+        self.in_tree({".github/workflows/ci.yml": workflow})
+        controls = {"RNF-003": [traceability.Control(".github/workflows/ci.yml", "secrets", "gitleaks-action")]}
+
+        errors = traceability.control_errors(controls, {"RNF-003": ("x", "P0")})
+
+        self.assertEqual(len(errors), 1)
+        self.assertIn("gitleaks-action", errors[0])
+
     def render_with(self, controls: dict, e2e: dict, scenarios: dict) -> str:
         requirements = {"RNF-001": ("Uno", "P0"), "RNF-002": ("Dos", "P0"), "RNF-003": ("Tres", "P0")}
         for name, value in {

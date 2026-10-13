@@ -132,7 +132,8 @@ def control_errors(controls: dict[str, list[Control]], reqs: dict[str, tuple[str
                     errors.append(f"{rid}: {control.file} no tiene la sección '{control.section}'")
                     continue
                 lines = block
-            if not any(control.text in line for line in lines):
+            # Comment lines do not count: a control must be backed by real configuration.
+            if not any(control.text in line for line in lines if not line.lstrip().startswith("#")):
                 where = f"la sección '{control.section}' de " if control.section else ""
                 errors.append(f"{rid}: {where}{control.file} no contiene '{control.text}'")
     return errors
