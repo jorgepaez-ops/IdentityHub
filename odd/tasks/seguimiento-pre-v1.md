@@ -54,8 +54,12 @@ con esos temas abiertos.
   `NotImplementedError`); GREEN = 4 pruebas OK contra `docker compose config` real. Mutación comprobada: quitar
   `127.0.0.1:` del puerto 9090 en una copia del compose hace fallar la prueba (`host_ip=None`). Corre en el job 1
   (`spec-drift`, siempre activo) y en `make spec-drift`.
-- [ ] **S4 — Limpieza menor.** Bloque de URLs repetido entre `up` y `up-app` del Makefile; sección
+- [x] **S4 — Limpieza menor.** Bloque de URLs repetido entre `up` y `up-app` del Makefile; sección
   «Levantar el stack» duplicada entre `README.md` y `docs/guia-desarrollo.md` (una fuente y un enlace).
+  Evidencia: no hay prueba ejecutable determinista para el Makefile; comprobado con `make -n up`, `make -n up-app`
+  y `make help` contra `HEAD` (mismas líneas de comando; el bloque de URLs ahora es la variable `PRINT_APP_URLS`
+  y su salida real es idéntica; `help` igual salvo el nombre del archivo). README: «Levantar el stack» queda en un
+  párrafo con enlace a `docs/guia-desarrollo.md#levantar-el-stack`.
 - [ ] **S5 — RNF-010 (latencia) con prueba de carga.** Prueba de carga mínima y reproducible contra el
   stack de CI con un umbral alineado con `specs/01-requirements.md` (RNF-010) y su gate; la matriz debe
   pasar RNF-010 de «sin cubrir» a cubierto.
@@ -93,8 +97,8 @@ Estrategia: `ask-on-risk` → `stacked-to-main` (usuario, 2026-10-13). Cortes: P
 |---|---|---|---|---|
 | S1 | delegado (Sonnet) | hecho | 118192d | — |
 | S2 | delegado (Sonnet) | hecho | e2701fd | — |
-| S3 | delegado (Sonnet) | hecho | (SHA en el commit siguiente) | — |
-| S4 | — | pendiente | — | — |
+| S3 | delegado (Sonnet) | hecho | fa6b8fe | — |
+| S4 | delegado (Sonnet) | hecho | (SHA en el commit siguiente) | — |
 | S5 | — | pendiente | — | — |
 | S6 | — | pendiente | — | — |
 | S7 | — | pendiente | — | — |
