@@ -152,7 +152,7 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
     (avisos del PR #31), desafíos, limitaciones, trabajo futuro y anexos A y B; sin Q4 ni guion. README: badge
     estático del gate de cobertura (≥ 70 %, job 6b). Revisión de Claude sobre el diff; grep de Q4, T17, T20, T21,
     guion y `cd.yml` sin coincidencias en el informe.
-- [ ] **F — Mejoras de complejidad media y alta (decisión del usuario, 2026-10-12: se anotan hoy y se hacen
+- [x] **F — Mejoras de complejidad media y alta (decisión del usuario, 2026-10-12: se anotan hoy y se hacen
   mañana, 2026-10-13; `v1.0.0` sale después).** Estimación de Claude (2026-10-12):
   - [x] F1 RF-019 exportación del audit log en CSV/JSON (media-baja, ~300 líneas: endpoint spec-first sobre el
     listado existente, botón en la UI, pruebas).
@@ -176,8 +176,14 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
     con modern eBPF en Docker Desktop sin `privileged`; 4 reglas propias (AM-020), alertas a Loki vía Alloy, alerta
     y paneles en Grafana, runbook y `make falco-test`. Revisión aprobada; Claude cerró la evasión de la excepción
     de `wget` y la detección de `connect` no bloqueante, verificado con Falco. Sin push.
-  - [ ] F4 RF-018 claves de servicio (media-alta, ~800 líneas): migración, endpoints, hash de la clave,
+  - [x] F4 RF-018 claves de servicio (media-alta, ~800 líneas): migración, endpoints, hash de la clave,
     middleware de autenticación por clave, UI de administración, pruebas y E2E.
+    Evidencia (2026-10-12/13): PR #39 fusionado (`f3a5c38`), ruta delegada a Sonnet. Clave `ihk_<publicId>_<secreto>`
+    (256 bits, solo SHA-256 guardado, comparación en tiempo constante con hash señuelo), alcance `audit-log:read`
+    solo en `GET /api/v1/admin/audit-log`, mismo 401 para toda causa, ADR 0014, AM-023, 5 escenarios con E2E.
+    Correcciones tras la revisión nativa: solo se auditan rechazos ligados a una clave existente (los anónimos van
+    al log, sin datos de la cabecera: CodeQL go/log-injection) y ningún fallo de auditoría se descarta en silencio.
+    Pruebas RED→GREEN, Postgres real, golangci-lint 0, vitest 262, E2E 57/57.
   - [x] F5 Decidido por el usuario (2026-10-12): **queda como trabajo futuro** (exposición del proyecto en 5 días;
     no se arriesga el núcleo de autenticación ya probado). Documentado en `docs/manuales/integracion-terceros.md`
     §9.1. Antes: integración de terceros (clientes OAuth en BD, OpenID Connect, refresh tokens
@@ -211,9 +217,24 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
     `no afectado`, leyenda en `security/findings/README.md`), `evidencia.json`, README, informe técnico, informe HTML,
     threat model, manual de seguridad y BITACORA. Commit: `fix(security): reclassify VULN-028 as not affected` (hash en el
     historial de la rama).
-  - [ ] F10 Badge de cobertura con el valor medido: hoy es estático («gate ≥ 70 %», E3) y siempre se ve verde
+  - [x] F10 Badge de cobertura con el valor medido: hoy es estático («gate ≥ 70 %», E3) y siempre se ve verde
     aunque la cobertura real cambie (aviso de dos lentes de la revisión nativa del 2026-10-12). Publicar el
     porcentaje que mide el job 6b sin servicio externo.
+    Evidencia (2026-10-12/13): PR #34 fusionado. Job `6c` (solo push a `main`, único con `contents: write`) publica
+    `coverage.json` en la rama huérfana `badges`; distingue rama inexistente de error de red y no pone `main` en rojo.
+    Verificado tras el merge: `badges/coverage.json` = 78.4 % (yellowgreen).
+- [x] **Hallazgos durante los merges (2026-10-12/13).** Sin id de VULN (decisión del usuario).
+  - CVE-2026-85091 (`zlib` 1.3.2-r0, MEDIUM) en la imagen `web`: capa temporal `apk upgrade --no-cache zlib`
+    hasta que la base de nginx lo incluya (PR #40). Trivy MEDIUM+ sin hallazgos, uid 101.
+  - Bug de F2 detectado por el hook de revisión con IA al integrar `main` en F6: si fallaba el `QUIT` después de
+    `250` a DATA, el worker reencolaba el evento y el correo se enviaba dos veces. `QUIT` ahora es de mejor
+    esfuerzo; prueba RED→GREEN (PR #41).
+  - Issue #29 (escaneo semanal del 2026-10-12 con go1.26.8) cerrado con evidencia: escaneo manual sobre `main`
+    (run 38337722846) con go1.26.9, govulncheck sin vulnerabilidades.
+  - Fallas de CI resueltas en los PR: Checkov CKV_AWS_273/40 justificados (SES SMTP exige usuario IAM), falso
+    positivo de Sonar S7552 en `gen-smtp-certs.sh`, prueba de frontend de F1 no aislada (FileReader colado).
+  - Merges: PR #32 a #41 en `main`. Ramas restantes: solo `main` y `badges`; worktrees y volúmenes de prueba
+    borrados. Matriz: 33 requisitos, 25 completos, 7 parciales, 1 sin cubrir (RNF-010), 0 diferidos.
 - [ ] **C2 — Tag `v1.0.0` y release** con el PDF del informe adjunto (`make informe`; el PDF no se
   versiona). En vivo frente al equipo (T21 de `idp-semana-4.md`). Requiere el merge del PR #20.
   Pasos: (1) merge del PR #20 y `main` local al día con CI en verde; (2) `make informe` y revisión del PDF;
@@ -312,8 +333,35 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
 
 ## Siguiente paso
 
-Hecho el 2026-10-12: C3, PR #31 y E1-E3 (rama `docs/cierre-informe`, sin push por decisión del usuario).
-Mañana (2026-10-13): push y PR de `docs/cierre-informe`; F1-F4 y F6-F8; decisiones del usuario sobre F5 y F9;
-al final C2 con `v1.0.0` (imágenes y PDF con el estado final).
-Prerrequisitos: Codex ya no está disponible (suscripción cancelada, 2026-10-12): la delegación va a Sonnet.
-Engram rechazó guardados en la sesión del 2026-10-12; abrir una consola nueva y correr `mem_doctor`.
+Mañana (2026-10-13), en este orden:
+0. **Filtro de documentación en `ci.yml` (prioridad, pedido explícito del usuario: "esto no puede pasar").**
+   El 2026-10-12 el PR #42 (solo `odd/tasks/cierre-entrega.md`) corrió el pipeline completo (E2E, DAST,
+   integración, imágenes) porque `ci.yml` usa `pull_request:` y `push: [main]` sin filtro de rutas. Causa
+   adicional: se abrió el PR al cierre del día en vez de dejar la rama local. Diseño:
+   - No usar `paths-ignore` a nivel de workflow: el ruleset "Protect main" exige 17 checks y quedarían en
+     "Expected — waiting", bloqueando el merge.
+   - Job inicial `changes` que detecte si el diff toca algo fuera de `**.md`, `odd/**` y `docs/**`; los jobs
+     pesados llevan `if: needs.changes.outputs.code == 'true'` (un job *skipped* cuenta como aprobado).
+   - `1 · Deriva entre specs y código` y `3 · Secretos en el historial` corren siempre.
+   - Verificar que `CodeQL`, `Trivy` y `Semgrep OSS` (checks de code scanning por SARIF) no queden pendientes
+     cuando su job se salta; probarlo con un PR documental real antes de dar la tarea por cerrada.
+   - Regla de trabajo: notas de fin de día van en rama local; sin push ni PR hasta que el usuario lo pida.
+   - **Implementado en el PR #43 (merge `e209138`, 2026-10-13).** Ruta: delegada (Sonnet) + correcciones
+     inline. Diferencias con el diseño: los jobs gateados usan `!cancelled() && code != 'false'` (si el job 0
+     falla se corre todo, porque *skipped* cuenta como aprobado); el job `image` arranca siempre y gatea cada
+     paso (los nombres expandidos de la matriz son obligatorios); `git diff --no-renames`; `.github/`, `specs/`
+     y `scripts/` cuentan como código aunque sean `.md`; `sast`, `semgrep`, `iac-scan` e `iac-checkov` también
+     corren siempre (alimentan los checks SARIF). Verificación: actionlint limpio, zizmor sin hallazgos nuevos,
+     clasificador probado en local, CI completo verde en #43, revisión nativa aprobada (3 pasadas).
+   - Pendiente para cerrar: este PR (#42, solo documentación) debe saltarse los jobs pesados y resolver todos
+     los checks obligatorios, incluido `Trivy` sin los SARIF de las imágenes.
+   - Seguimiento (advertencias no bloqueantes de la revisión): mover el clasificador a `scripts/` con prueba;
+     la guarda repetida en cada paso de `image` depende de que cada paso nuevo la incluya.
+1. Validar F7 con un tag `v0.9.1` sobre `main`: `latest` se mueve recién después de firmar y atestar; `cosign verify`
+   (Cosign v3) de las tres imágenes; prompt de capturas para Claude Desktop.
+2. C2: `make informe` (incluir en el informe lo hecho en F1-F4, F6-F10 y los hallazgos de arriba), revisión del PDF
+   por el usuario, notas del release, tag `v1.0.0` en vivo y `gh release create v1.0.0` con el PDF.
+3. Entorno local del usuario: agregar `SMTP_PASSWORD` al `.env` (`openssl rand -hex 24`) y correr `make certs`
+   antes de `make up`.
+Notas operativas: Codex ya no está disponible (la delegación va a Sonnet); `gh pr merge --delete-branch` también
+borra el worktree local de esa rama; Engram rechazó guardados en la sesión del 2026-10-12 (consola nueva).
