@@ -133,98 +133,122 @@ func (f *fakeSMTP) record(cmd string) {
 	f.commands = append(f.commands, cmd)
 }
 
+// smtpSession is the per-connection state of the fake server: the (possibly upgraded)
+// connection, its reader/writer and whether TLS is active.
+type smtpSession struct {
+	f         *fakeSMTP
+	raw       net.Conn
+	conn      net.Conn
+	r         *textproto.Reader
+	tlsActive bool
+}
+
+func (s *smtpSession) reply(line string) { _, _ = fmt.Fprintf(s.conn, "%s\r\n", line) }
+
+// upgrade switches the session to TLS and records that it happened.
+func (s *smtpSession) upgrade() {
+	s.conn = tls.Server(s.raw, s.f.tlsConfig)
+	s.r = textproto.NewReader(bufio.NewReader(s.conn))
+	s.tlsActive = true
+	s.f.mu.Lock()
+	s.f.usedTLS = true
+	s.f.mu.Unlock()
+}
+
 func (f *fakeSMTP) serve(raw net.Conn) {
 	defer raw.Close()
 	_ = raw.SetDeadline(time.Now().Add(10 * time.Second))
-	conn := raw
-	tlsActive := false
+	s := &smtpSession{f: f, raw: raw, conn: raw}
 	if f.implicitTLS {
-		conn = tls.Server(raw, f.tlsConfig)
-		tlsActive = true
-		f.mu.Lock()
-		f.usedTLS = true
-		f.mu.Unlock()
+		s.upgrade()
 	}
-	r := textproto.NewReader(bufio.NewReader(conn))
-	w := func(s string) { _, _ = fmt.Fprintf(conn, "%s\r\n", s) }
-	w("220 fake ESMTP")
+	s.r = textproto.NewReader(bufio.NewReader(s.conn))
+	s.reply("220 fake ESMTP")
 	for {
-		line, err := r.ReadLine()
+		line, err := s.r.ReadLine()
 		if err != nil {
 			return
 		}
 		verb := strings.ToUpper(strings.SplitN(line, " ", 2)[0])
 		f.record(verb)
-		switch verb {
-		case "EHLO", "HELO":
-			w("250-fake")
-			if f.offerStartTLS && !tlsActive {
-				w("250-STARTTLS")
-			}
-			if f.wantAuth != "" {
-				w("250-AUTH PLAIN")
-			}
-			w("250 8BITMIME")
-		case "STARTTLS":
-			w("220 go ahead")
-			conn = tls.Server(raw, f.tlsConfig)
-			r = textproto.NewReader(bufio.NewReader(conn))
-			w = func(s string) { _, _ = fmt.Fprintf(conn, "%s\r\n", s) }
-			tlsActive = true
-			f.mu.Lock()
-			f.usedTLS = true
-			f.mu.Unlock()
-		case "AUTH":
-			if !tlsActive {
-				f.mu.Lock()
-				f.authBeforeTLS = true
-				f.mu.Unlock()
-			}
-			parts := strings.Fields(line)
-			raw64 := ""
-			if len(parts) == 3 {
-				raw64 = parts[2]
-			} else {
-				w("334 ")
-				raw64, _ = r.ReadLine()
-			}
-			decoded, _ := base64.StdEncoding.DecodeString(raw64)
-			fields := strings.Split(string(decoded), "\x00")
-			ok := len(fields) == 3 && fields[1]+":"+fields[2] == f.wantAuth
-			f.mu.Lock()
-			f.authOK = ok
-			f.mu.Unlock()
-			if ok {
-				w("235 ok")
-			} else {
-				w("535 bad credentials")
-			}
-		case "MAIL":
-			f.mu.Lock()
-			f.mailFrom = line
-			f.mu.Unlock()
-			w("250 ok")
-		case "RCPT":
-			f.mu.Lock()
-			f.rcpts = append(f.rcpts, line)
-			f.mu.Unlock()
-			w("250 ok")
-		case "DATA":
-			w("354 go")
-			body, _ := r.ReadDotLines()
-			f.mu.Lock()
-			f.data = strings.Join(body, "\n")
-			f.mu.Unlock()
-			w("250 queued")
-			if f.dropAfterData {
-				return
-			}
-		case "QUIT":
-			w("221 bye")
+		if s.handle(verb, line) {
 			return
-		default:
-			w("250 ok")
 		}
+	}
+}
+
+// handle answers one command and reports whether the session is over.
+func (s *smtpSession) handle(verb, line string) bool {
+	f := s.f
+	switch verb {
+	case "EHLO", "HELO":
+		s.reply("250-fake")
+		if f.offerStartTLS && !s.tlsActive {
+			s.reply("250-STARTTLS")
+		}
+		if f.wantAuth != "" {
+			s.reply("250-AUTH PLAIN")
+		}
+		s.reply("250 8BITMIME")
+	case "STARTTLS":
+		s.reply("220 go ahead")
+		s.upgrade()
+	case "AUTH":
+		s.auth(line)
+	case "MAIL":
+		f.mu.Lock()
+		f.mailFrom = line
+		f.mu.Unlock()
+		s.reply("250 ok")
+	case "RCPT":
+		f.mu.Lock()
+		f.rcpts = append(f.rcpts, line)
+		f.mu.Unlock()
+		s.reply("250 ok")
+	case "DATA":
+		s.reply("354 go")
+		body, _ := s.r.ReadDotLines()
+		f.mu.Lock()
+		f.data = strings.Join(body, "\n")
+		f.mu.Unlock()
+		s.reply("250 queued")
+		return f.dropAfterData
+	case "QUIT":
+		s.reply("221 bye")
+		return true
+	default:
+		s.reply("250 ok")
+	}
+	return false
+}
+
+// auth handles AUTH PLAIN (initial response inline or in a 334 round trip) and records
+// whether it arrived before TLS and whether the credentials matched.
+func (s *smtpSession) auth(line string) {
+	f := s.f
+	if !s.tlsActive {
+		f.mu.Lock()
+		f.authBeforeTLS = true
+		f.mu.Unlock()
+	}
+	parts := strings.Fields(line)
+	raw64 := ""
+	if len(parts) == 3 {
+		raw64 = parts[2]
+	} else {
+		s.reply("334 ")
+		raw64, _ = s.r.ReadLine()
+	}
+	decoded, _ := base64.StdEncoding.DecodeString(raw64)
+	fields := strings.Split(string(decoded), "\x00")
+	ok := len(fields) == 3 && fields[1]+":"+fields[2] == f.wantAuth
+	f.mu.Lock()
+	f.authOK = ok
+	f.mu.Unlock()
+	if ok {
+		s.reply("235 ok")
+	} else {
+		s.reply("535 bad credentials")
 	}
 }
 

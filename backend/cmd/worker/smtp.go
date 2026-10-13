@@ -78,19 +78,9 @@ func (m *smtpMailer) tlsConfig() *tls.Config {
 
 // Send delivers message to the recipients. Errors never include the password.
 func (m *smtpMailer) Send(ctx context.Context, from string, to []string, message []byte) error {
-	dialer := &net.Dialer{Timeout: m.dialTimeout}
-	conn, err := dialer.DialContext(ctx, "tcp", m.addr)
+	conn, err := m.dial(ctx)
 	if err != nil {
-		return fmt.Errorf("conectando con el servidor SMTP: %w", err)
-	}
-	deadline := time.Now().Add(m.sessionTimeout)
-	if d, ok := ctx.Deadline(); ok && d.Before(deadline) {
-		deadline = d
-	}
-	_ = conn.SetDeadline(deadline)
-
-	if m.mode == config.SMTPTLSImplicit {
-		conn = tls.Client(conn, m.tlsConfig())
+		return err
 	}
 	client, err := smtp.NewClient(conn, m.host)
 	if err != nil {
@@ -99,29 +89,80 @@ func (m *smtpMailer) Send(ctx context.Context, from string, to []string, message
 	}
 	defer func() { _ = client.Close() }()
 
-	encrypted := m.mode == config.SMTPTLSImplicit
-	if m.mode == config.SMTPTLSStartTLS {
-		if ok, _ := client.Extension("STARTTLS"); !ok {
-			return errors.New("el servidor SMTP no ofrece STARTTLS y SMTP_TLS=starttls lo exige")
-		}
-		if err := client.StartTLS(m.tlsConfig()); err != nil {
-			return fmt.Errorf("negociando STARTTLS: %w", err)
-		}
-		encrypted = true
+	encrypted, err := m.secure(client)
+	if err != nil {
+		return err
 	}
-
-	if m.username != "" {
-		if !encrypted {
-			return errors.New("se niega a autenticarse por SMTP sin TLS")
-		}
-		if ok, _ := client.Extension("AUTH"); !ok {
-			return errors.New("el servidor SMTP no ofrece AUTH")
-		}
-		if err := client.Auth(smtp.PlainAuth("", m.username, m.credential, m.host)); err != nil {
-			return fmt.Errorf("autenticación SMTP rechazada: %w", err)
-		}
+	if err := m.authenticate(client, encrypted); err != nil {
+		return err
 	}
+	if err := transmit(client, from, to, message); err != nil {
+		return err
+	}
+	// The server already accepted the message (250 to DATA). A failed QUIT (deadline, reset)
+	// must not be reported as a send failure: the worker would requeue the event and send the
+	// email twice. It is best-effort; Close releases the connection either way.
+	if err := client.Quit(); err != nil {
+		_ = client.Close()
+	}
+	return nil
+}
 
+// dial opens the connection with the session deadline set, wrapping it in TLS for the
+// implicit mode.
+func (m *smtpMailer) dial(ctx context.Context) (net.Conn, error) {
+	dialer := &net.Dialer{Timeout: m.dialTimeout}
+	conn, err := dialer.DialContext(ctx, "tcp", m.addr)
+	if err != nil {
+		return nil, fmt.Errorf("conectando con el servidor SMTP: %w", err)
+	}
+	deadline := time.Now().Add(m.sessionTimeout)
+	if d, ok := ctx.Deadline(); ok && d.Before(deadline) {
+		deadline = d
+	}
+	_ = conn.SetDeadline(deadline)
+
+	if m.mode == config.SMTPTLSImplicit {
+		return tls.Client(conn, m.tlsConfig()), nil
+	}
+	return conn, nil
+}
+
+// secure upgrades the session with STARTTLS when that mode is configured (mandatory, never
+// opportunistic) and reports whether the channel is now encrypted.
+func (m *smtpMailer) secure(client *smtp.Client) (bool, error) {
+	if m.mode != config.SMTPTLSStartTLS {
+		return m.mode == config.SMTPTLSImplicit, nil
+	}
+	if ok, _ := client.Extension("STARTTLS"); !ok {
+		return false, errors.New("el servidor SMTP no ofrece STARTTLS y SMTP_TLS=starttls lo exige")
+	}
+	if err := client.StartTLS(m.tlsConfig()); err != nil {
+		return false, fmt.Errorf("negociando STARTTLS: %w", err)
+	}
+	return true, nil
+}
+
+// authenticate performs AUTH PLAIN when credentials are configured and refuses to do so
+// over an unencrypted channel.
+func (m *smtpMailer) authenticate(client *smtp.Client, encrypted bool) error {
+	if m.username == "" {
+		return nil
+	}
+	if !encrypted {
+		return errors.New("se niega a autenticarse por SMTP sin TLS")
+	}
+	if ok, _ := client.Extension("AUTH"); !ok {
+		return errors.New("el servidor SMTP no ofrece AUTH")
+	}
+	if err := client.Auth(smtp.PlainAuth("", m.username, m.credential, m.host)); err != nil {
+		return fmt.Errorf("autenticación SMTP rechazada: %w", err)
+	}
+	return nil
+}
+
+// transmit runs MAIL FROM, RCPT TO and DATA for one message.
+func transmit(client *smtp.Client, from string, to []string, message []byte) error {
 	if err := client.Mail(from); err != nil {
 		return fmt.Errorf("MAIL FROM: %w", err)
 	}
@@ -140,12 +181,6 @@ func (m *smtpMailer) Send(ctx context.Context, from string, to []string, message
 	}
 	if err := w.Close(); err != nil {
 		return fmt.Errorf("cerrando DATA: %w", err)
-	}
-	// The server already accepted the message (250 to DATA). A failed QUIT (deadline, reset)
-	// must not be reported as a send failure: the worker would requeue the event and send the
-	// email twice. It is best-effort; Close releases the connection either way.
-	if err := client.Quit(); err != nil {
-		_ = client.Close()
 	}
 	return nil
 }
