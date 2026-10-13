@@ -182,6 +182,8 @@ corregido (`f1b60ca`). Advertencia descartada con evidencia: la prueba de puerto
 limpia con `CI=true` (el compose no usa `env_file` ni interpolación sin `:?`). El rango 161-196 del extracto
 incluye a propósito el comentario de la línea 161 y termina en el último renglón del paso de `latest`.
 
+Informe técnico sincronizado con el estado final de S1-S7 (2026-10-13): alcance, conteos de pruebas, puertos en loopback, pipeline, desafíos y limitaciones; rangos `{{code:...}}` de `ci.yml` corregidos; `make informe` ok.
+
 ## Siguiente paso
 
 PR de documentación (tras la revisión del PDF por el usuario), luego PR-A (S1-S4) y S5-S6.

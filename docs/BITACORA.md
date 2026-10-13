@@ -45,6 +45,7 @@ Integra en `main` las mejoras de complejidad media y alta anotadas el 12 de octu
 - **S1 (seguimiento-pre-v1):** `release.yml` verifica con `cosign verify` y `cosign verify-attestation` cada digest antes de mover `latest`; primera prueba real con el tag `v1.0.0`.
 - **S5 (seguimiento-pre-v1):** RNF-010 con prueba de carga k6 (`make load-test`, paso del job 7 de CI): p95 de refresh, `GET /me` y JWKS de 2 a 5 ms contra el umbral de 300 ms; el login con Argon2id queda fuera, como dice el requisito.
 - **S6 (seguimiento-pre-v1):** segunda evidencia real para RF-008 (escenarios y E2E), RNF-007 y RNF-012 (E2E sobre `/metrics` y los logs reales) y RNF-001, RNF-002, RNF-006 y RNF-008 (`scripts/pipeline_controls_test.py` con escenarios); la matriz queda en 33 completos, 0 parciales y 0 sin cubrir.
+- **S7 (seguimiento-pre-v1):** los 123 code smells de SonarCloud quedan resueltos en la rama: 111 corregidos sin cambiar el comportamiento (550 pruebas unitarias, 631 de integración y 264 del frontend antes y después), 11 falsos positivos justificados y 1 no aplicable (`db/migrations/**`, inmutable, excluida del análisis). Sonar solo lo reflejará tras fusionar a `main`.
 - `make up` levanta el stack completo, observabilidad y Falco incluidos; se eliminó `make up-obs` y se añadió `make up-app` (solo la aplicación) para CI. Motivo: los guiones de la demo y del video muestran Grafana y Falco, y el usuario debe recordar un único comando (`make setup` en un clon nuevo y `make up`).
 
 ### Estado
