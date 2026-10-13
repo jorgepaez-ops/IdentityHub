@@ -155,6 +155,42 @@ func (e UserStatus) Valid() bool {
 	}
 }
 
+// Defines values for ExportFormat.
+const (
+	ExportFormatCsv  ExportFormat = "csv"
+	ExportFormatJson ExportFormat = "json"
+)
+
+// Valid indicates whether the value is a known member of the ExportFormat enum.
+func (e ExportFormat) Valid() bool {
+	switch e {
+	case ExportFormatCsv:
+		return true
+	case ExportFormatJson:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ExportAuditLogParamsFormat.
+const (
+	ExportAuditLogParamsFormatCsv  ExportAuditLogParamsFormat = "csv"
+	ExportAuditLogParamsFormatJson ExportAuditLogParamsFormat = "json"
+)
+
+// Valid indicates whether the value is a known member of the ExportAuditLogParamsFormat enum.
+func (e ExportAuditLogParamsFormat) Valid() bool {
+	switch e {
+	case ExportAuditLogParamsFormatCsv:
+		return true
+	case ExportAuditLogParamsFormatJson:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for AuthorizeClientParamsResponseType.
 const (
 	Code AuthorizeClientParamsResponseType = "code"
@@ -504,6 +540,9 @@ type ApplicationId = openapi_types.UUID
 // Cursor defines model for Cursor.
 type Cursor = string
 
+// ExportFormat defines model for ExportFormat.
+type ExportFormat string
+
 // Limit defines model for Limit.
 type Limit = int
 
@@ -557,6 +596,17 @@ type ListAuditLogParams struct {
 	Limit   *Limit   `form:"limit,omitempty" json:"limit,omitempty"`
 	Cursor  *Cursor  `form:"cursor,omitempty" json:"cursor,omitempty"`
 }
+
+// ExportAuditLogParams defines parameters for ExportAuditLog.
+type ExportAuditLogParams struct {
+	Format  ExportAuditLogParamsFormat `form:"format" json:"format"`
+	Action  *Action                    `form:"action,omitempty" json:"action,omitempty"`
+	ActorId *ActorId                   `form:"actorId,omitempty" json:"actorId,omitempty"`
+	Since   *Since                     `form:"since,omitempty" json:"since,omitempty"`
+}
+
+// ExportAuditLogParamsFormat defines parameters for ExportAuditLog.
+type ExportAuditLogParamsFormat string
 
 // ListUsersParams defines parameters for ListUsers.
 type ListUsersParams struct {
@@ -657,6 +707,9 @@ type ServerInterface interface {
 	// Consultar el registro de auditoría
 	// (GET /api/v1/admin/audit-log)
 	ListAuditLog(w http.ResponseWriter, r *http.Request, params ListAuditLogParams)
+	// Exportar el registro de auditoría filtrado en CSV o JSON
+	// (GET /api/v1/admin/audit-log/export)
+	ExportAuditLog(w http.ResponseWriter, r *http.Request, params ExportAuditLogParams)
 	// Listar las claves de servicio (solo metadatos)
 	// (GET /api/v1/admin/service-keys)
 	ListServiceKeys(w http.ResponseWriter, r *http.Request)
@@ -772,6 +825,12 @@ func (_ Unimplemented) UpdateApplicationRole(w http.ResponseWriter, r *http.Requ
 // Consultar el registro de auditoría
 // (GET /api/v1/admin/audit-log)
 func (_ Unimplemented) ListAuditLog(w http.ResponseWriter, r *http.Request, params ListAuditLogParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Exportar el registro de auditoría filtrado en CSV o JSON
+// (GET /api/v1/admin/audit-log/export)
+func (_ Unimplemented) ExportAuditLog(w http.ResponseWriter, r *http.Request, params ExportAuditLogParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1192,6 +1251,84 @@ func (siw *ServerInterfaceWrapper) ListAuditLog(w http.ResponseWriter, r *http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListAuditLog(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ExportAuditLog operation middleware
+func (siw *ServerInterfaceWrapper) ExportAuditLog(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ExportAuditLogParams
+
+	// ------------- Required query parameter "format" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "format", r.URL.Query(), &params.Format, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "format"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "format", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "action" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "action", r.URL.Query(), &params.Action, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "action"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "action", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "actorId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "actorId", r.URL.Query(), &params.ActorId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "actorId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "actorId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "since" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "since", r.URL.Query(), &params.Since, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "since"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "since", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ExportAuditLog(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1992,6 +2129,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/admin/audit-log", wrapper.ListAuditLog)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/admin/audit-log/export", wrapper.ExportAuditLog)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/admin/service-keys", wrapper.ListServiceKeys)

@@ -197,6 +197,9 @@ func (s *Server) ListAuditLog(w http.ResponseWriter, r *http.Request, params Lis
 		s.listAuditLog(w, request, params)
 	}).ServeHTTP(w, r)
 }
+func (s *Server) ExportAuditLog(w http.ResponseWriter, r *http.Request, params ExportAuditLogParams) {
+	s.adminOnly(func(w http.ResponseWriter, request *http.Request) { s.exportAuditLog(w, request, params) }).ServeHTTP(w, r)
+}
 func (s *Server) ListUsers(w http.ResponseWriter, r *http.Request, params ListUsersParams) {
 	RequireAuth(s.tokens)(RequireRole(s.currentUsers, "admin")(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
 		s.listUsers(w, request, params)

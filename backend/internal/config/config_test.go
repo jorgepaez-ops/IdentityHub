@@ -368,3 +368,116 @@ func TestRNF003_WorkerNoValidaClaveDeFirma(t *testing.T) {
 		t.Fatalf("LoadWorker must not validate JWT_SIGNING_KEY: %v", err)
 	}
 }
+
+func workerEnv(t *testing.T, extra map[string]string) {
+	t.Helper()
+	t.Setenv("RABBITMQ_URL", "amqp://x")
+	for k, v := range extra {
+		t.Setenv(k, v)
+	}
+}
+
+func TestRF012_SMTPPorDefectoExigeSTARTTLSSinCredenciales(t *testing.T) {
+	workerEnv(t, nil)
+	cfg, err := LoadWorker()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.SMTPTLS != "starttls" || cfg.SMTPUsername != "" || cfg.SMTPPassword.Reveal() != "" || cfg.SMTPCAFile != "" {
+		t.Fatalf("defaults = %+v", cfg)
+	}
+}
+
+func TestRF012_SMTPAceptaConfiguracionCompleta(t *testing.T) {
+	workerEnv(t, map[string]string{
+		"SMTP_TLS": "STARTTLS", "SMTP_USERNAME": "hub", "SMTP_PASSWORD": "s3cret", "SMTP_CA_FILE": "/certs/ca.pem",
+	})
+	cfg, err := LoadWorker()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.SMTPTLS != "starttls" || cfg.SMTPUsername != "hub" || cfg.SMTPPassword.Reveal() != "s3cret" || cfg.SMTPCAFile != "/certs/ca.pem" {
+		t.Fatalf("cfg = %+v", cfg)
+	}
+}
+
+func TestRF012_SMTPContrasenaNuncaSeFormatea(t *testing.T) {
+	workerEnv(t, map[string]string{"SMTP_USERNAME": "hub", "SMTP_PASSWORD": "pw-leak"})
+	cfg, err := LoadWorker()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, rendered := range []string{fmt.Sprintf("%v", cfg), fmt.Sprintf("%+v", cfg), fmt.Sprintf("%#v", cfg)} {
+		if strings.Contains(rendered, "pw-leak") {
+			t.Fatalf("SMTP password leaked: %s", rendered)
+		}
+	}
+}
+
+func TestRF012_SMTPCombinacionesInvalidasSeRechazan(t *testing.T) {
+	casos := []struct {
+		nombre string
+		env    map[string]string
+		espera string
+	}{
+		{"usuario sin contraseña", map[string]string{"SMTP_USERNAME": "hub"}, "SMTP_PASSWORD"},
+		{"contraseña sin usuario", map[string]string{"SMTP_PASSWORD": "x"}, "SMTP_USERNAME"},
+		{"modo desconocido", map[string]string{"SMTP_TLS": "maybe"}, "SMTP_TLS"},
+		{"none con credenciales", map[string]string{"SMTP_TLS": "none", "SMTP_USERNAME": "hub", "SMTP_PASSWORD": "x"}, "SMTP_TLS"},
+		{"CA con none", map[string]string{"SMTP_TLS": "none", "SMTP_CA_FILE": "/c.pem"}, "SMTP_CA_FILE"},
+	}
+	for _, c := range casos {
+		t.Run(c.nombre, func(t *testing.T) {
+			workerEnv(t, c.env)
+			_, err := LoadWorker()
+			if err == nil || !strings.Contains(err.Error(), c.espera) {
+				t.Fatalf("LoadWorker() error = %v, want mention of %s", err, c.espera)
+			}
+		})
+	}
+}
+
+func TestRF020_ClienteOAuthConfigurableYValidado(t *testing.T) {
+	const seed = "MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE="
+	base := map[string]string{"DATABASE_URL": "postgres://x", "RABBITMQ_URL": "amqp://x", "JWT_SIGNING_KEY": seed}
+	set := func(t *testing.T, extra map[string]string) {
+		for k, v := range base {
+			t.Setenv(k, v)
+		}
+		for k, v := range extra {
+			t.Setenv(k, v)
+		}
+	}
+
+	t.Run("valores propios", func(t *testing.T) {
+		set(t, map[string]string{
+			"OAUTH_CLIENT_ID":     "facturacion",
+			"OAUTH_REDIRECT_URI":  "https://app.example.test/oauth/callback",
+			"OAUTH_CLIENT_ORIGIN": "https://app.example.test",
+		})
+		cfg, err := Load()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if cfg.OAuthClientID != "facturacion" || cfg.OAuthRedirectURI != "https://app.example.test/oauth/callback" || cfg.OAuthClientOrigin != "https://app.example.test" {
+			t.Fatalf("cfg = %+v", cfg)
+		}
+	})
+
+	invalid := map[string]map[string]string{
+		"redirect relativo":      {"OAUTH_REDIRECT_URI": "/oauth/callback"},
+		"redirect con fragmento": {"OAUTH_REDIRECT_URI": "http://contabilidad.localhost:8080/cb#x"},
+		"esquema no http":        {"OAUTH_REDIRECT_URI": "ftp://contabilidad.localhost:8080/cb", "OAUTH_CLIENT_ORIGIN": "ftp://contabilidad.localhost:8080"},
+		"origen con ruta":        {"OAUTH_CLIENT_ORIGIN": "http://contabilidad.localhost:8080/app"},
+		"origen no coincide":     {"OAUTH_CLIENT_ORIGIN": "https://otro.example.test"},
+		"client id con espacios": {"OAUTH_CLIENT_ID": "mi cliente"},
+	}
+	for name, env := range invalid {
+		t.Run(name, func(t *testing.T) {
+			set(t, env)
+			if _, err := Load(); err == nil || !strings.Contains(err.Error(), "OAUTH_") {
+				t.Fatalf("Load() error = %v, want an OAUTH_ problem", err)
+			}
+		})
+	}
+}

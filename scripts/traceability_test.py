@@ -104,14 +104,16 @@ class GherkinParserTests(unittest.TestCase):
 
 
 class DeferredRequirementTests(unittest.TestCase):
-    def test_only_rf019_is_rendered_as_deferred_with_planned_date(self) -> None:
+    def test_nothing_is_deferred_and_a_deferred_requirement_still_renders(self) -> None:
+        # RF-018 and RF-019 are implemented: nothing is deferred any more.
+        self.assertEqual(traceability.DEFERRED, {})
+        # The generator must still render a deferred requirement if one is added again.
         expected = "Planificado para el 2026-10-13 (decisión del usuario del 2026-10-12)."
-        self.assertNotIn("RF-018", traceability.DEFERRED)
-        self.assertEqual(traceability.DEFERRED["RF-019"], expected)
+        self.addCleanup(setattr, traceability, "DEFERRED", traceability.DEFERRED)
+        traceability.DEFERRED = {"RF-018": expected}
 
         requirements = {
             "RF-018": ("Claves de servicio", "P2"),
-            "RF-019": ("Exportación del audit log", "P2"),
         }
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory)
@@ -120,23 +122,150 @@ class DeferredRequirementTests(unittest.TestCase):
             previous_operations = traceability.load_operations
             previous_scenarios = traceability.load_scenarios
             previous_e2e_titles = traceability.load_e2e_test_titles
+            previous_controls = traceability.load_controls
             self.addCleanup(setattr, traceability, "ROOT", previous_root)
             self.addCleanup(setattr, traceability, "load_requirements", previous_requirements)
             self.addCleanup(setattr, traceability, "load_operations", previous_operations)
             self.addCleanup(setattr, traceability, "load_scenarios", previous_scenarios)
             self.addCleanup(setattr, traceability, "load_e2e_test_titles", previous_e2e_titles)
+            self.addCleanup(setattr, traceability, "load_controls", previous_controls)
             traceability.ROOT = root
             traceability.load_requirements = lambda: requirements
             traceability.load_operations = lambda: {}
             traceability.load_scenarios = lambda scenarios: {}
             traceability.load_e2e_test_titles = lambda: {}
+            traceability.load_controls = lambda: {}
 
             rendered = traceability.render([])
 
-        self.assertIn("| **RF-018** | Claves de servicio | P2 | — | — | — | — | 🔴 sin cubrir |", rendered)
-        self.assertIn("| **RF-019** | Exportación del audit log | P2 | — | — | — | — | ⏳ diferido (2026-10-13) |", rendered)
-        self.assertIn("**Resumen:** 2 requisitos · 0 completos · 0 parciales · 1 sin cubrir · 1 diferidos (2026-10-13).", rendered)
+        self.assertIn("| **RF-018** | Claves de servicio | P2 | — | — | — | — | — | ⏳ diferido (2026-10-13) |", rendered)
+        self.assertIn("**Resumen:** 1 requisitos · 0 completos · 0 parciales · 0 sin cubrir · 1 diferidos (2026-10-13).", rendered)
         self.assertIn("*diferido (2026-10-13)* = planificado para el 2026-10-13 por decisión del usuario (2026-10-12).", rendered)
+
+
+class ControlsTests(unittest.TestCase):
+    """The fourth evidence column: CI/pipeline controls declared in specs/07-controls.yaml."""
+
+    def in_tree(self, files: dict[str, str]) -> None:
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        root = pathlib.Path(directory.name)
+        for name, content in files.items():
+            path = root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content, encoding="utf-8")
+        previous_root = traceability.ROOT
+        self.addCleanup(setattr, traceability, "ROOT", previous_root)
+        traceability.ROOT = root
+
+    WORKFLOW = (
+        "jobs:\n"
+        "  secrets:\n"
+        "    steps:\n"
+        "      - uses: gitleaks/gitleaks-action@v3\n"
+        "  lint:\n"
+        "    steps:\n"
+        "      - run: golangci-lint\n"
+    )
+
+    def test_parses_the_declarative_mapping(self) -> None:
+        self.in_tree(
+            {
+                "specs/07-controls.yaml": "# comment\n"
+                "RNF-003:\n"
+                "  - .github/workflows/ci.yml | secrets | gitleaks-action\n"
+                "RNF-008:\n"
+                "  - backend/Dockerfile | - | USER 65532\n"
+            }
+        )
+
+        controls = traceability.load_controls()
+
+        self.assertEqual(
+            controls,
+            {
+                "RNF-003": [traceability.Control(".github/workflows/ci.yml", "secrets", "gitleaks-action")],
+                "RNF-008": [traceability.Control("backend/Dockerfile", "", "USER 65532")],
+            },
+        )
+
+    def test_verified_controls_produce_no_errors(self) -> None:
+        self.in_tree({".github/workflows/ci.yml": self.WORKFLOW, "backend/Dockerfile": "USER 65532\n"})
+        controls = {
+            "RNF-003": [traceability.Control(".github/workflows/ci.yml", "secrets", "gitleaks-action")],
+            "RNF-008": [traceability.Control("backend/Dockerfile", "", "USER 65532")],
+        }
+
+        self.assertEqual(traceability.control_errors(controls, {"RNF-003": ("x", "P0"), "RNF-008": ("y", "P0")}), [])
+
+    def test_missing_job_text_file_or_requirement_fail_the_check(self) -> None:
+        self.in_tree({".github/workflows/ci.yml": self.WORKFLOW})
+        ci = ".github/workflows/ci.yml"
+        controls = {
+            "RNF-003": [
+                traceability.Control(ci, "nonexistent-job", "gitleaks-action"),
+                # The text exists in another job, not in the declared one: still unverifiable.
+                traceability.Control(ci, "lint", "gitleaks-action"),
+                traceability.Control("no/such/file.yml", "secrets", "x"),
+            ],
+            "RNF-777": [traceability.Control(ci, "secrets", "gitleaks-action")],
+        }
+
+        errors = "\n".join(traceability.control_errors(controls, {"RNF-003": ("x", "P0")}))
+
+        self.assertIn("RNF-003", errors)
+        self.assertIn("nonexistent-job", errors)
+        self.assertIn("lint", errors)
+        self.assertIn("no/such/file.yml", errors)
+        self.assertIn("RNF-777", errors)
+
+    def test_text_found_only_in_a_comment_does_not_verify_the_control(self) -> None:
+        workflow = "jobs:\n  secrets:\n    steps:\n      # TODO: gitleaks-action\n      - run: echo none\n"
+        self.in_tree({".github/workflows/ci.yml": workflow})
+        controls = {"RNF-003": [traceability.Control(".github/workflows/ci.yml", "secrets", "gitleaks-action")]}
+
+        errors = traceability.control_errors(controls, {"RNF-003": ("x", "P0")})
+
+        self.assertEqual(len(errors), 1)
+        self.assertIn("gitleaks-action", errors[0])
+
+    def render_with(self, controls: dict, e2e: dict, scenarios: dict) -> str:
+        requirements = {"RNF-001": ("Uno", "P0"), "RNF-002": ("Dos", "P0"), "RNF-003": ("Tres", "P0")}
+        for name, value in {
+            "load_requirements": lambda: requirements,
+            "load_operations": lambda: {},
+            "load_scenarios": lambda _: scenarios,
+            "load_e2e_test_titles": lambda: e2e,
+            "load_controls": lambda: controls,
+        }.items():
+            self.addCleanup(setattr, traceability, name, getattr(traceability, name))
+            setattr(traceability, name, value)
+        self.in_tree({})
+        return traceability.render([])
+
+    def test_controls_column_counts_as_one_evidence_source(self) -> None:
+        ci = ".github/workflows/ci.yml"
+        controls = {
+            "RNF-001": [traceability.Control(ci, "e2e", "a")],
+            "RNF-002": [traceability.Control(ci, "sast", "a"), traceability.Control(".github/workflows/release.yml", "publish", "b")],
+            "RNF-003": [traceability.Control(ci, "secrets", "a")],
+        }
+        rendered = self.render_with(controls, {}, {"RNF-003": ["sample.feature — x"]})
+
+        self.assertIn("Controles CI", rendered)
+        # Controls alone: one source -> parcial; two refs in one column are still one source.
+        self.assertIn("| **RNF-001** | Uno | P0 | — | — | — | — | `ci.yml#e2e` | 🟡 parcial |", rendered)
+        self.assertIn("`ci.yml#sast`, `release.yml#publish`", rendered)
+        self.assertIn("| 🟡 parcial |", rendered.split("**RNF-002**")[1].splitlines()[0])
+        # A test column plus controls -> completo.
+        self.assertIn("| 1 | — | — | `ci.yml#secrets` | ✅ completo |", rendered)
+
+    def test_requirement_without_tests_or_controls_stays_uncovered(self) -> None:
+        rendered = self.render_with({}, {}, {})
+
+        self.assertIn("| **RNF-001** | Uno | P0 | — | — | — | — | — | 🔴 sin cubrir |", rendered)
+        self.assertIn("**Resumen:** 3 requisitos · 0 completos · 0 parciales · 3 sin cubrir", rendered)
+        self.assertIn("cuatro columnas de evidencia", rendered)
 
 
 if __name__ == "__main__":

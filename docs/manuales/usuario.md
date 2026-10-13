@@ -269,7 +269,7 @@ Cada creación, cambio y eliminación de un rol queda registrado en la auditorí
 
 ![Fila de auditoría con sus metadatos desplegados](img/usuario/administrador-21-auditoria-metadatos.png)
 
-**Exportar CSV.** Igual que en Usuarios, **Exportar CSV** descarga los eventos **cargados** bajo los filtros actuales (siete columnas: fecha, acción, actor, tipo e ID de recurso, IP y metadatos, con el actor como correo y los metadatos como `clave=valor; ...`). Si hay más páginas, un aviso lo indica; pulse **Cargar más** antes de exportar para incluir el resto.
+**Exportar CSV o JSON.** **Exportar CSV** y **Exportar JSON** descargan **todos los eventos que cumplen los filtros aplicados**, no solo los cargados en pantalla: el servidor los consulta y devuelve hasta 10 000 eventos, del más reciente al más antiguo. Si el filtro tenía más, un aviso indica que la exportación se recortó; acote los filtros (por ejemplo con **Desde**) para obtener el resto. El CSV tiene nueve columnas (id, fecha, actor, acción, tipo e ID de recurso, IP, agente de usuario y metadatos en JSON), usa UTF-8 con marca BOM, y neutraliza con una comilla simple las celdas que empiezan por `=`, `+`, `-` o `@` para que Excel no las ejecute como fórmulas. Cada exportación queda registrada en la propia auditoría como `audit_log_exported`, con el formato, los filtros y el número de filas.
 
 ### 3.7 Claves de servicio
 
@@ -426,5 +426,5 @@ Qué demuestra esta historia ([criterio de aceptación 2 de la semana 4](../../o
 | El rol nuevo no aparece en Contabilidad | El cambio rige desde el siguiente token (hasta 15 minutos): cierre sesión en Contabilidad y vuelva a entrar. |
 | **Sin acceso a Contabilidad** | La cuenta no tiene un rol `contabilidad.*`; pídalo a un administrador (3.5). |
 | No puedo eliminar un rol | Tiene usuarios asignados (3.4): quite la asignación primero. |
-| El CSV exportado trae menos filas de las esperadas | Solo incluye lo cargado en pantalla (usuarios y auditoría) o lo visible tras filtros (movimientos); pulse **Cargar más** y vuelva a exportar (3.1, 3.6, 4.8). |
+| El CSV exportado trae menos filas de las esperadas | En usuarios solo incluye lo cargado en pantalla y en movimientos lo visible tras filtros; pulse **Cargar más** y vuelva a exportar (3.1, 4.8). La auditoría se exporta completa desde el servidor, con un tope de 10 000 eventos (3.6). |
 | Un indicador de Inicio dice **100+** | Es un conteo con tope de 100 por consulta; para el detalle abra el directorio o la auditoría desde la tarjeta (3.0). |

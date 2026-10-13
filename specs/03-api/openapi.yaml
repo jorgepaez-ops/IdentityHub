@@ -587,6 +587,44 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
+  /api/v1/admin/audit-log/export:
+    get:
+      operationId: exportAuditLog
+      tags: [admin]
+      summary: Exportar el registro de auditoría filtrado en CSV o JSON
+      description: |
+        Aplica los mismos filtros que el listado y devuelve como máximo 10 000 eventos, del más reciente
+        al más antiguo, como descarga (Content-Disposition: attachment). Si había más, la cabecera
+        X-Export-Truncated vale true. Las celdas CSV que empiezan por = + - @, tabulador o retorno de carro
+        se neutralizan con una comilla simple (inyección de fórmulas). La exportación queda registrada
+        en el propio registro de auditoría (audit_log_exported) con el formato y los filtros usados.
+      x-requirement: RF-019
+      parameters:
+        - $ref: '#/components/parameters/ExportFormat'
+        - $ref: '#/components/parameters/Action'
+        - $ref: '#/components/parameters/ActorId'
+        - $ref: '#/components/parameters/Since'
+      responses:
+        '200':
+          description: Archivo con los eventos filtrados
+          headers:
+            Content-Disposition:
+              description: attachment con un nombre que incluye la marca de tiempo
+              schema: { type: string }
+            X-Export-Truncated:
+              description: "true si el filtro tenía más de 10 000 eventos y la exportación se recortó"
+              schema: { type: string, enum: ['true', 'false'] }
+          content:
+            text/csv:
+              schema: { type: string }
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/AuditEvent' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /api/v1/admin/applications:
     get:
       operationId: listApplications
@@ -796,6 +834,11 @@ components:
       name: since
       in: query
       schema: { type: string, format: date-time }
+    ExportFormat:
+      name: format
+      in: query
+      required: true
+      schema: { type: string, enum: [csv, json] }
     Limit:
       name: limit
       in: query

@@ -33,8 +33,10 @@ export const csvFileName = (prefix: string, date: Date = new Date()) => `${prefi
 const REVOKE_DELAY_MS = 30_000
 
 /** Downloads through a Blob URL (no data: URL, so the CSP is untouched) and revokes the URL afterwards. */
-export function downloadCsv(fileName: string, content: string): void {
-  const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' }))
+export const downloadCsv = (fileName: string, content: string): void => downloadBlob(fileName, new Blob([content], { type: 'text/csv;charset=utf-8' }))
+
+export function downloadBlob(fileName: string, blob: Blob): void {
+  const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
   link.download = fileName

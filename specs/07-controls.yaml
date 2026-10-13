@@ -1,0 +1,70 @@
+# Controles de CI/pipeline que hacen cumplir cada requisito no funcional (cuarta columna de
+# specs/07-traceability.md). Cada línea es:   - <archivo> | <sección o -> | <texto>
+# `scripts/traceability.py --check` comprueba que el archivo exista, que tenga la sección
+# (job de workflow, servicio de compose, target de Makefile) y que el texto aparezca dentro de
+# ella. Una referencia rota rompe la build: no se admiten afirmaciones sin verificar.
+# Solo se listan controles que hacen cumplir lo que el criterio del requisito dice.
+
+# El stack completo se levanta con "make up" (docker compose) en los jobs E2E y DAST.
+RNF-001:
+  - .github/workflows/ci.yml | e2e | ./.github/actions/stack-up
+  - .github/actions/stack-up/action.yml | - | make up
+
+# Un push recorre secretos, SAST, SCA, escaneo de imagen y DAST, y cada gate rompe la build.
+RNF-002:
+  - .github/workflows/ci.yml | secrets | gitleaks/gitleaks-action
+  - .github/workflows/ci.yml | sast | github/codeql-action/analyze
+  - .github/workflows/ci.yml | sca | name: govulncheck
+  - .github/workflows/ci.yml | image | exit-code: "1"
+  - .github/workflows/ci.yml | dast | make scan-dast
+
+# Gitleaks sobre el historial completo (fetch-depth: 0) en cada push.
+RNF-003:
+  - .github/workflows/ci.yml | secrets | fetch-depth: 0
+  - .github/workflows/ci.yml | secrets | gitleaks/gitleaks-action
+
+# Trivy con --ignore-unfixed y exit-code 1 sobre cada imagen, y el mismo gate antes de publicar.
+RNF-004:
+  - .github/workflows/ci.yml | image | ignore-unfixed: true
+  - .github/workflows/ci.yml | image | trivyignores: security/.trivyignore
+  - .github/workflows/release.yml | gate | ignore-unfixed: true
+
+# Gate de cobertura sobre internal/ con umbral 70 %.
+RNF-005:
+  - .github/workflows/ci.yml | test-integration | Cobertura de internal/ (gate)
+  - .github/workflows/ci.yml | test-integration | coverage + 0 < 70
+
+# SBOM CycloneDX (Syft) y firma Cosign keyless en la publicación. La verificación de la firma
+# al desplegar no está automatizada, por eso este requisito sigue parcial.
+RNF-006:
+  - .github/workflows/release.yml | publish | cosign sign --yes
+  - .github/workflows/release.yml | publish | cosign attest --yes --type cyclonedx
+  - .github/workflows/release.yml | publish | format: cyclonedx-json
+
+# Solo se verifican los tres servicios propios (api, worker, web); las imágenes de terceros
+# (base de datos, broker, observabilidad) no están endurecidas igual.
+RNF-008:
+  - deploy/docker-compose.yml | api | read_only: true
+  - deploy/docker-compose.yml | api | cap_drop: [ALL]
+  - deploy/docker-compose.yml | api | no-new-privileges:true
+  - deploy/docker-compose.yml | worker | read_only: true
+  - deploy/docker-compose.yml | worker | cap_drop: [ALL]
+  - deploy/docker-compose.yml | worker | no-new-privileges:true
+  - deploy/docker-compose.yml | web | read_only: true
+  - deploy/docker-compose.yml | web | cap_drop: [ALL]
+  - deploy/docker-compose.yml | web | no-new-privileges:true
+  - backend/Dockerfile | - | USER 65532:65532
+  - frontend/Dockerfile | - | USER 101
+  - .github/workflows/ci.yml | iac-scan | scan-type: config
+  - .github/workflows/ci.yml | lint | hadolint/hadolint-action
+
+# ZAP (DAST) rompe la build ante hallazgos de riesgo medio o más, entre ellos cabeceras ausentes.
+RNF-009:
+  - .github/workflows/ci.yml | dast | make scan-dast
+
+# El job spec-drift regenera el código y falla si el árbol difiere de lo commiteado.
+RNF-011:
+  - .github/workflows/ci.yml | spec-drift | git diff --exit-code
+  - .github/workflows/ci.yml | spec-drift | Regenerar la API Go
+
+# RNF-007, RNF-010 y RNF-012: sin control de CI que haga cumplir su criterio (ver la matriz).

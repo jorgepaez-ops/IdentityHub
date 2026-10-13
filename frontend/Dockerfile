@@ -49,6 +49,12 @@ COPY --from=contabilidad-builder /app/dist /usr/share/nginx/contabilidad
 # P9d (2026-10-06): este digest de stable-alpine ya trae pcre2 10.49, libpng 1.6.59 y
 # nghttp2 1.70; se retiró la capa "apk upgrade pcre2" (CVE-2026-103111) que parchaba la base anterior.
 
+# 2026-10-13: el digest vigente de stable-alpine (Alpine 3.24.2) trae zlib 1.3.2-r0 con
+# CVE-2026-85091 (MEDIUM); el repositorio de Alpine ya publica 1.3.2-r1. Se parcha aquí y la capa
+# se retira cuando un digest nuevo de la base lo incluya (mismo criterio que pcre2 en P9d).
+USER 0
+RUN apk upgrade --no-cache zlib
+
 EXPOSE 8080
 
 # Explícito además del valor por defecto de la imagen: Trivy config (DS002)
