@@ -33,7 +33,7 @@ data "aws_iam_policy_document" "execution_secrets" {
   statement {
     sid       = "LeerSecretosDelProyecto"
     actions   = ["secretsmanager:GetSecretValue"]
-    resources = values(local.secret_arn)
+    resources = concat(values(local.secret_arn), local.smtp_secret_arns)
   }
   statement {
     sid       = "DescifrarConLaClaveDelProyecto"
@@ -58,6 +58,9 @@ resource "aws_iam_role" "task" {
 locals {
   smtp_host = var.localstack ? "mailpit" : "email-smtp.${var.region}.amazonaws.com"
   smtp_port = var.localstack ? "1025" : "587"
+  # SES exige STARTTLS en 587; el Mailpit de LocalStack no ofrece TLS (y por eso
+  # tampoco se le envian credenciales: el worker las rechazaria con "none").
+  smtp_tls = var.localstack ? "none" : "starttls"
 
   hub_url = "https://${var.hub_host}"
 
@@ -85,20 +88,24 @@ locals {
     { name = "SMTP_HOST", value = local.smtp_host },
     { name = "SMTP_PORT", value = local.smtp_port },
     { name = "SMTP_FROM", value = var.ses_from_address },
+    { name = "SMTP_TLS", value = local.smtp_tls },
   ]
 
   # El worker solo consume la cola y envia SMTP: no firma ni verifica tokens ni
   # resuelve la IP del cliente, asi que no recibe JWT_SIGNING_KEY ni TRUSTED_PROXIES.
-  worker_secrets = [
+  base_secrets = [
     { name = "RABBITMQ_URL", valueFrom = local.secret_arn["rabbitmq-url"] },
   ]
+
+  # Las credenciales SMTP de SES son solo del worker (minimo privilegio).
+  worker_secrets = concat(local.base_secrets, local.smtp_secrets)
 
   # La api ademas necesita la base, la clave de firma y los proxies de confianza.
   api_env = concat(local.worker_env, [
     { name = "TRUSTED_PROXIES", value = var.vpc_cidr },
   ])
 
-  api_secrets = concat(local.worker_secrets, [
+  api_secrets = concat(local.base_secrets, [
     { name = "DATABASE_URL", valueFrom = local.secret_arn["database-url"] },
     { name = "JWT_SIGNING_KEY", valueFrom = local.secret_arn["jwt-signing-key"] },
   ])

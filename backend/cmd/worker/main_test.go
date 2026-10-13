@@ -7,7 +7,6 @@ import (
 	"errors"
 	"log/slog"
 	"mime"
-	"net/smtp"
 	"reflect"
 	"strings"
 	"sync"
@@ -192,10 +191,9 @@ func TestRF012_MensajeSMTPNoPermiteInyeccionDeCabeceras(t *testing.T) {
 }
 
 type smtpCall struct {
-	address string
-	from    string
-	to      []string
-	body    []byte
+	from string
+	to   []string
+	body []byte
 }
 
 func TestRNF005_DeliveryUsesInjectedSMTPTransportAfterRendering(t *testing.T) {
@@ -210,15 +208,15 @@ func TestRNF005_DeliveryUsesInjectedSMTPTransportAfterRendering(t *testing.T) {
 	var call smtpCall
 	w := &worker{
 		cfg: &config.Config{SMTPHost: "smtp.test", SMTPPort: 2525, SMTPFrom: "sender@example.test", PublicBaseURL: "https://identity.example.test"},
-		sendMail: func(address string, _ smtp.Auth, from string, to []string, message []byte) error {
-			call = smtpCall{address: address, from: from, to: to, body: message}
+		sendMail: func(_ context.Context, from string, to []string, message []byte) error {
+			call = smtpCall{from: from, to: to, body: message}
 			return nil
 		},
 	}
 	if err := w.deliver(context.Background(), event.Envelope, body); err != nil {
 		t.Fatalf("deliver() error = %v", err)
 	}
-	if call.address != "smtp.test:2525" || call.from != "sender@example.test" || !reflect.DeepEqual(call.to, []string{"recipient@example.test"}) {
+	if call.from != "sender@example.test" || !reflect.DeepEqual(call.to, []string{"recipient@example.test"}) {
 		t.Fatalf("SMTP call = %#v", call)
 	}
 	if !strings.Contains(string(call.body), "Subject: [Identity Hub]") || !strings.Contains(string(call.body), "recipient@example.test") {
@@ -240,7 +238,7 @@ func TestRNF005_DeliveryStopsBeforeSMTPWhenContextIsCanceled(t *testing.T) {
 	called := false
 	w := &worker{
 		cfg: &config.Config{SMTPHost: "smtp.test", SMTPPort: 2525, SMTPFrom: "sender@example.test", PublicBaseURL: "https://identity.example.test"},
-		sendMail: func(string, smtp.Auth, string, []string, []byte) error {
+		sendMail: func(context.Context, string, []string, []byte) error {
 			called = true
 			return nil
 		},
@@ -265,7 +263,7 @@ func TestRF015_EntregaDeCuentaAusenteNoEnviaCorreo(t *testing.T) {
 	called := false
 	w := &worker{
 		cfg: &config.Config{SMTPHost: "smtp.test", SMTPPort: 2525, SMTPFrom: "sender@example.test", PublicBaseURL: "https://identity.example.test"},
-		sendMail: func(string, smtp.Auth, string, []string, []byte) error {
+		sendMail: func(context.Context, string, []string, []byte) error {
 			called = true
 			return nil
 		},
@@ -293,7 +291,7 @@ func TestRF015_EntregaDeCuentaAusenteRegistraElDescarteSinDatosSensibles(t *test
 	w := &worker{
 		logger: slog.New(slog.NewTextHandler(&logBuf, nil)),
 		cfg:    &config.Config{SMTPHost: "smtp.test", SMTPPort: 2525, SMTPFrom: "sender@example.test", PublicBaseURL: "https://identity.example.test"},
-		sendMail: func(string, smtp.Auth, string, []string, []byte) error {
+		sendMail: func(context.Context, string, []string, []byte) error {
 			t.Fatal("SMTP transport was called for a missing account")
 			return nil
 		},

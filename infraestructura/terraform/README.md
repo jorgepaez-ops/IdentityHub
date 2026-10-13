@@ -17,7 +17,7 @@ en lo posible con LocalStack. **No es necesaria para ejecutar el proyecto**: eso
 | `alb_logs.tf` | Bucket S3 de los logs de acceso del ALB (cifrado SSE-S3, versionado, bloqueo publico, solo TLS) |
 | `ecs.tf` | Cluster, roles IAM, task definitions (api, worker, web, broker, mailpit, migrate) y servicios |
 | `rds.tf` | RDS PostgreSQL 16 cifrado con KMS, privado, con backups y proteccion contra borrado |
-| `secrets.tf` | Contrasenas y semilla Ed25519 generadas con `random`, guardadas en Secrets Manager |
+| `secrets.tf` | Contrasenas y semilla Ed25519 generadas con `random`, y credenciales SMTP de SES (usuario IAM dedicado), guardadas en Secrets Manager |
 | `kms.tf`, `logs.tf` | Clave KMS con rotacion; grupos de CloudWatch Logs con retencion y KMS |
 | `service_discovery.tf` | Cloud Map: `api`, `broker`, `db` (CNAME a RDS) y `mailpit` resuelven como en el compose |
 | `dns_tls_waf.tf` | Route 53, ACM, WAFv2 sobre el ALB y la identidad de SES |
@@ -122,15 +122,19 @@ quitar `deletion_protection` antes en una cuenta real).
 
 ## Brechas conocidas
 
-- **Correo real:** el worker envia SMTP sin autenticacion ni TLS (ADR 0012); la interfaz SMTP de
-  SES exige ambos. Con `localstack = false` el worker apunta a SES pero no podra autenticarse hasta
-  cambiar el codigo.
+- **Correo real:** el worker autentica y exige STARTTLS. Con `localstack = false` apunta al endpoint
+  SMTP de SES en 587 con `SMTP_TLS=starttls` y recibe `SMTP_USERNAME`/`SMTP_PASSWORD` desde Secrets
+  Manager (usuario IAM `ses-smtp` con solo `ses:SendRawEmail`, limitado a `ses_from_address`). Sigue
+  pendiente fuera del codigo: verificar la identidad y el DKIM en SES y salir del sandbox; la clave
+  IAM y su derivada SMTP quedan en el estado de Terraform y no rotan solas.
 - **RabbitMQ autogestionado:** un solo nodo y sin disco persistente (decision D7); Amazon MQ no se
   usa porque LocalStack no lo soporta.
 - **Imagen de migrate:** debe incluir `db/migrations` (el compose las monta como volumen).
-- **Hosts fijos en la aplicacion:** Nginx (`server_name *.localhost`) y `config.go`
-  (`OAuthRedirectURI`) tienen los dominios `.localhost` escritos; con dominios reales hay que
-  parametrizarlos antes de que el flujo OAuth funcione de extremo a extremo.
+- **Hosts fijos en la aplicacion:** el cliente OAuth ya se configura con `OAUTH_CLIENT_ID`,
+  `OAUTH_REDIRECT_URI` y `OAUTH_CLIENT_ORIGIN` (esta referencia no los define: usa los valores
+  locales). Siguen fijos Nginx (`server_name *.localhost` y la CSP de Contabilidad), las constantes
+  de compilacion de `contabilidad/src/config.ts` y la fila de `oauth_clients` (migracion 000007);
+  con dominios reales hay que cambiarlos en conjunto (ver `docs/manuales/despliegue-y-operacion.md`).
 - **IP de cliente:** Nginx sobrescribe `X-Forwarded-For` con la IP del ALB, asi que detras del ALB
   la API ve la IP del balanceador; ajustar `TRUSTED_PROXIES` y esa cabecera es trabajo futuro.
 - **Nginx resuelve `api` solo al arrancar:** Terraform fuerza un despliegue de web cuando cambia la

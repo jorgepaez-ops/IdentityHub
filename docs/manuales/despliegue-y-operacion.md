@@ -28,7 +28,8 @@ Complete `.env` sin guardar secretos en Git. Las variables que se muestran a con
 | Rol de aplicación y migraciones | `IDENTITY_APP_PASSWORD`, `MIGRATE_DATABASE_URL`, `DATABASE_URL` | Credencial de mínimo privilegio, conexión del migrador y conexión de la API. El worker no recibe `DATABASE_URL`: solo consume la cola y envía SMTP. Al desplegar en AWS, publique primero la imagen del worker que ya usa `LoadWorker` y después aplique el Terraform que le quita el secreto y el acceso a la base y los secretos `JWT_SIGNING_KEY` y `TRUSTED_PROXIES`; una imagen anterior exige `DATABASE_URL` y `JWT_SIGNING_KEY` y no arrancaría. |
 | RabbitMQ | `RABBITMQ_DEFAULT_USER`, `RABBITMQ_DEFAULT_PASS`, `RABBITMQ_URL` | Usuario, contraseña y URL AMQP del broker. |
 | API y JWT | `API_PORT`, `API_BASE_URL`, `LOG_LEVEL`, `JWT_SIGNING_KEY`, `JWT_ISSUER`, `TRUSTED_PROXIES`, `JWT_ACCESS_TTL`, `JWT_REFRESH_TTL` | Puerto, URL local, nivel de log, firma y parámetros de token; `JWT_SIGNING_KEY` no tiene valor por defecto. Solo la API los recibe: el worker no firma tokens ni usa `TRUSTED_PROXIES`. |
-| Correo local | `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM` | Destino SMTP para el worker; por defecto apunta a Mailpit. |
+| Correo (SMTP) | `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM`, `SMTP_TLS`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_CA_FILE` | Destino y seguridad del SMTP del worker; por defecto apunta a Mailpit con STARTTLS y autenticación (ver "Correo SMTP"). `SMTP_PASSWORD` lo genera `make setup`. |
+| Cliente OAuth | `OAUTH_CLIENT_ID`, `OAUTH_REDIRECT_URI`, `OAUTH_CLIENT_ORIGIN` | Opcionales; por defecto los valores locales de Contabilidad (ver "Hosts configurables y fijos"). |
 | Observabilidad | `GRAFANA_ADMIN_USER`, `GRAFANA_ADMIN_PASSWORD` | Acceso inicial de Grafana cuando se habilita su perfil. |
 | Arranque inicial | `BOOTSTRAP_ADMIN_EMAIL` | Variable opcional consumida por Compose: crea o reemite por invitación el primer administrador bajo D17. No hay contraseña en esta variable. |
 | Límite local de E2E | `LOGIN_IP_MAX_FAILURES` | Compose lo admite para el límite por IP; `make e2e` lo eleva temporalmente y lo restaura. |
@@ -94,6 +95,40 @@ No hay un comando administrativo de desbloqueo documentado. D13 establece que co
 
 No despliegue el Compose de desarrollo como producción. La arquitectura de referencia en nube e IaC son entregables de T7 y T8; Checkov se incorpora en T10. Para ensayar localmente una configuración parecida a producción existe la **producción simulada** (T9): `deploy/docker-compose.prod.yml`, un override del Compose base.
 
+### Correo SMTP: STARTTLS y credenciales
+
+El worker no usa `smtp.SendMail`: abre la sesión SMTP explícitamente (EHLO, STARTTLS, AUTH, MAIL, RCPT, DATA, QUIT), con TLS 1.2 como mínimo, verificación del certificado contra `SMTP_HOST`, un plazo de 10 s para conectar y 30 s por sesión.
+
+| Variable | Valores | Efecto |
+|---|---|---|
+| `SMTP_TLS` | `starttls` (por defecto), `tls`, `none` | `starttls` exige que el servidor ofrezca STARTTLS y falla sin enviar nada si no lo hace; `tls` abre TLS implícito (puerto 465); `none` es texto plano, solo para desarrollo, y la configuración lo rechaza si hay credenciales. |
+| `SMTP_USERNAME`, `SMTP_PASSWORD` | ambas o ninguna | AUTH PLAIN, únicamente sobre TLS. La contraseña es un `Secret`: no aparece en logs ni en errores. |
+| `SMTP_CA_FILE` | ruta a un PEM | CA adicional de confianza (se suma a las raíces del sistema). Un archivo ilegible o sin certificados impide arrancar el worker. |
+
+**Desarrollo local.** Mailpit corre con `MP_SMTP_REQUIRE_STARTTLS`, certificado propio y `MP_SMTP_AUTH_FILE`. Los certificados se generan con:
+
+```bash
+make certs    # sh scripts/gen-smtp-certs.sh --env-file .env
+```
+
+Crea `deploy/certs/` (ignorado por git): `ca.pem` y `ca-key.pem` (CA local), `server.pem` y `server-key.pem` (SAN `mailpit`, `localhost`, `127.0.0.1`; claves en modo 0600) y `smtp-auth.txt` (usuario y contraseña de `.env`, que se reescribe en cada ejecución). Es idempotente; `sh scripts/gen-smtp-certs.sh --force` regenera la CA y los certificados. `make up`, `make up-obs` y `make restart` la ejecutan antes de levantar el stack, y la acción `stack-up` de CI también (vía `make up`). El worker monta solo `ca.pem` y confía en ella con `SMTP_CA_FILE`; un `.env` anterior sin `SMTP_PASSWORD` debe añadirla (`openssl rand -hex 24`).
+
+**Producción con Amazon SES.** Use el endpoint SMTP regional de SES (`email-smtp.<región>.amazonaws.com`) en el puerto 587 con `SMTP_TLS=starttls`; no defina `SMTP_CA_FILE` (los certificados de SES los firma una CA pública). `SMTP_USERNAME` y `SMTP_PASSWORD` son las credenciales SMTP de SES, que no son la clave de acceso IAM: se derivan de ella (`aws_iam_access_key.ses_smtp_password_v4` en Terraform). La referencia de `infraestructura/terraform` las crea para un usuario IAM con solo `ses:SendRawEmail`, las guarda en Secrets Manager (cifradas con KMS) y las inyecta únicamente al worker. El remitente `SMTP_FROM` debe pertenecer a una identidad verificada en SES y, mientras la cuenta esté en el sandbox, los destinatarios también.
+
+### Hosts configurables y fijos
+
+`OAUTH_CLIENT_ID`, `OAUTH_REDIRECT_URI` y `OAUTH_CLIENT_ORIGIN` sustituyen a las constantes del backend; sus valores por defecto son los locales de siempre. La configuración rechaza una redirect URI relativa, con fragmento o que no sea http(s), un origen con ruta y un origen que no coincida con el de la redirect URI. `ValidateRegisteredClient` sigue comparando esa configuración con la fila de `oauth_clients`, de modo que cambiar estas variables exige también actualizar esa fila (la sembró la migración 000007).
+
+Siguen fijos, y hay que cambiarlos en conjunto para otro dominio, porque no son valores de ejecución sino de compilación o de configuración de Nginx:
+
+- `frontend/nginx/default.conf`: los `server_name` `identityhub.localhost` y `contabilidad.localhost` y el `connect-src` de la CSP de Contabilidad.
+- `contabilidad/src/config.ts`: `HUB_ORIGIN`, `CLIENT_ID` y `AUDIENCE`, constantes de compilación acopladas a esa CSP.
+- `frontend/src/App.tsx`: el enlace "Contabilidad" del Hub.
+- `db/migrations/000007_oauth_authorization_code.up.sql`: la fila del cliente registrado.
+- Los valores por defecto de `PUBLIC_BASE_URL` y `JWT_ISSUER` (estos dos sí se pueden sobrescribir por entorno).
+
+Hacerlos configurables exige plantillas de Nginx (`envsubst`) y argumentos de compilación del frontend; se dejó fuera para no cambiar la superficie de seguridad (CSP) sin una prueba de extremo a extremo con otro dominio.
+
 ### Producción simulada
 
 ```bash
@@ -107,6 +142,7 @@ Variables obligatorias en `.env`, además de las del desarrollo (el comando fall
 |---|---|
 | `IDENTITY_HUB_API_IMAGE`, `IDENTITY_HUB_WORKER_IMAGE`, `IDENTITY_HUB_WEB_IMAGE` | Digest de cada imagen publicada en Docker Hub (`nombre@sha256:...`). Las publica `release.yml` en `docker.io/jorgeivp/identity-hub-api`, `identity-hub-worker` e `identity-hub-web` con cada tag `vX.Y.Z` (validado con `v0.9.0`); use el digest de la publicación, que figura en el resumen del run. |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM` | Relay SMTP y remitente de producción. |
+| `SMTP_USERNAME`, `SMTP_PASSWORD` | Credenciales del relay (con SES, las credenciales SMTP derivadas de una clave IAM). El worker las presenta solo tras STARTTLS. |
 
 Qué cambia frente a desarrollo:
 
@@ -119,5 +155,5 @@ Qué cambia frente a desarrollo:
 Límites conocidos:
 
 - Los secretos siguen llegando como variables de entorno desde `.env`: la API no soporta variables `*_FILE`, así que no hay secretos por archivo.
-- El worker envía SMTP sin autenticación ni TLS (`backend/cmd/worker/main.go:198-199`); un relay real exige un cambio de código (misma brecha que el ADR 0012).
+- El worker autentica por SMTP y exige STARTTLS (`SMTP_TLS=starttls`, puerto 587). La CA local de desarrollo no se monta aquí: el relay se verifica con las raíces del sistema.
 - Las imágenes ya están publicadas en Docker Hub; sin tener a mano sus digests, la validación sin arrancar se limita a `docker compose ... config`.

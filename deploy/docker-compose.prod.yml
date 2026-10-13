@@ -15,9 +15,9 @@
 # ║                                                                          ║
 # ║  Límites conocidos: es una simulación local, no un despliegue real.      ║
 # ║  Los secretos siguen llegando por variables de entorno desde .env        ║
-# ║  (el backend no soporta *_FILE). El worker envía SMTP sin autenticación  ║
-# ║  ni TLS (backend/cmd/worker/main.go:198-199), así que un relay real      ║
-# ║  exige un cambio de código (misma brecha que el ADR 0012).               ║
+# ║  (el backend no soporta *_FILE). El worker autentica por SMTP y exige    ║
+# ║  STARTTLS (SMTP_TLS=starttls por defecto; SMTP_USERNAME/SMTP_PASSWORD    ║
+# ║  son las credenciales del relay, p. ej. SES, puerto 587).                ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 
 x-logging: &logging
@@ -84,10 +84,16 @@ services:
         condition: service_completed_successfully
     environment:
       LOG_LEVEL: info
-      # SMTP real obligatorio. Ojo: el worker no autentica ni usa TLS.
-      SMTP_HOST: "${SMTP_HOST:?SMTP_HOST debe apuntar al relay SMTP de producción (el worker no usa autenticación ni TLS)}"
-      SMTP_PORT: "${SMTP_PORT:?SMTP_PORT debe indicar el puerto del relay SMTP de producción}"
+      # Relay SMTP real: STARTTLS obligatorio y credenciales propias. La CA local
+      # de desarrollo no se monta; el relay se verifica con las raíces del sistema.
+      SMTP_HOST: "${SMTP_HOST:?SMTP_HOST debe apuntar al relay SMTP de producción}"
+      SMTP_PORT: "${SMTP_PORT:?SMTP_PORT debe indicar el puerto del relay SMTP de producción (587 con STARTTLS)}"
       SMTP_FROM: "${SMTP_FROM:?SMTP_FROM debe ser el remitente de producción (por ejemplo no-reply@su-dominio)}"
+      SMTP_TLS: "${SMTP_TLS:-starttls}"
+      SMTP_CA_FILE: ""
+      SMTP_USERNAME: "${SMTP_USERNAME:?SMTP_USERNAME debe ser el usuario del relay SMTP de producción}"
+      SMTP_PASSWORD: "${SMTP_PASSWORD:?debe ser la contraseña del relay SMTP de producción}"
+    volumes: !reset []
     deploy:
       resources:
         limits:

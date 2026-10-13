@@ -4,6 +4,8 @@
 *.local.md
 *.pem
 *.key
+# Certificados y credenciales SMTP locales de Mailpit (make certs)
+deploy/certs/
 !specs/**/*.key.example
 
 # Go
