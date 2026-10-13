@@ -173,7 +173,6 @@ select { width: 100%; padding: .7rem .75rem; color: var(--ink); background: var(
 .metadata-pair { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: .75rem; }
 .metadata-list dt { color: var(--muted); font-family: var(--mono); }
 .metadata-list dd { margin: 0; font-family: var(--mono); overflow-wrap: anywhere; }
-.link-button:hover { text-decoration: underline; }
 .actor-cell { display: flex; flex-direction: column; align-items: flex-start; gap: .15rem; }
 @media (max-width: 760px) { .rail-brand + nav { flex-wrap: wrap; } }
 .role-section { margin-top: 1.25rem; }

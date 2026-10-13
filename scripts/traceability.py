@@ -470,7 +470,7 @@ def count_or_dash(items: list[str] | None) -> str:
 
 
 def requirement_state(rid: str, covered: int) -> str:
-    """Matrix state of one requirement and the counter it increments."""
+    """Matrix state key of one requirement; render() also uses it as the counts key."""
     if rid in DEFERRED:
         return "diferido"
     if covered >= 2:
