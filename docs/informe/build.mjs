@@ -137,8 +137,7 @@ function render(body) {
       const cap = /^%%caption: (.*)\n/m.exec(withoutLandscape)?.[1] ?? ''
       const src = withoutLandscape.replace(/^%%caption: (.*)\n/m, '')
       const caption = cap ? `<figcaption>Figura ${figN}. ${esc(cap)}</figcaption>` : ''
-      const fig = `<figure class="diagrama${small ? ' chica' : ''}"><div class="mermaid">${esc(src)}</div>${caption}</figure>\n`
-      return land ? `<div class="apaisada">${fig}</div>\n` : fig
+      return `<figure class="diagrama${small ? ' chica' : ''}${land ? ' apaisada' : ''}"><div class="mermaid">${esc(src)}</div>${caption}</figure>\n`
     }
     return `<pre class="code"><code class="lang-${lang || 'text'}">${esc(text)}</code></pre>\n`
   }
@@ -167,9 +166,10 @@ function render(body) {
   let html = marked.parse(body)
 
   // Keep each diagram with the heading and the paragraphs that introduce it (same page, never split).
+  // A wide diagram (caption prefix @L) takes the whole block to its own landscape page.
   html = html.replace(
-    /(?:<h[234][^>]*>(?:(?!<\/h[234]>)[\s\S])*<\/h[234]>\n)?(?:<p>(?:(?!<\/p>)[\s\S])*<\/p>\n){0,2}<(?:figure class="diagrama[^"]*"|div class="apaisada")>/g,
-    (m) => `<div class="bloque-fig">${m}`
+    /(?:<h[234][^>]*>(?:(?!<\/h[234]>)[\s\S])*<\/h[234]>\n)?(?:<p>(?:(?!<\/p>)[\s\S])*<\/p>\n){0,2}<figure class="diagrama[^"]*">/g,
+    (m) => `<div class="bloque-fig${m.includes('apaisada">') ? ' hoja-apaisada' : ''}">${m}`
   )
   html = html.replace(/(<figure class="diagrama[^"]*">(?:(?!<\/figure>)[\s\S])*<\/figure>\n)/g, '$1</div>\n')
 
@@ -246,9 +246,9 @@ tr { break-inside: avoid; }
 td code, th code { font-size: 7.6pt; }
 table.idcol td:first-child { white-space: nowrap; }
 figure { margin: 2mm 0 3mm; break-inside: avoid; text-align: center; }
-figure.diagrama svg { max-width: 100%; height: auto; max-height: 150mm; }
-.apaisada { page: land; break-before: page; break-after: page; }
-.apaisada figure.diagrama svg { max-height: 150mm; }
+figure.diagrama svg { width: 100% !important; max-width: 100% !important; height: auto; max-height: 205mm; }
+.hoja-apaisada { page: land; break-before: page; break-after: page; }
+.hoja-apaisada figure.diagrama svg { max-height: 128mm; }
 @page land { size: A4 landscape; margin: 16mm 14mm 18mm 14mm;
   @bottom-center { content: counter(page); font: 9pt "Helvetica Neue", Arial, sans-serif; color: #555; }
   @bottom-left { content: "Identity Hub — Informe técnico"; font: 8pt "Helvetica Neue", Arial, sans-serif; color: #888; }

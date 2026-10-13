@@ -65,13 +65,13 @@ Los diagramas se mantienen como código Mermaid versionado en `docs/diagramas/um
 
 La figura muestra los componentes desplegados y los paquetes internos de la API y del procesamiento asíncrono.
 
-{{mermaid:../diagramas/uml/componentes.md#1|Diagrama de componentes de Identity Hub (docs/diagramas/uml/componentes.md).}}
+{{mermaid:../diagramas/uml/componentes.md#1|@L Diagrama de componentes de Identity Hub (docs/diagramas/uml/componentes.md).}}
 
 ### Diagrama de despliegue local
 
 Representa el archivo Compose: una red con subred `172.28.0.0/16`, los puertos publicados al host, los volúmenes (`pgdata`, `rabbitdata`, `grafanadata`) y los servicios de observabilidad bajo el perfil `observability`.
 
-{{mermaid:../diagramas/uml/despliegue.md#1|Despliegue local con Docker Compose (docs/diagramas/uml/despliegue.md).}}
+{{mermaid:../diagramas/uml/despliegue.md#1|@L Despliegue local con Docker Compose (docs/diagramas/uml/despliegue.md).}}
 
 ### Diagrama de casos de uso
 
@@ -160,7 +160,7 @@ El enunciado pide despliegue con IaC en Terraform o Ansible. Como no hay presupu
 
 Una VPC `10.20.0.0/16` en dos zonas de disponibilidad. Solo el ALB vive en subredes públicas; las tareas ECS y RDS van en subredes privadas, sin IP pública, y salen a Internet por un NAT gateway. RabbitMQ corre como servicio ECS autogestionado (decisión D7) porque Amazon MQ para RabbitMQ no está soportado por LocalStack y así toda la arquitectura se puede razonar igual que el Compose.
 
-{{mermaid:../diagramas/uml/despliegue-aws.md#1|@S Infraestructura de referencia en AWS (docs/diagramas/uml/despliegue-aws.md).}}
+{{mermaid:../diagramas/uml/despliegue-aws.md#1|@L Infraestructura de referencia en AWS (docs/diagramas/uml/despliegue-aws.md).}}
 
 La segunda figura describe cómo llegaría una versión a producción: tag, gates, publicación de imágenes por digest, `terraform apply` en dos fases con la migración entre ambas.
 
