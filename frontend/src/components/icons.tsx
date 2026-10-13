@@ -19,3 +19,4 @@ export const CheckIcon = (props: IconProps) => <Icon {...props}><path d="m5 12 4
 export const WarningIcon = (props: IconProps) => <Icon {...props}><path d="M10.3 3.5 2.5 18a2 2 0 0 0 1.8 3h15.4a2 2 0 0 0 1.8-3L13.7 3.5a2 2 0 0 0-3.4 0Z" /><path d="M12 9v4M12 17h.01" /></Icon>
 export const CloseIcon = (props: IconProps) => <Icon {...props}><path d="m6 6 12 12M18 6 6 18" /></Icon>
 export const DownloadIcon = (props: IconProps) => <Icon {...props}><path d="M12 3v12M7 10l5 5 5-5" /><path d="M4 21h16" /></Icon>
+export const KeyIcon = (props: IconProps) => <Icon {...props}><circle cx="8" cy="15" r="4" /><path d="m10.8 12.2 9.2-9.2M16 7l3 3M14 9l2 2" /></Icon>

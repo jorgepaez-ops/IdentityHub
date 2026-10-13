@@ -565,7 +565,13 @@ paths:
       operationId: listAuditLog
       tags: [admin]
       summary: Consultar el registro de auditoría
+      description: |
+        Acepta el access token de un administrador o una clave de servicio con el alcance
+        `audit-log:read` (RF-018). Una clave inválida, expirada o revocada devuelve el mismo `401`.
       x-requirement: RF-011
+      security:
+        - bearerAuth: []
+        - serviceKeyAuth: []
       parameters:
         - $ref: '#/components/parameters/Action'
         - $ref: '#/components/parameters/ActorId'
@@ -715,6 +721,56 @@ paths:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }
 
+  /api/v1/admin/service-keys:
+    get:
+      operationId: listServiceKeys
+      tags: [admin]
+      summary: Listar las claves de servicio (solo metadatos)
+      description: Nunca devuelve el secreto ni su hash.
+      x-requirement: RF-018
+      responses:
+        '200':
+          description: Claves de servicio, las más recientes primero
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/ServiceKey' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      operationId: createServiceKey
+      tags: [admin]
+      summary: Emitir una clave de servicio
+      description: |
+        Devuelve la clave completa una sola vez; no se puede recuperar después. Solo un
+        administrador con access token puede emitirla (una clave de servicio no emite claves).
+      x-requirement: RF-018
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CreateServiceKeyRequest' } } }
+      responses:
+        '201':
+          description: Clave emitida; `key` solo aparece en esta respuesta
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CreatedServiceKey' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/v1/admin/service-keys/{serviceKeyId}:
+    delete:
+      operationId: revokeServiceKey
+      tags: [admin]
+      summary: Revocar una clave de servicio
+      description: Revocación lógica e idempotente; revocar una clave ya revocada también devuelve 204.
+      x-requirement: RF-018
+      parameters: [{ $ref: '#/components/parameters/ServiceKeyId' }]
+      responses:
+        '204': { description: Clave revocada }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -722,6 +778,14 @@ components:
       scheme: bearer
       bearerFormat: JWT
       description: Access token Ed25519. Validar contra el JWKS; se rechaza cualquier `alg` distinto de `EdDSA`.
+    serviceKeyAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: ihk_<publicId>_<secret>
+      description: |
+        Clave de servicio de RF-018 (`Authorization: Bearer ihk_<publicId>_<secret>`). Solo la
+        aceptan las operaciones que la declaran en `security` y exigen su alcance (hoy,
+        `audit-log:read` en `listAuditLog`); el resto responde 401.
 
   parameters:
     ApplicationId:
@@ -731,6 +795,11 @@ components:
       schema: { type: string, format: uuid }
     RoleId:
       name: roleId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    ServiceKeyId:
+      name: serviceKeyId
       in: path
       required: true
       schema: { type: string, format: uuid }
@@ -929,6 +998,45 @@ components:
       properties:
         description: { type: string, maxLength: 500 }
         permissionKeys: { type: array, uniqueItems: true, items: { type: string } }
+
+    ServiceKeyScope:
+      type: string
+      description: Lista cerrada de alcances. Hoy solo `audit-log:read`.
+      enum: [audit-log:read]
+    CreateServiceKeyRequest:
+      type: object
+      required: [name, scopes, expiresInDays]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100, example: SIEM de seguridad }
+        scopes:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/ServiceKeyScope' }
+        expiresInDays: { type: integer, minimum: 1, maximum: 365 }
+    ServiceKey:
+      type: object
+      description: Metadatos de una clave de servicio. Nunca incluye el secreto ni su hash.
+      required: [id, name, scopes, prefix, createdAt, createdBy, expiresAt]
+      properties:
+        id:         { type: string, format: uuid }
+        name:       { type: string }
+        scopes:     { type: array, items: { $ref: '#/components/schemas/ServiceKeyScope' } }
+        prefix:     { type: string, description: 'Parte pública de la clave (`ihk_<publicId>`); sirve para identificarla',
+                  example: ihk_3f9a1c07d2b84e65 }
+        createdAt:  { type: string, format: date-time }
+        createdBy:  { type: string, format: uuid, nullable: true }
+        expiresAt:  { type: string, format: date-time }
+        lastUsedAt: { type: string, format: date-time, nullable: true }
+        revokedAt:  { type: string, format: date-time, nullable: true }
+    CreatedServiceKey:
+      description: Metadatos más la clave completa, que se muestra una sola vez.
+      allOf:
+        - $ref: '#/components/schemas/ServiceKey'
+        - type: object
+          required: [key]
+          properties:
+            key: { type: string, description: 'Clave completa `ihk_<publicId>_<secret>`; no se puede recuperar después' }
 
     User:
       type: object

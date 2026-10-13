@@ -27,7 +27,7 @@ declaración de buenas intenciones.
 | **RF-015** | Restablecimiento de contraseña | P1 | `requestPasswordReset`, `confirmPasswordReset` | 3 | 33 | 3 | — | ✅ completo |
 | **RF-016** | Sesiones activas | P1 | `listSessions`, `revokeSession` | 1 | 8 | 1 | — | ✅ completo |
 | **RF-017** | Bloqueo por fuerza bruta | P1 | — | 4 | 23 | 1 | — | ✅ completo |
-| **RF-018** | Claves de servicio | P2 | — | — | — | — | — | ⏳ diferido (2026-10-13) |
+| **RF-018** | Claves de servicio | P2 | `listServiceKeys`, `createServiceKey`, `revokeServiceKey` | 5 | 29 | 5 | — | ✅ completo |
 | **RF-019** | Exportación del audit log | P2 | `exportAuditLog` | 2 | 13 | 2 | — | ✅ completo |
 | **RF-020** | Autorización de aplicaciones cliente | P1 | `authorizeClient`, `exchangeAuthorizationCode` | 10 | 32 | 8 | — | ✅ completo |
 | **RF-021** | Roles y permisos configurables por aplicación | P1 | `listApplications`, `listApplicationRoles`, `createApplicationRole`, `updateApplicationRole`, `deleteApplicationRole` | 6 | 31 | 6 | — | ✅ completo |
@@ -44,7 +44,7 @@ declaración de buenas intenciones.
 | **RNF-011** | Los specs son la fuente de verdad | P0 | — | — | 5 | — | `ci.yml#spec-drift` | ✅ completo |
 | **RNF-012** | Logs sin datos sensibles | P0 | — | — | 5 | — | — | 🟡 parcial |
 
-**Resumen:** 33 requisitos · 24 completos · 7 parciales · 1 sin cubrir · 1 diferidos (2026-10-13).
+**Resumen:** 33 requisitos · 25 completos · 7 parciales · 1 sin cubrir · 0 diferidos (2026-10-13).
 
 Leyenda de estado: *completo* = verificado por al menos dos de las
 cuatro columnas de evidencia (Escenarios, Pruebas Go, E2E, Controles CI) · *parcial* = una sola ·
@@ -111,6 +111,12 @@ una sola fuente de evidencia.
   - autenticacion.feature — Adivinar códigos MFA en desafíos sucesivos bloquea la cuenta
   - autenticacion.feature — Bloqueo tras intentos fallidos repetidos
   - restablecimiento-contrasena.feature — Restablecer desbloquea la cuenta sin que un fallo la vuelva a bloquear
+- **RF-018**
+  - claves-de-servicio.feature — Admin emite una clave, la usa para leer el audit log y la revoca
+  - claves-de-servicio.feature — El listado de claves no expone el secreto
+  - claves-de-servicio.feature — Una clave de servicio solo abre las operaciones que declaran su alcance
+  - claves-de-servicio.feature — Una clave inválida, expirada o revocada recibe la misma respuesta
+  - claves-de-servicio.feature — Solo un administrador gestiona claves de servicio
 - **RF-019**
   - control-de-acceso.feature — Un administrador exporta el registro de auditoría filtrado
   - control-de-acceso.feature — Un usuario corriente no puede exportar el registro de auditoría

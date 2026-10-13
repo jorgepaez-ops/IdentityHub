@@ -58,3 +58,9 @@ export const applicationsFixture = () => [{
   ],
 }]
 export const applicationsRoute = { 'GET /api/v1/admin/applications': () => json(200, applicationsFixture()) }
+
+// RF-018: service key metadata as the API lists it (never the secret or its hash).
+export const serviceKeyFixture = (overrides: Record<string, unknown> = {}) => ({
+  id: '44444444-4444-4444-8444-444444444441', name: 'SIEM de seguridad', scopes: ['audit-log:read'], prefix: 'ihk_0123456789abcdef',
+  createdAt: '2026-10-01T10:00:00Z', createdBy: 'admin-id', expiresAt: '2027-01-01T10:00:00Z', ...overrides,
+})

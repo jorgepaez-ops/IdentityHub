@@ -104,10 +104,13 @@ class GherkinParserTests(unittest.TestCase):
 
 
 class DeferredRequirementTests(unittest.TestCase):
-    def test_rf018_is_rendered_as_deferred_with_planned_date_and_rf019_is_not(self) -> None:
+    def test_nothing_is_deferred_and_a_deferred_requirement_still_renders(self) -> None:
+        # RF-018 and RF-019 are implemented: nothing is deferred any more.
+        self.assertEqual(traceability.DEFERRED, {})
+        # The generator must still render a deferred requirement if one is added again.
         expected = "Planificado para el 2026-10-13 (decisión del usuario del 2026-10-12)."
-        self.assertEqual(traceability.DEFERRED["RF-018"], expected)
-        self.assertNotIn("RF-019", traceability.DEFERRED)
+        self.addCleanup(setattr, traceability, "DEFERRED", traceability.DEFERRED)
+        traceability.DEFERRED = {"RF-018": expected}
 
         requirements = {
             "RF-018": ("Claves de servicio", "P2"),

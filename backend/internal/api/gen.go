@@ -16,7 +16,8 @@ import (
 )
 
 const (
-	BearerAuthScopes bearerAuthContextKey = "bearerAuth.Scopes"
+	BearerAuthScopes     bearerAuthContextKey     = "bearerAuth.Scopes"
+	ServiceKeyAuthScopes serviceKeyAuthContextKey = "serviceKeyAuth.Scopes"
 )
 
 // Defines values for HealthStatusStatus.
@@ -94,6 +95,21 @@ func (e ReadinessStatusStatus) Valid() bool {
 	case Degraded:
 		return true
 	case Ready:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ServiceKeyScope.
+const (
+	AuditLogRead ServiceKeyScope = "audit-log:read"
+)
+
+// Valid indicates whether the value is a known member of the ServiceKeyScope enum.
+func (e ServiceKeyScope) Valid() bool {
+	switch e {
+	case AuditLogRead:
 		return true
 	default:
 		return false
@@ -277,6 +293,31 @@ type CreateApplicationRoleRequest struct {
 	PermissionKeys []string            `json:"permissionKeys"`
 }
 
+// CreateServiceKeyRequest defines model for CreateServiceKeyRequest.
+type CreateServiceKeyRequest struct {
+	ExpiresInDays int               `json:"expiresInDays"`
+	Name          string            `json:"name"`
+	Scopes        []ServiceKeyScope `json:"scopes"`
+}
+
+// CreatedServiceKey defines model for CreatedServiceKey.
+type CreatedServiceKey struct {
+	CreatedAt time.Time           `json:"createdAt"`
+	CreatedBy *openapi_types.UUID `json:"createdBy"`
+	ExpiresAt time.Time           `json:"expiresAt"`
+	Id        openapi_types.UUID  `json:"id"`
+
+	// Key Clave completa `ihk_<publicId>_<secret>`; no se puede recuperar después
+	Key        string     `json:"key"`
+	LastUsedAt *time.Time `json:"lastUsedAt,omitempty"`
+	Name       string     `json:"name"`
+
+	// Prefix Parte pública de la clave (`ihk_<publicId>`); sirve para identificarla
+	Prefix    string            `json:"prefix"`
+	RevokedAt *time.Time        `json:"revokedAt,omitempty"`
+	Scopes    []ServiceKeyScope `json:"scopes"`
+}
+
 // EmailRequest defines model for EmailRequest.
 type EmailRequest struct {
 	Email openapi_types.Email `json:"email"`
@@ -405,6 +446,24 @@ type ReadinessStatusStatus string
 // Role Rol de directorio (`admin` o `user`) o rol configurable `<aplicacion>.<nombre>`.
 type Role = string
 
+// ServiceKey Metadatos de una clave de servicio. Nunca incluye el secreto ni su hash.
+type ServiceKey struct {
+	CreatedAt  time.Time           `json:"createdAt"`
+	CreatedBy  *openapi_types.UUID `json:"createdBy"`
+	ExpiresAt  time.Time           `json:"expiresAt"`
+	Id         openapi_types.UUID  `json:"id"`
+	LastUsedAt *time.Time          `json:"lastUsedAt,omitempty"`
+	Name       string              `json:"name"`
+
+	// Prefix Parte pública de la clave (`ihk_<publicId>`); sirve para identificarla
+	Prefix    string            `json:"prefix"`
+	RevokedAt *time.Time        `json:"revokedAt,omitempty"`
+	Scopes    []ServiceKeyScope `json:"scopes"`
+}
+
+// ServiceKeyScope Lista cerrada de alcances. Hoy solo `audit-log:read`.
+type ServiceKeyScope string
+
 // Session defines model for Session.
 type Session struct {
 	CreatedAt time.Time `json:"createdAt"`
@@ -493,6 +552,9 @@ type Query = string
 // RoleId defines model for RoleId.
 type RoleId = openapi_types.UUID
 
+// ServiceKeyId defines model for ServiceKeyId.
+type ServiceKeyId = openapi_types.UUID
+
 // SessionId defines model for SessionId.
 type SessionId = openapi_types.UUID
 
@@ -522,6 +584,9 @@ type Unauthorized = Problem
 
 // bearerAuthContextKey is the context key for bearerAuth security scheme
 type bearerAuthContextKey string
+
+// serviceKeyAuthContextKey is the context key for serviceKeyAuth security scheme
+type serviceKeyAuthContextKey string
 
 // ListAuditLogParams defines parameters for ListAuditLog.
 type ListAuditLogParams struct {
@@ -586,6 +651,9 @@ type CreateApplicationRoleJSONRequestBody = CreateApplicationRoleRequest
 // UpdateApplicationRoleJSONRequestBody defines body for UpdateApplicationRole for application/json ContentType.
 type UpdateApplicationRoleJSONRequestBody = UpdateApplicationRoleRequest
 
+// CreateServiceKeyJSONRequestBody defines body for CreateServiceKey for application/json ContentType.
+type CreateServiceKeyJSONRequestBody = CreateServiceKeyRequest
+
 // CreateEmployeeJSONRequestBody defines body for CreateEmployee for application/json ContentType.
 type CreateEmployeeJSONRequestBody = AdminCreateUserRequest
 
@@ -642,6 +710,15 @@ type ServerInterface interface {
 	// Exportar el registro de auditoría filtrado en CSV o JSON
 	// (GET /api/v1/admin/audit-log/export)
 	ExportAuditLog(w http.ResponseWriter, r *http.Request, params ExportAuditLogParams)
+	// Listar las claves de servicio (solo metadatos)
+	// (GET /api/v1/admin/service-keys)
+	ListServiceKeys(w http.ResponseWriter, r *http.Request)
+	// Emitir una clave de servicio
+	// (POST /api/v1/admin/service-keys)
+	CreateServiceKey(w http.ResponseWriter, r *http.Request)
+	// Revocar una clave de servicio
+	// (DELETE /api/v1/admin/service-keys/{serviceKeyId})
+	RevokeServiceKey(w http.ResponseWriter, r *http.Request, serviceKeyId ServiceKeyId)
 	// Listar y buscar cuentas
 	// (GET /api/v1/admin/users)
 	ListUsers(w http.ResponseWriter, r *http.Request, params ListUsersParams)
@@ -754,6 +831,24 @@ func (_ Unimplemented) ListAuditLog(w http.ResponseWriter, r *http.Request, para
 // Exportar el registro de auditoría filtrado en CSV o JSON
 // (GET /api/v1/admin/audit-log/export)
 func (_ Unimplemented) ExportAuditLog(w http.ResponseWriter, r *http.Request, params ExportAuditLogParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Listar las claves de servicio (solo metadatos)
+// (GET /api/v1/admin/service-keys)
+func (_ Unimplemented) ListServiceKeys(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Emitir una clave de servicio
+// (POST /api/v1/admin/service-keys)
+func (_ Unimplemented) CreateServiceKey(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Revocar una clave de servicio
+// (DELETE /api/v1/admin/service-keys/{serviceKeyId})
+func (_ Unimplemented) RevokeServiceKey(w http.ResponseWriter, r *http.Request, serviceKeyId ServiceKeyId) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1082,6 +1177,8 @@ func (siw *ServerInterfaceWrapper) ListAuditLog(w http.ResponseWriter, r *http.R
 
 	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
 
+	ctx = context.WithValue(ctx, ServiceKeyAuthScopes, []string{})
+
 	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
@@ -1232,6 +1329,78 @@ func (siw *ServerInterfaceWrapper) ExportAuditLog(w http.ResponseWriter, r *http
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ExportAuditLog(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListServiceKeys operation middleware
+func (siw *ServerInterfaceWrapper) ListServiceKeys(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListServiceKeys(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateServiceKey operation middleware
+func (siw *ServerInterfaceWrapper) CreateServiceKey(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateServiceKey(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RevokeServiceKey operation middleware
+func (siw *ServerInterfaceWrapper) RevokeServiceKey(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "serviceKeyId" -------------
+	var serviceKeyId ServiceKeyId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "serviceKeyId", chi.URLParam(r, "serviceKeyId"), &serviceKeyId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "serviceKeyId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RevokeServiceKey(w, r, serviceKeyId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1963,6 +2132,15 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/admin/audit-log/export", wrapper.ExportAuditLog)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/admin/service-keys", wrapper.ListServiceKeys)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/admin/service-keys", wrapper.CreateServiceKey)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/v1/admin/service-keys/{serviceKeyId}", wrapper.RevokeServiceKey)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/admin/users", wrapper.ListUsers)

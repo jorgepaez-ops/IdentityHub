@@ -29,6 +29,7 @@ import (
 	"github.com/jorgepaez/identity-hub/internal/auth/passwordreset"
 	"github.com/jorgepaez/identity-hub/internal/auth/refresh"
 	"github.com/jorgepaez/identity-hub/internal/auth/rolegrid"
+	"github.com/jorgepaez/identity-hub/internal/auth/servicekey"
 	"github.com/jorgepaez/identity-hub/internal/auth/token"
 )
 
@@ -57,6 +58,7 @@ type Server struct {
 	adminUsers       admin.Manager
 	roleGrid         rolegrid.Manager
 	auditLog         auditlog.Reader
+	serviceKeys      servicekey.Manager
 	trustedProxies   []netip.Prefix
 }
 
@@ -130,6 +132,9 @@ func (s *Server) SetRoleGridService(service rolegrid.Manager) { s.roleGrid = ser
 // SetAuditLogService is used by composition and focused audit-log handler tests.
 func (s *Server) SetAuditLogService(service auditlog.Reader) { s.auditLog = service }
 
+// SetServiceKeyService enables RF-018: service key administration and key authentication.
+func (s *Server) SetServiceKeyService(service servicekey.Manager) { s.serviceKeys = service }
+
 func (s *Server) SetTrustedProxies(prefixes []netip.Prefix) {
 	s.trustedProxies = append([]netip.Prefix(nil), prefixes...)
 }
@@ -185,10 +190,12 @@ func (s *Server) handleBindingError(w http.ResponseWriter, r *http.Request, err 
 	writeProblem(w, http.StatusBadRequest, "invalid-request", titleBadRequest, "The request could not be processed.")
 }
 
+// ListAuditLog accepts an admin access token or a service key with the audit-log:read scope (RF-018).
+// Admitting another operation to service keys is wrapping it with serviceKeyOrAdmin and its scope.
 func (s *Server) ListAuditLog(w http.ResponseWriter, r *http.Request, params ListAuditLogParams) {
-	RequireAuth(s.tokens)(RequireRole(s.currentUsers, "admin")(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+	s.serviceKeyOrAdmin(servicekey.ScopeAuditLogRead, func(w http.ResponseWriter, request *http.Request) {
 		s.listAuditLog(w, request, params)
-	}))).ServeHTTP(w, r)
+	}).ServeHTTP(w, r)
 }
 func (s *Server) ExportAuditLog(w http.ResponseWriter, r *http.Request, params ExportAuditLogParams) {
 	s.adminOnly(func(w http.ResponseWriter, request *http.Request) { s.exportAuditLog(w, request, params) }).ServeHTTP(w, r)
@@ -222,6 +229,18 @@ func (s *Server) ResendInvitation(w http.ResponseWriter, r *http.Request, userID
 // adminOnly wraps a handler with authentication and the admin role, like the other admin routes.
 func (s *Server) adminOnly(next http.HandlerFunc) http.Handler {
 	return RequireAuth(s.tokens)(RequireRole(s.currentUsers, "admin")(next))
+}
+
+func (s *Server) ListServiceKeys(w http.ResponseWriter, r *http.Request) {
+	s.adminOnly(s.listServiceKeys).ServeHTTP(w, r)
+}
+
+func (s *Server) CreateServiceKey(w http.ResponseWriter, r *http.Request) {
+	s.adminOnly(s.createServiceKey).ServeHTTP(w, r)
+}
+
+func (s *Server) RevokeServiceKey(w http.ResponseWriter, r *http.Request, serviceKeyID ServiceKeyId) {
+	s.adminOnly(func(w http.ResponseWriter, r *http.Request) { s.revokeServiceKey(w, r, serviceKeyID) }).ServeHTTP(w, r)
 }
 
 func (s *Server) ListApplications(w http.ResponseWriter, r *http.Request) {

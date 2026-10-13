@@ -34,9 +34,7 @@ E2E_TEST = re.compile(r"\btest\(\s*'((?:RNF|RF)-\d{3}[^']*)'\s*,")
 
 # Requisitos pendientes de implementación. T3 define sus contratos, pero la matriz los
 # mantiene diferidos hasta que sus tareas de backend/frontend queden cerradas.
-DEFERRED = {
-    "RF-018": "Planificado para el 2026-10-13 (decisión del usuario del 2026-10-12).",
-}
+DEFERRED: dict[str, str] = {}
 
 
 class Scenario(NamedTuple):
