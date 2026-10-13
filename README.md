@@ -41,12 +41,12 @@ La visión y los contratos del sistema están en [`specs/00-vision.md`](specs/00
 
 1. Clone el repositorio y entre en su directorio.
 2. Ejecute `make setup`: genera un `.env` local con secretos aleatorios a partir de [`.env.example`](.env.example). El archivo `.env` no se versiona y un `.env` existente no se sobrescribe.
-3. Ejecute `docker compose up -d` (equivalente: `make up`, que además construye las imágenes).
+3. Ejecute `make up`: genera los certificados SMTP locales (`make certs`, idempotente) y levanta el stack construyendo las imágenes. Si prefiere `docker compose up -d`, corra antes `make certs`: Mailpit exige STARTTLS y autenticación, y sin `deploy/certs/` el stack no arranca.
 
 ```bash
 git clone <url-del-repositorio> && cd <directorio>
 make setup
-docker compose up -d
+make up        # o: make certs && docker compose up -d
 ```
 
 El `docker-compose.yml` de la raíz incluye `deploy/docker-compose.yml`; `make up` usa `docker compose --env-file .env -f deploy/docker-compose.yml`. Al terminar se exponen estas direcciones:
@@ -61,7 +61,7 @@ El `docker-compose.yml` de la raíz incluye `deploy/docker-compose.yml`; `make u
 
 Use `make up-obs` para incluir Grafana en <http://localhost:3000> y Prometheus en <http://localhost:9090>. [`Makefile`](Makefile) y `make help` enumeran los demás comandos disponibles.
 
-El compose real vive en `deploy/` y el de la raíz lo incluye, de modo que un clon nuevo arranca con `make setup && docker compose up -d`. Los secretos se generan localmente y nunca se versionan.
+El compose real vive en `deploy/` y el de la raíz lo incluye, de modo que un clon nuevo arranca con `make setup && make up`. Los secretos se generan localmente y nunca se versionan.
 
 ## 7. Seguridad y evidencia DevSecOps
 

@@ -194,8 +194,8 @@ resource "aws_wafv2_web_acl_logging_configuration" "alb" {
 }
 
 # ── SES (solo produccion) ───────────────────────────────────────────────────
-# El worker aun no autentica ni usa STARTTLS (ADR 0012): se deja la identidad
-# lista para cuando lo soporte. No se aplica en LocalStack: solo CRUD (ADR 0012)
+# El worker autentica con credenciales SMTP de SES (secrets.tf) y exige STARTTLS
+# en 587. No se aplica en LocalStack: solo CRUD (ADR 0012)
 resource "aws_ses_domain_identity" "main" {
   count = var.localstack ? 0 : 1
 
