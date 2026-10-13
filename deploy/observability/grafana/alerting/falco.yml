@@ -1,0 +1,56 @@
+# AM-020: alerta de detección en tiempo de ejecución (Falco) sobre los contenedores de la aplicación.
+# Runbook: docs/runbooks/falco-alerta.md
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: identity-hub-runtime
+    folder: Identity Hub
+    interval: 1m
+    rules:
+      - uid: identity-falco-alert
+        title: Falco detectó actividad anómala en un contenedor
+        condition: C
+        for: 0s
+        # Sin alertas Falco no hay series en Loki: es el estado sano, no un fallo. Que Falco o Alloy estén
+        # caídos no se detecta aquí; el runbook indica cómo comprobarlo.
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: warning
+          service: falco
+        annotations:
+          summary: "Falco emitió {{ $values.B.Value }} alerta(s) de prioridad Warning o superior en 5 minutos"
+          description: >-
+            Una regla de Falco (shell, escritura en directorios del sistema, gestor de paquetes o conexión
+            saliente pública) se disparó en api, worker o web. Esos contenedores son distroless, de solo
+            lectura y sin capacidades: ninguna de esas acciones es normal. Revise qué regla y qué contenedor
+            en el tablero «Identity Hub — Seguridad» o en Loki con {service="falco"}.
+          runbook_url: https://github.com/jorgepaez-ops/IdentityHub/blob/main/docs/runbooks/falco-alerta.md
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: loki
+            model:
+              refId: A
+              queryType: instant
+              expr: 'sum(count_over_time({service="falco", priority=~"Warning|Error|Critical|Alert|Emergency"}[5m]))'
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+              settings: { mode: dropNN }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0] }
