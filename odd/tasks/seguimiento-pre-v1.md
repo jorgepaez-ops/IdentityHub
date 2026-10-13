@@ -28,11 +28,14 @@ con esos temas abiertos.
 
 ## Tareas
 
-- [ ] **S1 — Verificación automática del release.** Paso en `release.yml` (job `publish`, después de
+- [x] **S1 — Verificación automática del release.** Paso en `release.yml` (job `publish`, después de
   firmar y atestar y antes de mover `latest`) que ejecute `cosign verify` y
   `cosign verify-attestation --type cyclonedx` con la identidad del workflow y el emisor OIDC de Actions.
   Prueba real: el tag `v1.0.0`. Documentar en informe, ADR 0011, manual de despliegue y modelo de amenazas
   (AM-008).
+  Evidencia: sin RED local posible (el paso solo corre en el release; no hay prueba ejecutable determinista).
+  Comprobado: `actionlint` limpio; `zizmor` sin hallazgos, igual que HEAD (0 y 2 suprimidos); orden del
+  paso: después de firmar/atestar y antes de mover `latest`; cosign-installer v4.1.2 (Cosign v3).
 - [ ] **S2 — Clasificador del job 0 en `scripts/` con prueba.** `scripts/ci_changes.py` (o `.sh`) con
   pruebas sobre: solo documentación, mixto, `.md` bajo `specs/`/`.github/`/`scripts/`, renombre de código a
   `docs/`, lista vacía, error de git. `ci.yml` lo invoca. Sustituir la guarda repetida en cada paso del job
@@ -78,7 +81,7 @@ Estrategia: `ask-on-risk` → `stacked-to-main` (usuario, 2026-10-13). Cortes: P
 
 | Tarea | Ruta | Estado | Commit | Revisión |
 |---|---|---|---|---|
-| S1 | — | pendiente | — | — |
+| S1 | delegado (Sonnet) | hecho | (SHA en el commit siguiente) | — |
 | S2 | — | pendiente | — | — |
 | S3 | — | pendiente | — | — |
 | S4 | — | pendiente | — | — |

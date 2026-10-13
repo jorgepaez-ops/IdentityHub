@@ -42,6 +42,7 @@ Integra en `main` las mejoras de complejidad media y alta anotadas el 12 de octu
 - Las notas de fin de día viven en una rama local, sin PR hasta que se pidan.
 - El diseño del filtro de documentación con `paths-ignore` se descartó: los checks obligatorios quedarían en «Expected — waiting»; un job que decide en tiempo de ejecución sí cuenta como aprobado al omitirse.
 - Los hallazgos nuevos de esta etapa no reciben identificador VULN (decisión del usuario).
+- **S1 (seguimiento-pre-v1):** `release.yml` verifica con `cosign verify` y `cosign verify-attestation` cada digest antes de mover `latest`; primera prueba real con el tag `v1.0.0`.
 - `make up` levanta el stack completo, observabilidad y Falco incluidos; se eliminó `make up-obs` y se añadió `make up-app` (solo la aplicación) para CI. Motivo: los guiones de la demo y del video muestran Grafana y Falco, y el usuario debe recordar un único comando (`make setup` en un clon nuevo y `make up`).
 
 ### Estado

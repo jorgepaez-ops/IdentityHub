@@ -342,7 +342,7 @@ El despliegue de referencia en AWS se describió en la sección de arquitectura 
 
 {{code:yaml:.github/workflows/release.yml:161-182}}
 
-**Verificación.** `cosign verify` y `cosign verify-attestation --type cyclonedx` pasan sobre las tres imágenes con Cosign v3. Cosign v3 guarda la firma y la atestación como referrers OCI (formato *bundle*), por lo que no aparecen como etiquetas `.sig` o `.att` en Docker Hub y Cosign v2 no las encuentra: la verificación debe hacerse con Cosign v3. La verificación se repitió de forma independiente el 13 de octubre con Cosign v3.1.3 sobre `v0.9.0` y `v0.9.1`, con la identidad `^https://github.com/jorgepaez-ops/IdentityHub/` y el emisor OIDC de GitHub Actions: `cosign verify` y `cosign verify-attestation --type cyclonedx` resultaron correctos en las tres imágenes de ambas versiones. Esa comprobación se hizo a mano; todavía no es un paso del workflow (ver «Limitaciones»).
+**Verificación.** `cosign verify` y `cosign verify-attestation --type cyclonedx` pasan sobre las tres imágenes con Cosign v3. Cosign v3 guarda la firma y la atestación como referrers OCI (formato *bundle*), por lo que no aparecen como etiquetas `.sig` o `.att` en Docker Hub y Cosign v2 no las encuentra: la verificación debe hacerse con Cosign v3. La verificación se repitió de forma independiente el 13 de octubre con Cosign v3.1.3 sobre `v0.9.0` y `v0.9.1`, con la identidad `^https://github.com/jorgepaez-ops/IdentityHub/` y el emisor OIDC de GitHub Actions: `cosign verify` y `cosign verify-attestation --type cyclonedx` resultaron correctos en las tres imágenes de ambas versiones. Esa comprobación manual ya es un paso del workflow: tras firmar y atestar, el job `publish` ejecuta `cosign verify` y `cosign verify-attestation --type cyclonedx` sobre el digest con la identidad del workflow y el emisor OIDC de Actions, y solo si ambos pasan mueve `latest` (paso «Verificar firma y atestación»; su primera prueba real es el tag `v1.0.0`).
 
 ## Fase 6: Operación y monitoreo
 
@@ -580,7 +580,6 @@ Falco, que el enunciado menciona para la detección de comportamiento anómalo e
 - **Sin riesgo aceptado vigente:** VULN-028 (GO-2026-5932) se reclasificó el 2026-10-12 como no afectado; solo se reabriría si algún paquete empezara a importar `x/crypto/openpgp`.
 - **Cobertura de la matriz de trazabilidad:** de 33 requisitos, 25 están completos, 7 son parciales (RF-008, RNF-001, RNF-002, RNF-006, RNF-007, RNF-008 y RNF-012, con una sola fuente de evidencia) y RNF-010 (latencia) no tiene prueba, porque no hay prueba de carga. No queda ningún requisito diferido.
 - **El clasificador del job 0 no tiene pruebas automatizadas:** vive como script embebido en el workflow y se probó en local y con PR reales; el seguimiento previsto es moverlo a `scripts/` con una prueba. Además, la guarda repetida en cada paso del job de imágenes depende de que cada paso nuevo la incluya.
-- **La verificación de firmas no está automatizada:** `cosign verify` y `cosign verify-attestation` se ejecutaron a mano (Cosign v3.1.3) sobre `v0.9.0` y `v0.9.1`; el workflow de release firma y atesta, pero no verifica después.
 - **Las claves de servicio tienen un único alcance:** `audit-log:read`, solo en el listado del audit log.
 
 ## Diferencias conocidas entre especificación y código
@@ -606,11 +605,10 @@ La revisión de la rama de pulido encontró tres diferencias entre lo que decía
 
 ## Trabajo futuro
 
-1. **Automatizar la verificación del release:** un paso posterior que ejecute `cosign verify` y `cosign verify-attestation --type cyclonedx` con la identidad del workflow.
-2. **Mover el clasificador del job 0 a `scripts/` con una prueba** y sustituir la guarda repetida en el job de imágenes por una forma que no dependa de cada paso nuevo.
-3. Evolucionar la integración de terceros: clientes OAuth en base de datos, OpenID Connect, refresh tokens por cliente, introspección y revocación; y reemplazar la publicación directa por un **outbox transaccional**.
-4. **Medir la latencia (RNF-010)** con una prueba de carga y completar la evidencia de los requisitos que la matriz marca como parciales.
-5. Ampliar los alcances de las claves de servicio más allá de la lectura del audit log.
+1. **Mover el clasificador del job 0 a `scripts/` con una prueba** y sustituir la guarda repetida en el job de imágenes por una forma que no dependa de cada paso nuevo.
+2. Evolucionar la integración de terceros: clientes OAuth en base de datos, OpenID Connect, refresh tokens por cliente, introspección y revocación; y reemplazar la publicación directa por un **outbox transaccional**.
+3. **Medir la latencia (RNF-010)** con una prueba de carga y completar la evidencia de los requisitos que la matriz marca como parciales.
+4. Ampliar los alcances de las claves de servicio más allá de la lectura del audit log.
 
 # Anexo A — Puesta en marcha y operación
 
