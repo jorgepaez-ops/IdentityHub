@@ -112,6 +112,10 @@ con esos temas abiertos.
     prueba de Dockerfile renombrada a lo que demuestra (2840afe).
   - `traceability.py`: `verification_errors` comprueba por máquina el `# Verificación:` de cada escenario solo-`@RNF`; RED en copia temporal (cdafb16); README de 06-acceptance actualizado.
   - Docs: tabla de evidencia de los 8 requisitos en el informe (Fase 4), subsección en la guía (43556d2).
+  Tercera ronda de la revisión nativa (S5/S6):
+  - `load_test_script_test.py`: el stub «slow» de k6 espera (sondeo de 50 ms, tope de 30 s) a que la prueba cree `STUB_RELEASE`, que se crea solo después de enviar la señal, así INT/TERM siempre llegan con k6 corriendo; docstring corregido; 10 corridas seguidas OK.
+  - `traceability.py`: una cadena entre comillas dobles sin prefijo en `# Verificación:` es error; nuevo `e2e "<título>"` comprobado contra `e2e/tests/*.spec.ts`; `make <objetivo>` solo cuenta entre comillas o comillas invertidas (prosa como «make sure» ya no se lee como objetivo); 3 pruebas nuevas/ajustadas (RED 3 fallos, luego 23 OK); README de specs/06-acceptance y scripts/README alineados; matriz sin cambios.
+  - `Makefile`: `_load-test-run` pasa `COMPOSE='$(COMPOSE)'` explícito a `scripts/load-test.sh`; comprobado con `make -n` y `make up-app && make load-test` real (exit 0, p95 3.82 ms), luego `make down`.
 - [ ] **S7 — Code smells de SonarCloud.** 123 abiertos al 2026-10-13 (CRITICAL 32, MAJOR 55, MINOR 34,
   INFO 2); reglas principales: go:S3776 (16), typescript:S6819 (16), css:S4666 (11), godre:S8196 (10),
   plsql:S1192 (6), python:S3776 (6). Corregir sin cambiar comportamiento, con las pruebas como red; los

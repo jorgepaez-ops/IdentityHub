@@ -285,6 +285,7 @@ class NonFunctionalVerificationTests(unittest.TestCase):
         "tests/load/a.js": "export default 1\n",
         ".github/workflows/ci.yml": "jobs:\n  spec-drift:\n    steps:\n  e2e:\n    steps:\n      - name: Pruebas X\n",
         "Makefile": "load-test: ## x\n\t@true\n",
+        "e2e/tests/a.spec.ts": "test('RNF-010 Un título', async () => {});\n",
     }
 
     def errors(self, feature: str | None = None, files: dict[str, str] | None = None) -> list[str]:
@@ -336,8 +337,22 @@ class NonFunctionalVerificationTests(unittest.TestCase):
         self.assertNotIn("RNF-001 Uno", text)
 
     def test_a_quoted_e2e_title_is_not_read_as_a_ci_step_name(self) -> None:
-        feature = self.FEATURE.replace('paso "Pruebas X" del job e2e de CI', 'y el test E2E "RNF-010 Un título" del job e2e')
+        feature = self.FEATURE.replace('paso "Pruebas X" del job e2e de CI', 'y e2e "RNF-010 Un título" del job e2e')
         self.assertEqual(self.errors(feature), [])
+        missing = self.FEATURE.replace('paso "Pruebas X"', 'e2e "RNF-010 Otro"')
+        self.assertIn("título E2E RNF-010 Otro", "\n".join(self.errors(missing)))
+
+    def test_a_bare_quoted_string_is_an_error(self) -> None:
+        feature = self.FEATURE.replace('paso "Pruebas X"', 'y "RNF-010 Un título"')
+        text = "\n".join(self.errors(feature))
+        self.assertIn('sin prefijo: "RNF-010 Un título"', text)
+        self.assertIn('paso "…"', text)
+
+    def test_prose_make_is_not_read_as_a_target_but_a_backticked_one_is_checked(self) -> None:
+        prose = self.FEATURE.replace('vía "make load-test"', "make sure de que corra")
+        self.assertEqual(self.errors(prose), [])
+        ticked = self.FEATURE.replace('vía "make load-test"', "vía `make no-existe`")
+        self.assertIn("make no-existe", "\n".join(self.errors(ticked)))
 
     def test_a_job_id_followed_by_punctuation_resolves(self) -> None:
         for suffix in (",", ".", ")", ";"):
@@ -345,7 +360,7 @@ class NonFunctionalVerificationTests(unittest.TestCase):
             self.assertEqual(self.errors(feature), [], suffix)
 
     def test_an_unquoted_make_target_is_checked(self) -> None:
-        feature = self.FEATURE.replace('vía "make load-test"', "vía make no-existe")
+        feature = self.FEATURE.replace('vía "make load-test"', "vía \"make no-existe\"")
         self.assertIn("make no-existe", "\n".join(self.errors(feature)))
 
     def test_a_partial_class_name_does_not_match(self) -> None:

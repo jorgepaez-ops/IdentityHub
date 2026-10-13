@@ -251,13 +251,15 @@ def verification_errors(scenarios: list[Scenario]) -> list[str]:
 
     These scenarios are not derived into Playwright specs, so the free-text comment is their only link
     to the test that runs them. The line must name an existing file and at least one named reference,
-    written in this explicit grammar (anything else, such as a quoted test title, is plain prose and is
-    ignored):
+    written in this explicit grammar (unquoted prose is ignored, but a double-quoted string that is not
+    one of the forms below is an error, so a typo cannot silently skip a check):
 
     - ``(Name)``: a class/function ``Name`` defined in a referenced file (whole-word match);
     - ``job <id>``: a job ``<id>`` of ci.yml (letters, digits, ``_`` and ``-`` only, so trailing punctuation is not part of the id);
     - ``paso "<step name>"``: a ``- name: <step name>`` step of ci.yml, exact match;
-    - ``make <target>`` (quotes optional, e.g. ``"make load-test"``): a target of the Makefile.
+    - ``e2e "<title>"``: a ``test('<title>'`` literal in e2e/tests/**/*.spec.ts, exact match;
+    - ``make <target>`` written inside backticks or double quotes (```make x``` or ``"make x"``): a target of
+      the Makefile. Unquoted ``make`` is prose ("make sure") and is not read as a target.
 
     Every named reference must resolve; a scenario with no file or no named reference fails.
     Scenarios that carry any @RF tag are exempt (their link is the E2E title, checked elsewhere).
@@ -293,7 +295,7 @@ def verification_errors(scenarios: list[Scenario]) -> list[str]:
             named += 1
             if not re.search(rf"^  {re.escape(job)}:", ci, re.M):
                 problems.append(f"el job {job} no existe en ci.yml")
-        for target in re.findall(r"\bmake ([\w-]+)", text):
+        for target in re.findall(r'[`"]make ([\w-]+)[`"]', text):
             named += 1
             if not re.search(rf"^{re.escape(target)}:", read("Makefile"), re.M):
                 problems.append(f"el objetivo make {target} no existe en el Makefile")
@@ -301,6 +303,14 @@ def verification_errors(scenarios: list[Scenario]) -> list[str]:
             named += 1
             if not re.search(rf"^\s*- name: {re.escape(step)}\s*$", ci, re.M):
                 problems.append(f"el paso {step} no existe en ci.yml")
+        specs = [p.read_text(encoding="utf-8") for p in sorted((ROOT / "e2e" / "tests").rglob("*.spec.ts"))] if (ROOT / "e2e" / "tests").is_dir() else []
+        for title in re.findall(r'\be2e "([^"]+)"', text):
+            named += 1
+            if not any(re.search(rf"\btest\(\s*'{re.escape(title)}'", body) for body in specs):
+                problems.append(f"el título E2E {title} no existe en e2e/tests/*.spec.ts")
+        leftover = re.sub(r'\b(?:paso|e2e) "[^"]*"|"make [\w-]+"', "", text)
+        for stray in re.findall(r'"[^"]*"', leftover):
+            problems.append(f'texto entre comillas sin prefijo: {stray}; use paso "…" para un paso de ci.yml, o e2e "…" para un título de Playwright')
         if not named:
             problems.append("no nombra ninguna prueba concreta (clase/función, job, paso o make)")
         errors += [f"{label}: {problem}" for problem in problems]

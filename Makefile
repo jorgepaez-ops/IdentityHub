@@ -136,7 +136,8 @@ load-test: ## Prueba de carga de latencia (RNF-010, k6 en contenedor) contra el 
 	@$(WITH_RAISED_LIMIT) _load-test-run
 
 _load-test-run:
-	scripts/load-test.sh
+	@# COMPOSE se pasa explícito: el script aborta si falta y no debe depender de que el sub-make lo herede del entorno.
+	COMPOSE='$(COMPOSE)' scripts/load-test.sh
 
 capturas: ## Regenera las capturas del manual de usuario (docs/manuales/img/usuario) contra el stack levantado
 	@$(WITH_RAISED_LIMIT) _capturas-run

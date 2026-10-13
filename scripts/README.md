@@ -45,7 +45,7 @@ Todas usan `unittest` de la biblioteca estándar y no dejan `__pycache__` (el jo
 
 | Archivo | Qué protege | Respalda |
 | --- | --- | --- |
-| `traceability_test.py` | El verificador de trazabilidad: correspondencia escenario-E2E, controles, matriz, y la gramática de `# Verificación:` (archivo, `(Nombre)`, `job <id>`, `paso "<nombre>"`, `make <objetivo>`), con casos negativos. | RNF-011 (deriva de specs) y el enlace de los escenarios `@RNF`. |
+| `traceability_test.py` | El verificador de trazabilidad: correspondencia escenario-E2E, controles, matriz, y la gramática de `# Verificación:` (archivo, `(Nombre)`, `job <id>`, `paso "<nombre>"`, `e2e "<título>"`, `make <objetivo>` entre comillas o comillas invertidas; una cadena entre comillas sin prefijo es error), con casos negativos. | RNF-011 (deriva de specs) y el enlace de los escenarios `@RNF`. |
 | `pipeline_controls_test.py` | Propiedades reales de los contenedores y del pipeline (compose renderizado, Dockerfile, workflows) con una prueba negativa por cada comprobación. Clases `Rnf001Containerization`, `Rnf002Pipeline`, `Rnf006Provenance`, `Rnf008Hardening`. | RNF-001, RNF-002, RNF-006 y RNF-008. |
 | `compose_ports_test.py` | Que Prometheus, Loki y Grafana (perfil `observability`) publiquen puertos solo en `127.0.0.1`. Usa `docker compose config` con valores ficticios y sin leer un `.env` real. | Puertos de observabilidad en loopback. |
 | `ci_changes_test.py` | El clasificador del job 0 sobre repositorios git desechables (documentación frente a código, fallos hacia «correr todo») y un lint de las guardas del job `image`. Clases `ClassifierTest` e `ImageJobGuardTest`. | Job 0 de CI (`changes`). |

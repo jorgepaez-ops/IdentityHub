@@ -16,8 +16,11 @@ Ese enlace se verifica por máquina (`verification_errors` en `scripts/traceabil
 `make spec-drift` y de `traceability.py --check`): la línea `# Verificación:` va justo encima de las
 etiquetas y debe nombrar (1) un archivo existente y (2) algo concreto que exista por nombre: una clase o
 función entre paréntesis en ese archivo (`scripts/x_test.py (ClaseDePrueba)`), un `job <id>` de `ci.yml`,
-un paso entre comillas (`paso "Nombre"`, línea `- name:` de `ci.yml`) o un `make <objetivo>` del
-Makefile (con o sin comillas). Cualquier otro texto entre comillas, como el título de una prueba E2E, es prosa y no se comprueba. Cualquier referencia que no resuelva, o un escenario `@RNF` sin la línea, rompe el build. Los
+un paso entre comillas (`paso "Nombre"`, línea `- name:` de `ci.yml`), un título de Playwright
+(`e2e "Título"`, literal de `test('...'` en `e2e/tests/*.spec.ts`) o un `make <objetivo>` del Makefile
+escrito entre comillas o comillas invertidas (`` `make x` `` o `"make x"`; un `make` suelto como en "make
+sure" es prosa y no se lee como objetivo). Una cadena entre comillas dobles sin uno de esos prefijos es un
+error, no prosa: así un typo no se salta la comprobación en silencio. Cualquier referencia que no resuelva, o un escenario `@RNF` sin la línea, rompe el build. Los
 escenarios con alguna etiqueta `@RF` quedan fuera (los cubre la correspondencia con el título E2E) y la
 matriz sigue contando igual.
 

@@ -3,7 +3,9 @@
 
 docker is replaced by a stub placed first on PATH, so no stack, k6 image or database is needed. The stub
 appends every call to a log, records the SQL it receives on stdin, and its "run" (k6) behavior is chosen
-with STUB_RUN: "ok", "fail" (exit 7) or "slow" (waits for a go-file, then sleeps 1 s and succeeds).
+with STUB_RUN: "ok", "fail" (exit 7) or "slow". The "slow" stub touches STUB_STARTED and then blocks, polling every
+50 ms for up to 30 s, until the test creates STUB_RELEASE, and then exits 0. The interrupt tests create STUB_RELEASE
+only after sending the signal, so the signal always arrives while the k6 stub is running, with no timing window.
 """
 from __future__ import annotations
 
@@ -29,7 +31,10 @@ esac
 if [ "$1" = "run" ]; then
   case "$STUB_RUN" in
     fail) exit 7 ;;
-    slow) touch "$STUB_STARTED"; sleep 1; exit 0 ;;
+    slow)
+      touch "$STUB_STARTED"
+      for _ in $(seq 600); do [ -e "$STUB_RELEASE" ] && exit 0; sleep 0.05; done
+      exit 99 ;;
   esac
 fi
 exit 0
@@ -47,11 +52,13 @@ class LoadTestScriptTests(unittest.TestCase):
         (bin_dir / "docker").chmod(0o755)
         self.log = self.tmp / "calls.log"
         self.started = self.tmp / "started"
+        self.release = self.tmp / "release"
         self.env = {
             **os.environ,
             "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
             "STUB_LOG": str(self.log),
             "STUB_STARTED": str(self.started),
+            "STUB_RELEASE": str(self.release),
             "STUB_RUN": "ok",
             "COMPOSE": "docker compose --env-file .env -f deploy/docker-compose.yml",
         }
@@ -94,6 +101,7 @@ class LoadTestScriptTests(unittest.TestCase):
             time.sleep(0.05)
         self.assertTrue(self.started.exists(), "the k6 stub never started")
         process.send_signal(sig)  # only the script: bash runs the trap once the child ends (with status 0)
+        self.release.touch()  # let the blocked k6 stub finish, strictly after the signal was delivered
         return process.wait(timeout=30), self.calls()
 
     def test_an_interrupted_run_exits_non_zero_and_cleans_up(self) -> None:
