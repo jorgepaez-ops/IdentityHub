@@ -53,12 +53,10 @@ volver a acordarse.
   (volver a hacer `git add` y repetir). Es local a este clon: un clon nuevo necesita
   `pre-commit install` (ver `docs/guia-desarrollo.md`, sección 6).
 
-- **Copias " 2" de iCloud.** El repo vive en `~/Documents`, sincronizado con iCloud (decisión del
-  usuario, no se mueve). El 2026-09-27 aparecieron ~135 copias `* 2.*` sin seguimiento (p. ej.
-  `gen 2.go`) que rompían `go build` por símbolos duplicados. Al arrancar cada sesión, correr
-  `find . -path ./.git -prune -o -path '*/node_modules' -prune -o -name "* 2*" -print`; si aparecen,
-  comparar cada una con su original (`cmp`) y borrar solo las idénticas. **Avisar siempre al usuario
-  qué se borró** (lista o conteo) y cuáles quedaron sin borrar y por qué; nunca borrar en silencio.
+- **El repo ya no está en iCloud.** Desde la semana del 2026-10-05 vive en
+  `~/Proyectos/Universidad/ProyectoFinalMateria`, fuera de iCloud, así que ya no aparecen las copias
+  `* 2.*` que rompían `go build`. No hace falta buscarlas al arrancar. Es un detalle del equipo local:
+  no va en el informe ni en la documentación del proyecto.
 
 ## Engram: sesiones colgadas
 
