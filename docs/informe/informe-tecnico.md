@@ -170,7 +170,7 @@ Lo que esta referencia no promete, según el propio ADR: TLS, DNS público y WAF
 
 ## Modelo en OWASP Threat Dragon
 
-El modelo versionado está en `docs/threat-model/identity-hub.json` (formato Threat Dragon v2) y se alinea con la fuente de verdad `specs/05-security/threat-model.md`. Contiene dos diagramas de flujo de datos con sus fronteras de confianza y 23 amenazas clasificadas por STRIDE. El archivo conserva la estructura de los modelos de demostración oficiales y valida contra el esquema oficial de Threat Dragon con una sola salvedad (`strokeDasharray: null`), que los modelos oficiales también tienen; no se abrió en la interfaz gráfica de Threat Dragon en el entorno de desarrollo.
+El modelo versionado está en `docs/threat-model/identity-hub.json` (formato Threat Dragon v2) y se alinea con la fuente de verdad `specs/05-security/threat-model.md`. Contiene dos diagramas de flujo de datos con sus fronteras de confianza y 24 amenazas clasificadas por STRIDE (las 23 del modelo inicial y AM-023, agregada con las claves de servicio). El archivo conserva la estructura de los modelos de demostración oficiales y valida contra el esquema oficial de Threat Dragon con una sola salvedad (`strokeDasharray: null`), que los modelos oficiales también tienen; no se abrió en la interfaz gráfica de Threat Dragon en el entorno de desarrollo.
 
 ### DFD nivel 0: contexto y cadena de suministro
 
@@ -232,7 +232,7 @@ flowchart LR
 
 ## Amenazas por categoría STRIDE y contramedidas
 
-Las 23 amenazas se reparten así: 6 de suplantación (Spoofing), 4 de manipulación (Tampering), 2 de repudio (Repudiation), 5 de divulgación de información (Information disclosure), 3 de denegación de servicio (Denial of service) y 3 de elevación de privilegios (Elevation of privilege). La columna «Amenaza» resume el riesgo (el elemento del DFD y el texto completo están en el modelo). La columna Estado sigue el modelo: *Mitigated* indica que la contramedida está implementada en el repositorio; *Open* que falta o está incompleta.
+Las 24 amenazas se reparten así: 7 de suplantación (Spoofing), 4 de manipulación (Tampering), 2 de repudio (Repudiation), 5 de divulgación de información (Information disclosure), 3 de denegación de servicio (Denial of service) y 3 de elevación de privilegios (Elevation of privilege). La columna «Amenaza» resume el riesgo (el elemento del DFD y el texto completo están en el modelo). La columna Estado sigue el modelo: *Mitigated* indica que la contramedida está implementada en el repositorio; *Open* que falta o está incompleta.
 
 | Categoría | Id | Amenaza (elemento del DFD) | Contramedida implementada | Estado |
 |---|---|---|---|---|
@@ -262,11 +262,11 @@ Las 23 amenazas se reparten así: 6 de suplantación (Spoofing), 4 de manipulaci
 
 Nota de transparencia: la especificación original repite el id AM-017 para dos amenazas distintas (códigos MFA y Argon2id como amplificador); el modelo de Threat Dragon las distingue como «AM-017 (MFA)» y «AM-017». Y la compuerta que la especificación cita para AM-014 («Trivy config sobre el compose de producción») no existe, porque Trivy config no analiza archivos de Docker Compose; la evidencia real es la comprobación `docker compose config` de la producción simulada, que confirma que ningún servicio salvo `web` publica puertos.
 
-**AM-023 (claves de servicio).** La función RF-018 añadió una credencial de larga vida para integraciones de máquina a máquina, y con ella una amenaza nueva: su robo o fuerza bruta. La contramedida, registrada en `specs/05-security/threat-model.md` y en el ADR 0014, es un secreto de 256 bits aleatorios (formato `ihk_<publicId>_<secreto>`) del que solo se guarda el SHA-256, comparación en tiempo constante con un hash señuelo, el mismo `401` para clave desconocida, incorrecta, expirada o revocada (sin oráculo), vencimiento obligatorio de 1 a 365 días, un alcance mínimo (`audit-log:read`, solo lectura, aceptado únicamente en `GET /api/v1/admin/audit-log`) y revocación inmediata. Nota de transparencia: AM-023 existe en la especificación textual, pero el modelo de Threat Dragon (`docs/threat-model/identity-hub.json`) conserva las 23 amenazas originales y todavía no la incluye; por eso este informe sigue contando 23 en el modelo.
+**AM-023 (claves de servicio).** La función RF-018 añadió una credencial de larga vida para integraciones de máquina a máquina, y con ella una amenaza nueva: su robo o fuerza bruta. La contramedida, registrada en `specs/05-security/threat-model.md` y en el ADR 0014, es un secreto de 256 bits aleatorios (formato `ihk_<publicId>_<secreto>`) del que solo se guarda el SHA-256, comparación en tiempo constante con un hash señuelo, el mismo `401` para clave desconocida, incorrecta, expirada o revocada (sin oráculo), vencimiento obligatorio de 1 a 365 días, un alcance mínimo (`audit-log:read`, solo lectura, aceptado únicamente en `GET /api/v1/admin/audit-log`) y revocación inmediata. AM-023 figura también en el modelo de Threat Dragon (`docs/threat-model/identity-hub.json`) como amenaza de suplantación sobre el flujo interno hacia `/api`, en estado *Mitigated*.
 
 ## Amenazas que estaban abiertas y cómo se cerraron
 
-Ninguna de las 23 amenazas queda en estado *Open*. Las tres que lo estaban se cerraron con el workflow de publicación (`release.yml`, tarea C3):
+Ninguna de las 24 amenazas queda en estado *Open*. Las tres que lo estaban se cerraron con el workflow de publicación (`release.yml`, tarea C3):
 
 - **AM-008 (firma de imágenes) y AM-022 (OIDC keyless):** el job `publish` firma cada imagen con Cosign keyless (identidad OIDC de GitHub, sin claves de larga vida) sobre el digest, y es el único job con el environment protegido `dockerhub`, restringido a tags `v*`. Además se mantienen los permisos mínimos por job (`permissions: contents: read` por defecto en `ci.yml`).
 - **AM-009 (cadena de suministro):** además de osv-scanner, govulncheck, npm audit y lockfiles, cada imagen publicada lleva un SBOM CycloneDX generado con Syft y adjunto como atestación firmada. No queda riesgo residual: VULN-028 (GO-2026-5932, sin versión corregida) se reclasificó el 2026-10-12 como no afectado, porque `go list -deps` no encuentra `x/crypto/openpgp` ni en el backend ni en las herramientas.
@@ -609,7 +609,7 @@ La revisión de la rama de pulido encontró tres diferencias entre lo que decía
 2. **Mover el clasificador del job 0 a `scripts/` con una prueba** y sustituir la guarda repetida en el job de imágenes por una forma que no dependa de cada paso nuevo.
 3. Evolucionar la integración de terceros: clientes OAuth en base de datos, OpenID Connect, refresh tokens por cliente, introspección y revocación; y reemplazar la publicación directa por un **outbox transaccional**.
 4. **Medir la latencia (RNF-010)** con una prueba de carga y completar la evidencia de los requisitos que la matriz marca como parciales.
-5. Incorporar AM-023 al modelo de Threat Dragon y ampliar los alcances de las claves de servicio más allá de la lectura del audit log.
+5. Ampliar los alcances de las claves de servicio más allá de la lectura del audit log.
 
 # Anexo A — Puesta en marcha y operación
 

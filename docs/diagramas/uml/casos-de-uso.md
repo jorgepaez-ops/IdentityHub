@@ -52,7 +52,7 @@ flowchart LR
     C11 -. "«include»" .-> C10
     C12 -. "«extend»" .-> C7
     C13 -. "«extend»" .-> C8
-    C15 -. "«include»" .-> C14
+    C15 -. "requiere una clave emitida en" .-> C14
 
     Client --- C10
     Siem --- C15
