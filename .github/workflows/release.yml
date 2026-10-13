@@ -170,8 +170,10 @@ jobs:
           identity="^https://github.com/${GITHUB_REPOSITORY}/\\.github/workflows/release\\.yml@refs/tags/v"
           retry cosign verify "${IMAGE}@${DIGEST}" \
             --certificate-identity-regexp "${identity}" --certificate-oidc-issuer "${OIDC_ISSUER}"
+          # La atestación verificada trae el SBOM completo: imprimirla alargaba el paso a varios minutos.
           retry cosign verify-attestation --type cyclonedx "${IMAGE}@${DIGEST}" \
-            --certificate-identity-regexp "${identity}" --certificate-oidc-issuer "${OIDC_ISSUER}"
+            --certificate-identity-regexp "${identity}" --certificate-oidc-issuer "${OIDC_ISSUER}" >/dev/null
+          echo "Firma y atestación CycloneDX verificadas para ${IMAGE}@${DIGEST}"
 
       # latest solo apunta a una imagen ya firmada y atestada, y solo si este tag es el tag
       # vX.Y.Z más alto del repositorio: repetir el release de un tag viejo no hace retroceder latest.
@@ -205,5 +207,5 @@ jobs:
             echo "### ${IMAGE}"
             echo "- Etiquetas: ${tags}"
             echo "- Digest: \`${DIGEST}\`"
-            echo "- Firma y SBOM: \`cosign verify ${IMAGE}@${DIGEST} --certificate-identity-regexp '^https://github.com/${GITHUB_REPOSITORY}/' --certificate-oidc-issuer https://token.actions.githubusercontent.com\`"
+            echo "- Firma y SBOM: \`cosign verify ${IMAGE}@${DIGEST} --certificate-identity-regexp '^https://github.com/${GITHUB_REPOSITORY}/\\.github/workflows/release\\.yml@refs/tags/v' --certificate-oidc-issuer https://token.actions.githubusercontent.com\`"
           } >> "$GITHUB_STEP_SUMMARY"
