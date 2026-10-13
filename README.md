@@ -116,7 +116,7 @@ Las 27 alertas de Checkov eran omisiones ya justificadas en línea (`#checkov:sk
 - [Manual de usuario](docs/manuales/usuario.md): flujos de empleado, administrador y Contabilidad con capturas.
 - [Claves de servicio](docs/manuales/claves-de-servicio.md): emisión, uso y revocación de claves para integraciones máquina (RF-018).
 - [Informe técnico](docs/informe/informe-tecnico.md): fuente del PDF final; ejecute `make informe` para regenerarlo.
-- [Guion del video](docs/video/guion.md): demostración de 13 minutos; la grabación sigue pendiente.
+- [Guion del video](docs/video/guion.md): demostración de 15 minutos; la grabación sigue pendiente.
 
 Para una revisión técnica ordenada, empiece por la [visión](specs/00-vision.md), continúe con los [ADRs](specs/adr/), revise el [modelo de amenazas](specs/05-security/threat-model.md) y cierre con la [matriz de trazabilidad](specs/07-traceability.md). Esta ruta permite contrastar intención, diseño, controles y evidencia.
 

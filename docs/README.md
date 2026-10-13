@@ -42,7 +42,7 @@ La columna **Ubicación actual** solo enlaza rutas que existen en este checkout.
 | Repositorio GitHub público con código, pipeline, IaC y documentación | 163–166 | [`../README.md`](../README.md), [`../.github/workflows/`](../.github/workflows/) e [`../infraestructura/`](../infraestructura/) | hecho (T21c; el PR de la fase 4 está fusionado) |
 | Imágenes publicadas y versionadas en Docker Hub | 163–167 | [`../specs/adr/0011-docker-hub-como-registry.md`](../specs/adr/0011-docker-hub-como-registry.md) | hecho (C3): `docker.io/jorgeivp/identity-hub-api`, `-worker` y `-web`, firmadas con Cosign y con SBOM adjunto; validado con el tag `v0.9.0` |
 | Informe técnico en PDF | 163–168 | PDF generado con `make informe` (no se versiona por tamaño; se adjunta al release de GitHub en T21), fuente en [`informe/informe-tecnico.md`](informe/informe-tecnico.md); `make informe` lo regenera | hecho (T19) |
-| Video-demostración de 10–15 minutos | 163–169 | [`video/guion.md`](video/guion.md) | guion completo de 13 minutos (T20); grabación a cargo del equipo |
+| Video-demostración de 10–15 minutos | 163–169 | [`video/guion.md`](video/guion.md) | guion completo de 15 minutos (T20), con escenas de exportación de auditoría, claves de servicio y Falco; grabación a cargo del equipo |
 | PDF: portada | 174 | [`informe/informe-tecnico.md`](informe/informe-tecnico.md) | hecho (T19) |
 | PDF: introducción | 175 | [`informe/informe-tecnico.md`](informe/informe-tecnico.md) | hecho (T19) |
 | PDF: arquitectura y diagramas UML | 176 | [`informe/informe-tecnico.md`](informe/informe-tecnico.md) | hecho (T19) |
@@ -72,7 +72,7 @@ No los exige el enunciado, pero responden a la demo en vivo con el profesor:
 4. Consulte los manuales de [`arquitectura`](manuales/arquitectura.md), [`despliegue y operación`](manuales/despliegue-y-operacion.md) y [`seguridad`](manuales/seguridad.md).
 5. Revise el [`informe de seguridad`](security-report.html) junto con las evidencias de seguridad.
 6. Lea la [`bitácora`](BITACORA.md) para avances, decisiones y estado histórico.
-7. Prepare la demo en vivo de la sustentación con el [`guion de la demo`](guion-demo.md) (unos 5 minutos) y el video con el [`guion del video`](video/guion.md) (13 minutos; la grabación sigue pendiente).
+7. Prepare la demo en vivo de la sustentación con el [`guion de la demo`](guion-demo.md) (unos 5 minutos, más 4 opcionales) y el video con el [`guion del video`](video/guion.md) (15 minutos; la grabación sigue pendiente).
 8. Siga el avance de la entrega en [`../odd/tasks/`](../odd/tasks/).
 
 ## Próximos artefactos
