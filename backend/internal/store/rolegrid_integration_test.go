@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jorgepaez/identity-hub/internal/auth/rolegrid"
 	"github.com/jorgepaez/identity-hub/internal/store"
 	"github.com/jorgepaez/identity-hub/internal/testdb"
@@ -53,22 +54,31 @@ func TestRF021_StoreListaAplicacionesConPermisosRolesYConteos(t *testing.T) {
 	if err != nil || len(listed) != 2 {
 		t.Fatalf("ListRoles() = %v, %v", listed, err)
 	}
+	requireIdentityAppRolegridPrivileges(t, pool)
+}
+
+// requireIdentityAppRolegridPrivileges checks the runtime role can read every table the role
+// grid touches and can write roles and role_permissions (but never update role_permissions).
+func requireIdentityAppRolegridPrivileges(t *testing.T, pool *pgxpool.Pool) {
+	t.Helper()
 	for _, table := range []string{"permissions", "role_permissions", "roles", "applications", "user_roles"} {
-		var ok bool
-		if err := pool.QueryRow(ctx, `SELECT has_table_privilege('identity_app', $1, 'SELECT')`, table).Scan(&ok); err != nil || !ok {
-			t.Fatalf("identity_app lacks SELECT on %s (err=%v)", table, err)
-		}
+		requireIdentityAppPrivilege(t, pool, table, "SELECT")
 	}
 	for _, table := range []string{"roles", "role_permissions"} {
 		for _, privilege := range []string{"INSERT", "UPDATE", "DELETE"} {
 			if table == "role_permissions" && privilege == "UPDATE" {
 				continue
 			}
-			var ok bool
-			if err := pool.QueryRow(ctx, `SELECT has_table_privilege('identity_app', $1, $2)`, table, privilege).Scan(&ok); err != nil || !ok {
-				t.Fatalf("identity_app lacks %s on %s (err=%v)", privilege, table, err)
-			}
+			requireIdentityAppPrivilege(t, pool, table, privilege)
 		}
+	}
+}
+
+func requireIdentityAppPrivilege(t *testing.T, pool *pgxpool.Pool, table, privilege string) {
+	t.Helper()
+	var ok bool
+	if err := pool.QueryRow(context.Background(), `SELECT has_table_privilege('identity_app', $1, $2)`, table, privilege).Scan(&ok); err != nil || !ok {
+		t.Fatalf("identity_app lacks %s on %s (err=%v)", privilege, table, err)
 	}
 }
 
@@ -91,23 +101,7 @@ func TestRF021_ServicioConStoreCreaActualizaYEliminaConAuditoria(t *testing.T) {
 	applicationID := applications[0].ID
 	ip := netip.MustParseAddr("203.0.113.20")
 
-	role, err := service.Create(ctx, rolegrid.CreateInput{ActorUserID: actor.ID, ApplicationID: applicationID, Name: "contabilidad.auditor", Description: "Solo lectura", PermissionKeys: []string{"reportes.ver", "movimientos.ver_todos"}, IP: ip, UserAgent: "itest"})
-	if err != nil {
-		t.Fatalf("Create() error = %v", err)
-	}
-	if !reflect.DeepEqual(role.PermissionKeys, []string{"movimientos.ver_todos", "reportes.ver"}) {
-		t.Fatalf("Create() keys = %v", role.PermissionKeys)
-	}
-	if _, err := service.Create(ctx, rolegrid.CreateInput{ActorUserID: actor.ID, ApplicationID: applicationID, Name: "contabilidad.auditor", PermissionKeys: nil}); !errors.Is(err, rolegrid.ErrDuplicateRole) {
-		t.Fatalf("duplicate Create() error = %v, want ErrDuplicateRole", err)
-	}
-	if _, err := service.Create(ctx, rolegrid.CreateInput{ActorUserID: actor.ID, ApplicationID: applicationID, Name: "contabilidad.otro", PermissionKeys: []string{"usuarios.borrar"}}); !errors.Is(err, rolegrid.ErrInvalidPermission) {
-		t.Fatalf("unknown permission error = %v", err)
-	}
-	var leaked int
-	if err := pool.QueryRow(ctx, `SELECT count(*) FROM roles WHERE name = 'contabilidad.otro'`).Scan(&leaked); err != nil || leaked != 0 {
-		t.Fatalf("rejected role persisted: count=%d err=%v", leaked, err)
-	}
+	role := requireCreateRoleRules(t, pool, service, actor.ID, applicationID, ip)
 
 	keys := []string{"cierre.ejecutar"}
 	description := "Con cierre"
@@ -118,27 +112,68 @@ func TestRF021_ServicioConStoreCreaActualizaYEliminaConAuditoria(t *testing.T) {
 	if _, err := pool.Exec(ctx, `INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)`, actor.ID, role.ID); err != nil {
 		t.Fatal(err)
 	}
-	if err := service.Delete(ctx, rolegrid.DeleteInput{ActorUserID: actor.ID, ApplicationID: applicationID, RoleID: role.ID}); !errors.Is(err, rolegrid.ErrSelfRoleDelete) {
+	other := createAdminTestUser(t, ctx, repository, "grid-other@example.test", "Grid Other", "")
+	requireDeleteRoleRules(t, pool, service, actor.ID, other.ID, applicationID, role.ID, ip)
+
+	requireRoleAuditTrail(t, pool, role.ID, keys)
+}
+
+// requireCreateRoleRules creates a role and checks the sorted keys, the duplicate-name and
+// unknown-permission rejections, and that a rejected role is not left behind.
+func requireCreateRoleRules(t *testing.T, pool *pgxpool.Pool, service *rolegrid.Service, actorID, applicationID uuid.UUID, ip netip.Addr) rolegrid.Role {
+	t.Helper()
+	ctx := context.Background()
+	role, err := service.Create(ctx, rolegrid.CreateInput{ActorUserID: actorID, ApplicationID: applicationID, Name: "contabilidad.auditor", Description: "Solo lectura", PermissionKeys: []string{"reportes.ver", "movimientos.ver_todos"}, IP: ip, UserAgent: "itest"})
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+	if !reflect.DeepEqual(role.PermissionKeys, []string{"movimientos.ver_todos", "reportes.ver"}) {
+		t.Fatalf("Create() keys = %v", role.PermissionKeys)
+	}
+	if _, err := service.Create(ctx, rolegrid.CreateInput{ActorUserID: actorID, ApplicationID: applicationID, Name: "contabilidad.auditor", PermissionKeys: nil}); !errors.Is(err, rolegrid.ErrDuplicateRole) {
+		t.Fatalf("duplicate Create() error = %v, want ErrDuplicateRole", err)
+	}
+	if _, err := service.Create(ctx, rolegrid.CreateInput{ActorUserID: actorID, ApplicationID: applicationID, Name: "contabilidad.otro", PermissionKeys: []string{"usuarios.borrar"}}); !errors.Is(err, rolegrid.ErrInvalidPermission) {
+		t.Fatalf("unknown permission error = %v", err)
+	}
+	var leaked int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM roles WHERE name = 'contabilidad.otro'`).Scan(&leaked); err != nil || leaked != 0 {
+		t.Fatalf("rejected role persisted: count=%d err=%v", leaked, err)
+	}
+	return role
+}
+
+// requireDeleteRoleRules checks the guards on a role held by actorID (self delete / self
+// permission change), a role assigned to someone (ErrRoleAssigned), then deletes it once the
+// assignments are gone and checks a second delete reports ErrRoleNotFound.
+func requireDeleteRoleRules(t *testing.T, pool *pgxpool.Pool, service *rolegrid.Service, actorID, otherID, applicationID, roleID uuid.UUID, ip netip.Addr) {
+	t.Helper()
+	ctx := context.Background()
+	if err := service.Delete(ctx, rolegrid.DeleteInput{ActorUserID: actorID, ApplicationID: applicationID, RoleID: roleID}); !errors.Is(err, rolegrid.ErrSelfRoleDelete) {
 		t.Fatalf("Delete(held) error = %v, want ErrSelfRoleDelete", err)
 	}
-	if _, err := service.Update(ctx, rolegrid.UpdateInput{ActorUserID: actor.ID, ApplicationID: applicationID, RoleID: role.ID, PermissionKeys: &[]string{"reportes.ver"}}); !errors.Is(err, rolegrid.ErrSelfPermissionChange) {
+	if _, err := service.Update(ctx, rolegrid.UpdateInput{ActorUserID: actorID, ApplicationID: applicationID, RoleID: roleID, PermissionKeys: &[]string{"reportes.ver"}}); !errors.Is(err, rolegrid.ErrSelfPermissionChange) {
 		t.Fatalf("Update(held) error = %v, want ErrSelfPermissionChange", err)
 	}
-	other := createAdminTestUser(t, ctx, repository, "grid-other@example.test", "Grid Other", "")
-	if err := service.Delete(ctx, rolegrid.DeleteInput{ActorUserID: other.ID, ApplicationID: applicationID, RoleID: role.ID}); !errors.Is(err, rolegrid.ErrRoleAssigned) {
+	if err := service.Delete(ctx, rolegrid.DeleteInput{ActorUserID: otherID, ApplicationID: applicationID, RoleID: roleID}); !errors.Is(err, rolegrid.ErrRoleAssigned) {
 		t.Fatalf("Delete(assigned) error = %v, want ErrRoleAssigned", err)
 	}
-	if _, err := pool.Exec(ctx, `DELETE FROM user_roles WHERE role_id = $1`, role.ID); err != nil {
+	if _, err := pool.Exec(ctx, `DELETE FROM user_roles WHERE role_id = $1`, roleID); err != nil {
 		t.Fatal(err)
 	}
-	if err := service.Delete(ctx, rolegrid.DeleteInput{ActorUserID: other.ID, ApplicationID: applicationID, RoleID: role.ID, IP: ip, UserAgent: "itest"}); err != nil {
+	if err := service.Delete(ctx, rolegrid.DeleteInput{ActorUserID: otherID, ApplicationID: applicationID, RoleID: roleID, IP: ip, UserAgent: "itest"}); err != nil {
 		t.Fatalf("Delete() error = %v", err)
 	}
-	if err := service.Delete(ctx, rolegrid.DeleteInput{ActorUserID: other.ID, ApplicationID: applicationID, RoleID: role.ID}); !errors.Is(err, rolegrid.ErrRoleNotFound) {
+	if err := service.Delete(ctx, rolegrid.DeleteInput{ActorUserID: otherID, ApplicationID: applicationID, RoleID: roleID}); !errors.Is(err, rolegrid.ErrRoleNotFound) {
 		t.Fatalf("Delete(gone) error = %v, want ErrRoleNotFound", err)
 	}
+}
 
-	rows, err := pool.Query(ctx, `SELECT action, actor_user_id, resource_type, resource_id, host(ip), user_agent, metadata FROM audit_log WHERE action LIKE 'role\_%' AND action <> 'role_changed' ORDER BY id`)
+// requireRoleAuditTrail checks the role_created/updated/deleted audit rows: resource, client IP,
+// user agent and role name on every row, and the updated keys on role_updated.
+func requireRoleAuditTrail(t *testing.T, pool *pgxpool.Pool, roleID uuid.UUID, keys []string) {
+	t.Helper()
+	rows, err := pool.Query(context.Background(), `SELECT action, actor_user_id, resource_type, resource_id, host(ip), user_agent, metadata FROM audit_log WHERE action LIKE 'role\_%' AND action <> 'role_changed' ORDER BY id`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,7 +193,7 @@ func TestRF021_ServicioConStoreCreaActualizaYEliminaConAuditoria(t *testing.T) {
 		if err := json.Unmarshal(metadata, &body); err != nil {
 			t.Fatal(err)
 		}
-		if resourceType != "application_role" || resourceID != role.ID.String() || address != "203.0.113.20" || userAgent != "itest" || body.RoleName != "contabilidad.auditor" {
+		if resourceType != "application_role" || resourceID != roleID.String() || address != "203.0.113.20" || userAgent != "itest" || body.RoleName != "contabilidad.auditor" {
 			t.Fatalf("audit row %s: type=%s id=%s ip=%s ua=%s meta=%s", action, resourceType, resourceID, address, userAgent, metadata)
 		}
 		if action == "role_updated" && !reflect.DeepEqual(body.PermissionKeys, keys) {
