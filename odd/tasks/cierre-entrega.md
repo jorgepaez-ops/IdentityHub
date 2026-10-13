@@ -374,6 +374,11 @@ Mañana (2026-10-13), en este orden:
      independiente; recomendación (a) pasa a "automatizar cosign verify como paso posterior del release".
 2. C2: `make informe` (incluir en el informe lo hecho en F1-F4, F6-F10 y los hallazgos de arriba), revisión del PDF
    por el usuario, notas del release, tag `v1.0.0` en vivo y `gh release create v1.0.0` con el PDF.
+   - **Cerrada (2026-10-13).** PR #44-#49 en `main`; tag `v1.0.0` sobre `06b6e01`, run de `release.yml`
+     38460792159 en verde (6 jobs); el paso «Verificar firma y atestación» corrió antes de «Mover latest» en las tres
+     imágenes. Verificación local con Cosign v3.1.3 e identidad fijada a `release.yml@refs/tags/v`: `verify` y
+     `verify-attestation` OK; `latest` = `v1.0.0` (api `fa53d22a`, worker `9bd06633`, web `d5e81249`). Release
+     publicado con el informe técnico (53 páginas) adjunto: https://github.com/jorgepaez-ops/IdentityHub/releases/tag/v1.0.0
    - **Avance (2026-10-13).** Informe técnico actualizado (`b4bf102`, PDF 51 pp., sin versionar) y auditoría de toda
      la documentación; correcciones en 21 archivos (`ae016a1`, `55d330c`, `f9b43d4`, `82fb5c7`, `a8a93c2`): bitácora,
      READMEs, AGENTS/CLAUDE, guía de desarrollo (primer arranque y `.env` anterior a F2), diagramas (Falco, SMTP
