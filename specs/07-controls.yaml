@@ -67,4 +67,9 @@ RNF-011:
   - .github/workflows/ci.yml | spec-drift | git diff --exit-code
   - .github/workflows/ci.yml | spec-drift | Regenerar la API Go
 
-# RNF-007, RNF-010 y RNF-012: sin control de CI que haga cumplir su criterio (ver la matriz).
+# RNF-010: la prueba de carga corre en el job E2E, detrás de las pruebas, y rompe la build si el p95 supera 300 ms.
+RNF-010:
+  - .github/workflows/ci.yml | e2e | make load-test
+  - Makefile | load-test | scripts/load-test.sh
+
+# RNF-007 y RNF-012: sin control de CI que haga cumplir su criterio (ver la matriz).

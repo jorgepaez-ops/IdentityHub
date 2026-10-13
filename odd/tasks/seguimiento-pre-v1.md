@@ -60,9 +60,20 @@ con esos temas abiertos.
   y `make help` contra `HEAD` (mismas líneas de comando; el bloque de URLs ahora es la variable `PRINT_APP_URLS`
   y su salida real es idéntica; `help` igual salvo el nombre del archivo). README: «Levantar el stack» queda en un
   párrafo con enlace a `docs/guia-desarrollo.md#levantar-el-stack`.
-- [ ] **S5 — RNF-010 (latencia) con prueba de carga.** Prueba de carga mínima y reproducible contra el
+- [x] **S5 — RNF-010 (latencia) con prueba de carga.** Prueba de carga mínima y reproducible contra el
   stack de CI con un umbral alineado con `specs/01-requirements.md` (RNF-010) y su gate; la matriz debe
   pasar RNF-010 de «sin cubrir» a cubierto.
+  Evidencia: `make load-test` (`scripts/load-test.sh` + `tests/load/auth-latency.js`, k6 en
+  `grafana/k6@sha256:e66db15b…`, digest leído con `docker pull` + `docker inspect`) mide refresh, `GET /me`
+  y JWKS con umbral `p(95)<300` (RNF-010: p95 de los endpoints de autenticación, sin Argon2id; el login
+  se hace una vez en `setup()`). RED: con `P95_MS=1` termina con código 99 y marca los tres umbrales
+  `✗`. GREEN contra `make up-app` (20 s por escenario, 2 074 peticiones, 0 % de errores): corrida 1
+  refresh p95 4,79 ms / p99 6,88 ms, `/me` 3,15 / 4,15 ms, JWKS 2,14 / 2,54 ms; corrida 2 (vía `make
+  load-test`) p95 5,46 / 3,25 / 2,25 ms. Paso nuevo en el job 7 de CI tras `make e2e`; sin
+  `with-raised-login-limit.sh` a propósito (ningún login falla y refresh va a ~3 r/s < 5 r/s de Nginx).
+  Matriz: RNF-010 pasa de «sin cubrir» a completo (Escenarios 1 + Controles CI); 26 completos, 7 parciales,
+  0 sin cubrir. `actionlint` limpio; `zizmor` 21 hallazgos antes y después (sin nuevos); `make informe` ok
+  (rangos `{{code:...ci.yml}}` del informe desplazados +6). Rutas de CI no ejecutadas en un runner real.
 - [ ] **S6 — Segunda evidencia de los 7 requisitos parciales.** RF-008, RNF-001, RNF-002, RNF-006,
   RNF-007, RNF-008, RNF-012 tienen una sola columna de evidencia en `specs/07-traceability.md`
   (completo = 2 de 4: Escenarios, Pruebas Go, E2E, Controles CI). Añadir la evidencia que falte con
@@ -99,7 +110,7 @@ Estrategia: `ask-on-risk` → `stacked-to-main` (usuario, 2026-10-13). Cortes: P
 | S2 | delegado (Sonnet) | hecho | e2701fd | — |
 | S3 | delegado (Sonnet) | hecho | fa6b8fe | — |
 | S4 | delegado (Sonnet) | hecho | aeeb74e | — |
-| S5 | — | pendiente | — | — |
+| S5 | delegado (Sonnet) | hecho | pendiente de SHA | — |
 | S6 | — | pendiente | — | — |
 | S7 | — | pendiente | — | — |
 

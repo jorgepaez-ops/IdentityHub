@@ -18,7 +18,7 @@ SQLC_VERSION := v1.31.1
 SQLC         ?= sqlc
 
 .DEFAULT_GOAL := help
-.PHONY: help setup certs up down informe logs ps restart build test test-go test-integration test-front e2e _e2e-run capturas _capturas-run scan-dast _scan-dast-run spec-drift lint fmt gen scan scan-secrets scan-deps scan-image scan-config scan-iac migrate psql rabbit mail clean up-app up-prod down-prod falco-test
+.PHONY: help setup certs up down informe logs ps restart build test test-go test-integration test-front e2e load-test _e2e-run capturas _capturas-run scan-dast _scan-dast-run spec-drift lint fmt gen scan scan-secrets scan-deps scan-image scan-config scan-iac migrate psql rabbit mail clean up-app up-prod down-prod falco-test
 
 help: ## Muestra esta ayuda
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -128,6 +128,11 @@ e2e: ## Pruebas de extremo a extremo contra el stack levantado
 
 _e2e-run:
 	cd e2e && npm ci --ignore-scripts && npx playwright test
+
+load-test: ## Prueba de carga de latencia (RNF-010, k6 en contenedor) contra el stack levantado; falla si el p95 supera 300 ms
+	@# Un solo login correcto en setup() y ninguno fallido: no hay bloqueo por IP (RF-017) que esquivar,
+	@# y el escenario de refresh va por debajo del límite de Nginx (5 r/s), así que no usa WITH_RAISED_LIMIT.
+	@COMPOSE='$(COMPOSE)' scripts/load-test.sh
 
 capturas: ## Regenera las capturas del manual de usuario (docs/manuales/img/usuario) contra el stack levantado
 	@$(WITH_RAISED_LIMIT) _capturas-run

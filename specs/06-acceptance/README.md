@@ -8,6 +8,10 @@ La correspondencia se verifica en CI: el job `spec-drift` comprueba que todo
 escenario `@RF-NNN` tiene un `test(...)` de Playwright cuyo título empieza por
 ese mismo identificador. Un escenario sin prueba rompe el build.
 
+Los escenarios de `requisitos-no-funcionales.feature` solo llevan etiquetas `@RNF-NNN`: no se derivan
+en un spec de Playwright y cada uno nombra, en un comentario `# Verificación:`, la prueba o el
+control que lo ejecuta de verdad (por ejemplo `make load-test`).
+
 Convención de etiquetas:
 
 - `@RF-NNN` — requisito que verifica

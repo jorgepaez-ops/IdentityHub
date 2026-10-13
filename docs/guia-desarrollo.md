@@ -234,6 +234,24 @@ make e2e     # npm ci + npx playwright test
   stack con `make up`, instala Chromium y ejecuta `make e2e`; si falla, sube `e2e/playwright-report`
   y `e2e/test-results` como artefactos.
 
+### Prueba de carga (RNF-010)
+
+```bash
+make up-app      # o make up; el stack debe estar sano antes
+make load-test   # k6 en un contenedor (imagen fijada por digest); falla si el p95 supera 300 ms
+```
+
+- Mide `POST /api/v1/auth/refresh` (una sesión que rota su cookie, ~3 r/s), `GET /api/v1/me` y
+  `GET /.well-known/jwks.json` (50 r/s cada uno, 20 s). El login con Argon2id queda fuera de la
+  medición: se hace una sola vez en `setup()` y el requisito lo excluye.
+- `scripts/load-test.sh` siembra una cuenta `load-*@example.test` desechable con una invitación
+  pendiente (como las pruebas E2E) y k6 la acepta, inicia sesión y lee el código MFA en Mailpit. No
+  falla ningún login, así que no hay bloqueo por IP (RF-017) que esquivar; el refresh va por debajo
+  de los 5 r/s de Nginx. Por eso no usa `scripts/with-raised-login-limit.sh`.
+- Los umbrales viven en `tests/load/auth-latency.js` (`P95_MS`, por defecto 300; `DURATION`, por defecto
+  20s) y hacen que k6 termine con código distinto de cero. La imagen se cambia con `K6_IMAGE`.
+- CI lo corre en el job `7 · E2E (Playwright)`, después de `make e2e` y sobre el mismo stack.
+
 ### DAST con ZAP
 
 `make scan-dast` corre OWASP ZAP (imagen fijada en `ZAP_IMAGE`) contra el stack ya levantado: baseline

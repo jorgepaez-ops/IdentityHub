@@ -40,11 +40,11 @@ declaración de buenas intenciones.
 | **RNF-007** | Observabilidad | P0 | — | — | 5 | — | — | 🟡 parcial |
 | **RNF-008** | Contenedores endurecidos | P0 | — | — | — | — | `docker-compose.yml#api`, `docker-compose.yml#worker`, `docker-compose.yml#web`, `backend/Dockerfile`, `frontend/Dockerfile`, `ci.yml#iac-scan`, `ci.yml#lint` | 🟡 parcial |
 | **RNF-009** | Cabeceras de seguridad | P0 | — | — | — | 6 | `ci.yml#dast` | ✅ completo |
-| **RNF-010** | Latencia | P1 | — | — | — | — | — | 🔴 sin cubrir |
+| **RNF-010** | Latencia | P1 | — | 1 | — | — | `ci.yml#e2e`, `Makefile#load-test` | ✅ completo |
 | **RNF-011** | Los specs son la fuente de verdad | P0 | — | — | 5 | — | `ci.yml#spec-drift` | ✅ completo |
 | **RNF-012** | Logs sin datos sensibles | P0 | — | — | 5 | — | — | 🟡 parcial |
 
-**Resumen:** 33 requisitos · 25 completos · 7 parciales · 1 sin cubrir · 0 diferidos (2026-10-13).
+**Resumen:** 33 requisitos · 26 completos · 7 parciales · 0 sin cubrir · 0 diferidos (2026-10-13).
 
 Leyenda de estado: *completo* = verificado por al menos dos de las
 cuatro columnas de evidencia (Escenarios, Pruebas Go, E2E, Controles CI) · *parcial* = una sola ·
@@ -138,3 +138,5 @@ una sola fuente de evidencia.
   - roles-y-permisos.feature — Se rechaza un permiso de otra aplicación
   - roles-y-permisos.feature — No se elimina un rol asignado
   - roles-y-permisos.feature — Cada cambio de rol queda auditado
+- **RNF-010**
+  - requisitos-no-funcionales.feature — El p95 de los endpoints de autenticación se mantiene por debajo de 300 ms

@@ -34,7 +34,7 @@ La elección del lenguaje merece una nota. El backend está escrito en **Go** (A
 
 Identity Hub incluye registro por invitación por correo, contraseñas con Argon2id, JWT firmados con Ed25519 y publicados por JWKS, refresh tokens rotativos, MFA obligatorio por código enviado al correo, roles, una grilla de roles y permisos por aplicación, auditoría append-only con exportación a CSV o JSON, claves de servicio para integraciones de máquina a máquina y SSO hacia Contabilidad. El worker entrega el correo por SMTP con STARTTLS obligatorio y autenticación. Quedan fuera por decisión documentada: federación con proveedores externos, multi-tenancy efectivo, alta disponibilidad, TOTP y WebAuthn. El objetivo de despliegue es un único host con Docker Compose; la nube es una arquitectura de referencia.
 
-A la fecha de este documento están completas las semanas 1 a 4 y el cierre de la entrega. La semana 4 incluyó la publicación de las imágenes en Docker Hub con SBOM y firma Cosign mediante el workflow `release.yml` (validado primero con el tag `v0.9.0`). Entre el 12 y el 13 de octubre se fusionaron en `main` los PR 32 a 41 y el PR 43, que cerraron las funciones que habían quedado diferidas y endurecieron la entrega: exportación del audit log (RF-019), claves de servicio (RF-018), SMTP autenticado con STARTTLS y hosts configurables, detección en ejecución con Falco, una columna de controles de CI en la matriz de trazabilidad, un badge de cobertura con el valor medido, el orden de publicación del release (`latest` solo después de firmar y atestar), la reclasificación de VULN-028 y un filtro que evita correr el pipeline completo en cambios solo de documentación. La matriz de trazabilidad queda con 33 requisitos: 25 completos, 7 parciales, 1 sin cubrir (RNF-010, latencia, sin prueba de carga) y 0 diferidos. El release se revalidó con el tag `v0.9.1`, que ya publica con el orden definitivo. El tag de entrega es `v1.0.0`: el workflow de release publica cada tag `vX.Y.Z`, de modo que el resultado no depende de que ese tag ya exista al leer este informe. Lo que todavía no existe se declara en las secciones de limitaciones y trabajo futuro.
+A la fecha de este documento están completas las semanas 1 a 4 y el cierre de la entrega. La semana 4 incluyó la publicación de las imágenes en Docker Hub con SBOM y firma Cosign mediante el workflow `release.yml` (validado primero con el tag `v0.9.0`). Entre el 12 y el 13 de octubre se fusionaron en `main` los PR 32 a 41 y el PR 43, que cerraron las funciones que habían quedado diferidas y endurecieron la entrega: exportación del audit log (RF-019), claves de servicio (RF-018), SMTP autenticado con STARTTLS y hosts configurables, detección en ejecución con Falco, una columna de controles de CI en la matriz de trazabilidad, un badge de cobertura con el valor medido, el orden de publicación del release (`latest` solo después de firmar y atestar), la reclasificación de VULN-028 y un filtro que evita correr el pipeline completo en cambios solo de documentación. La matriz de trazabilidad queda con 33 requisitos: 26 completos, 7 parciales, 0 sin cubrir y 0 diferidos (RNF-010, latencia, pasó de sin cubrir a completo con una prueba de carga). El release se revalidó con el tag `v0.9.1`, que ya publica con el orden definitivo. El tag de entrega es `v1.0.0`: el workflow de release publica cada tag `vX.Y.Z`, de modo que el resultado no depende de que ese tag ya exista al leer este informe. Lo que todavía no existe se declara en las secciones de limitaciones y trabajo futuro.
 
 # Arquitectura
 
@@ -314,7 +314,7 @@ El modelado de amenazas con Threat Dragon y STRIDE se describe en la sección an
 
 **Imágenes (jobs 9-10).** Una matriz construye las tres imágenes (`api`, `worker` y `web`) con Buildx y caché de GitHub Actions, y las escanea con Trivy en dos pasos: primero un informe SARIF que se sube siempre a Code Scanning y luego el gate, que rompe la build ante CVE de severidad `HIGH` o `CRITICAL` **con parche disponible** (`ignore-unfixed: true`). La política es deliberada: bloquear por un CVE sin arreglo no protege de nada y entrena al equipo a ignorar el rojo. Las excepciones se registrarían en `security/.trivyignore`, que se mantiene vacío a propósito: toda excepción exige CVE, justificación, responsable, expiración y ficha asociada.
 
-{{code:yaml:.github/workflows/ci.yml:738-753}}
+{{code:yaml:.github/workflows/ci.yml:744-759}}
 
 **Configuración (job 8).** Trivy config analiza Dockerfiles y demás configuración con el mismo patrón de dos pasos (SARIF y gate en `HIGH,CRITICAL`).
 
@@ -330,9 +330,19 @@ El modelado de amenazas con Threat Dragon y STRIDE se describe en la sección an
 
 **E2E (job 7).** Playwright ejecuta 59 pruebas en Chromium contra el stack completo levantado con Compose; cada prueba corresponde a un escenario Gherkin de los requisitos (el verificador de trazabilidad exige la correspondencia uno a uno). Si falla o se cancela, sube el informe y las trazas como artefactos.
 
+**Prueba de carga (RNF-010, job 7).** Tras las pruebas E2E y sobre el mismo stack, `make load-test` ejecuta k6 (imagen fijada por digest) con `tests/load/auth-latency.js`. Mide `POST /api/v1/auth/refresh`, `GET /api/v1/me` y `GET /.well-known/jwks.json` (el login con Argon2id queda fuera, como dice el requisito) y los umbrales `p(95)<300` hacen que k6 termine con código distinto de cero. Una corrida local contra `make up-app` (20 s por escenario, 2 074 peticiones, 0 % de errores) dio estos tiempos:
+
+| Endpoint | p95 | p99 |
+|---|---|---|
+| `POST /api/v1/auth/refresh` (~3 r/s, límite de Nginx 5 r/s) | 4,79 ms | 6,88 ms |
+| `GET /api/v1/me` (50 r/s) | 3,15 ms | 4,15 ms |
+| `GET /.well-known/jwks.json` (50 r/s) | 2,14 ms | 2,54 ms |
+
+El umbral de 300 ms deja un margen de dos órdenes de magnitud respecto de lo medido; sigue siendo un gate de regresión, no una afirmación de capacidad (es una sola máquina, sin red real).
+
 **DAST (job 11).** OWASP ZAP 2.17.0 corre en tres escaneos: *baseline* del Hub, *baseline* de Contabilidad y escaneo de API a partir del contrato OpenAPI, todos contra el stack levantado. ZAP se ejecuta con `-I` (no decide él); el único punto de decisión es `scripts/zap-gate.py`, que rompe la build ante alertas de riesgo medio o alto, salvo una entrada `IGNORE` justificada en `.zap/rules.tsv`. Los informes JSON y HTML se suben como artefacto aunque el job falle.
 
-{{code:yaml:.github/workflows/ci.yml:755-777}}
+{{code:yaml:.github/workflows/ci.yml:761-783}}
 
 ## Fase 5: Despliegue
 
@@ -578,7 +588,8 @@ Falco, que el enunciado menciona para la detección de comportamiento anómalo e
 - **Un solo cliente OAuth y sin OpenID Connect:** la guía de integración de terceros enumera lo que falta (registro dinámico, refresh tokens para aplicaciones, cierre de sesión único, revocación).
 - **Sin outbox transaccional** (ADR 0006): la publicación al broker usa *publisher confirms*, pero no hay garantía transaccional conjunta entre la base de datos y el broker; el outbox es trabajo futuro deliberado.
 - **Sin riesgo aceptado vigente:** VULN-028 (GO-2026-5932) se reclasificó el 2026-10-12 como no afectado; solo se reabriría si algún paquete empezara a importar `x/crypto/openpgp`.
-- **Cobertura de la matriz de trazabilidad:** de 33 requisitos, 25 están completos, 7 son parciales (RF-008, RNF-001, RNF-002, RNF-006, RNF-007, RNF-008 y RNF-012, con una sola fuente de evidencia) y RNF-010 (latencia) no tiene prueba, porque no hay prueba de carga. No queda ningún requisito diferido.
+- **Cobertura de la matriz de trazabilidad:** de 33 requisitos, 26 están completos y 7 son parciales (RF-008, RNF-001, RNF-002, RNF-006, RNF-007, RNF-008 y RNF-012, con una sola fuente de evidencia). No queda ningún requisito sin cubrir ni diferido.
+- **La prueba de carga es mínima:** mide tres endpoints sin Argon2id en una sola máquina y con un umbral de regresión; no es una prueba de capacidad ni de saturación.
 - **Las claves de servicio tienen un único alcance:** `audit-log:read`, solo en el listado del audit log.
 
 ## Diferencias conocidas entre especificación y código
@@ -605,7 +616,7 @@ La revisión de la rama de pulido encontró tres diferencias entre lo que decía
 ## Trabajo futuro
 
 1. Evolucionar la integración de terceros: clientes OAuth en base de datos, OpenID Connect, refresh tokens por cliente, introspección y revocación; y reemplazar la publicación directa por un **outbox transaccional**.
-2. **Medir la latencia (RNF-010)** con una prueba de carga y completar la evidencia de los requisitos que la matriz marca como parciales.
+2. Completar la evidencia de los requisitos que la matriz marca como parciales.
 3. Ampliar los alcances de las claves de servicio más allá de la lectura del audit log.
 
 # Anexo A — Puesta en marcha y operación
@@ -671,6 +682,7 @@ Los dominios `*.localhost` se resuelven a `127.0.0.1` en los navegadores moderno
 | `make e2e` | Suite E2E de Playwright contra el stack levantado (sube y restaura el límite de fallos por IP) |
 | `make capturas` | Regenera las 48 capturas del manual de usuario contra el stack levantado |
 | `make scan` | Todos los gates de seguridad en local (`scan-secrets`, `scan-deps`, `scan-config`, `scan-iac`, `scan-image`) |
+| `make load-test` | Prueba de carga de latencia con k6 (RNF-010) contra el stack levantado; falla si el p95 supera 300 ms |
 | `make scan-dast` | OWASP ZAP (baseline del Hub y de Contabilidad, y API) contra el stack levantado; informes en `security/zap-reports/` |
 | `make spec-drift` | Verifica sin red la matriz de trazabilidad y los escenarios Gherkin contra E2E |
 | `make gen` | Regenera todo lo derivado de los specs (Go desde OpenAPI, `sqlc`, tipos TypeScript, trazabilidad) |

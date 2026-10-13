@@ -582,6 +582,12 @@ jobs:
       - name: Pruebas E2E (make e2e)
         run: make e2e
 
+      # RNF-010: k6 (imagen fijada por digest) contra el mismo stack, después de las pruebas E2E. Rompe
+      # la build si el p95 de refresh, GET /me o JWKS supera 300 ms. Un login correcto y ninguno
+      # fallido, y el refresh va por debajo de los 5 r/s de Nginx: no hace falta subir el límite por IP.
+      - name: Prueba de carga de latencia (make load-test)
+        run: make load-test
+
       - name: Subir informe y trazas de Playwright
         # cancelled(): al vencer timeout-minutes GitHub cancela el job (no lo marca como
         # fallido); sin esto, justo ese caso se quedaría sin informe ni logs.

@@ -43,11 +43,12 @@ Integra en `main` las mejoras de complejidad media y alta anotadas el 12 de octu
 - El diseño del filtro de documentación con `paths-ignore` se descartó: los checks obligatorios quedarían en «Expected — waiting»; un job que decide en tiempo de ejecución sí cuenta como aprobado al omitirse.
 - Los hallazgos nuevos de esta etapa no reciben identificador VULN (decisión del usuario).
 - **S1 (seguimiento-pre-v1):** `release.yml` verifica con `cosign verify` y `cosign verify-attestation` cada digest antes de mover `latest`; primera prueba real con el tag `v1.0.0`.
+- **S5 (seguimiento-pre-v1):** RNF-010 con prueba de carga k6 (`make load-test`, paso del job 7 de CI): p95 de refresh, `GET /me` y JWKS de 2 a 5 ms contra el umbral de 300 ms; el login con Argon2id queda fuera, como dice el requisito.
 - `make up` levanta el stack completo, observabilidad y Falco incluidos; se eliminó `make up-obs` y se añadió `make up-app` (solo la aplicación) para CI. Motivo: los guiones de la demo y del video muestran Grafana y Falco, y el usuario debe recordar un único comando (`make setup` en un clon nuevo y `make up`).
 
 ### Estado
 
-- `main` con CI verde, `v0.9.1` validado. Matriz: 33 requisitos (25 completos, 7 parciales, 1 sin cubrir, 0 diferidos). Informe técnico actualizado (`b4bf102`); esta rama propaga el estado final a README, manuales, diagramas y modelo de amenazas.
+- `main` con CI verde, `v0.9.1` validado. Matriz: 33 requisitos (26 completos, 7 parciales, 0 sin cubrir, 0 diferidos). Informe técnico actualizado (`b4bf102`); esta rama propaga el estado final a README, manuales, diagramas y modelo de amenazas.
 
 ### Siguiente paso
 
