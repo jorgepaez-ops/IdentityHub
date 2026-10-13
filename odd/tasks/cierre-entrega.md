@@ -361,6 +361,13 @@ Mañana (2026-10-13), en este orden:
      la guarda repetida en cada paso de `image` depende de que cada paso nuevo la incluya.
 1. Validar F7 con un tag `v0.9.1` sobre `main`: `latest` se mueve recién después de firmar y atestar; `cosign verify`
    (Cosign v3) de las tres imágenes; prompt de capturas para Claude Desktop.
+   - **Cerrada (2026-10-13).** Tag `v0.9.1` sobre `32e8359`, run de `release.yml` 38405885275 *success*. Por imagen,
+     el paso "Mover latest" empieza después de terminar "Firmar y atestar" (api 13:34:25→13:34:28, worker
+     13:34:32→13:34:35, web 13:34:32→13:34:36 UTC). `latest` = `v0.9.1` en Docker Hub (`jorgeivp/identity-hub-*`).
+     Verificación local con Cosign v3.1.3 (`cosign verify` + `verify-attestation --type cyclonedx`, identidad
+     `^https://github.com/jorgepaez-ops/IdentityHub/`, issuer de Actions): OK en las tres. Digests:
+     api `sha256:147b1694…c052`, worker `sha256:14152883…bd71`, web `sha256:f6c911dc…4e56`.
+     Capturas: prompt de Desktop entregado; pendiente confirmación del usuario.
 2. C2: `make informe` (incluir en el informe lo hecho en F1-F4, F6-F10 y los hallazgos de arriba), revisión del PDF
    por el usuario, notas del release, tag `v1.0.0` en vivo y `gh release create v1.0.0` con el PDF.
 3. Entorno local del usuario: agregar `SMTP_PASSWORD` al `.env` (`openssl rand -hex 24`) y correr `make certs`
