@@ -1,0 +1,91 @@
+# seguimiento-pre-v1 — Cerrar el seguimiento técnico antes del tag `v1.0.0`
+
+## Objetivo
+
+No dejar pendientes técnicos abiertos en la entrega, salvo F5 (integración de terceros y outbox,
+trabajo futuro decidido el 2026-10-12). Decisión del usuario (2026-10-13): «incluye todo, también los
+code smells de SonarCloud».
+
+## Problema y por qué
+
+Las revisiones nativas del 2026-10-13, la sección «Limitaciones» del informe técnico y la «Deuda menor»
+de `odd/tasks/cierre-entrega.md` dejaron trabajo anotado como seguimiento. El usuario no quiere entregar
+con esos temas abiertos.
+
+## Alcance autorizado
+
+- S1-S7 de abajo, con pruebas y documentación junto al comportamiento.
+- Fuera de alcance: F5; ampliar alcances de claves de servicio (función nueva, cercana a F5); aplicar
+  Terraform y correr Falco en CI (límites de diseño documentados).
+
+## Restricciones
+
+- Rama `feat/seguimiento-pre-v1`, apilada sobre `docs/notas-2026-10-13` (documentación de cierre aún sin PR).
+- Cada tarea cierra con un commit de unidad de trabajo (Conventional Commits, sin atribución de IA).
+- Política de pruebas primero cuando exista una prueba ejecutable determinista (RED → GREEN).
+- Delegación: Sonnet escribe; Opus revisa antes de cada commit (CLAUDE.md, reparto de modelos).
+- Entrega: `ask-on-risk`; el pronóstico supera ~400 líneas, se pregunta la estrategia de cadena.
+
+## Tareas
+
+- [ ] **S1 — Verificación automática del release.** Paso en `release.yml` (job `publish`, después de
+  firmar y atestar y antes de mover `latest`) que ejecute `cosign verify` y
+  `cosign verify-attestation --type cyclonedx` con la identidad del workflow y el emisor OIDC de Actions.
+  Prueba real: el tag `v1.0.0`. Documentar en informe, ADR 0011, manual de despliegue y modelo de amenazas
+  (AM-008).
+- [ ] **S2 — Clasificador del job 0 en `scripts/` con prueba.** `scripts/ci_changes.py` (o `.sh`) con
+  pruebas sobre: solo documentación, mixto, `.md` bajo `specs/`/`.github/`/`scripts/`, renombre de código a
+  `docs/`, lista vacía, error de git. `ci.yml` lo invoca. Sustituir la guarda repetida en cada paso del job
+  `image` por una forma que no dependa de cada paso nuevo (por ejemplo, un paso que termine el job temprano
+  no existe en Actions: evaluar acción compuesta o matriz condicional; documentar la elección).
+- [ ] **S3 — Prueba de los puertos de observabilidad en loopback.** Prueba (en CI, job barato) que lea
+  `docker compose config` y falle si Prometheus, Loki o Grafana publican sin `host_ip: 127.0.0.1`.
+  Aclarar en la guía el caso de `localhost` resuelto a `::1`.
+- [ ] **S4 — Limpieza menor.** Bloque de URLs repetido entre `up` y `up-app` del Makefile; sección
+  «Levantar el stack» duplicada entre `README.md` y `docs/guia-desarrollo.md` (una fuente y un enlace).
+- [ ] **S5 — RNF-010 (latencia) con prueba de carga.** Prueba de carga mínima y reproducible contra el
+  stack de CI con un umbral alineado con `specs/01-requirements.md` (RNF-010) y su gate; la matriz debe
+  pasar RNF-010 de «sin cubrir» a cubierto.
+- [ ] **S6 — Segunda evidencia de los 7 requisitos parciales.** RF-008, RNF-001, RNF-002, RNF-006,
+  RNF-007, RNF-008, RNF-012 tienen una sola columna de evidencia en `specs/07-traceability.md`
+  (completo = 2 de 4: Escenarios, Pruebas Go, E2E, Controles CI). Añadir la evidencia que falte con
+  pruebas reales, sin inflar la matriz.
+- [ ] **S7 — Code smells de SonarCloud.** 123 abiertos al 2026-10-13 (CRITICAL 32, MAJOR 55, MINOR 34,
+  INFO 2); reglas principales: go:S3776 (16), typescript:S6819 (16), css:S4666 (11), godre:S8196 (10),
+  plsql:S1192 (6), python:S3776 (6). Corregir sin cambiar comportamiento, con las pruebas como red; los
+  falsos positivos se justifican en Sonar, no se silencian en bloque.
+
+## Criterios de aceptación
+
+1. Las pruebas de cada tarea pasan (RED observado antes de GREEN cuando aplica) y CI queda en verde.
+2. `python3 scripts/traceability.py --check` al día; 0 requisitos sin cubrir y 0 parciales, salvo los que
+   se justifiquen por escrito.
+3. SonarCloud con 0 code smells abiertos o cada restante justificado como falso positivo en Sonar.
+4. Informe técnico, bitácora y manuales sin «Limitaciones» o «Trabajo futuro» que ya estén resueltos.
+
+## Comprobaciones aplicables
+
+`make test-go`, `make test-integration` (con `TEST_DATABASE_URL`), `make test-front`, `make lint` con
+golangci-lint real, `npm run typecheck`, `python3 scripts/traceability.py --check`, `actionlint`, `zizmor`
+sin hallazgos nuevos, CI completo en el PR.
+
+## Pronóstico de entrega
+
+S1 ~40 · S2 ~200 · S3 ~80 · S4 ~60 · S5 ~200 · S6 ~350 · S7 ~900 líneas → ~1 800, supera ~400.
+Estrategia: `ask-on-risk` → `stacked-to-main` (usuario, 2026-10-13). Cortes: PR-A = S1-S4; PR-B = S5-S6; PR-C… = S7 por lotes de ~400 líneas. El PR de documentación (`docs/notas-2026-10-13`) va antes.
+
+## Progreso
+
+| Tarea | Ruta | Estado | Commit | Revisión |
+|---|---|---|---|---|
+| S1 | — | pendiente | — | — |
+| S2 | — | pendiente | — | — |
+| S3 | — | pendiente | — | — |
+| S4 | — | pendiente | — | — |
+| S5 | — | pendiente | — | — |
+| S6 | — | pendiente | — | — |
+| S7 | — | pendiente | — | — |
+
+## Siguiente paso
+
+S1-S4 (corte PR-A) con un escritor delegado, un commit por tarea.
