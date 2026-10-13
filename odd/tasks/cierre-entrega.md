@@ -353,8 +353,10 @@ Mañana (2026-10-13), en este orden:
      y `scripts/` cuentan como código aunque sean `.md`; `sast`, `semgrep`, `iac-scan` e `iac-checkov` también
      corren siempre (alimentan los checks SARIF). Verificación: actionlint limpio, zizmor sin hallazgos nuevos,
      clasificador probado en local, CI completo verde en #43, revisión nativa aprobada (3 pasadas).
-   - Pendiente para cerrar: este PR (#42, solo documentación) debe saltarse los jobs pesados y resolver todos
-     los checks obligatorios, incluido `Trivy` sin los SARIF de las imágenes.
+   - **Cerrada (2026-10-13).** PR #42 (solo documentación): jobs pesados *skipped*, las tres imágenes *success*
+     con pasos omitidos, CodeQL/Semgrep OSS/Checkov/SonarCloud *success*, `Trivy` *neutral* (faltan los SARIF de
+     imágenes; no bloquea), PR `CLEAN`, ~1 min contra ~8 min antes. Push a `main` del merge (`32e8359`): el job 0
+     decidió `code=false (solo documentación)` y el run terminó *success* con el mismo patrón.
    - Seguimiento (advertencias no bloqueantes de la revisión): mover el clasificador a `scripts/` con prueba;
      la guarda repetida en cada paso de `image` depende de que cada paso nuevo la incluya.
 1. Validar F7 con un tag `v0.9.1` sobre `main`: `latest` se mueve recién después de firmar y atestar; `cosign verify`
