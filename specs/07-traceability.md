@@ -27,7 +27,7 @@ declaración de buenas intenciones.
 | **RF-015** | Restablecimiento de contraseña | P1 | `requestPasswordReset`, `confirmPasswordReset` | 3 | 33 | 3 | ✅ completo |
 | **RF-016** | Sesiones activas | P1 | `listSessions`, `revokeSession` | 1 | 8 | 1 | ✅ completo |
 | **RF-017** | Bloqueo por fuerza bruta | P1 | — | 4 | 23 | 1 | ✅ completo |
-| **RF-018** | Claves de servicio | P2 | `listServiceKeys`, `createServiceKey`, `revokeServiceKey` | 5 | — | 5 | ✅ completo |
+| **RF-018** | Claves de servicio | P2 | `listServiceKeys`, `createServiceKey`, `revokeServiceKey` | 5 | 25 | 5 | ✅ completo |
 | **RF-019** | Exportación del audit log | P2 | — | — | — | — | ⏳ diferido (semana 4) |
 | **RF-020** | Autorización de aplicaciones cliente | P1 | `authorizeClient`, `exchangeAuthorizationCode` | 10 | 31 | 8 | ✅ completo |
 | **RF-021** | Roles y permisos configurables por aplicación | P1 | `listApplications`, `listApplicationRoles`, `createApplicationRole`, `updateApplicationRole`, `deleteApplicationRole` | 6 | 31 | 6 | ✅ completo |

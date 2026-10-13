@@ -30,8 +30,8 @@ func TestRNF011_GeneratedServerContract(t *testing.T) {
 		}
 
 		contract := reflect.TypeOf((*ServerInterface)(nil)).Elem()
-		if contract.NumMethod() != 28 {
-			t.Fatalf("ServerInterface methods = %d, want 28", contract.NumMethod())
+		if contract.NumMethod() != 31 {
+			t.Fatalf("ServerInterface methods = %d, want 31", contract.NumMethod())
 		}
 		for _, operation := range []string{"RefreshSession", "Logout"} {
 			method, ok := contract.MethodByName(operation)

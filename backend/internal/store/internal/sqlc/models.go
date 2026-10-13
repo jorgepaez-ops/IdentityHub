@@ -240,6 +240,20 @@ type RolePermission struct {
 	PermissionID uuid.UUID
 }
 
+type ServiceKey struct {
+	ID       uuid.UUID
+	PublicID string
+	// SHA-256 of the secret part of ihk_<public_id>_<secret>; the secret itself is never stored.
+	SecretHash []byte
+	Name       string
+	Scopes     []string
+	CreatedBy  pgtype.UUID
+	CreatedAt  pgtype.Timestamptz
+	ExpiresAt  pgtype.Timestamptz
+	LastUsedAt pgtype.Timestamptz
+	RevokedAt  pgtype.Timestamptz
+}
+
 type User struct {
 	ID               uuid.UUID
 	Email            string
