@@ -369,6 +369,37 @@ Alcances honestos: RNF-006 verifica la firma al publicar, no al desplegar (no ha
 
 El despliegue de referencia en AWS se describió en la sección de arquitectura y se valida con Checkov y `terraform validate`. Para el entorno de producción simulado que exige el enunciado, `deploy/docker-compose.prod.yml` es un *override* del Compose base: imágenes por digest y sin `build`, solo `web` publica un puerto, Mailpit no arranca, `restart: unless-stopped`, rotación de logs, límites de memoria y CPU, y se conserva el endurecimiento del Compose base (`read_only`, `cap_drop: ALL`, `no-new-privileges`, `tmpfs`). Se levanta con `make up-prod` y se detiene con `make down-prod`. Las imágenes ya existen en Docker Hub (`docker.io/jorgeivp/identity-hub-api`, `identity-hub-worker` e `identity-hub-web`), de modo que `IDENTITY_HUB_API_IMAGE`, `IDENTITY_HUB_WORKER_IMAGE` e `IDENTITY_HUB_WEB_IMAGE` pueden apuntar a ellas por digest.
 
+### Cómo se firma y se verifica una imagen
+
+Publicar una imagen no basta: quien la descargue tiene que poder comprobar que salió de este pipeline y saber qué lleva dentro. Para eso se usan tres piezas.
+
+- **SBOM (*Software Bill of Materials*).** Es el inventario de todo lo que contiene la imagen: paquetes del sistema operativo, módulos de Go y dependencias de JavaScript, cada uno con su versión. Sirve para responder en minutos «¿esta imagen usa la biblioteca X afectada por el aviso Y?». Lo genera Syft en el formato **CycloneDX**, un estándar de OWASP que leen escáneres y plataformas de gestión de vulnerabilidades.
+- **Firma *keyless* con Cosign.** Cosign es la herramienta de firma del proyecto Sigstore. «*Keyless*» significa que no existe una clave privada guardada en ningún lado que alguien pueda robar: al ejecutarse, el workflow recibe de GitHub una identidad temporal (un token OIDC que dice «soy `release.yml` de este repositorio, en el tag `vX.Y.Z`»), Sigstore emite con ella un certificado que vence en minutos, se firma la imagen y la firma queda registrada en un log público de transparencia. La confianza no depende de custodiar una clave, sino de la identidad del workflow, que cualquiera puede comprobar.
+- **Atestación.** Es el SBOM firmado de la misma forma y adjunto a la imagen. Así el inventario queda ligado a esa imagen exacta y no se puede reemplazar sin que la verificación falle.
+
+Todo se hace sobre el **digest** de la imagen (su huella SHA-256), no sobre la etiqueta: una etiqueta como `latest` puede moverse, el digest no. El flujo de una versión es:
+
+1. El equipo crea y sube el tag `vX.Y.Z`.
+2. El job `gate` construye las tres imágenes y las escanea con Trivy; si hay vulnerabilidades corregibles, el release se detiene.
+3. El job `publish` sube cada imagen con la etiqueta `vX.Y.Z` y obtiene su digest.
+4. Syft genera el SBOM CycloneDX de la imagen.
+5. Cosign firma el digest y adjunta el SBOM como atestación.
+6. El propio workflow verifica la firma y la atestación con la identidad esperada; si algo no coincide, se detiene.
+7. Solo entonces mueve `latest` a ese digest, y únicamente si es la versión más alta.
+
+Cualquier persona puede repetir la comprobación del paso 6 sin credenciales del proyecto:
+
+```
+cosign verify docker.io/jorgeivp/identity-hub-api:v1.0.0 \
+  --certificate-identity-regexp '^https://github.com/jorgepaez-ops/IdentityHub/\.github/workflows/release\.yml@refs/tags/v' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+cosign verify-attestation --type cyclonedx docker.io/jorgeivp/identity-hub-api:v1.0.0 \
+  --certificate-identity-regexp '^https://github.com/jorgepaez-ops/IdentityHub/\.github/workflows/release\.yml@refs/tags/v' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
+Si la imagen se hubiera modificado después de firmarla, o la firma viniera de otro workflow o repositorio, el comando falla.
+
 **Publicación (`release.yml`).** El workflow se dispara solo con tags `vX.Y.Z` y tiene dos fases. El job `gate` construye `api`, `worker` y `web`, ejecuta el mismo gate de Trivy que CI y guarda cada imagen como artefacto. El job `publish` depende de `gate`, es el único con el environment protegido `dockerhub` (restringido a tags `v*`), carga la misma imagen ya escaneada y la publica solo con la etiqueta `vX.Y.Z`; después genera un SBOM CycloneDX con Syft, firma con Cosign keyless (OIDC de GitHub) y adjunta el SBOM como atestación, todo sobre el digest. Solo entonces un paso final mueve `latest` a ese mismo digest, y únicamente si el tag es el `vX.Y.Z` más alto del repositorio (repetir el release de un tag viejo no hace retroceder `latest`), y verifica que el digest de `latest` coincida con el firmado. Este orden (tarea F7) corrige el diseño original, que subía `latest` antes de firmar y dejaba una ventana en la que la etiqueta apuntaba a una imagen sin firma. Los pasos de red (push, firma, atestación y consulta de tags) se reintentan hasta tres veces con espera creciente, y los artefactos de imagen se retienen 7 días en lugar de 1 para poder repetir solo el job de publicación si falla (F8). El workflow se validó con el tag `v0.9.0` (ejecución 38319904991, en verde, 6 jobs) y el orden nuevo con el tag `v0.9.1` sobre el commit `32e8359` (ejecución 38405885275, en verde): en las tres imágenes el paso «Mover latest» empezó después de terminar «Firmar y atestar», y `latest` quedó apuntando a `v0.9.1` en Docker Hub. El tag de entrega es `v1.0.0` y el workflow publica cada tag de la misma manera.
 
 {{code:yaml:.github/workflows/release.yml:161-196}}
