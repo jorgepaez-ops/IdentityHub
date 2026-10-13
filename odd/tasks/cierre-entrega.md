@@ -369,6 +369,9 @@ Mañana (2026-10-13), en este orden:
      api `sha256:147b1694…c052`, worker `sha256:14152883…bd71`, web `sha256:f6c911dc…4e56`.
      Capturas: 16 en el informe formal APA, sección "F7 · Release firmado (v0.9.1)" (pp. 19-21, Anexo B B110-B125),
      confirmadas por el usuario el 2026-10-13.
+     Verificación extra de `v0.9.0` (Cosign v3.1.3, mismos comandos): OK en las tres imágenes (api `52f2988c…`,
+     worker `f9b5443d…`, web `fcca1f1c…`). Informe formal actualizado por Desktop: obs. 14 y 16 con la verificación
+     independiente; recomendación (a) pasa a "automatizar cosign verify como paso posterior del release".
 2. C2: `make informe` (incluir en el informe lo hecho en F1-F4, F6-F10 y los hallazgos de arriba), revisión del PDF
    por el usuario, notas del release, tag `v1.0.0` en vivo y `gh release create v1.0.0` con el PDF.
 3. Entorno local del usuario: agregar `SMTP_PASSWORD` al `.env` (`openssl rand -hex 24`) y correr `make certs`
