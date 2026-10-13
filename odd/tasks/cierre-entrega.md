@@ -164,7 +164,9 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
     falcosidekick hacia Loki y una alerta. Riesgo a verificar primero: soporte en Docker Desktop de macOS.
   - [ ] F4 RF-018 claves de servicio (media-alta, ~800 líneas): migración, endpoints, hash de la clave,
     middleware de autenticación por clave, UI de administración, pruebas y E2E.
-  - [ ] F5 Decidir con el usuario: integración de terceros (clientes OAuth en BD, OpenID Connect, refresh tokens
+  - [x] F5 Decidido por el usuario (2026-10-12): **queda como trabajo futuro** (exposición del proyecto en 5 días;
+    no se arriesga el núcleo de autenticación ya probado). Documentado en `docs/manuales/integracion-terceros.md`
+    §9.1. Antes: integración de terceros (clientes OAuth en BD, OpenID Connect, refresh tokens
     por cliente, introspección, revocación) y outbox transaccional (alta, >2 000 líneas). Recomendación de
     Claude: dejarlo como trabajo futuro justificado (toca el núcleo de autenticación ya probado).
   - [ ] F6 Matriz: RNF-001, 002, 006, 008 y 010 salen "sin cubrir" porque el generador solo cuenta pruebas Go,
