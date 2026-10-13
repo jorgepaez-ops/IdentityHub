@@ -98,7 +98,7 @@ Estrategia: `ask-on-risk` → `stacked-to-main` (usuario, 2026-10-13). Cortes: P
 | S1 | delegado (Sonnet) | hecho | 118192d | — |
 | S2 | delegado (Sonnet) | hecho | e2701fd | — |
 | S3 | delegado (Sonnet) | hecho | fa6b8fe | — |
-| S4 | delegado (Sonnet) | hecho | (SHA en el commit siguiente) | — |
+| S4 | delegado (Sonnet) | hecho | aeeb74e | — |
 | S5 | — | pendiente | — | — |
 | S6 | — | pendiente | — | — |
 | S7 | — | pendiente | — | — |
