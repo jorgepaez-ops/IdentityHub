@@ -154,6 +154,10 @@ jobs:
       - name: Pruebas de los requisitos no funcionales del pipeline y los contenedores
         run: python3 scripts/pipeline_controls_test.py
 
+      # RNF-010: guarda de producción y estado de salida de scripts/load-test.sh (docker simulado, sin red).
+      - name: Pruebas del script de la prueba de carga
+        run: python3 scripts/load_test_script_test.py
+
       - name: Regenerar la matriz de trazabilidad
         run: python3 scripts/traceability.py
 
