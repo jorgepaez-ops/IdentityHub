@@ -128,7 +128,7 @@ jobs:
       - name: Publicar ${{ matrix.name }}:${{ github.ref_name }}
         id: push
         run: |
-          retry() { for i in 1 2 3; do "$@" && return 0; echo "::warning::intento $i falló: $*"; sleep $((i * 15)); done; return 1; }
+          retry() { for i in 1 2 3; do "$@" && return 0; echo "::warning::intento $i falló: $*"; [ "$i" -lt 3 ] && sleep $((i * 15)); done; return 1; }
           docker load -i "image-${{ matrix.name }}.tar"
           docker tag "${LOCAL_TAG}" "${IMAGE}:${VERSION}"
           retry docker push "${IMAGE}:${VERSION}"
@@ -154,20 +154,21 @@ jobs:
           DIGEST: ${{ steps.push.outputs.digest }}
           SBOM: sbom-${{ matrix.name }}.cdx.json
         run: |
-          retry() { for i in 1 2 3; do "$@" && return 0; echo "::warning::intento $i falló: $*"; sleep $((i * 15)); done; return 1; }
+          retry() { for i in 1 2 3; do "$@" && return 0; echo "::warning::intento $i falló: $*"; [ "$i" -lt 3 ] && sleep $((i * 15)); done; return 1; }
           retry cosign sign --yes "${IMAGE}@${DIGEST}"
           retry cosign attest --yes --type cyclonedx --predicate "${SBOM}" "${IMAGE}@${DIGEST}"
 
-      # latest solo apunta a una imagen ya firmada y atestada, y solo si este tag es la versión
-      # más alta publicada: repetir el release de un tag viejo no hace retroceder latest.
+      # latest solo apunta a una imagen ya firmada y atestada, y solo si este tag es el tag
+      # vX.Y.Z más alto del repositorio: repetir el release de un tag viejo no hace retroceder latest.
       - name: Mover latest al digest firmado
         id: latest
         env:
           DIGEST: ${{ steps.push.outputs.digest }}
         run: |
-          retry() { for i in 1 2 3; do "$@" && return 0; echo "::warning::intento $i falló: $*"; sleep $((i * 15)); done; return 1; }
-          highest="$(git ls-remote --tags --refs "https://github.com/${GITHUB_REPOSITORY}.git" \
-            | sed 's|.*refs/tags/||' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1)"
+          retry() { for i in 1 2 3; do "$@" && return 0; echo "::warning::intento $i falló: $*"; [ "$i" -lt 3 ] && sleep $((i * 15)); done; return 1; }
+          retry git ls-remote --tags --refs "https://github.com/${GITHUB_REPOSITORY}.git" > tags.txt
+          highest="$(sed 's|.*refs/tags/||' tags.txt | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1 || true)"
+          [[ -n "${highest}" ]] || { echo "::error::no se pudo determinar la versión más alta"; exit 1; }
           if [[ "${highest}" != "${VERSION}" ]]; then
             echo "moved=false" >> "$GITHUB_OUTPUT"
             echo "::notice::latest no se mueve: ${VERSION} no es la versión más alta (${highest})"
