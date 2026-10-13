@@ -50,6 +50,23 @@ loki.process "json" {
   stage.labels {
     values = { level = "" }
   }
+
+  // Alertas de Falco (JSON, una por línea): `rule` y `priority` como etiquetas permiten consultar y
+  // alertar por regla o gravedad. Las líneas de arranque de Falco no son JSON y no pasan el selector.
+  stage.match {
+    selector = "{service=\"falco\"} |= \"\\\"rule\\\"\""
+
+    stage.json {
+      expressions = {
+        rule     = "rule",
+        priority = "priority",
+      }
+    }
+
+    stage.labels {
+      values = { rule = "", priority = "" }
+    }
+  }
 }
 
 loki.write "local" {

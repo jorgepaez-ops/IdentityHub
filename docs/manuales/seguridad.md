@@ -50,7 +50,7 @@ Las credenciales máquina a máquina de RF-018 (amenaza AM-023, [ADR 0014](../..
 | [`.gitleaksignore`](../../.gitleaksignore) | Huellas de falsos positivos conocidos en el historial; no contiene secretos ni habilita una exclusión amplia. |
 | [`security/.trivyignore`](../../security/.trivyignore) | Vacío a propósito. Toda excepción futura exige CVE, justificación, responsable, expiración y ficha asociada. |
 | [`.zap/rules.tsv`](../../.zap/rules.tsv) | `WARN` documenta alertas bajas aceptadas; solo `IGNORE` con justificación puede suprimir una alerta media o alta. |
-| [`backend/osv-scanner.toml`](../../backend/osv-scanner.toml) | Riesgo aceptado de VULN-028: ignora GO-2026-5932 (`golang.org/x/crypto/openpgp`, sin versión corregida y no alcanzable) hasta el 2026-12-25, con la justificación en el propio archivo y en la ficha. |
+| [`backend/osv-scanner.toml`](../../backend/osv-scanner.toml) | VULN-028, no afectado: ignora de forma permanente GO-2026-5932 (`golang.org/x/crypto/openpgp`, sin versión corregida y código no presente según `go list -deps`), con la justificación en el propio archivo y en la ficha. |
 
 ## Hook local
 

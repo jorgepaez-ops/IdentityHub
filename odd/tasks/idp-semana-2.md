@@ -774,7 +774,7 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
   alcanzable — **fuera de alcance de T24**, sin VULN asignado todavía; anotado aquí para que se le
   asigne ficha en una tarea futura.
 - Commit: 001a489
-- Evidencia (`Usuario`):  - [ ] VULN-022  - [ ] VULN-026 (x/text)
+- Evidencia (`Usuario`):  - [x] VULN-022  - [x] VULN-026 (x/text)
 
 ### T25 — Dependencias del frontend
 - [x] Estado · Ejecutor: `Claude` (red saliente necesaria para `npm install`; por la regla nueva de esta feature, no se delegó a Codex — ver CLAUDE.md) · Cubre: AM-009, RNF-004 · Remedia: VULN-025 (axios 0.21.1, lodash 4.17.15) · Bloqueada por: T0.3
@@ -799,7 +799,7 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
   (`vite@8`, `@typescript-eslint/parser@8.70.1`, `react-router-dom@7.18.4`), fuera de alcance de T25.
   Queda para que el usuario decida en qué tarea futura se documentan y remedian.
 - Commit: 534f13e
-- Evidencia (`Usuario`):  - [ ] VULN-025 (axios/lodash)
+- Evidencia (`Usuario`):  - [x] VULN-025 (axios/lodash)
 
 ### T26 — Secretos fuera del compose y de los `ENV`
 - [x] Estado · Ejecutor: `Codex` (compose/Dockerfile, hasta que su sandbox dio "permission denied" contra el socket de Docker al verificar) + `Claude` (rol `identity_app`, Q21, y el resto de la verificación) · Cubre: RNF-003, AM-012 · Remedia: VULN-003, VULN-012, VULN-001 (compose/Dockerfile) · Bloqueada por: T0.3, T21
@@ -833,7 +833,7 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
   Go acorde"); se verificó T26 arrancando solo `db`, `broker`, `mailpit` y `migrate` (sin construir
   api/worker/web), suficiente para probar el mecanismo de secretos que sí es de esta tarea.
 - Commit: afab4e9
-- Evidencia (`Usuario`):  - [ ] VULN-003  - [ ] VULN-012  - [ ] VULN-001 (Gitleaks/Trivy secret)
+- Evidencia (`Usuario`):  - [x] VULN-003  - [x] VULN-012  - [x] VULN-001 (Gitleaks/Trivy secret)
 
 ### T27 — Dockerfile del backend
 - [x] Estado · Ejecutor: `Claude` (Codex no tiene el socket de Docker, ver regla en `CLAUDE.md`; esta tarea es casi toda verificación con Docker) · Cubre: RNF-004, RNF-008, AM-020 · Remedia: VULN-008, VULN-009, VULN-010, VULN-011 · Bloqueada por: T0.3, T26
@@ -863,7 +863,7 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
   de corregir `noctx`/`misspell` de `golangci-lint`) en verde. `python3 scripts/traceability.py`
   regenerado (las 3 pruebas nuevas lo requerían).
 - Commit: a0c64d6
-- Evidencia (`Usuario`):  - [ ] VULN-008  - [ ] VULN-009  - [ ] VULN-010  - [ ] VULN-011
+- Evidencia (`Usuario`):  - [x] VULN-008  - [x] VULN-009  - [x] VULN-010  - [x] VULN-011
 
 ### T28 — Dockerfile del frontend
 - [x] Estado · Ejecutor: `Claude` (misma razón que T27: Codex no tiene el socket de Docker) · Cubre: RNF-004, RNF-008 · Remedia: VULN-016, VULN-017, VULN-018 · Bloqueada por: T0.3
@@ -883,7 +883,7 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
   http://localhost:8080/` devuelve `200 OK` con el HTML de la SPA. `make test` (Go + frontend) en
   verde.
 - Commit: 8f3d461
-- Evidencia (`Usuario`):  - [ ] VULN-016  - [ ] VULN-017  - [ ] VULN-018
+- Evidencia (`Usuario`):  - [x] VULN-016  - [x] VULN-017  - [x] VULN-018
 
 ### T29 — Nginx: cabeceras, `server_tokens` y `limit_req`
 - [x] Estado · Ejecutor: `Claude` (verificación con `make up` real; mismo criterio que T27/T28) · Cubre: RNF-009, AM-001, AM-015, AM-017, frontera T2 · Remedia: VULN-013, VULN-014, VULN-015 · Bloqueada por: T0.3, T28
@@ -914,7 +914,7 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
   ver; es el handler de login. No se toca aquí (T29 es solo Nginx); anotado para que se decida en
   qué tarea se corrige la validación de entrada.
 - Commit: 18dea33
-- Evidencia (`Usuario`):  - [ ] VULN-013  - [ ] VULN-014  - [ ] VULN-015 (`curl -sI` antes/después; sin gate hoy)
+- Evidencia (`Usuario`):  - [x] VULN-013  - [x] VULN-014  - [x] VULN-015 (`curl -sI` antes/después; sin gate hoy)
 
 ### T30 — Compose: imágenes base y endurecimiento
 - [x] Estado · Ejecutor: `Claude` (mismo motivo que T27-T29: Codex no tiene el socket de Docker) · Cubre: RNF-008, RNF-004, AM-014, AM-020 · Remedia: VULN-019 (parcial: solo `postgres`/`rabbitmq`), VULN-024 (sin endurecimiento de contenedores; el comentario del compose lo llama VULN-020) · Bloqueada por: T0.3, T26, T27
@@ -950,7 +950,7 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
   ninguno de los dos lo puede corregir este proyecto (no construimos esa imagen, solo la
   referenciamos); anotado, no se inventa VULN-NNN.
 - Commit: 824be7d
-- Evidencia (`Usuario`):  - [ ] VULN-019  - [ ] VULN-024
+- Evidencia (`Usuario`):  - [x] VULN-019  - [x] VULN-024
 
 ### T31 — Gitleaks frente al historial: `.gitleaksignore` por huella exacta
 - [x] Estado · Ejecutor: `Claude` (decisión ya tomada por el `Usuario`, Q8; verificación con `make scan-secrets`, mismo motivo que T27-T30) · Cubre: RNF-003, AM-012 · Remedia: relacionada con VULN-023 · Bloqueada por: T26 y por la lista de huellas que entrega el `Usuario` desde el run de Gitleaks de T0.2
@@ -996,7 +996,7 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
   `git reset --hard` antes de este párrafo, nunca subido). Anotado en `CLAUDE.md`; la única
   protección real hoy es `make scan-secrets` a mano y el job `secrets` de CI.
 - Commit: 8054f2e
-- Evidencia (`Usuario`):  - [ ] VULN-023 (antes/después de la política acordada)
+- Evidencia (`Usuario`):  - [x] VULN-023 (antes/después de la política acordada)
 
 ### T32 — Revisión de la Fase 3
 - [x] Estado · Ejecutor: `Claude (revisión)` · Cubre: T23 a T31
@@ -1091,7 +1091,7 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
 - Dudas abiertas: ninguna. Falta que el usuario confirme el mismo resultado en el job "5 ·
   Dependencias vulnerables" del próximo run de CI, al abrir el PR de T35.
 - Commit: d149e59
-- Evidencia (`Usuario`):  - [ ] VULN-027
+- Evidencia (`Usuario`):  - [x] VULN-027 ("después" registrado; el "antes", run 36259385478, sin captura)
 
 ### T34b — Dependencias Go desactualizadas (VULN-028 y VULN-029)
 - [x] Estado · Ejecutor: `Claude` (Sonnet 5; `go get` y `go mod tidy` necesitan red) · Cubre: AM-009 · Remedia: VULN-028, VULN-029 · Bloquea a: T35
@@ -1144,7 +1144,7 @@ en el informe externo (Desktop) y datos de texto para el `despues` del `evidenci
   depende de Go: ya se reconstruyó dentro de `make build`/`make up` sin cambios de código y con
   Trivy limpio.
 - Commit: `98f5f98`
-- Evidencia (`Usuario`):  - [ ] VULN-028  - [ ] VULN-029 ("antes" capturado en el informe, run 36281691237; falta el "después")
+- Evidencia (`Usuario`):  - [x] VULN-028  - [x] VULN-029 ("antes" run 36281691237 y "después" run 36283211113 registrados en el informe)
 
 ### T35 — CI en verde y evidencia "después"
 - [x] Estado · Ejecutor: `Usuario` con Claude Desktop (PR, run, capturas en el informe) y `Claude` (completa los `evidencia.json`) · Cubre: todos los VULN de la Fase 3 · Bloqueada por: T34a, T34b
