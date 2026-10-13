@@ -11,7 +11,7 @@ SQLC_VERSION := v1.31.1
 SQLC         ?= sqlc
 
 .DEFAULT_GOAL := help
-.PHONY: help setup up down informe logs ps restart build test test-go test-integration test-front e2e _e2e-run capturas _capturas-run scan-dast _scan-dast-run spec-drift lint fmt gen scan scan-secrets scan-deps scan-image scan-config scan-iac migrate psql rabbit mail clean up-prod down-prod
+.PHONY: help setup certs up down informe logs ps restart build test test-go test-integration test-front e2e _e2e-run capturas _capturas-run scan-dast _scan-dast-run spec-drift lint fmt gen scan scan-secrets scan-deps scan-image scan-config scan-iac migrate psql rabbit mail clean up-prod down-prod
 
 help: ## Muestra esta ayuda
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -21,7 +21,11 @@ help: ## Muestra esta ayuda
 setup: ## Genera .env con secretos aleatorios (no sobrescribe uno existente)
 	python3 scripts/setup_env.py
 
-up: ## Levanta el stack de desarrollo
+certs: ## Genera la CA local, el certificado de Mailpit y sus credenciales SMTP (deploy/certs/, idempotente)
+	@test -f .env || { echo "falta .env: corre make setup primero"; exit 1; }
+	sh scripts/gen-smtp-certs.sh --env-file .env
+
+up: certs ## Levanta el stack de desarrollo
 	$(COMPOSE) up -d --build
 	@echo ""
 	@echo "  Hub             http://identityhub.localhost:8080  (localhost:8080 también sirve el Hub)"
@@ -39,7 +43,7 @@ up-prod: ## Levanta la producción simulada (imágenes por digest, sin build ni 
 down-prod: ## Detiene la producción simulada conservando los volúmenes
 	$(COMPOSE_PROD) down
 
-up-obs: ## Levanta el stack incluida la observabilidad
+up-obs: certs ## Levanta el stack incluida la observabilidad
 	$(COMPOSE_OBS) up -d --build
 	@echo "  Grafana         http://localhost:3000     (credentials from .env)"
 	@echo "  Prometheus      http://localhost:9090"
@@ -56,7 +60,7 @@ ps: ## Estado de los contenedores
 logs: ## Sigue los logs (make logs S=api)
 	$(COMPOSE) logs -f $(S)
 
-restart: ## Reconstruye y reinicia un servicio (make restart S=api)
+restart: certs ## Reconstruye y reinicia un servicio (make restart S=api)
 	$(COMPOSE) up -d --build $(S)
 
 build: ## Construye las tres imágenes

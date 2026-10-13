@@ -69,10 +69,18 @@ services:
     ports:
       - "1025:1025"  # SMTP
       - "8025:8025"  # interfaz web y API HTTP que consultan las pruebas E2E
+    # SMTP con STARTTLS obligatorio y autenticación real (SMTP_USERNAME/SMTP_PASSWORD
+    # del .env). Los certificados y smtp-auth.txt los genera `make certs`
+    # (scripts/gen-smtp-certs.sh, en deploy/certs/, fuera de git). Sin
+    # MP_SMTP_AUTH_ALLOW_INSECURE, Mailpit solo acepta PLAIN/LOGIN tras TLS.
+    volumes:
+      - ./certs:/certs:ro
     environment:
       MP_MAX_MESSAGES: 500
-      MP_SMTP_AUTH_ACCEPT_ANY: 1
-      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+      MP_SMTP_TLS_CERT: /certs/server.pem
+      MP_SMTP_TLS_KEY: /certs/server-key.pem
+      MP_SMTP_REQUIRE_STARTTLS: 1
+      MP_SMTP_AUTH_FILE: /certs/smtp-auth.txt
     healthcheck:
       test: ["CMD", "/mailpit", "readyz"]
       interval: 10s
@@ -165,6 +173,13 @@ services:
       SMTP_HOST: mailpit
       SMTP_PORT: 1025
       SMTP_FROM: no-reply@identity.local
+      SMTP_TLS: starttls
+      SMTP_CA_FILE: /certs/ca.pem
+      SMTP_USERNAME: "${SMTP_USERNAME:-identity-hub}"
+      SMTP_PASSWORD: "${SMTP_PASSWORD:?set it in the repository root .env (make setup generates it)}"
+    volumes:
+      # Solo la CA pública: el worker no necesita ni debe ver las claves.
+      - ./certs/ca.pem:/certs/ca.pem:ro
     ports:
       - "9091:9091"  # /metrics del worker
     restart: unless-stopped

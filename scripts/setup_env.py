@@ -19,6 +19,9 @@ PASSWORD_KEYS = (
     "IDENTITY_APP_PASSWORD",
     "RABBITMQ_DEFAULT_PASS",
     "GRAFANA_ADMIN_PASSWORD",
+    # Contraseña SMTP de Mailpit: make certs la copia a deploy/certs/smtp-auth.txt y el
+    # worker la presenta (AUTH PLAIN tras STARTTLS).
+    "SMTP_PASSWORD",
 )
 JWT_KEY = "JWT_SIGNING_KEY"
 SECRET_KEYS = (*PASSWORD_KEYS, JWT_KEY)

@@ -12,9 +12,9 @@ runs:
         shell: bash
         run: |
           gen_hex() { openssl rand -hex 24; }
-          PG_PASS="$(gen_hex)"; APP_PASS="$(gen_hex)"; MQ_PASS="$(gen_hex)"; GF_PASS="$(gen_hex)"
+          PG_PASS="$(gen_hex)"; APP_PASS="$(gen_hex)"; MQ_PASS="$(gen_hex)"; GF_PASS="$(gen_hex)"; SMTP_PASS="$(gen_hex)"
           JWT_KEY="$(openssl rand -base64 32)"
-          for secret in "$PG_PASS" "$APP_PASS" "$MQ_PASS" "$GF_PASS" "$JWT_KEY"; do
+          for secret in "$PG_PASS" "$APP_PASS" "$MQ_PASS" "$GF_PASS" "$SMTP_PASS" "$JWT_KEY"; do
             echo "::add-mask::${secret}"
           done
           umask 077
@@ -29,6 +29,10 @@ runs:
             echo "DATABASE_URL=postgres://identity_app:${APP_PASS}@db:5432/identity?sslmode=disable"
             echo "RABBITMQ_URL=amqp://identity:${MQ_PASS}@broker:5672/"
             echo "JWT_SIGNING_KEY=${JWT_KEY}"
+            # Credenciales SMTP de Mailpit (STARTTLS + autenticación). make up corre make certs,
+            # que genera la CA local y deploy/certs/smtp-auth.txt a partir de estas variables.
+            echo "SMTP_USERNAME=identity-hub"
+            echo "SMTP_PASSWORD=${SMTP_PASS}"
             # Subred de la red por defecto de docker-compose.yml (nginx llega a la API desde ahí).
             echo "TRUSTED_PROXIES=172.28.0.0/16"
             # Compose interpola el archivo entero, también los servicios de perfiles inactivos.
@@ -42,6 +46,8 @@ runs:
         shell: bash
         run: echo "127.0.0.1 identityhub.localhost contabilidad.localhost" | sudo tee -a /etc/hosts
 
+      # make up depende de make certs: genera la CA local y el certificado de Mailpit
+      # (deploy/certs/) antes de que compose monte esos archivos.
       - name: Levantar el stack (make up)
         shell: bash
         run: make up
