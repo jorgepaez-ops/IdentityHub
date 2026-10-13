@@ -94,6 +94,7 @@ type fakeSMTP struct {
 	offerStartTLS bool
 	implicitTLS   bool
 	wantAuth      string // expected "user:pass"; empty = AUTH not offered
+	dropAfterData bool   // close the connection right after accepting the message
 
 	mu            sync.Mutex
 	authBeforeTLS bool
@@ -215,6 +216,9 @@ func (f *fakeSMTP) serve(raw net.Conn) {
 			f.data = strings.Join(body, "\n")
 			f.mu.Unlock()
 			w("250 queued")
+			if f.dropAfterData {
+				return
+			}
 		case "QUIT":
 			w("221 bye")
 			return
@@ -324,6 +328,21 @@ func TestRF012_SMTPModoNoneEnviaSinTLS(t *testing.T) {
 	defer f.mu.Unlock()
 	if f.usedTLS || !strings.Contains(f.data, "hello") {
 		t.Fatalf("usedTLS=%v data=%q", f.usedTLS, f.data)
+	}
+}
+
+func TestRF012_SMTPQuitFallidoTrasAceptarElMensajeNoEsErrorDeEnvio(t *testing.T) {
+	// The server already answered 250 to DATA: a lost QUIT must not make the worker requeue
+	// the event and send the email twice.
+	f := &fakeSMTP{dropAfterData: true}
+	startFakeSMTP(t, f)
+	if err := send(t, mailerConfig(f, func(c *config.Config) { c.SMTPTLS = "none" })); err != nil {
+		t.Fatalf("Send() error = %v, want nil once the message was accepted", err)
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if !strings.Contains(f.data, "hello") {
+		t.Fatalf("data = %q", f.data)
 	}
 }
 
