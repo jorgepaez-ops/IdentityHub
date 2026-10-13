@@ -14,13 +14,18 @@ control que lo ejecuta de verdad (por ejemplo `scripts/pipeline_controls_test.py
 
 Ese enlace se verifica por máquina (`verification_errors` en `scripts/traceability.py`, parte de
 `make spec-drift` y de `traceability.py --check`): la línea `# Verificación:` va justo encima de las
-etiquetas y debe nombrar (1) un archivo existente y (2) algo concreto que exista por nombre: una clase o
-función entre paréntesis en ese archivo (`scripts/x_test.py (ClaseDePrueba)`), un `job <id>` de `ci.yml`,
-un paso entre comillas (`paso "Nombre"`, línea `- name:` de `ci.yml`), un título de Playwright
-(`e2e "Título"`, literal de `test('...'` en `e2e/tests/*.spec.ts`) o un `make <objetivo>` del Makefile
-escrito entre comillas o comillas invertidas (`` `make x` `` o `"make x"`; un `make` suelto como en "make
-sure" es prosa y no se lee como objetivo). Una cadena entre comillas dobles sin uno de esos prefijos es un
-error, no prosa: así un typo no se salta la comprobación en silencio. Cualquier referencia que no resuelva, o un escenario `@RNF` sin la línea, rompe el build. Los
+etiquetas, se lee una sola vez de izquierda a derecha y admite exactamente esta gramática (el resto del texto es libre):
+
+- una ruta de archivo (.py, .js, .ts, .sh, .yml, .yaml o .go) que debe existir;
+- `(Nombre)`: clase o función que debe existir como palabra completa en ese archivo;
+- `job <id>`: id de un job de ci.yml, con id = letras, dígitos, `_` y `-` (la puntuación final no es parte del id);
+- `paso "<nombre>"`: paso de ci.yml con `- name:` exactamente igual;
+- `e2e "<título>"`: prueba de Playwright con ese título exacto (`test(`, `test.only(` o `test.skip(`, con comillas simples, dobles o invertidas) en `e2e/tests/**/*.spec.ts`;
+- `make <objetivo>`: objetivo del Makefile, suelto, entre comillas invertidas o entre comillas dobles del mismo tipo al abrir y cerrar. Un `make <palabra>` suelto siempre es referencia y debe existir, así que los `.feature` no usan «make» como prosa;
+- cualquier otro texto entre comillas dobles es un error que nombra los prefijos aceptados (paso, e2e, make);
+- un escenario sin ninguna referencia nombrada falla y el error lista todas las formas aceptadas.
+
+Cualquier referencia que no resuelva, o un escenario `@RNF` sin la línea, rompe el build. Los
 escenarios con alguna etiqueta `@RF` quedan fuera (los cubre la correspondencia con el título E2E) y la
 matriz sigue contando igual.
 

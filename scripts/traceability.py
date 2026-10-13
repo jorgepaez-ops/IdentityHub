@@ -54,7 +54,22 @@ class Scenario(NamedTuple):
 
 GHERKIN_SCENARIO = re.compile(r"(Escenario|Esquema del escenario):")
 VERIFICATION_COMMENT = "# Verificación:"
-FILE_REFERENCE = re.compile(r"[\w./-]+\.(?:py|js|ts|sh|yml|yaml|go)\b")
+VERIFICATION_PREFIXES = 'paso "…" (paso de ci.yml), e2e "…" (título de Playwright) o make <objetivo>'
+# One scan, left to right; the first alternative that matches at a position wins, so the quoted
+# `make` forms must come before the bare one and the catch-all stray string comes last.
+VERIFICATION_TOKEN = re.compile(
+    r"""
+    (?P<file>[\w./-]+\.(?:py|js|ts|sh|yml|yaml|go)\b)
+  | \((?P<name>\w+)\)
+  | \bjob\s+(?P<job>[\w-]+)
+  | \bpaso\s+"(?P<step>[^"]+)"
+  | \be2e\s+"(?P<e2e>[^"]+)"
+  | (?P<quote>["`])make\s+(?P<quoted_make>[\w-]+)(?P=quote)
+  | \bmake\s+(?P<make>[\w-]+)
+  | "(?P<stray>[^"]*)"
+    """,
+    re.X,
+)
 
 
 class Control(NamedTuple):
@@ -246,73 +261,104 @@ def computed_requirement_titles() -> list[str]:
     return locations
 
 
-def verification_errors(scenarios: list[Scenario]) -> list[str]:
-    """Machine-check the "# Verificación:" line of every scenario tagged only with @RNF-NNN.
+class VerificationSources(NamedTuple):
+    """The repository texts a ``# Verificación:`` reference can resolve against, read once."""
 
-    These scenarios are not derived into Playwright specs, so the free-text comment is their only link
-    to the test that runs them. The line must name an existing file and at least one named reference,
-    written in this explicit grammar (unquoted prose is ignored, but a double-quoted string that is not
-    one of the forms below is an error, so a typo cannot silently skip a check):
+    ci: str
+    makefile: str
+    e2e_specs: list[str]
 
-    - ``(Name)``: a class/function ``Name`` defined in a referenced file (whole-word match);
-    - ``job <id>``: a job ``<id>`` of ci.yml (letters, digits, ``_`` and ``-`` only, so trailing punctuation is not part of the id);
-    - ``paso "<step name>"``: a ``- name: <step name>`` step of ci.yml, exact match;
-    - ``e2e "<title>"``: a ``test('<title>'`` literal in e2e/tests/**/*.spec.ts, exact match;
-    - ``make <target>`` written inside backticks or double quotes (```make x``` or ``"make x"``): a target of
-      the Makefile. Unquoted ``make`` is prose ("make sure") and is not read as a target.
 
-    Every named reference must resolve; a scenario with no file or no named reference fails.
-    Scenarios that carry any @RF tag are exempt (their link is the E2E title, checked elsewhere).
-    """
-    errors: list[str] = []
-
+def load_verification_sources() -> VerificationSources:
     def read(relative: str) -> str:
         path = ROOT / relative
         return path.read_text(encoding="utf-8") if path.is_file() else ""
 
+    specs_dir = ROOT / "e2e" / "tests"
+    specs = [p.read_text(encoding="utf-8") for p in sorted(specs_dir.rglob("*.spec.ts"))] if specs_dir.is_dir() else []
+    return VerificationSources(read(".github/workflows/ci.yml"), read("Makefile"), specs)
+
+
+def tokenize_verification(text: str) -> tuple[list[tuple[str, str]], list[str]]:
+    """Scan one ``# Verificación:`` line once, left to right.
+
+    Returns the ``(kind, value)`` references in order plus the problems that are not references: a
+    double-quoted string without a prefix, and quote characters left unconsumed (an unclosed or
+    mismatched ``make`` delimiter).
+    """
+    references: list[tuple[str, str]] = []
+    problems: list[str] = []
+    gaps: list[str] = []
+    position = 0
+    for match in VERIFICATION_TOKEN.finditer(text):
+        gaps.append(text[position:match.start()])
+        position = match.end()
+        kind = match.lastgroup
+        if kind == "stray":
+            problems.append(f'texto entre comillas sin prefijo: "{match.group("stray")}"; use {VERIFICATION_PREFIXES}')
+        else:
+            references.append(("make" if kind == "quoted_make" else kind, match.group(kind)))
+    gaps.append(text[position:])
+    if any(quote in gap for gap in gaps for quote in '"`'):
+        problems.append('comilla sin cerrar o delimitadores distintos: `make <objetivo>` va con ``…``, con "…" o sin comillas, pero el mismo al abrir y cerrar')
+    return references, problems
+
+
+def reference_problem(kind: str, value: str, sources: VerificationSources, files: dict[str, str]) -> str | None:
+    """Return why one named reference does not resolve, or ``None`` when it does."""
+    if kind == "name":
+        pattern = rf"(?:class|def|function)\s+{re.escape(value)}\b|(['\"`]){re.escape(value)}\1"
+        if not any(re.search(pattern, body) for body in files.values()):
+            return f"{value} no está definido en {', '.join(files) or 'ningún archivo'}"
+    elif kind == "job" and not re.search(rf"^  {re.escape(value)}:", sources.ci, re.M):
+        return f"el job {value} no existe en ci.yml"
+    elif kind == "step" and not re.search(rf"^\s*- name: {re.escape(value)}\s*$", sources.ci, re.M):
+        return f"el paso {value} no existe en ci.yml"
+    elif kind == "make" and not re.search(rf"^{re.escape(value)}:", sources.makefile, re.M):
+        return f"el objetivo make {value} no existe en el Makefile"
+    elif kind == "e2e" and not any(re.search(rf"""\btest(?:\.only|\.skip)?\(\s*(['"`]){re.escape(value)}\1""", body) for body in sources.e2e_specs):
+        return f"el título E2E {value} no existe en e2e/tests/*.spec.ts"
+    return None
+
+
+def verification_errors(scenarios: list[Scenario]) -> list[str]:
+    """Machine-check the "# Verificación:" line of every scenario tagged only with @RNF-NNN.
+
+    These scenarios are not derived into Playwright specs, so the free-text comment is their only link
+    to the test that runs them. The line is tokenized once (``VERIFICATION_TOKEN``) and the grammar is
+    defined only here; other words are free text and ignored:
+
+    - una ruta de archivo (.py, .js, .ts, .sh, .yml, .yaml o .go) que debe existir;
+    - `(Nombre)`: clase o función que debe existir como palabra completa en ese archivo;
+    - `job <id>`: id de un job de ci.yml, con id = letras, dígitos, `_` y `-` (la puntuación final no es parte del id);
+    - `paso "<nombre>"`: paso de ci.yml con `- name:` exactamente igual;
+    - `e2e "<título>"`: prueba de Playwright con ese título exacto (`test(`, `test.only(` o `test.skip(`, con comillas simples, dobles o invertidas) en `e2e/tests/**/*.spec.ts`;
+    - `make <objetivo>`: objetivo del Makefile, suelto, entre comillas invertidas o entre comillas dobles del mismo tipo al abrir y cerrar. Un `make <palabra>` suelto siempre es referencia y debe existir, así que los `.feature` no usan «make» como prosa;
+    - cualquier otro texto entre comillas dobles es un error que nombra los prefijos aceptados (paso, e2e, make);
+    - un escenario sin ninguna referencia nombrada falla y el error lista todas las formas aceptadas.
+
+    Every named reference must resolve, and a scenario with no file or no named reference fails.
+    Scenarios that carry any @RF tag are exempt (their link is the E2E title, checked elsewhere).
+    """
+    errors: list[str] = []
+    sources = load_verification_sources()
     for scenario in scenarios:
         if not scenario.tags or any(tag.startswith("RF-") for tag in scenario.tags):
             continue
         label = f"{', '.join(scenario.tags)} {scenario.name} ({scenario.source}:{scenario.line})"
-        text = scenario.verification
-        if not text:
+        if not scenario.verification:
             errors.append(f"{label}: falta la línea «# Verificación:» justo encima de las etiquetas")
             continue
-        problems: list[str] = []
-        files = FILE_REFERENCE.findall(text)
-        file_texts = {f: read(f) for f in files if (ROOT / f).is_file()}
+        references, problems = tokenize_verification(scenario.verification)
+        files = [value for kind, value in references if kind == "file"]
+        file_texts = {f: (ROOT / f).read_text(encoding="utf-8") for f in files if (ROOT / f).is_file()}
         problems += [f"el archivo {f} no existe" for f in files if f not in file_texts]
         if not files:
             problems.append("no nombra ningún archivo de prueba")
-        named = 0
-        for name in re.findall(r"\((\w+)\)", text):
-            named += 1
-            pattern = rf"(?:class|def|function)\s+{re.escape(name)}\b|(['\"`]){re.escape(name)}\1"
-            if not any(re.search(pattern, body) for body in file_texts.values()):
-                problems.append(f"{name} no está definido en {', '.join(files) or 'ningún archivo'}")
-        ci = read(".github/workflows/ci.yml")
-        for job in re.findall(r"\bjob ([\w-]+)", text):
-            named += 1
-            if not re.search(rf"^  {re.escape(job)}:", ci, re.M):
-                problems.append(f"el job {job} no existe en ci.yml")
-        for target in re.findall(r'[`"]make ([\w-]+)[`"]', text):
-            named += 1
-            if not re.search(rf"^{re.escape(target)}:", read("Makefile"), re.M):
-                problems.append(f"el objetivo make {target} no existe en el Makefile")
-        for step in re.findall(r'\bpaso "([^"]+)"', text):
-            named += 1
-            if not re.search(rf"^\s*- name: {re.escape(step)}\s*$", ci, re.M):
-                problems.append(f"el paso {step} no existe en ci.yml")
-        specs = [p.read_text(encoding="utf-8") for p in sorted((ROOT / "e2e" / "tests").rglob("*.spec.ts"))] if (ROOT / "e2e" / "tests").is_dir() else []
-        for title in re.findall(r'\be2e "([^"]+)"', text):
-            named += 1
-            if not any(re.search(rf"\btest\(\s*'{re.escape(title)}'", body) for body in specs):
-                problems.append(f"el título E2E {title} no existe en e2e/tests/*.spec.ts")
-        leftover = re.sub(r'\b(?:paso|e2e) "[^"]*"|"make [\w-]+"', "", text)
-        for stray in re.findall(r'"[^"]*"', leftover):
-            problems.append(f'texto entre comillas sin prefijo: {stray}; use paso "…" para un paso de ci.yml, o e2e "…" para un título de Playwright')
+        named = [(kind, value) for kind, value in references if kind != "file"]
         if not named:
-            problems.append("no nombra ninguna prueba concreta (clase/función, job, paso o make)")
+            problems.append("no nombra ninguna prueba concreta (clase/función entre paréntesis, job, paso, e2e o make)")
+        problems += [p for p in (reference_problem(k, v, sources, file_texts) for k, v in named) if p]
         errors += [f"{label}: {problem}" for problem in problems]
     return errors
 

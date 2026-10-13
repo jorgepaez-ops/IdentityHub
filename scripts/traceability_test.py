@@ -14,6 +14,7 @@ import unittest
 sys.dont_write_bytecode = True
 
 SCRIPT = pathlib.Path(__file__).with_name("traceability.py")
+REPO_ROOT = SCRIPT.parent.parent
 SPEC = importlib.util.spec_from_file_location("traceability", SCRIPT)
 if SPEC is None or SPEC.loader is None:
     raise RuntimeError("could not load traceability.py")
@@ -348,18 +349,52 @@ class NonFunctionalVerificationTests(unittest.TestCase):
         self.assertIn('sin prefijo: "RNF-010 Un título"', text)
         self.assertIn('paso "…"', text)
 
-    def test_prose_make_is_not_read_as_a_target_but_a_backticked_one_is_checked(self) -> None:
-        prose = self.FEATURE.replace('vía "make load-test"', "make sure de que corra")
-        self.assertEqual(self.errors(prose), [])
-        ticked = self.FEATURE.replace('vía "make load-test"', "vía `make no-existe`")
-        self.assertIn("make no-existe", "\n".join(self.errors(ticked)))
+    def with_make(self, replacement: str) -> str:
+        return self.FEATURE.replace('vía "make load-test"', replacement)
+
+    def test_a_make_target_is_checked_bare_in_backticks_or_in_double_quotes(self) -> None:
+        for form in ("vía make {}", "vía `make {}`", 'vía "make {}"'):
+            self.assertEqual(self.errors(self.with_make(form.format("load-test"))), [], form)
+            text = "\n".join(self.errors(self.with_make(form.format("no-existe"))))
+            self.assertIn("make no-existe", text, form)
+
+    def test_prose_make_is_not_allowed_because_a_bare_make_is_a_reference(self) -> None:
+        text = "\n".join(self.errors(self.with_make("make sure de que corra")))
+        self.assertIn("make sure", text)
+
+    def test_mismatched_make_delimiters_are_an_error(self) -> None:
+        for form in ('vía "make load-test`', 'vía `make load-test"', 'vía "make load-test', "vía `make load-test"):
+            text = "\n".join(self.errors(self.with_make(form)))
+            self.assertIn("comilla", text, form)
+
+    def test_the_current_feature_files_have_no_prose_make(self) -> None:
+        for path in sorted((REPO_ROOT / "specs" / "06-acceptance").glob("*.feature")):
+            for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+                if not line.lstrip().startswith("# Verificación:"):
+                    self.assertNotRegex(line, r"\bmake\b", f"{path.name}:{number}")
+
+    def test_an_e2e_title_resolves_with_any_quote_style_and_test_modifier(self) -> None:
+        cases = {
+            "It's ok": ('test("RNF-010 It\'s ok", async () => {});', "test(`RNF-010 It's ok`, async () => {});"),
+            "Un título": ("test.only('RNF-010 Un título', async () => {});", "test.skip('RNF-010 Un título', async () => {});"),
+        }
+        for title, declarations in cases.items():
+            feature = self.FEATURE.replace('paso "Pruebas X"', f'e2e "RNF-010 {title}"')
+            for declaration in declarations:
+                files = {**self.FILES, "e2e/tests/a.spec.ts": declaration + "\n"}
+                self.assertEqual(self.errors(feature, files), [], declaration)
+
+    def test_unknown_quoted_text_is_an_error_naming_the_accepted_prefixes(self) -> None:
+        text = "\n".join(self.errors(self.FEATURE.replace('paso "Pruebas X"', 'y "algo suelto"')))
+        for expected in ('sin prefijo: "algo suelto"', "paso", "e2e", "make"):
+            self.assertIn(expected, text)
 
     def test_a_job_id_followed_by_punctuation_resolves(self) -> None:
         for suffix in (",", ".", ")", ";"):
             feature = self.FEATURE.replace("job spec-drift de CI", f"job spec-drift{suffix} de CI")
             self.assertEqual(self.errors(feature), [], suffix)
 
-    def test_an_unquoted_make_target_is_checked(self) -> None:
+    def test_a_double_quoted_missing_make_target_is_reported(self) -> None:
         feature = self.FEATURE.replace('vía "make load-test"', "vía \"make no-existe\"")
         self.assertIn("make no-existe", "\n".join(self.errors(feature)))
 
@@ -371,6 +406,12 @@ class NonFunctionalVerificationTests(unittest.TestCase):
         self.assertIn("RnfOne no está definido", "\n".join(self.errors(files=files)))
         files["scripts/x_test.py"] = "x = 'RnfOne'\n"
         self.assertEqual(self.errors(files=files), [])
+
+    def test_a_scenario_with_no_named_reference_lists_every_accepted_form(self) -> None:
+        feature = "Característica: NFR\n  # Verificación: scripts/x_test.py\n  @RNF-001\n  Escenario: Solo archivo\n"
+        text = "\n".join(self.errors(feature))
+        for form in ("clase/función", "job", "paso", "e2e", "make"):
+            self.assertIn(form, text)
 
     def test_a_partial_step_name_does_not_match(self) -> None:
         files = dict(self.FILES)

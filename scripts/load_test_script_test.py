@@ -23,7 +23,11 @@ sys.dont_write_bytecode = True
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "scripts" / "load-test.sh"
-STUB = r"""#!/usr/bin/env bash
+POLL_INTERVAL_SECONDS = 0.05  # how often the "slow" k6 stub (and the test) poll for a file
+MAX_POLLS = 600  # 600 polls x 0.05 s = 30 s ceiling for the stub waiting on STUB_RELEASE
+# Exit status of the "slow" stub when STUB_RELEASE never appeared within MAX_POLLS: the test never released it.
+STUB_NEVER_RELEASED = 99
+STUB = rf"""#!/usr/bin/env bash
 echo "docker $*" >> "$STUB_LOG"
 case " $* " in
   *" exec "*) cat >> "$STUB_LOG"; exit 0 ;;
@@ -33,8 +37,8 @@ if [ "$1" = "run" ]; then
     fail) exit 7 ;;
     slow)
       touch "$STUB_STARTED"
-      for _ in $(seq 600); do [ -e "$STUB_RELEASE" ] && exit 0; sleep 0.05; done
-      exit 99 ;;
+      for _ in $(seq {MAX_POLLS}); do [ -e "$STUB_RELEASE" ] && exit 0; sleep {POLL_INTERVAL_SECONDS}; done
+      exit {STUB_NEVER_RELEASED} ;;
   esac
 fi
 exit 0
@@ -96,9 +100,9 @@ class LoadTestScriptTests(unittest.TestCase):
             ["bash", str(SCRIPT)], env={**self.env, "STUB_RUN": "slow"},
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
-        deadline = time.time() + 30
+        deadline = time.time() + MAX_POLLS * POLL_INTERVAL_SECONDS
         while not self.started.exists() and time.time() < deadline:
-            time.sleep(0.05)
+            time.sleep(POLL_INTERVAL_SECONDS)
         self.assertTrue(self.started.exists(), "the k6 stub never started")
         process.send_signal(sig)  # only the script: bash runs the trap once the child ends (with status 0)
         self.release.touch()  # let the blocked k6 stub finish, strictly after the signal was delivered

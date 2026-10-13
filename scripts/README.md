@@ -38,6 +38,19 @@ EVENT_NAME=pull_request PR_BASE_SHA=<sha> PR_HEAD_SHA=<sha> bash scripts/ci_chan
 make up-app && make load-test
 ```
 
+### Gramática de `# Verificación:`
+
+`traceability.py` lee la línea una sola vez de izquierda a derecha y admite exactamente esta gramática (el resto del texto es libre):
+
+- una ruta de archivo (.py, .js, .ts, .sh, .yml, .yaml o .go) que debe existir;
+- `(Nombre)`: clase o función que debe existir como palabra completa en ese archivo;
+- `job <id>`: id de un job de ci.yml, con id = letras, dígitos, `_` y `-` (la puntuación final no es parte del id);
+- `paso "<nombre>"`: paso de ci.yml con `- name:` exactamente igual;
+- `e2e "<título>"`: prueba de Playwright con ese título exacto (`test(`, `test.only(` o `test.skip(`, con comillas simples, dobles o invertidas) en `e2e/tests/**/*.spec.ts`;
+- `make <objetivo>`: objetivo del Makefile, suelto, entre comillas invertidas o entre comillas dobles del mismo tipo al abrir y cerrar. Un `make <palabra>` suelto siempre es referencia y debe existir, así que los `.feature` no usan «make» como prosa;
+- cualquier otro texto entre comillas dobles es un error que nombra los prefijos aceptados (paso, e2e, make);
+- un escenario sin ninguna referencia nombrada falla y el error lista todas las formas aceptadas.
+
 ## Pruebas
 
 Todas usan `unittest` de la biblioteca estándar y no dejan `__pycache__` (el job `spec-drift` exige un
@@ -45,7 +58,7 @@ Todas usan `unittest` de la biblioteca estándar y no dejan `__pycache__` (el jo
 
 | Archivo | Qué protege | Respalda |
 | --- | --- | --- |
-| `traceability_test.py` | El verificador de trazabilidad: correspondencia escenario-E2E, controles, matriz, y la gramática de `# Verificación:` (archivo, `(Nombre)`, `job <id>`, `paso "<nombre>"`, `e2e "<título>"`, `make <objetivo>` entre comillas o comillas invertidas; una cadena entre comillas sin prefijo es error), con casos negativos. | RNF-011 (deriva de specs) y el enlace de los escenarios `@RNF`. |
+| `traceability_test.py` | El verificador de trazabilidad: correspondencia escenario-E2E, controles, matriz, y la gramática de `# Verificación:` (ver arriba; archivo, `(Nombre)`, `job <id>`, `paso "<nombre>"`, `e2e "<título>"`, `make <objetivo>` suelto, entre comillas invertidas o dobles; texto entre comillas sin prefijo es error), con casos negativos. | RNF-011 (deriva de specs) y el enlace de los escenarios `@RNF`. |
 | `pipeline_controls_test.py` | Propiedades reales de los contenedores y del pipeline (compose renderizado, Dockerfile, workflows) con una prueba negativa por cada comprobación. Clases `Rnf001Containerization`, `Rnf002Pipeline`, `Rnf006Provenance`, `Rnf008Hardening`. | RNF-001, RNF-002, RNF-006 y RNF-008. |
 | `compose_ports_test.py` | Que Prometheus, Loki y Grafana (perfil `observability`) publiquen puertos solo en `127.0.0.1`. Usa `docker compose config` con valores ficticios y sin leer un `.env` real. | Puertos de observabilidad en loopback. |
 | `ci_changes_test.py` | El clasificador del job 0 sobre repositorios git desechables (documentación frente a código, fallos hacia «correr todo») y un lint de las guardas del job `image`. Clases `ClassifierTest` e `ImageJobGuardTest`. | Job 0 de CI (`changes`). |
