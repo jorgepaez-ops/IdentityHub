@@ -42,6 +42,8 @@ TRUSTED_PROXIES=
 LOG_LEVEL=info
 GRAFANA_ADMIN_USER=admin
 GRAFANA_ADMIN_PASSWORD=
+SMTP_USERNAME=identity-hub
+SMTP_PASSWORD=              # obligatorio
 """
 
 
@@ -70,7 +72,7 @@ class SetupEnvTests(unittest.TestCase):
     def test_secrets_are_filled(self) -> None:
         self.run_setup()
         out = parse(self.output)
-        for key in ("POSTGRES_PASSWORD", "IDENTITY_APP_PASSWORD", "RABBITMQ_DEFAULT_PASS", "GRAFANA_ADMIN_PASSWORD"):
+        for key in ("POSTGRES_PASSWORD", "IDENTITY_APP_PASSWORD", "RABBITMQ_DEFAULT_PASS", "GRAFANA_ADMIN_PASSWORD", "SMTP_PASSWORD"):
             self.assertRegex(out[key], r"^[0-9a-f]{48}$")
         self.assertNotIn("obligatorio", self.output.read_text())
 

@@ -11,6 +11,7 @@ import (
 	"math"
 	"net/mail"
 	"net/netip"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -43,6 +44,10 @@ type Config struct {
 	SMTPHost                string
 	SMTPPort                int
 	SMTPFrom                string
+	SMTPUsername            string
+	SMTPPassword            Secret
+	SMTPTLS                 string
+	SMTPCAFile              string
 	PublicBaseURL           string
 	JWTSigningKey           Secret
 	JWTIssuer               string
@@ -62,10 +67,21 @@ type Config struct {
 	BootstrapAdminEmail     string
 }
 
+// Defaults of the single registered OAuth client (ADR 0009). Each one can be
+// overridden with OAUTH_CLIENT_ID / OAUTH_REDIRECT_URI / OAUTH_CLIENT_ORIGIN so
+// the same binary runs under real hostnames; the defaults keep local
+// development unchanged.
 const (
-	OAuthClientID     = "contabilidad"
-	OAuthRedirectURI  = "http://contabilidad.localhost:8080/oauth/callback"
-	OAuthClientOrigin = "http://contabilidad.localhost:8080"
+	DefaultOAuthClientID     = "contabilidad"
+	DefaultOAuthRedirectURI  = "http://contabilidad.localhost:8080/oauth/callback"
+	DefaultOAuthClientOrigin = "http://contabilidad.localhost:8080"
+)
+
+// SMTP transport security modes (SMTP_TLS).
+const (
+	SMTPTLSStartTLS = "starttls" // require STARTTLS; fail if the server does not offer it
+	SMTPTLSImplicit = "tls"      // TLS from the first byte (SMTPS, usually port 465)
+	SMTPTLSNone     = "none"     // cleartext; local development only, never with credentials
 )
 
 // Load lee el entorno y acumula TODOS los errores antes de fallar, en vez de
@@ -159,6 +175,8 @@ func load(requireDatabase bool) (*Config, error) {
 	argon2 := loadPasswordConfig(c)
 	trustedProxies := parseTrustedProxies(os.Getenv("TRUSTED_PROXIES"), &c.problems)
 	bootstrapAdminEmail := loadBootstrapAdminEmail(c)
+	smtpSettings := loadSMTP(c)
+	oauthClient := loadOAuthClient(c)
 
 	cfg := &Config{
 		Port:                    c.integer("API_PORT", "8081"),
@@ -169,6 +187,10 @@ func load(requireDatabase bool) (*Config, error) {
 		SMTPHost:                c.optional("SMTP_HOST", "mailpit"),
 		SMTPPort:                c.integer("SMTP_PORT", "1025"),
 		SMTPFrom:                c.optional("SMTP_FROM", "no-reply@identity.local"),
+		SMTPUsername:            smtpSettings.username,
+		SMTPPassword:            smtpSettings.credential,
+		SMTPTLS:                 smtpSettings.tls,
+		SMTPCAFile:              smtpSettings.caFile,
 		PublicBaseURL:           c.optional("PUBLIC_BASE_URL", "http://identityhub.localhost:8080"),
 		JWTSigningKey:           Secret(jwtSigningKey),
 		JWTIssuer:               c.optional("JWT_ISSUER", "http://identityhub.localhost:8080"),
@@ -176,9 +198,9 @@ func load(requireDatabase bool) (*Config, error) {
 		AccessTTL:               c.duration("JWT_ACCESS_TTL", "15m"),
 		RefreshTTL:              c.duration("JWT_REFRESH_TTL", "720h"),
 		HubSessionTTL:           c.positiveDuration("HUB_SESSION_TTL", "720h"),
-		OAuthClientID:           OAuthClientID,
-		OAuthRedirectURI:        OAuthRedirectURI,
-		OAuthClientOrigin:       OAuthClientOrigin,
+		OAuthClientID:           oauthClient.id,
+		OAuthRedirectURI:        oauthClient.redirectURI,
+		OAuthClientOrigin:       oauthClient.origin,
 		LoginAccountMaxFailures: c.positiveInteger("LOGIN_ACCOUNT_MAX_FAILURES", "5"),
 		LoginIPMaxFailures:      c.positiveInteger("LOGIN_IP_MAX_FAILURES", "20"),
 		LoginFailureWindow:      c.positiveDuration("LOGIN_FAILURE_WINDOW", "15m"),
@@ -206,6 +228,81 @@ func loadServerSecrets(c *problemCollector, requireDatabase bool) (databaseURL, 
 		c.add("JWT_SIGNING_KEY debe ser una semilla Ed25519 en base64 de 32 bytes")
 	}
 	return databaseURL, jwtSigningKey
+}
+
+type smtpSecurity struct {
+	username   string
+	credential Secret
+	tls        string
+	caFile     string
+}
+
+// loadSMTP reads the SMTP authentication and transport-security settings. The
+// default is the safe one (STARTTLS required); "none" is an explicit opt-out
+// that is refused whenever credentials are configured, so a password can never
+// be sent in cleartext by configuration alone.
+func loadSMTP(c *problemCollector) smtpSecurity {
+	out := smtpSecurity{
+		username:   c.optional("SMTP_USERNAME", ""),
+		credential: Secret(c.optional("SMTP_PASSWORD", "")),
+		tls:        strings.ToLower(c.optional("SMTP_TLS", SMTPTLSStartTLS)),
+		caFile:     c.optional("SMTP_CA_FILE", ""),
+	}
+	switch out.tls {
+	case SMTPTLSStartTLS, SMTPTLSImplicit, SMTPTLSNone:
+	default:
+		c.add("SMTP_TLS debe ser starttls, tls o none")
+	}
+	if out.username != "" && out.credential == "" {
+		c.add("SMTP_USERNAME requiere SMTP_PASSWORD")
+	}
+	if out.credential != "" && out.username == "" {
+		c.add("SMTP_PASSWORD requiere SMTP_USERNAME")
+	}
+	if out.tls == SMTPTLSNone && (out.username != "" || out.credential != "") {
+		c.add("SMTP_TLS=none no se permite con credenciales SMTP: no se envían contraseñas sin cifrar")
+	}
+	if out.tls == SMTPTLSNone && out.caFile != "" {
+		c.add("SMTP_CA_FILE no tiene efecto con SMTP_TLS=none")
+	}
+	return out
+}
+
+type oauthClientSettings struct{ id, redirectURI, origin string }
+
+// loadOAuthClient reads the registered client and validates that the redirect
+// URI is an absolute http(s) URL without fragment and that the origin is
+// exactly the scheme and host of that URI.
+func loadOAuthClient(c *problemCollector) oauthClientSettings {
+	out := oauthClientSettings{
+		id:          c.optional("OAUTH_CLIENT_ID", DefaultOAuthClientID),
+		redirectURI: c.optional("OAUTH_REDIRECT_URI", DefaultOAuthRedirectURI),
+		origin:      c.optional("OAUTH_CLIENT_ORIGIN", DefaultOAuthClientOrigin),
+	}
+	if strings.ContainsAny(out.id, " \t\r\n") {
+		c.add("OAUTH_CLIENT_ID no puede contener espacios")
+	}
+	redirect, ok := parseHTTPURL(c, "OAUTH_REDIRECT_URI", out.redirectURI)
+	origin, ok2 := parseHTTPURL(c, "OAUTH_CLIENT_ORIGIN", out.origin)
+	if ok && redirect.Fragment != "" {
+		c.add("OAUTH_REDIRECT_URI no puede llevar fragmento")
+	}
+	if ok2 && (origin.Path != "" || origin.RawQuery != "" || origin.Fragment != "") {
+		c.add("OAUTH_CLIENT_ORIGIN debe ser solo esquema y host, sin ruta")
+	}
+	if ok && ok2 && (redirect.Scheme != origin.Scheme || redirect.Host != origin.Host) {
+		c.add("OAUTH_CLIENT_ORIGIN debe coincidir con el origen de OAUTH_REDIRECT_URI")
+	}
+	return out
+}
+
+func parseHTTPURL(c *problemCollector, key, value string) (*url.URL, bool) {
+	u, err := url.Parse(value)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		c.add("%s debe ser una URL absoluta http(s)", key)
+		return nil, false
+	}
+	return u, true
 }
 
 // loadPasswordConfig reads and validates the Argon2 parameters.
