@@ -334,6 +334,18 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
 ## Siguiente paso
 
 Mañana (2026-10-13), en este orden:
+0. **Filtro de documentación en `ci.yml` (prioridad, pedido explícito del usuario: "esto no puede pasar").**
+   El 2026-10-12 el PR #42 (solo `odd/tasks/cierre-entrega.md`) corrió el pipeline completo (E2E, DAST,
+   integración, imágenes) porque `ci.yml` usa `pull_request:` y `push: [main]` sin filtro de rutas. Causa
+   adicional: se abrió el PR al cierre del día en vez de dejar la rama local. Diseño:
+   - No usar `paths-ignore` a nivel de workflow: el ruleset "Protect main" exige 17 checks y quedarían en
+     "Expected — waiting", bloqueando el merge.
+   - Job inicial `changes` que detecte si el diff toca algo fuera de `**.md`, `odd/**` y `docs/**`; los jobs
+     pesados llevan `if: needs.changes.outputs.code == 'true'` (un job *skipped* cuenta como aprobado).
+   - `1 · Deriva entre specs y código` y `3 · Secretos en el historial` corren siempre.
+   - Verificar que `CodeQL`, `Trivy` y `Semgrep OSS` (checks de code scanning por SARIF) no queden pendientes
+     cuando su job se salta; probarlo con un PR documental real antes de dar la tarea por cerrada.
+   - Regla de trabajo: notas de fin de día van en rama local; sin push ni PR hasta que el usuario lo pida.
 1. Validar F7 con un tag `v0.9.1` sobre `main`: `latest` se mueve recién después de firmar y atestar; `cosign verify`
    (Cosign v3) de las tres imágenes; prompt de capturas para Claude Desktop.
 2. C2: `make informe` (incluir en el informe lo hecho en F1-F4, F6-F10 y los hallazgos de arriba), revisión del PDF
