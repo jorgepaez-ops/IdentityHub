@@ -368,7 +368,7 @@ class NonFunctionalVerificationTests(unittest.TestCase):
             self.assertIn("comilla sin cerrar o delimitadores distintos", text, form)
 
     def test_backticks_around_a_path_or_a_job_are_formatting(self) -> None:
-        self.assertEqual(self.errors(self.with_make("vía `make load-test` en `job e2e`")), [])
+        self.assertEqual(traceability.tokenize_verification("`scripts/load-test.sh` vía `job e2e`")[1], [])
 
     def test_every_real_verification_line_tokenizes_without_problems(self) -> None:
         lines = [
@@ -382,7 +382,10 @@ class NonFunctionalVerificationTests(unittest.TestCase):
             self.assertEqual(traceability.tokenize_verification(text)[1], [], f"{name}:{number}")
 
     def test_the_grammar_copies_match_the_docstring(self) -> None:
-        bullets = [line.strip() for line in traceability.verification_errors.__doc__.splitlines() if line.strip().startswith("- ")]
+        doc = traceability.verification_errors.__doc__
+        if doc is None:
+            self.skipTest("docstrings removidos (python -OO)")
+        bullets = [line.strip() for line in doc.splitlines() if line.strip().startswith("- ")]
         self.assertTrue(bullets)
         for copy in (REPO_ROOT / "specs" / "06-acceptance" / "README.md", REPO_ROOT / "scripts" / "README.md"):
             text = copy.read_text(encoding="utf-8")
