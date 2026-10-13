@@ -7,7 +7,6 @@ docente: Jaider Ospina Navas
 equipo: Miguel Ángel Díaz Díaz · María Fernanda Giraldo Osorio · William Ricardo Niño Pico · Jorge Iván Páez Rincón · Milena Rocío Ramírez Espinosa
 repositorio: https://github.com/jorgepaez-ops/IdentityHub
 licencia: Apache License 2.0 (archivo LICENSE del repositorio)
-fecha: 13 de octubre de 2026
 entrega: 23 de octubre de 2026
 ---
 
@@ -34,7 +33,11 @@ La elección del lenguaje merece una nota. El backend está escrito en **Go** (A
 
 Identity Hub incluye registro por invitación por correo, contraseñas con Argon2id, JWT firmados con Ed25519 y publicados por JWKS, refresh tokens rotativos, MFA obligatorio por código enviado al correo, roles, una grilla de roles y permisos por aplicación, auditoría append-only con exportación a CSV o JSON, claves de servicio para integraciones de máquina a máquina y SSO hacia Contabilidad. El worker entrega el correo por SMTP con STARTTLS obligatorio y autenticación. Quedan fuera por decisión documentada: federación con proveedores externos, multi-tenancy efectivo, alta disponibilidad, TOTP y WebAuthn. El objetivo de despliegue es un único host con Docker Compose; la nube es una arquitectura de referencia.
 
-A la fecha de este documento están completas las semanas 1 a 4 y el cierre de la entrega. La semana 4 incluyó la publicación de las imágenes en Docker Hub con SBOM y firma Cosign mediante el workflow `release.yml` (validado primero con el tag `v0.9.0`). Entre el 12 y el 13 de octubre se fusionaron en `main` los PR 32 a 41 y el PR 43, que cerraron las funciones que habían quedado diferidas y endurecieron la entrega: exportación del audit log (RF-019), claves de servicio (RF-018), SMTP autenticado con STARTTLS y hosts configurables, detección en ejecución con Falco, una columna de controles de CI en la matriz de trazabilidad, un badge de cobertura con el valor medido, el orden de publicación del release (`latest` solo después de firmar y atestar), la reclasificación de VULN-028 y un filtro que evita correr el pipeline completo en cambios solo de documentación. La matriz de trazabilidad queda con 33 requisitos, los 33 completos (0 parciales, 0 sin cubrir y 0 diferidos): RNF-010 (latencia) tiene una prueba de carga y los siete requisitos que tenían una sola fuente de evidencia recibieron una segunda, real. El release se revalidó con el tag `v0.9.1`, que ya publica con el orden definitivo. El tag de entrega es `v1.0.0`: el workflow de release publica cada tag `vX.Y.Z`, de modo que el resultado no depende de que ese tag ya exista al leer este informe. Lo que todavía no existe se declara en las secciones de limitaciones y trabajo futuro.
+A la fecha de entrega están completas las semanas 1 a 4 y el cierre de la entrega. La semana 4 incluyó la publicación de las imágenes en Docker Hub con SBOM y firma Cosign mediante el workflow `release.yml` (validado primero con el tag `v0.9.0`). Entre el 12 y el 13 de octubre se fusionaron en `main` los PR 32 a 41 y el PR 43, que cerraron las funciones que habían quedado diferidas y endurecieron la entrega: exportación del audit log (RF-019), claves de servicio (RF-018), SMTP autenticado con STARTTLS y hosts configurables, detección en ejecución con Falco, una columna de controles de CI en la matriz de trazabilidad, un badge de cobertura con el valor medido, el orden de publicación del release (`latest` solo después de firmar y atestar), la reclasificación de VULN-028 y un filtro que evita correr el pipeline completo en cambios solo de documentación. La matriz de trazabilidad queda con 33 requisitos, los 33 completos (0 parciales, 0 sin cubrir y 0 diferidos): RNF-010 (latencia) tiene una prueba de carga y los siete requisitos que tenían una sola fuente de evidencia recibieron una segunda, real. El release se revalidó con el tag `v0.9.1`, que ya publica con el orden definitivo. El tag de entrega es `v1.0.0`: el workflow de release publica cada tag `vX.Y.Z`, de modo que el resultado no depende de que ese tag ya exista al leer este informe. Lo que todavía no existe se declara en las secciones de limitaciones y trabajo futuro.
+
+El 13 de octubre se cerró además el seguimiento técnico previo al tag, tareas S1 a S7, en una rama de seguimiento todavía sin fusionar a `main`: verificación automática de la firma y la atestación dentro de `release.yml` (S1), clasificador del job 0 en `scripts/ci_changes.sh` con 12 pruebas (S2), prueba de que Prometheus, Loki y Grafana publican solo en `127.0.0.1` (S3), limpieza del `Makefile` y de la guía (S4), prueba de carga de RNF-010 con k6 en el job 7 (S5) y una segunda fuente de evidencia real para los siete requisitos que tenían una sola (S6). La última, S7, resolvió los 123 *code smells* que SonarCloud tenía abiertos el 13 de octubre: 111 se corrigieron sin cambiar el comportamiento, 11 son falsos positivos justificados (p. ej. bucles de sondeo secuenciales a propósito) y 1 no es aplicable, porque está en una migración ya aplicada, que es inmutable (`db/migrations/**` pasó a `sonar.exclusions`). SonarCloud analiza `main`, de modo que su panel solo reflejará la resolución cuando la rama se fusione. Con ello la matriz de trazabilidad queda en 33 completos, 0 parciales y 0 sin cubrir. Solo F5 (integración de terceros y *outbox* transaccional) queda como trabajo futuro, por decisión del 12 de octubre.
+
+Las pruebas al cierre son: 550 unitarias y 631 de integración en Go, 264 de Vitest en el frontend, 148 en Contabilidad, 63 E2E de Playwright y 94 de los scripts de apoyo (siete suites de Python en `scripts/`, catalogadas en `scripts/README.md`).
 
 # Arquitectura
 
@@ -44,15 +47,15 @@ Identity Hub es un conjunto de contenedores orquestados por Docker Compose. La t
 
 | Componente | Responsabilidad |
 |---|---|
-| `web` | Nginx que sirve las dos SPA (Hub y Contabilidad), aplica cabeceras de seguridad y el límite de peticiones de autenticación, y hace de proxy hacia la API. |
-| `api` | API HTTP en Go: autenticación, autorización, dominio, persistencia y publicación de eventos. |
-| `worker` | Proceso asíncrono en Go que consume eventos y entrega notificaciones por SMTP con STARTTLS y autenticación; publica métricas y salud. |
+| web | Nginx que sirve las dos SPA (Hub y Contabilidad), aplica cabeceras de seguridad y el límite de peticiones de autenticación, y hace de proxy hacia la API. |
+| api | API HTTP en Go: autenticación, autorización, dominio, persistencia y publicación de eventos. |
+| worker | Proceso asíncrono en Go que consume eventos y entrega notificaciones por SMTP con STARTTLS y autenticación; publica métricas y salud. |
 | PostgreSQL 16 | Usuarios, sesiones, roles, permisos y auditoría; la aplicación usa un rol de mínimo privilegio sin permiso de `UPDATE`/`DELETE` sobre la auditoría. |
 | RabbitMQ 4 | Eventos persistentes con confirmación de publicación entre la API y el worker, con cola de mensajes muertos (DLQ). |
 | Mailpit | Captura el SMTP local: en desarrollo los correos no salen a Internet. Exige STARTTLS y autenticación con una CA local que genera `make certs`. |
 | Prometheus, Loki, Alloy, Falco y Grafana | Métricas, logs y detección de comportamiento anómalo en ejecución, bajo el perfil `observability` de Compose, que `make up` activa. |
 
-Los flujos entre dominios son: navegador a `web` a `api` por HTTP; `api` a PostgreSQL por SQL (consultas generadas por `sqlc`); `api` a RabbitMQ a `worker` por AMQP; `worker` a Mailpit por SMTP con STARTTLS; y Hub a Contabilidad por OAuth 2.0 Authorization Code con PKCE sobre dos orígenes (`identityhub.localhost` y `contabilidad.localhost`). Las decisiones más relevantes están registradas como ADR (0001 a 0014): stack y contenerización, IdP propio en lugar de Keycloak, OpenAPI 3.0.3 como fuente de verdad, Argon2id, refresh tokens rotativos con familia, publicación directa sin outbox, línea base vulnerable deliberada, GitHub Actions, SSO con PKCE, MFA por correo, Docker Hub como registry, arquitectura de referencia en AWS, roles y permisos configurables por aplicación y claves de servicio para integraciones máquina a máquina.
+Los flujos entre dominios son: navegador a web a api por HTTP; api a PostgreSQL por SQL (consultas generadas por `sqlc`); api a RabbitMQ a worker por AMQP; worker a Mailpit por SMTP con STARTTLS; y Hub a Contabilidad por OAuth 2.0 Authorization Code con PKCE sobre dos orígenes (`identityhub.localhost` y `contabilidad.localhost`). Las decisiones más relevantes están registradas como ADR (0001 a 0014): stack y contenerización, IdP propio en lugar de Keycloak, OpenAPI 3.0.3 como fuente de verdad, Argon2id, refresh tokens rotativos con familia, publicación directa sin outbox, línea base vulnerable deliberada, GitHub Actions, SSO con PKCE, MFA por correo, Docker Hub como registry, arquitectura de referencia en AWS, roles y permisos configurables por aplicación y claves de servicio para integraciones máquina a máquina.
 
 ## Diagramas UML del sistema
 
@@ -87,7 +90,6 @@ El flujo separa la validación de la contraseña de la verificación del código
 El pipeline cubre las seis fases del enunciado. El diagrama sitúa cada herramienta en su fase y muestra el destino de los resultados: los SARIF van a *Code Scanning* de GitHub y los artefactos de ZAP y Playwright se conservan como artefactos del run.
 
 ```mermaid
-%%landscape
 %%caption: Pipeline DevSecOps de Identity Hub por fases (fuente: ci.yml, baseline-scan.yml y scheduled-scan.yml). En GitHub Actions casi todos los jobs corren en paralelo; los pesados dependen del job 0, que decide si el cambio toca código, y la construcción de imágenes depende además del job de lint.
 flowchart LR
     subgraph F1["1 · Planificación"]
@@ -139,14 +141,14 @@ flowchart LR
 
 ## Pulido del frontend
 
-Una rama final (`feat/pulido-frontend`) revisó la interfaz de las dos aplicaciones sin cambiar el contrato de la API. Lo entregado, con las capturas regeneradas en el [manual de usuario](../manuales/usuario.md):
+Una etapa final revisó la interfaz de las dos aplicaciones (Hub y Contabilidad) sin cambiar el contrato de la API. Para el usuario cambió lo siguiente (las capturas están en el [manual de usuario](../manuales/usuario.md)):
 
-- **Sistema visual común** en el Hub y en Contabilidad. Las fuentes se empaquetan con la aplicación y se sirven desde el propio origen, de modo que la CSP no necesita abrirse a un CDN. El tema sigue la preferencia del sistema (claro u oscuro) y hay un selector manual; el contraste, el foco visible, los roles y las etiquetas ARIA se revisaron en ambos temas y a 390 px de ancho.
-- **Inicio de la consola.** Un administrador aterriza en **Inicio**, con indicadores de usuarios activos, pendientes, bloqueados y deshabilitados, los inicios fallidos de las últimas 24 horas y la actividad reciente. La API no entrega totales exactos, así que cada tarjeta cuenta hasta una página de 100 resultados y muestra «100+» cuando hay más (y hasta «200+» en los inicios fallidos, que suman dos consultas); si una consulta falla, solo esa tarjeta muestra el aviso y **Reintentar**.
-- **Filtros en la URL.** La búsqueda, el estado, la categoría y el orden de las tablas viven en la dirección, de modo que se pueden compartir, recargar y recorrer con el botón Atrás; el directorio y la auditoría ofrecen atajos (por ejemplo, **Cambios de roles**).
-- **Exportación CSV** de las filas visibles de Contabilidad y del directorio del Hub (con BOM UTF-8, CRLF y montos numéricos). Las celdas de texto que empiezan con `=`, `+`, `-`, `@`, tabulador o retorno de carro se neutralizan anteponiendo una comilla simple, para evitar la inyección de fórmulas al abrir el archivo en una hoja de cálculo; los números no se tocan, así que los montos negativos siguen siendo numéricos.
-- **Gráficos del Resumen de Contabilidad** (dona por estado, barras por categoría y columnas por mes) dibujados a mano en SVG, sin biblioteca de gráficos, con una tabla equivalente tras el enlace **Ver datos de...** para quien no los pueda ver.
-- **Diálogo de confirmación** accesible antes de aprobar o rechazar un movimiento en Contabilidad (foco atrapado en el diálogo, Escape cancela, el foco inicial está en **Cancelar**; al cancelar vuelve al botón que lo abrió y, al confirmar, a la tabla, porque la fila ya no tiene ese botón).
+- **Aspecto común y accesible.** Las dos aplicaciones comparten un mismo sistema visual, con tema claro u oscuro según el sistema (y selector manual), foco visible y contraste revisado. Las fuentes se sirven desde el propio origen para que la política de seguridad de contenido (CSP) no tenga que abrirse a un CDN externo.
+- **Inicio de la consola.** El administrador aterriza en **Inicio**, con indicadores de usuarios activos, pendientes, bloqueados y deshabilitados, los inicios fallidos de las últimas 24 horas y la actividad reciente. Si una consulta falla, solo esa tarjeta lo avisa y ofrece **Reintentar**.
+- **Filtros en la dirección.** La búsqueda, el estado y el orden de las tablas quedan en la URL, de modo que se pueden compartir, recargar y recorrer con el botón Atrás.
+- **Exportación CSV** de Contabilidad y del directorio del Hub. Las celdas de texto que empiezan con `=`, `+`, `-` o `@` se neutralizan para evitar la inyección de fórmulas al abrir el archivo en una hoja de cálculo.
+- **Gráficos del Resumen de Contabilidad** (por estado, categoría y mes), dibujados en SVG sin biblioteca externa, con una tabla equivalente para quien no pueda verlos.
+- **Confirmación accesible** antes de aprobar o rechazar un movimiento en Contabilidad, para evitar acciones por error.
 
 ![Inicio de la consola del Hub.](../manuales/img/usuario/administrador-22-inicio.png)
 
@@ -162,13 +164,15 @@ Una VPC `10.20.0.0/16` en dos zonas de disponibilidad. Solo el ALB vive en subre
 
 La segunda figura describe cómo llegaría una versión a producción: tag, gates, publicación de imágenes por digest, `terraform apply` en dos fases con la migración entre ambas.
 
-{{mermaid:../diagramas/uml/despliegue-aws.md#2|Despliegue de una versión según el Terraform de referencia.}}
+{{mermaid:../diagramas/uml/despliegue-aws.md#2|@S Despliegue de una versión según el Terraform de referencia.}}
 
 Lo que esta referencia no promete, según el propio ADR: TLS, DNS público y WAF se definen pero no se prueban; el correo por SES exigía que el worker soportara autenticación SMTP y STARTTLS, lo que ya hace (la tarea F2 lo implementó y el Terraform crea las credenciales SMTP de SES); detrás de un ALB, Nginx debe propagar la IP real del cliente o el límite por IP trataría a todos los usuarios como uno; y el `server_name` de Nginx y los hosts `*.localhost` siguen fijos en el código, aunque el cliente OAuth y sus URL ya se configuran por variables de entorno.
 
 # Modelado de Amenazas
 
 ## Modelo en OWASP Threat Dragon
+
+OWASP Threat Dragon es una herramienta de código abierto de OWASP para el modelado de amenazas. Permite dibujar diagramas de flujo de datos (DFD) con sus fronteras de confianza y registrar, por cada elemento del diagrama, las amenazas identificadas con la metodología STRIDE (suplantación, manipulación, repudio, divulgación de información, denegación de servicio y elevación de privilegios). El modelo se guarda como un archivo JSON, que se puede versionar junto con el código. Aquí se usa porque obliga a razonar sobre los flujos y las fronteras antes de elegir controles, y porque su formato abierto permite revisar el modelo en el repositorio como cualquier otro artefacto.
 
 El modelo versionado está en `docs/threat-model/identity-hub.json` (formato Threat Dragon v2) y se alinea con la fuente de verdad `specs/05-security/threat-model.md`. Contiene dos diagramas de flujo de datos con sus fronteras de confianza y 24 amenazas clasificadas por STRIDE (las 23 del modelo inicial y AM-023, agregada con las claves de servicio). El archivo conserva la estructura de los modelos de demostración oficiales y valida contra el esquema oficial de Threat Dragon con una sola salvedad (`strokeDasharray: null`), que los modelos oficiales también tienen; no se abrió en la interfaz gráfica de Threat Dragon en el entorno de desarrollo.
 
@@ -282,15 +286,15 @@ Hay cuatro workflows en `.github/workflows/`: `ci.yml` (el pipeline principal, c
 
 El workflow principal se dispara en `push` a `main`, en cada `pull_request` y manualmente; cancela las ejecuciones previas de la misma rama, y el token por defecto solo lee (el principio de mínimo privilegio responde a la amenaza AM-022).
 
-{{code:yaml:.github/workflows/ci.yml:31-44}}
+{{code:yaml:.github/workflows/ci.yml:36-50}}
 
 **Detección de cambios (job 0).** Un cambio solo de documentación no debería costar un pipeline completo. El job `changes` compara el diff del PR (o del push) y marca `code=false` únicamente si todos los archivos, con renombres incluidos, terminan en `.md` o están bajo `odd/` o `docs/`, y ninguno está bajo `.github/`, `specs/` o `scripts/`, que cuentan como código aunque sean Markdown porque gobiernan el comportamiento. Ante cualquier duda (lista vacía, error de `git`, `workflow_dispatch` o falla del propio job) decide `code=true`, y los jobs pesados se condicionan con `!cancelled() && needs.changes.outputs.code != 'false'`, de modo que un job 0 caído corre todo en vez de omitir pruebas. No se usó `paths-ignore`: el ruleset de `main` exige 17 checks por nombre y un check que no se ejecuta queda en «Expected — waiting» para siempre, mientras que un job omitido (*skipped*) cuenta como aprobado. Por la misma razón el job de imágenes, cuya matriz expande los nombres obligatorios, arranca siempre y omite cada paso. Los jobs baratos que alimentan checks obligatorios o SARIF (deriva de specs, secretos, SAST, Semgrep, configuración e IaC) corren siempre. Se validó con un PR real solo de documentación (PR 42): los jobs pesados quedaron omitidos, los checks de CodeQL, Semgrep, Checkov y SonarCloud terminaron en verde, el check agregado de Trivy quedó en *neutral* por faltar los SARIF de imágenes (no bloquea) y la ejecución tomó cerca de 1 minuto contra unos 8 minutos antes; el push a `main` del merge repitió el patrón con `code=false (solo documentación)`. La lógica vive en `scripts/ci_changes.sh` y la prueban 12 casos de `scripts/ci_changes_test.py` (solo documentación, mixto, Markdown bajo rutas de código, renombre de código a `docs/`, lista vacía, error de `git`, push inicial y `workflow_dispatch`), que corren en el job 1; uno de ellos falla si algún paso del job de imágenes pierde su guarda.
 
-{{code:yaml:.github/workflows/ci.yml:120-128}}
+{{code:yaml:.github/workflows/ci.yml:66-89}}
 
 ## Fase 1: Planificación
 
-El modelado de amenazas con Threat Dragon y STRIDE se describe en la sección anterior. La planificación se apoya además en especificaciones versionadas en `specs/` (visión, requisitos, contrato OpenAPI, modelo de dominio, ADR y escenarios de aceptación en Gherkin). El job **1 · Deriva entre specs y código** impide que estas diverjan del código: valida el contrato OpenAPI con `openapi-spec-validator`, regenera la interfaz Go (`oapi-codegen`), las consultas (`sqlc`) y los tipos TypeScript, ejecuta las pruebas del verificador de trazabilidad, del gate de ZAP y de los requisitos no funcionales del pipeline y los contenedores (`scripts/pipeline_controls_test.py`: RNF-001, RNF-002, RNF-006 y RNF-008 contra el compose renderizado, los Dockerfile y los workflows), regenera la matriz `specs/07-traceability.md` y falla si el árbol de trabajo queda sucio (`git diff --exit-code`).
+El modelado de amenazas con Threat Dragon y STRIDE se describe en la sección anterior. La planificación se apoya además en especificaciones versionadas en `specs/` (visión, requisitos, contrato OpenAPI, modelo de dominio, ADR y escenarios de aceptación en Gherkin). El job **1 · Deriva entre specs y código** impide que estas diverjan del código: valida el contrato OpenAPI con `openapi-spec-validator`, regenera la interfaz Go (`oapi-codegen`), las consultas (`sqlc`) y los tipos TypeScript, ejecuta las siete suites de Python de `scripts/` (94 pruebas): el verificador de trazabilidad, el gate de ZAP, el generador del `.env`, el clasificador del job 0 (`ci_changes_test.py`), la publicación de puertos de la observabilidad solo en loopback (`compose_ports_test.py`, que lee `docker compose config` y falla si Prometheus, Loki o Grafana publican fuera de `127.0.0.1`), los requisitos no funcionales del pipeline y los contenedores (`pipeline_controls_test.py`: RNF-001, RNF-002, RNF-006 y RNF-008 contra el compose renderizado, los Dockerfile y los workflows) y el script de la prueba de carga (`load_test_script_test.py`, con Docker simulado y sin red), regenera la matriz `specs/07-traceability.md` y falla si el árbol de trabajo queda sucio (`git diff --exit-code`).
 
 ## Fase 2: Codificación
 
@@ -298,23 +302,23 @@ El modelado de amenazas con Threat Dragon y STRIDE se describe en la sección an
 
 **Secretos (job 3).** Gitleaks corre sobre el **historial completo** (`fetch-depth: 0`), porque un secreto borrado en el último commit sigue siendo válido en el historial. Se usa una configuración propia (`.gitleaks.toml`) con reglas adicionales: la regla por defecto dejó pasar la mayoría de los secretos sembrados (VULN-023) y se añadieron reglas para contraseñas en variables de entorno o YAML y para URLs de conexión con credenciales.
 
-{{code:yaml:.github/workflows/ci.yml:265-280}}
+{{code:yaml:.github/workflows/ci.yml:238-252}}
 
 **Lint y tipos (job 2).** `golangci-lint` v2.13.2 incluye **gosec**, que detecta patrones inseguros en Go; ESLint y la comprobación de tipos corren sobre el Hub y Contabilidad, y Hadolint analiza los Dockerfiles con `failure-threshold: warning`.
 
 **SAST (jobs 4 y 4b).** CodeQL con las consultas `security-extended` analiza Go y JavaScript/TypeScript y publica sus resultados como SARIF. Semgrep 1.86.0 usa los conjuntos `p/owasp-top-ten`, `p/golang` y `p/react`, publica un SARIF y, en un segundo paso, rompe la build con severidad `ERROR`. El enunciado menciona Bandit para Python; como el backend es Go, los equivalentes son gosec, CodeQL y govulncheck, y Semgrep se mantiene como herramienta común.
 
-{{code:yaml:.github/workflows/ci.yml:313-337}}
+{{code:yaml:.github/workflows/ci.yml:286-310}}
 
 **Dependencias (job 5).** `govulncheck` analiza **alcanzabilidad**: solo informa de vulnerabilidades cuyo código es realmente invocable, lo que elimina casi todo el ruido frente a un escáner que solo lee `go.mod`. `npm audit --audit-level=high` cubre el Hub y Contabilidad, y osv-scanner v2.6.0 (`--recursive --all-vulns`) recorre todos los manifiestos, marcando como no invocado lo que el análisis de llamadas descarta.
 
-{{code:yaml:.github/workflows/ci.yml:350-362}}
+{{code:yaml:.github/workflows/ci.yml:353-373}}
 
 ## Fase 3: Integración (build)
 
 **Imágenes (jobs 9-10).** Una matriz construye las tres imágenes (`api`, `worker` y `web`) con Buildx y caché de GitHub Actions, y las escanea con Trivy en dos pasos: primero un informe SARIF que se sube siempre a Code Scanning y luego el gate, que rompe la build ante CVE de severidad `HIGH` o `CRITICAL` **con parche disponible** (`ignore-unfixed: true`). La política es deliberada: bloquear por un CVE sin arreglo no protege de nada y entrena al equipo a ignorar el rojo. Las excepciones se registrarían en `security/.trivyignore`, que se mantiene vacío a propósito: toda excepción exige CVE, justificación, responsable, expiración y ficha asociada.
 
-{{code:yaml:.github/workflows/ci.yml:748-763}}
+{{code:yaml:.github/workflows/ci.yml:725-736}}
 
 **Configuración (job 8).** Trivy config analiza Dockerfiles y demás configuración con el mismo patrón de dos pasos (SARIF y gate en `HIGH,CRITICAL`).
 
@@ -322,9 +326,9 @@ El modelado de amenazas con Threat Dragon y STRIDE se describe en la sección an
 
 ## Fase 4: Pruebas
 
-**Unitarias e integración (jobs 6 y 6b).** `go test -race` y las pruebas de Vitest del frontend y de Contabilidad. El job 6b ejecuta las pruebas con la etiqueta `integration` contra un PostgreSQL real (imagen fijada por digest) y aplica un **gate de cobertura del 70 %** sobre `./internal/...`.
+**Unitarias e integración (jobs 6 y 6b).** `go test -race` y las pruebas de Vitest del frontend y de Contabilidad. El job 6b ejecuta las pruebas con la etiqueta `integration` contra un PostgreSQL real (imagen fijada por digest) y aplica un **gate de cobertura del 70 %** sobre `./internal/...`. Al cierre son 550 pruebas unitarias y 631 de integración en Go, 264 en el frontend y 148 en Contabilidad.
 
-{{code:yaml:.github/workflows/ci.yml:488-504}}
+{{code:yaml:.github/workflows/ci.yml:460-477}}
 
 **Badge de cobertura (job 6c).** El README muestra el porcentaje que mide el job 6b, no un valor fijo. El job 6c corre solo en `push` a `main`, es el único con `contents: write` y publica un `coverage.json` en la rama huérfana `badges`, de donde lo lee el badge sin depender de un servicio externo. Distingue una rama inexistente (`git ls-remote --exit-code` devuelve 2) de un fallo de red, que se reintenta, y lleva `continue-on-error` para que un problema al publicar el badge no ponga `main` en rojo, porque el gate real es el 6b. Tras el merge se verificó `badges/coverage.json` con 78,4 %.
 
@@ -332,7 +336,7 @@ El modelado de amenazas con Threat Dragon y STRIDE se describe en la sección an
 
 **Pruebas de observabilidad y de logs (job 7).** Dos pruebas E2E comprueban requisitos que antes solo tenían pruebas de Go. `RNF-007` lee `/metrics` de la API y del worker en formato Prometheus, comprueba que un inicio de sesión fallido real incrementa `identity_login_attempts_total{result="failed"}`, que cada línea de log de ambos procesos es JSON y que el panel de Grafana consulta las cuatro señales del requisito. `RNF-012` hace un inicio de sesión fallido y otro completo (contraseña, código MFA, renovación) y exige que ningún log de la API ni del worker contenga las contraseñas, los tokens ni el código; se observó en rojo al añadir un texto presente en los logs a la lista de secretos. Para RF-008, dos escenarios nuevos (`perfil-propio.feature`) y sus pruebas E2E cubren la consulta y la actualización del perfil, y la ausencia de token.
 
-**Prueba de carga (RNF-010, job 7).** Tras las pruebas E2E y sobre el mismo stack, `make load-test` ejecuta k6 (imagen fijada por digest) con `tests/load/auth-latency.js`. Mide `POST /api/v1/auth/refresh`, `GET /api/v1/me` y `GET /.well-known/jwks.json` (el login con Argon2id queda fuera, como dice el requisito) y los umbrales `p(95)<300` hacen que k6 termine con código distinto de cero. Una corrida local contra `make up-app` (20 s por escenario, 2 074 peticiones, 0 % de errores) dio estos tiempos:
+**Prueba de carga (RNF-010, job 7).** Tras las pruebas E2E y sobre el mismo stack, `make load-test` ejecuta k6 (imagen fijada por digest) con `tests/load/auth-latency.js`. Mide `POST /api/v1/auth/refresh`, `GET /api/v1/me` y `GET /.well-known/jwks.json` (el login con Argon2id queda fuera, como dice el requisito) y los umbrales `p(95)<300` hacen que k6 termine con código distinto de cero. Como `make e2e`, corre bajo `scripts/with-raised-login-limit.sh` (variable `WITH_RAISED_LIMIT` del `Makefile`), porque justo después de la suite E2E la IP del *runner* puede seguir bloqueada por los inicios fallidos (RF-017); el script rechaza `docker-compose.prod.yml` y deshabilita al salir la cuenta `load-*` que crea. Una corrida local contra `make up-app` (20 s por escenario, 2 074 peticiones, 0 % de errores) dio estos tiempos:
 
 | Endpoint | p95 | p99 |
 |---|---|---|
@@ -344,7 +348,7 @@ El umbral de 300 ms deja un margen de dos órdenes de magnitud respecto de lo me
 
 **DAST (job 11).** OWASP ZAP 2.17.0 corre en tres escaneos: *baseline* del Hub, *baseline* de Contabilidad y escaneo de API a partir del contrato OpenAPI, todos contra el stack levantado. ZAP se ejecuta con `-I` (no decide él); el único punto de decisión es `scripts/zap-gate.py`, que rompe la build ante alertas de riesgo medio o alto, salvo una entrada `IGNORE` justificada en `.zap/rules.tsv`. Los informes JSON y HTML se suben como artefacto aunque el job falle.
 
-{{code:yaml:.github/workflows/ci.yml:765-787}}
+{{code:yaml:.github/workflows/ci.yml:738-759}}
 
 **Evidencia de los requisitos no funcionales.** La matriz de trazabilidad (`specs/07-traceability.md`) da por cubierto un requisito cuando tiene al menos dos de cuatro fuentes de evidencia (escenarios, pruebas de Go, pruebas E2E, controles de CI). Los siete requisitos que antes solo tenían una fuente, más RNF-010, se respaldan con las pruebas de la tabla. Los escenarios `@RNF-NNN` no se derivan en un spec de Playwright: cada uno nombra en un comentario `# Verificación:` la prueba que lo ejecuta, y `scripts/traceability.py` comprueba por máquina que el archivo, la clase, el job, el paso o el objetivo `make` citados existen (`make spec-drift`, job 1).
 
@@ -369,7 +373,7 @@ El despliegue de referencia en AWS se describió en la sección de arquitectura 
 
 {{code:yaml:.github/workflows/release.yml:161-196}}
 
-**Verificación.** `cosign verify` y `cosign verify-attestation --type cyclonedx` pasan sobre las tres imágenes con Cosign v3. Cosign v3 guarda la firma y la atestación como referrers OCI (formato *bundle*), por lo que no aparecen como etiquetas `.sig` o `.att` en Docker Hub y Cosign v2 no las encuentra: la verificación debe hacerse con Cosign v3. La verificación se repitió de forma independiente el 13 de octubre con Cosign v3.1.3 sobre `v0.9.0` y `v0.9.1`, con la identidad `^https://github.com/jorgepaez-ops/IdentityHub/` y el emisor OIDC de GitHub Actions: `cosign verify` y `cosign verify-attestation --type cyclonedx` resultaron correctos en las tres imágenes de ambas versiones. Esa comprobación manual ya es un paso del workflow: tras firmar y atestar, el job `publish` ejecuta `cosign verify` y `cosign verify-attestation --type cyclonedx` sobre el digest con la identidad del workflow y el emisor OIDC de Actions, y solo si ambos pasan mueve `latest` (paso «Verificar firma y atestación»; su primera prueba real es el tag `v1.0.0`).
+**Verificación.** `cosign verify` y `cosign verify-attestation --type cyclonedx` pasan sobre las tres imágenes con Cosign v3. Cosign v3 guarda la firma y la atestación como referrers OCI (formato *bundle*), por lo que no aparecen como etiquetas `.sig` o `.att` en Docker Hub y Cosign v2 no las encuentra: la verificación debe hacerse con Cosign v3. La verificación se repitió de forma independiente el 13 de octubre con Cosign v3.1.3 sobre `v0.9.0` y `v0.9.1`, con la identidad `^https://github.com/jorgepaez-ops/IdentityHub/` y el emisor OIDC de GitHub Actions: `cosign verify` y `cosign verify-attestation --type cyclonedx` resultaron correctos en las tres imágenes de ambas versiones. Esa comprobación manual ya es un paso del workflow: tras firmar y atestar, el job `publish` ejecuta `cosign verify` y `cosign verify-attestation --type cyclonedx` sobre el digest con la identidad fijada al propio workflow (`…/.github/workflows/release.yml@refs/tags/v…`, de modo que una firma hecha desde `ci.yml` o desde una rama no pasa; se probó contra `v0.9.1`) y el emisor OIDC de Actions, y solo si ambos pasan mueve `latest` (paso «Verificar firma y atestación»; su primera prueba real es el tag `v1.0.0`).
 
 ## Fase 6: Operación y monitoreo
 
@@ -390,7 +394,8 @@ La observabilidad (sección 7) y el reescaneo semanal cierran el ciclo. `schedul
 | Fase | Job o archivo | Herramienta | Integración y umbral |
 |---|---|---|---|
 | Codificación | pre-commit | Gitleaks, detect-private-key, gofmt, go build | Bloquea el commit local |
-| Planificación | 0 | Detección de cambios | Omite los jobs pesados si el cambio es solo documentación |
+| Planificación | 0 | Detección de cambios (`scripts/ci_changes.sh`, 12 pruebas) | Omite los jobs pesados si el cambio es solo documentación |
+| Planificación | 1 | Deriva de specs y siete suites de `scripts/` (94 pruebas) | Falla si el árbol queda sucio tras regenerar |
 | Codificación | 3 | Gitleaks (historial completo) | Falla ante hallazgos |
 | Codificación | 2 | gosec (golangci-lint), ESLint, Hadolint | Falla ante hallazgos; Hadolint en `warning` |
 | Codificación | 4 y 4b | CodeQL `security-extended`, Semgrep | SARIF a Code Scanning; Semgrep falla con `ERROR` |
@@ -399,13 +404,13 @@ La observabilidad (sección 7) y el reescaneo semanal cierran el ciclo. `schedul
 | Integración | 9-10 | Trivy image (api, worker, web) | SARIF y gate en `HIGH,CRITICAL` corregibles |
 | Integración | 12 | Checkov 3.3.23 | Falla ante cualquier hallazgo; SARIF |
 | Pruebas | 6 y 6b | go test, Vitest | Gate de cobertura del 70 % |
-| Pruebas | 7 | Playwright | 63 pruebas E2E |
+| Pruebas | 7 | Playwright y k6 | 63 pruebas E2E; p95 menor que 300 ms en refresh, `GET /me` y JWKS |
 | Pruebas | 6c | Badge de cobertura | Publica el porcentaje medido en la rama `badges`; solo en `main` |
 | Pruebas | 11 | OWASP ZAP 2.17.0 | `zap-gate.py` falla con riesgo medio o alto |
-| Despliegue | release.yml | Syft, Cosign | SBOM y firma keyless; `latest` se mueve solo tras firmar y atestar |
+| Despliegue | release.yml | Syft, Cosign | SBOM y firma keyless; `cosign verify` con identidad fijada; `latest` se mueve solo tras firmar, atestar y verificar |
 | Operación | scheduled-scan | govulncheck | Abre una incidencia automática |
 | Operación | `make up` | Falco | Reglas propias; alertas a Loki y Grafana (no corre en CI) |
-| Externo | PR | SonarCloud | Gate de calidad del código nuevo; no está definido en `ci.yml` |
+| Externo | PR y `main` | SonarCloud | Gate de calidad del código nuevo; no está definido en `ci.yml`; los 123 *code smells* abiertos se resolvieron en el seguimiento previo al tag (el panel solo lo refleja tras fusionar a `main`) |
 
 # Resultados de Seguridad
 
@@ -463,7 +468,7 @@ El enunciado pide Bandit, que es un analizador de Python. Como el backend es Go,
 | `use-of-md5` | `backend/internal/api/legacy_auth.go:54` | WARNING | VULN-002 |
 | `math-random-used` | `backend/internal/api/legacy_auth.go:30` | WARNING | VULN-004 |
 | `hardcoded-jwt-key` | `backend/internal/api/legacy_auth.go:121` | WARNING | VULN-001 |
-| `request-host-used` (Nginx) | `frontend/nginx/default.conf:61` y `:75` | WARNING | Informativo (corregido después, ver «Endurecimiento adicional de la rama de pulido») |
+| `request-host-used` (Nginx) | `frontend/nginx/default.conf:61` y `:75` | WARNING | Informativo (corregido después, ver «Endurecimiento adicional del repositorio») |
 | `run-shell-injection` | `.github/workflows/baseline-scan.yml:132` | ERROR | Del workflow de la línea base |
 | `github-actions-mutable-action-tag` | 40 ocurrencias en los workflows | WARNING | Informativo |
 
@@ -513,9 +518,9 @@ Estados: **Resuelto** (remediado con commit y evidencia), **Aceptado** (riesgo a
 
 Resumen: de los 31 hallazgos, 30 están resueltos y 1 (VULN-028) está no afectado (el código vulnerable no está presente). Ningún hallazgo quedó sin ficha y ningún gate se debilitó para lograr un verde. VULN-030 y VULN-031 amplían el rango pedido (001 a 029) porque ZAP, ya integrado como gate, los encontró después.
 
-## Endurecimiento adicional de la rama de pulido
+## Endurecimiento adicional del repositorio
 
-Además de la interfaz, la rama cerró las alertas de *code scanning* que quedaban en `main` y reforzó la postura del repositorio:
+Además de la interfaz, esa etapa cerró las alertas de *code scanning* que quedaban en `main` y reforzó la postura del repositorio:
 
 - **Acciones de GitHub fijadas por SHA**, con Dependabot para actualizarlas; con ello desaparecieron las alertas `github-actions-mutable-action-tag` de Semgrep.
 - **Diagramas regenerados sin JavaScript.** Los tres HTML de `docs/diagramas/` pasaron de unos 800 KB a 12-16 KB, con SVG en línea, sin `<script>` ni atributos `on*`; con ello se cerraron las alertas de CodeQL que señalaban el JavaScript incrustado de la herramienta de dibujo.
@@ -529,9 +534,10 @@ Además de la interfaz, la rama cerró las alertas de *code scanning* que quedab
 Durante la integración de las funciones de cierre (PR 32 a 41) aparecieron hallazgos que no corresponden a la línea base ni se remedian con una ficha. Por decisión del equipo no recibieron identificador `VULN`, y se listan aquí para que el rastro sea completo:
 
 - **CVE-2026-85091 (`zlib` 1.3.2-r0, severidad media) en la imagen `web`.** Se mitigó con una capa temporal `apk upgrade --no-cache zlib` hasta que la base de nginx lo incluya (PR 40). Trivy con severidad media o superior quedó sin hallazgos y el proceso sigue con uid 101.
-- **Doble envío de correo por un error de la tarea F2.** El hook de revisión con IA lo detectó al integrar `main` en la rama de la matriz (F6): si fallaba el comando `QUIT` después de que el servidor aceptara el mensaje con `250`, el worker reencolaba el evento y el correo se enviaba dos veces. `QUIT` pasó a ser de mejor esfuerzo, con una prueba que primero falla y luego pasa (PR 41).
+- **Doble envío de correo por un error de la tarea F2.** La revisión automática lo detectó al integrar `main` en la rama de la matriz (F6): si fallaba el comando `QUIT` después de que el servidor aceptara el mensaje con `250`, el worker reencolaba el evento y el correo se enviaba dos veces. `QUIT` pasó a ser de mejor esfuerzo, con una prueba que primero falla y luego pasa (PR 41).
 - **Registro de intentos anónimos con claves de servicio.** La revisión de F4 llevó a auditar solo los rechazos ligados a una clave existente, a registrar los anónimos sin datos de la cabecera (alerta `go/log-injection` de CodeQL) y a no descartar en silencio ningún fallo de auditoría.
 - **Fallas de CI resueltas en los PR.** Checkov marcó CKV_AWS_273 y CKV_AWS_40 sobre el usuario IAM de las credenciales SMTP de SES; se justificaron en línea porque SES SMTP exige un usuario IAM. Sonar reportó un falso positivo (S7552) en `scripts/gen-smtp-certs.sh`, y una prueba del frontend de F1 no estaba aislada (un `FileReader` se colaba entre pruebas).
+- **Code smells de SonarCloud (S7, 13 de octubre).** De 123 abiertos, 111 se corrigieron: complejidad cognitiva de Go, Python y TypeScript reducida partiendo funciones, interfaces de repositorio renombradas a sustantivos de agente (`…Transactor`, `healthcheckRequester`), roles ARIA reemplazados por elementos nativos (`<dialog>`, `<output>`, `<fieldset>`) con el mismo aspecto, selectores CSS duplicados fusionados verificando la cascada propiedad por propiedad, `ASC` explícito en las consultas (con `sqlc` regenerado) y condicionales de bash en los scripts. Once son falsos positivos justificados y uno no es aplicable (migración inmutable, excluida del análisis).
 - **Issue 29 (escaneo semanal del 12 de octubre con go1.26.8).** Se cerró con evidencia: escaneo manual sobre `main` con go1.26.9 y govulncheck sin vulnerabilidades.
 - **VULN-028.** Se reclasificó como *no afectado* el 12 de octubre: GO-2026-5932 no tiene versión corregida ni la tendrá, y `go list -deps` no encuentra `x/crypto/openpgp` en el backend ni en las herramientas.
 
@@ -545,13 +551,13 @@ El perfil `observability` del Compose añade cinco servicios a la aplicación, t
 
 | Servicio | Función | Puerto del host |
 |---|---|---|
-| Prometheus | Recoge métricas de la API (`api:8081`), el worker (`worker:9091`), RabbitMQ (`broker:15692`) y de sí mismo | 9090 |
-| Loki | Almacena los logs estructurados | 3100 |
+| Prometheus | Recoge métricas de la API (`api:8081`), el worker (`worker:9091`), RabbitMQ (`broker:15692`) y de sí mismo | 127.0.0.1:9090 |
+| Loki | Almacena los logs estructurados | 127.0.0.1:3100 |
 | Grafana Alloy | Lee los logs de los contenedores por el socket de Docker (solo lectura) y los envía a Loki | sin puerto publicado |
-| Grafana | Visualiza ambas fuentes; datasources y dashboard aprovisionados desde `deploy/observability/grafana/` | 3000 |
+| Grafana | Visualiza ambas fuentes; datasources y dashboard aprovisionados desde `deploy/observability/grafana/` | 127.0.0.1:3000 |
 | Falco | Detección de comportamiento anómalo en tiempo de ejecución (driver modern eBPF); sus alertas llegan a Loki por Alloy | sin puerto publicado |
 
-Forma parte de `make up`, el único comando para levantar el stack completo; `make up-app` levanta solo la aplicación, sin estos cinco servicios (es lo que usa CI). Sin kernel con BTF, Falco falla y se reinicia, pero la aplicación y el resto de la observabilidad funcionan. Las credenciales de Grafana viven en `.env` (`GRAFANA_ADMIN_USER` y `GRAFANA_ADMIN_PASSWORD`, generadas por `make setup`). Los logs de la API y del worker son JSON estructurado; Alloy los etiqueta con el servicio (`api`, `worker`, `broker`, `db`, `web`, etc.). Las capturas de esta sección se tomaron con el stack real levantado y después de ejecutar la suite E2E (`make e2e`, 52 pruebas), que genera inicios de sesión correctos y fallidos, MFA, invitaciones y eventos, de modo que las consultas muestran datos reales. El script de captura (`docs/informe/capturas-grafana.mjs`) abre la sesión de Grafana por HTTP, sin mostrar jamás el formulario de acceso, de modo que ninguna captura contiene credenciales.
+Prometheus y Loki no tienen autenticación y Grafana es una consola de administración, así que sus puertos se publican solo en el loopback del anfitrión (`127.0.0.1`); `scripts/compose_ports_test.py` lo comprueba en CI y en `make spec-drift`. Si `localhost` resuelve a `::1` (IPv6), esos puertos no responden porque solo escuchan en IPv4: hay que usar `127.0.0.1`. Forma parte de `make up`, el único comando para levantar el stack completo; `make up-app` levanta solo la aplicación, sin estos cinco servicios (es lo que usa CI). Sin kernel con BTF, Falco falla y se reinicia, pero la aplicación y el resto de la observabilidad funcionan. Las credenciales de Grafana viven en `.env` (`GRAFANA_ADMIN_USER` y `GRAFANA_ADMIN_PASSWORD`, generadas por `make setup`). Los logs de la API y del worker son JSON estructurado; Alloy los etiqueta con el servicio (`api`, `worker`, `broker`, `db`, `web`, etc.). Las capturas de esta sección se tomaron con el stack real levantado y después de ejecutar la suite E2E (`make e2e`, que entonces tenía 52 pruebas; hoy son 63), que genera inicios de sesión correctos y fallidos, MFA, invitaciones y eventos, de modo que las consultas muestran datos reales. El script de captura (`docs/informe/capturas-grafana.mjs`) abre la sesión de Grafana por HTTP, sin mostrar jamás el formulario de acceso, de modo que ninguna captura contiene credenciales.
 
 ## Dashboard «Identity Hub — Seguridad»
 
@@ -589,13 +595,12 @@ Falco, que el enunciado menciona para la detección de comportamiento anómalo e
 
 - **Una línea base vulnerable es un instrumento delicado.** Sembrar vulnerabilidades reales permite medir cada gate, pero obliga a proteger la evidencia: alguien puede «arreglar» una vulnerabilidad sembrada y destruirla. Se mitigó con el ADR 0007, avisos en los archivos afectados y un tag inmutable. Además, la imagen `api` del tag vulnerable ya no se puede construir hoy: su `apt-get install` sobre Debian 11 falla con 404 porque los repositorios retiraron esos paquetes (la propia base sembrada envejeció), por lo que parte del «antes» se obtuvo con escaneos de la época y con construcciones parciales (por ejemplo, solo el target `web`).
 - **Los falsos positivos de los gates también son hallazgos.** Gitleaks detectó referencias de Terraform (`random_password.*.result`) como secretos y, al construir la plantilla `.env`, una regla de `.gitleaks.toml` cruzaba saltos de línea. Se resolvió registrando huellas puntuales (nunca exclusiones amplias) y, después, ajustando la regla `contrasena-en-variable-de-entorno` para que ya no cruce saltos de línea (tarea D1).
-- **El repositorio vive en una carpeta sincronizada con iCloud.** Aparecieron unas 135 copias sin seguimiento con sufijo « 2» (por ejemplo `gen 2.go`) que rompían `go build` por símbolos duplicados, y en T18 iCloud renombró o borró 15 capturas del manual. Se adoptó una rutina: al iniciar cada sesión buscar los archivos `* 2*`, compararlos con el original con `cmp`, borrar solo los idénticos e informar siempre qué se borró; y los binarios generados (PNG, PDF) se producen en una carpeta temporal fuera del repositorio y se copian una sola vez al final.
-- **Los límites de las herramientas delegadas.** El agente Codex trabaja en un sandbox sin red saliente y sin el socket de Docker; fallaron tareas que necesitaban `go get`, `govulncheck`, `docker build` o `make up`. Se estableció una regla: lo que necesita red o Docker (dependencias, escaneos, E2E, capturas, publicación) lo cierra directamente el orquestador. Y todo job delegado se monitorea de forma activa en vez de esperar a que alguien pregunte. Desde el 12 de octubre Codex dejó de estar disponible (su modelo por defecto no se admitía con la cuenta), y las tareas F1 a F10 se delegaron a otro modelo bajo revisión del orquestador.
 - **Los gates tienen interacciones que no se ven a primera vista.** El límite de 20 fallos por IP (RF-017) bloqueaba el navegador del desarrollador después de una corrida de E2E o de DAST, porque todas las pruebas salen de la misma IP y el `audit_log` es append-only. Se resolvió con un envoltorio (`scripts/with-raised-login-limit.sh`) que sube solo el límite por IP mientras corre la suite y lo restaura con un `trap`, y con un aviso al terminar. Del mismo modo, `make test-integration` sin `TEST_DATABASE_URL` omite en silencio las pruebas contra la base: «pasa» pero la cobertura cae, lo que ocultaba errores hasta que se levantó un PostgreSQL desechable igual al de CI.
 - **Defecto de codificación en los correos (T18), encontrado y corregido.** Al fotografiar el manual de usuario se detectó que el worker no declaraba la codificación del correo: `buildRawMessage` no enviaba `MIME-Version` ni `Content-Type: text/plain; charset=utf-8` ni codificaba el asunto (RFC 2047), de modo que Mailpit mostraba «GÃ³mez» en lugar de «Gómez». Era un error funcional, no de seguridad. La tarea T21a lo corrigió: el worker envía ahora `MIME-Version`, `Content-Type: text/plain; charset=utf-8`, el asunto codificado según RFC 2047 y elimina CR y LF de las cabeceras.
 - **Avisos nuevos con `main` en verde (2026-10-12).** Una dependencia, la biblioteca estándar de Go y la base de nginx publicaron avisos después del último verde; los gates bloquearon el release y se remedió en el PR 31 (ver «Fase 6: Operación y monitoreo»).
-- **Integrar diez ramas a la vez produjo problemas que ninguna mostraba sola.** Al fusionar los PR 32 a 41 en `main` aparecieron un CVE de `zlib` en la imagen `web`, el doble envío de correo causado por `QUIT` (encontrado por el hook de revisión con IA al integrar `main` en la rama de F6), el issue 29 del escaneo semanal y tres fallas de CI (Checkov, un falso positivo de Sonar y una prueba del frontend no aislada); el detalle está en «Hallazgos y correcciones posteriores al cierre de la remediación».
-- **Un PR de solo notas corrió el pipeline completo.** El PR 42, que cambiaba únicamente `odd/tasks/cierre-entrega.md`, ejecutó E2E, DAST, integración e imágenes, unos 8 minutos, porque `ci.yml` no distinguía documentación de código. Se resolvió con el job 0 (PR 43) y con una regla de trabajo: las notas de fin de día viven en una rama local, sin PR hasta que se pidan. El diseño inicial con `paths-ignore` se descartó porque los checks obligatorios del ruleset quedarían en «Expected — waiting».
+- **Integrar diez ramas a la vez produjo problemas que ninguna mostraba sola.** Al fusionar los PR 32 a 41 en `main` aparecieron un CVE de `zlib` en la imagen `web`, el doble envío de correo causado por `QUIT` (encontrado por la revisión automática al integrar `main` en la rama de F6), el issue 29 del escaneo semanal y tres fallas de CI (Checkov, un falso positivo de Sonar y una prueba del frontend no aislada); el detalle está en «Hallazgos y correcciones posteriores al cierre de la remediación».
+- **Un PR de solo notas corrió el pipeline completo.** El PR 42, que cambiaba únicamente notas de cierre en Markdown, ejecutó E2E, DAST, integración e imágenes, unos 8 minutos, porque `ci.yml` no distinguía documentación de código. Se resolvió con el job 0 (PR 43). El diseño inicial con `paths-ignore` se descartó porque los checks obligatorios del ruleset quedarían en «Expected — waiting».
+- **Refactorizar sin cambiar el comportamiento exige una red de pruebas medible.** Los 123 *code smells* de SonarCloud (S7) obligaron a partir pruebas y renombrar interfaces sin perder aserciones; se verificó con conteos iguales antes y después (550 pruebas unitarias, 631 de integración y 264 del frontend) y, donde bajó el conteo de `t.Fatal`/`t.Error` por mover verificaciones a *helpers*, con una revisión manual archivo por archivo.
 - **El orden importa en un release firmado.** El primer diseño de `release.yml` movía `latest` antes de firmar. Se corrigió (F7) y se comprobó con un tag de validación, `v0.9.1`, antes del tag de entrega.
 
 ## Limitaciones
@@ -606,12 +611,13 @@ Falco, que el enunciado menciona para la detección de comportamiento anómalo e
 - **Sin outbox transaccional** (ADR 0006): la publicación al broker usa *publisher confirms*, pero no hay garantía transaccional conjunta entre la base de datos y el broker; el outbox es trabajo futuro deliberado.
 - **Sin riesgo aceptado vigente:** VULN-028 (GO-2026-5932) se reclasificó el 2026-10-12 como no afectado; solo se reabriría si algún paquete empezara a importar `x/crypto/openpgp`.
 - **Cobertura de la matriz de trazabilidad:** los 33 requisitos tienen al menos dos fuentes de evidencia; «completo» no significa verificación exhaustiva. RNF-006 verifica la firma al publicar, antes de mover `latest`, pero no al desplegar (la producción simulada no la comprueba al arrancar); RNF-008 comprueba el endurecimiento solo de `api`, `worker` y `web`, no de las imágenes de terceros (base de datos, broker, observabilidad); RNF-002 cubre las etapas hasta la publicación y el DAST, sin un despliegue automatizado.
+- **SonarCloud todavía no refleja la resolución:** analiza `main`, así que sus 123 *code smells* abiertos seguirán visibles hasta que esa rama de seguimiento se fusione; los 11 falsos positivos se justifican en Sonar, no se silencian en bloque.
 - **La prueba de carga es mínima:** mide tres endpoints sin Argon2id en una sola máquina y con un umbral de regresión; no es una prueba de capacidad ni de saturación.
 - **Las claves de servicio tienen un único alcance:** `audit-log:read`, solo en el listado del audit log.
 
 ## Diferencias conocidas entre especificación y código
 
-La revisión de la rama de pulido encontró tres diferencias entre lo que decía la especificación (o la configuración de despliegue) y lo que hace el código. Las tres se resolvieron el 2026-10-06; en dos se corrigió la especificación y en una la configuración:
+La revisión final encontró tres diferencias entre lo que decía la especificación (o la configuración de despliegue) y lo que hace el código. Las tres se resolvieron el 2026-10-06; en dos se corrigió la especificación y en una la configuración:
 
 - **Purga de cuentas sin verificar a las 24 h: se corrigió la especificación.** `specs/02-domain-model.md` describía una purga por lote que ningún proceso ejecuta. Se decidió no implementarla: la invitación vence a las 24 h, la cuenta sigue en `pending_verification` y un administrador puede reenviar la invitación (token nuevo; el anterior deja de valer). No eliminar cuentas huérfanas conserva el rastro de auditoría y deja el control en manos del administrador, y una cuenta pendiente no inicia sesión, así que mantenerla no amplía la superficie de ataque.
 - **Bloqueo puesto por un administrador: se corrigió la especificación.** El bloqueo automático por fallos fija `locked_until` (15 min) y se levanta al vencer; el manual deja `locked_until` vacío y es intencional que no venza, porque una decisión humana no debe caducar sola. Lo levanta un administrador al pasar la cuenta a `active` o la confirmación de un restablecimiento de contraseña. El modelo de dominio y los diagramas de estados lo dicen ahora de forma explícita.
@@ -632,7 +638,7 @@ La revisión de la rama de pulido encontró tres diferencias entre lo que decía
 
 ## Trabajo futuro
 
-1. Evolucionar la integración de terceros: clientes OAuth en base de datos, OpenID Connect, refresh tokens por cliente, introspección y revocación; y reemplazar la publicación directa por un **outbox transaccional**.
+1. (F5) Evolucionar la integración de terceros: clientes OAuth en base de datos, OpenID Connect, refresh tokens por cliente, introspección y revocación; y reemplazar la publicación directa por un **outbox transaccional**.
 2. Ampliar los alcances de las claves de servicio más allá de la lectura del audit log.
 
 # Anexo A — Puesta en marcha y operación
@@ -674,9 +680,9 @@ make ps                   # 3. estado de los contenedores
 | Métricas del worker | `http://localhost:9091/metrics` |
 | Mailpit (buzón de pruebas) | `http://localhost:8025` |
 | RabbitMQ (administración) | `http://localhost:15672` (credenciales en `.env`) |
-| Grafana (incluido en `make up`) | `http://localhost:3000` (credenciales en `.env`) |
-| Prometheus (incluido en `make up`) | `http://localhost:9090` |
-| Loki (incluido en `make up`) | `http://localhost:3100` |
+| Grafana (incluido en `make up`; solo loopback) | `http://127.0.0.1:3000` (credenciales en `.env`) |
+| Prometheus (incluido en `make up`; solo loopback) | `http://127.0.0.1:9090` |
+| Loki (incluido en `make up`; solo loopback) | `http://127.0.0.1:3100` |
 
 Los dominios `*.localhost` se resuelven a `127.0.0.1` en los navegadores modernos sin editar `/etc/hosts` ni instalar certificados.
 
@@ -698,9 +704,9 @@ Los dominios `*.localhost` se resuelven a `127.0.0.1` en los navegadores moderno
 | `make e2e` | Suite E2E de Playwright contra el stack levantado (sube y restaura el límite de fallos por IP) |
 | `make capturas` | Regenera las 48 capturas del manual de usuario contra el stack levantado |
 | `make scan` | Todos los gates de seguridad en local (`scan-secrets`, `scan-deps`, `scan-config`, `scan-iac`, `scan-image`) |
-| `make load-test` | Prueba de carga de latencia con k6 (RNF-010) contra el stack levantado; falla si el p95 supera 300 ms |
+| `make load-test` | Prueba de carga de latencia con k6 (RNF-010) contra el stack levantado (con el límite por IP elevado, como `make e2e`); falla si el p95 supera 300 ms |
 | `make scan-dast` | OWASP ZAP (baseline del Hub y de Contabilidad, y API) contra el stack levantado; informes en `security/zap-reports/` |
-| `make spec-drift` | Verifica sin red la matriz de trazabilidad, los escenarios Gherkin contra E2E y los requisitos no funcionales de los contenedores y el pipeline |
+| `make spec-drift` | Verifica sin red la matriz de trazabilidad, los escenarios Gherkin contra E2E y los requisitos no funcionales de los contenedores y el pipeline, además de las pruebas de `scripts/` (clasificador del job 0, puertos en loopback, script de carga) |
 | `make gen` | Regenera todo lo derivado de los specs (Go desde OpenAPI, `sqlc`, tipos TypeScript, trazabilidad) |
 | `make lint`, `make fmt` | Lint y tipos; formato de Go |
 | `make migrate`, `make psql`, `make rabbit`, `make mail` | Migraciones pendientes, consola de PostgreSQL, abrir RabbitMQ, abrir Mailpit |
@@ -748,7 +754,6 @@ La guía completa es `docs/guia-desarrollo.md`.
 |---|---|
 | E2E o DAST local termina con 423 o bloqueo por IP | Las pruebas fallan inicios de sesión a propósito desde una sola IP; ejecute `make e2e` o `make scan-dast` (no Playwright o ZAP directo), porque el envoltorio sube solo el límite por IP y avisa cuándo baja. Espere el vencimiento (hasta 15 minutos); no se borra la auditoría. |
 | Nginx devuelve 502 después de recrear `api` | Cambió la IP del contenedor `api` y Nginx conserva la anterior: confirme con `make ps` y `/healthz` que la API está sana y reinicie el proxy con `docker restart identity-hub-web-1`. |
-| `go build` informa símbolos duplicados con nombres terminados en « 2» | Copias de iCloud sin seguimiento (por ejemplo `gen 2.go`): `find . -path ./.git -prune -o -path '*/node_modules' -prune -o -name "* 2*" -print`; compare cada una con `cmp` y borre solo las idénticas. |
 | Tras regenerar `.env` el stack no autentica | PostgreSQL y RabbitMQ conservan las contraseñas antiguas en sus volúmenes: `make clean` (borra los datos) y volver a levantar. |
 | Un `.env` desechable ya existe y `make setup` no cambia nada | Es el comportamiento esperado: no sobrescribe. Use `--force` solo sabiendo lo anterior. |
 

@@ -133,7 +133,7 @@ function LoginPage({ onAuthenticated }: Readonly<{ onAuthenticated: (user: Curre
             {canStartOver && <button className="secondary-button" onClick={startOver} type="button">Volver a iniciar sesión</button>}
           </div>
         )}
-        {notice && <div className="success-box" role="status"><p>{notice}</p></div>}
+        {notice && <output className="success-box">{notice}</output>}
         {challenge ? (
           <form onSubmit={verify}>
             <p className="muted">Enviamos un código de seis dígitos a tu correo electrónico.</p>

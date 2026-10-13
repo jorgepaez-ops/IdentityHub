@@ -118,13 +118,17 @@ con esos temas abiertos.
   - `Makefile`: `_load-test-run` pasa `COMPOSE='$(COMPOSE)'` explícito a `scripts/load-test.sh`; comprobado con `make -n` y `make up-app && make load-test` real (exit 0, p95 3.82 ms), luego `make down`.
   Cuarta ronda de la revisión nativa (S5/S6):
   - `traceability.py`: `verification_errors` usa un único tokenizador (`VERIFICATION_TOKEN`, una pasada) con la gramática documentada en un solo texto (docstring, `specs/06-acceptance/README.md`, `scripts/README.md`); `make <objetivo>` suelto, entre comillas invertidas o dobles iguales (delimitadores distintos son error); `e2e` acepta `test(`/`test.only(`/`test.skip(` con comillas simples, dobles o invertidas; ci.yml, Makefile y specs E2E se leen una vez; prueba nueva de que los `.feature` no usan «make» como prosa. `load_test_script_test.py`: constantes con nombre y el exit 99 documentado (STUB_RELEASE nunca apareció). RED 6 fallos, luego 29 OK; matriz sin cambios.
-- [ ] **S7 — Code smells de SonarCloud.** 123 abiertos al 2026-10-13 (CRITICAL 32, MAJOR 55, MINOR 34,
+- [x] **S7 — Code smells de SonarCloud.** 123 abiertos al 2026-10-13 (CRITICAL 32, MAJOR 55, MINOR 34,
   INFO 2); reglas principales: go:S3776 (16), typescript:S6819 (16), css:S4666 (11), godre:S8196 (10),
   plsql:S1192 (6), python:S3776 (6). Corregir sin cambiar comportamiento, con las pruebas como red; los
   falsos positivos se justifican en Sonar, no se silencian en bloque.
   - Quinta ronda (inline, Opus): las comillas invertidas fuera de una referencia son formato si están cerradas; el mensaje de comilla sin pareja ya no culpa a `make`; prueba fuerte del mensaje; la prueba de los `.feature` reales tokeniza sus líneas `# Verificación:`; `test_the_grammar_copies_match_the_docstring` mantiene sincronizadas las tres copias de la gramática (mutación en `scripts/README.md`: falla). Revisión de la quinta ronda: aprobada; la advertencia R3-001 (restaurar la prueba de «make» en prosa fuera de `# Verificación:`) se descarta porque el analizador solo lee esas líneas y la ronda anterior marcó esa prueba como incorrecta; se aplicaron las dos sugerencias (prueba con ruta real entre comillas invertidas y `skipTest` con `python -OO`).
 
 Lote 1/3 (Go), 2026-10-13: ver apéndice «S7 — inventario Sonar». Corregido: godre:S8242 (`internal/testdb/testdb.go:73`, `migrationLock` ya no guarda `context.Context`; `release`/`releaseIfHeld` lo reciben por parámetro) y de paso el `errcheck` que golangci-lint con `-tags=integration` marcaba en la misma función (`_ = dropDatabase(...)`). Sin cambio de comportamiento. No aplicado: go:S3776 x16 (todos en archivos `_test.go`, fuera de alcance por instrucción), godre:S8196 x10 (la descripción de la regla no está en la API; el nombre «método+er» daría `WithinLoginTransactioner`, peor que `Repository`; se propone marcar falso positivo en Sonar, decisión del usuario), go:S1135 (falso positivo: «todo» en español). Sin código generado marcado; `.sonarcloud.properties` ya excluye duplicados de `gen.go`/`sqlc`. Observación fuera de alcance: `gocognit` da 25 a `(*smtpMailer).Send` (`backend/cmd/worker/smtp.go:80`) y Sonar no lo marca (cuenta distinto). Evidencia: golangci-lint v2.13.2 0 issues (con y sin `-tags=integration`), `go vet`, `gofmt`, `make test-go` OK (59.9 %), `make test-integration` con Postgres 16 desechable OK (81.1 % antes y después; funciones de `testdb` sin pérdida de cobertura), `gocognit -over 15` sin hallazgos en `testdb.go`.
+
+Lote 2/3 (TS/JS), 2026-10-13: 55 hallazgos typescript/javascript; 51 corregidos y 4 falsos positivos documentados en el apéndice (`e2e/manual/capturas.ts:258`, `e2e/support/mailpit.ts:33/39/74`: bucles secuenciales intencionales). S6819 con elementos nativos: `<dialog open>` en `ConfirmDialog` (contabilidad) y `UserDrawer` (frontend), `<output>` para `role=status` (toasts, skeleton, avisos de éxito, Login), `<fieldset>` para `role=group`; el teclado de los diálogos (Escape, Tab, clic en el fondo) pasó a escuchas nativas con `addEventListener` y CSS ajustado (`.dialog`, `.drawer`, `.success-box`, reset de `fieldset`) para que la apariencia no cambie. Claves de lista sin índice con `keyedMessages` (sufijo de ocurrencia: hay una prueba con mensajes idénticos). S3776 en `completeCallback` (contabilidad) y `UserDrawer.submit`; S3358, S7755, S7781, S6551, S5906, S3735 y, en `docs/informe/build.mjs`, S6582/S8786/S7758/S878/S4624/S9382. Evidencia: frontend lint/typecheck/build OK y vitest 264/264 antes y después; contabilidad lint/typecheck/build OK y vitest 148/148 antes y después; `e2e` `tsc --noEmit` OK; `make informe` con la misma salida que antes (54 páginas, mismo índice); `make up-app && make e2e` 63/63 y `make down`. Los 11 hallazgos `css:` quedan fuera de este lote.
+
+Lote 3/3 (resto de lenguajes), 2026-10-13: 40 hallazgos, ninguno queda «pendiente» en el apéndice. Corregidos: `css:S4666` x11 (`ab2ad9a`; los bloques duplicados se fusionaron verificando propiedad por propiedad que el orden de la cascada no cambia: el segundo `:root[data-theme="dark"]` pisaba todas las variables del primero, que era código muerto; `.logout-button` conservaba `margin-top:auto` anulado por el bloque posterior), `plsql:OrderByExplicitAscCheck` x3 (`40302a3`; `ASC` explícito en todos los `ORDER BY` de `db/queries/` y `sqlc generate` con v1.31.1, cuyo único cambio en Go son esas cadenas SQL), `python:S3776` x6 / `S3358` x2 / `S1481` x1 (`078f7c2`; `traceability.py` y `zap-gate.py` partidos en funciones con nombre, complejidad cognitiva máxima 15 medida con complexipy), `shelldre:S7688` x5 / `S7679` x3 / `S7682` / `S131` (`a5f8365`; `[[ ]]` en los scripts con shebang bash, parámetro posicional a variable local en `ip-lockout-warning.sh` y a variable normal en `gen-smtp-certs.sh`, que es `#!/bin/sh`, sin `local`). No aplicable: `plsql:S1192` en `db/migrations/000001_initial_schema.up.sql` (migración aplicada e inmutable; `db/migrations/**` pasó a `sonar.exclusions`). Falsos positivos: `plsql:S1192` x5 en `db/queries/users.sql` (etiquetas de enums en consultas independientes; no hay constantes entre sentencias y parametrizarlas cambiaría firmas y comportamiento) y `githubactions:S1135` (la palabra «TODOS» en español). Evidencia: los 7 `scripts/*_test.py` salen con 0 (12+4+6+13+17+31+11 pruebas), `make spec-drift` y `traceability.py --check` OK, `bash -n`/`sh -n` OK en los scripts tocados; frontend lint/typecheck/build OK y vitest 264/264 antes y después; `make test-integration` con `postgres:16-bookworm` desechable en 55432 OK (81.1 % antes y después, 29 paquetes `ok`; contenedor eliminado); `make up-app && make e2e` 63/63 y `make down`.
 
 Lote 1b/3 (Go, «incluye todo» con archivos de pruebas), 2026-10-13: corregido godre:S8196 x10 (`c623e04`; `Repository` de bootstrap/employee/invitationresend/login/logout/mfa/refresh pasan a `…Transactor`, un solo método cada una; `healthcheckHTTPClient` → `healthcheckRequester`, `userLookup` → `userByIDGetter`, `deferredConfirmation` → `confirmationWaiter`), go:S1135 (`8f8609d`) y go:S3776 x16 en pruebas, más `(*smtpMailer).Send` (gocognit 25 → `dial`/`secure`/`authenticate`/`transmit`, STARTTLS obligatorio, AUTH solo con TLS y QUIT best-effort intactos) en `0223446`; pruebas por paquete: worker `0223446`, api `b44396a`, auth + audit `7bb35fd`, store `b83f7c3`. Sin cambio de comportamiento ni de nombres de prueba. Evidencia: golangci-lint v2.13.2 0 issues (con y sin `-tags=integration`), `go vet` y `gofmt` limpios, `make test-go` OK (550 `=== RUN`, 59.9 % antes y después), `make test-integration` con Postgres 16 desechable OK (631 `=== RUN` antes y después, mismos nombres salvo UUID aleatorios en subpruebas, 0 FAIL, 0 SKIP; 81.1 % antes y después), `gocognit -over 15` sin hallazgos en las funciones tocadas (quedan otras funciones de prueba que gocognit cuenta distinto de Sonar y que Sonar no marca), `scripts/traceability.py --check` al día.
 Revisión nativa del lote Go (2026-10-13), en worktrees por corte porque el lote completo (1 233 líneas) excede el
@@ -169,7 +173,7 @@ Estrategia: `ask-on-risk` → `stacked-to-main` (usuario, 2026-10-13). Cortes: P
 | S4 | delegado (Sonnet) | hecho | aeeb74e | — |
 | S5 | delegado (Sonnet) | hecho | d64043a | — |
 | S6 | delegado (Sonnet) | hecho | df56da3 | — |
-| S7 | delegado (Sonnet) | en curso: lote 1/3 Go hecho (godre:S8242, S8196, S3776 x16, S1135, más `smtpMailer.Send`); lotes 2/3 y 3/3 pendientes | `e8b3dd0`, `6a41c55`, `c623e04` (S8196), `8f8609d` (S1135), `0223446` (worker), `b44396a` (api), `7bb35fd` (auth + audit), `b83f7c3` (store) | — |
+| S7 | delegado (Sonnet) | hecho (3 lotes): lote 1/3 Go hecho (godre:S8242, S8196, S3776 x16, S1135, más `smtpMailer.Send`); lote 2/3 TS/JS hecho (51 corregidos, 4 falsos positivos e2e; `e5510f9` contabilidad, `e49e17b` frontend, `6841cf1` docs/informe, `463398e` e2e); lote 3/3 hecho (`ab2ad9a` css, `40302a3` sql, `078f7c2` python, `a5f8365` shell; 1 no aplicable y 6 falsos positivos documentados); todas las filas del apéndice resueltas | `e8b3dd0`, `6a41c55`, `c623e04` (S8196), `8f8609d` (S1135), `0223446` (worker), `b44396a` (api), `7bb35fd` (auth + audit), `b83f7c3` (store) | — |
 
 Revisión nativa de S1-S4 (2026-10-13): aprobada (4 lentes, 15 archivos). Correcciones posteriores, también
 aprobadas: identidad de `cosign verify` restringida a `release.yml` en un tag (probada contra `v0.9.1`, y
@@ -177,6 +181,8 @@ rechaza la identidad de `ci.yml`) (`a15ee05`); informe con el clasificador proba
 corregido (`f1b60ca`). Advertencia descartada con evidencia: la prueba de puertos sin `.env` pasa en una copia
 limpia con `CI=true` (el compose no usa `env_file` ni interpolación sin `:?`). El rango 161-196 del extracto
 incluye a propósito el comentario de la línea 161 y termina en el último renglón del paso de `latest`.
+
+Informe técnico sincronizado con el estado final de S1-S7 (2026-10-13): alcance, conteos de pruebas, puertos en loopback, pipeline, desafíos y limitaciones; rangos `{{code:...}}` de `ci.yml` corregidos; `make informe` ok.
 
 ## Siguiente paso
 
@@ -188,18 +194,18 @@ Fuente: `api/issues/search` (CODE_SMELL, sin resolver), 123 al momento de la con
 
 | Lenguaje | Regla | Severidad | Archivo:línea | Mensaje | Estado |
 |---|---|---|---|---|---|
-| css | css:S4666 | MAJOR | `frontend/src/styles.css:106` | Duplicate selector ".stat-tile", first used at line 103 | pendiente |
-| css | css:S4666 | MAJOR | `frontend/src/styles.css:177` | Duplicate selector ".link-button", first used at line 146 | pendiente |
-| css | css:S4666 | MAJOR | `frontend/src/styles.css:201` | Duplicate selector ":root", first used at line 1 | pendiente |
-| css | css:S4666 | MAJOR | `frontend/src/styles.css:203` | Duplicate selector ":root[data-theme="dark"]", first used at line 31 | pendiente |
-| css | css:S4666 | MAJOR | `frontend/src/styles.css:204` | Duplicate selector "body", first used at line 33 | pendiente |
-| css | css:S4666 | MAJOR | `frontend/src/styles.css:214` | Duplicate selector ".left-rail", first used at line 55 | pendiente |
-| css | css:S4666 | MAJOR | `frontend/src/styles.css:215` | Duplicate selector "nav a", first used at line 59 | pendiente |
-| css | css:S4666 | MAJOR | `frontend/src/styles.css:217` | Duplicate selector ".logout-button", first used at line 64 | pendiente |
-| css | css:S4666 | MAJOR | `frontend/src/styles.css:218` | Duplicate selector ".icon-button", first used at line 154 | pendiente |
-| css | css:S4666 | MAJOR | `frontend/src/styles.css:222` | Duplicate selector ".table-scroll", first used at line 134 | pendiente |
-| css | css:S4666 | MAJOR | `frontend/src/styles.css:225` | Duplicate selector ".toast", first used at line 168 | pendiente |
-| githubactions | githubactions:S1135 | INFO | `.github/workflows/ci.yml:14` | Complete the task associated to this "TODO" comment. | pendiente |
+| css | css:S4666 | MAJOR | `frontend/src/styles.css:106` | Duplicate selector ".stat-tile", first used at line 103 | corregido `ab2ad9a` |
+| css | css:S4666 | MAJOR | `frontend/src/styles.css:177` | Duplicate selector ".link-button", first used at line 146 | corregido `ab2ad9a` |
+| css | css:S4666 | MAJOR | `frontend/src/styles.css:201` | Duplicate selector ":root", first used at line 1 | corregido `ab2ad9a` |
+| css | css:S4666 | MAJOR | `frontend/src/styles.css:203` | Duplicate selector ":root[data-theme="dark"]", first used at line 31 | corregido `ab2ad9a` |
+| css | css:S4666 | MAJOR | `frontend/src/styles.css:204` | Duplicate selector "body", first used at line 33 | corregido `ab2ad9a` |
+| css | css:S4666 | MAJOR | `frontend/src/styles.css:214` | Duplicate selector ".left-rail", first used at line 55 | corregido `ab2ad9a` |
+| css | css:S4666 | MAJOR | `frontend/src/styles.css:215` | Duplicate selector "nav a", first used at line 59 | corregido `ab2ad9a` |
+| css | css:S4666 | MAJOR | `frontend/src/styles.css:217` | Duplicate selector ".logout-button", first used at line 64 | corregido `ab2ad9a` |
+| css | css:S4666 | MAJOR | `frontend/src/styles.css:218` | Duplicate selector ".icon-button", first used at line 154 | corregido `ab2ad9a` |
+| css | css:S4666 | MAJOR | `frontend/src/styles.css:222` | Duplicate selector ".table-scroll", first used at line 134 | corregido `ab2ad9a` |
+| css | css:S4666 | MAJOR | `frontend/src/styles.css:225` | Duplicate selector ".toast", first used at line 168 | corregido `ab2ad9a` |
+| githubactions | githubactions:S1135 | INFO | `.github/workflows/ci.yml:14` | Complete the task associated to this "TODO" comment. | falso positivo: «TODOS» (español, «si TODOS los archivos modificados…») en un comentario; no hay tarea pendiente |
 | go | go:S1135 | INFO | `backend/internal/events/events_test.go:85` | Complete the task associated to this TODO comment. | corregido (lote 1b, `8f8609d`): comentario reformulado («cualquier tipo de evento») |
 | go | go:S3776 | CRITICAL | `backend/cmd/worker/smtp_test.go:136` | Refactor this method to reduce its Cognitive Complexity from 26 to the 15 allowed. | corregido (lote 1b, `0223446`): helpers con nombre, mismas aserciones |
 | go | go:S3776 | CRITICAL | `backend/internal/api/login_test.go:308` | Refactor this method to reduce its Cognitive Complexity from 17 to the 15 allowed. | corregido (lote 1b, `b44396a`): helpers con nombre, mismas aserciones |
@@ -228,86 +234,107 @@ Fuente: `api/issues/search` (CODE_SMELL, sin resolver), 123 al momento de la con
 | go | godre:S8196 | MINOR | `backend/internal/auth/refresh/refresh.go:77` | Rename this interface to follow Go naming conventions for single-method interfaces. | corregido (lote 1b, `c623e04`): renombrada a nombre de agente («…Transactor», `healthcheckRequester`, `userByIDGetter`, `confirmationWaiter`) |
 | go | godre:S8196 | MINOR | `backend/internal/events/broker.go:13` | Rename this interface to follow Go naming conventions for single-method interfaces. | corregido (lote 1b, `c623e04`): renombrada a nombre de agente («…Transactor», `healthcheckRequester`, `userByIDGetter`, `confirmationWaiter`) |
 | go | godre:S8242 | MAJOR | `backend/internal/testdb/testdb.go:73` | Remove this 'context.Context' field and pass context as a parameter to methods that need it. | corregido (lote 1/3) |
-| javascript | javascript:S4624 | MAJOR | `docs/informe/build.mjs:138` | Refactor this code to not use nested template literals. | pendiente |
-| javascript | javascript:S4624 | MAJOR | `docs/informe/build.mjs:157` | Refactor this code to not use nested template literals. | pendiente |
-| javascript | javascript:S6582 | MINOR | `docs/informe/build.mjs:81` | Prefer using an optional chain expression instead, as it's more concise and easier to read. | pendiente |
-| javascript | javascript:S7758 | MINOR | `docs/informe/build.mjs:122` | Prefer `String.fromCodePoint()` over `String.fromCharCode()`. | pendiente |
-| javascript | javascript:S7781 | MINOR | `docs/informe/build.mjs:31` | Prefer `String#replaceAll()` over `String#replace()`. | pendiente |
-| javascript | javascript:S7781 | MINOR | `docs/informe/build.mjs:31` | Prefer `String#replaceAll()` over `String#replace()`. | pendiente |
-| javascript | javascript:S7781 | MINOR | `docs/informe/build.mjs:31` | Prefer `String#replaceAll()` over `String#replace()`. | pendiente |
-| javascript | javascript:S7781 | MINOR | `docs/informe/build.mjs:31` | Prefer `String#replaceAll()` over `String#replace()`. | pendiente |
-| javascript | javascript:S878 | MAJOR | `docs/informe/build.mjs:136` | Unexpected use of comma operator. | pendiente |
-| javascript | javascript:S878 | MAJOR | `docs/informe/build.mjs:137` | Unexpected use of comma operator. | pendiente |
-| javascript | javascript:S8786 | MAJOR | `docs/informe/build.mjs:88` | Simplify this regular expression to reduce its runtime, as it has super-linear performance due to backtracking. | pendiente |
-| javascript | javascript:S9382 | MINOR | `docs/informe/build.mjs:301` | Unexpected `await` inside a loop. | pendiente |
-| javascript | javascript:S9382 | MINOR | `docs/informe/build.mjs:322` | Unexpected `await` inside a loop. | pendiente |
-| javascript | javascript:S9382 | MINOR | `docs/informe/build.mjs:322` | Unexpected `await` inside a loop. | pendiente |
-| plsql | plsql:OrderByExplicitAscCheck | MINOR | `db/queries/roles.sql:6` | Add ASC in order to make the order explicit. | pendiente |
-| plsql | plsql:OrderByExplicitAscCheck | MINOR | `db/queries/roles.sql:26` | Add ASC in order to make the order explicit. | pendiente |
-| plsql | plsql:OrderByExplicitAscCheck | MINOR | `db/queries/users.sql:39` | Add ASC in order to make the order explicit. | pendiente |
-| plsql | plsql:S1192 | CRITICAL | `db/migrations/000001_initial_schema.up.sql:17` | Define a constant instead of duplicating this literal 5 times. | pendiente |
-| plsql | plsql:S1192 | CRITICAL | `db/queries/users.sql:38` | Define a constant instead of duplicating this literal 11 times. | pendiente |
-| plsql | plsql:S1192 | CRITICAL | `db/queries/users.sql:62` | Define a constant instead of duplicating this literal 5 times. | pendiente |
-| plsql | plsql:S1192 | CRITICAL | `db/queries/users.sql:104` | Define a constant instead of duplicating this literal 5 times. | pendiente |
-| plsql | plsql:S1192 | CRITICAL | `db/queries/users.sql:287` | Define a constant instead of duplicating this literal 6 times. | pendiente |
-| plsql | plsql:S1192 | CRITICAL | `db/queries/users.sql:338` | Define a constant instead of duplicating this literal 4 times. | pendiente |
-| python | python:S1481 | MINOR | `scripts/zap-gate.py:109` | Replace the unused local variable "comment" with "_". | pendiente |
-| python | python:S3358 | MAJOR | `scripts/traceability.py:337` | Extract this nested conditional expression into an independent statement. | pendiente |
-| python | python:S3358 | MAJOR | `scripts/traceability.py:338` | Extract this nested conditional expression into an independent statement. | pendiente |
-| python | python:S3776 | CRITICAL | `scripts/traceability.py:69` | Refactor this function to reduce its Cognitive Complexity from 16 to the 15 allowed. | pendiente |
-| python | python:S3776 | CRITICAL | `scripts/traceability.py:114` | Refactor this function to reduce its Cognitive Complexity from 22 to the 15 allowed. | pendiente |
-| python | python:S3776 | CRITICAL | `scripts/traceability.py:167` | Refactor this function to reduce its Cognitive Complexity from 16 to the 15 allowed. | pendiente |
-| python | python:S3776 | CRITICAL | `scripts/traceability.py:240` | Refactor this function to reduce its Cognitive Complexity from 25 to the 15 allowed. | pendiente |
-| python | python:S3776 | CRITICAL | `scripts/traceability.py:288` | Refactor this function to reduce its Cognitive Complexity from 40 to the 15 allowed. | pendiente |
-| python | python:S3776 | CRITICAL | `scripts/zap-gate.py:80` | Refactor this function to reduce its Cognitive Complexity from 22 to the 15 allowed. | pendiente |
-| shell | shelldre:S131 | CRITICAL | `scripts/ip-lockout-warning.sh:26` | Add a default case (*) to handle unexpected values. | pendiente |
-| shell | shelldre:S7679 | MAJOR | `scripts/gen-smtp-certs.sh:48` | Assign this positional parameter to a local variable. | pendiente |
-| shell | shelldre:S7679 | MAJOR | `scripts/ip-lockout-warning.sh:58` | Assign this positional parameter to a local variable. | pendiente |
-| shell | shelldre:S7679 | MAJOR | `scripts/ip-lockout-warning.sh:58` | Assign this positional parameter to a local variable. | pendiente |
-| shell | shelldre:S7682 | MAJOR | `scripts/ip-lockout-warning.sh:57` | Add an explicit return statement at the end of the function. | pendiente |
-| shell | shelldre:S7688 | MAJOR | `deploy/postgres-init/01-identity-app-role.sh:10` | Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. | pendiente |
-| shell | shelldre:S7688 | MAJOR | `scripts/ip-lockout-warning.sh:55` | Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. | pendiente |
-| shell | shelldre:S7688 | MAJOR | `scripts/ip-lockout-warning.sh:62` | Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. | pendiente |
-| shell | shelldre:S7688 | MAJOR | `scripts/with-raised-login-limit.sh:15` | Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. | pendiente |
-| shell | shelldre:S7688 | MAJOR | `scripts/with-raised-login-limit.sh:25` | Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. | pendiente |
-| typescript | typescript:S3358 | MAJOR | `contabilidad/src/views/Transactions.tsx:48` | Extract this nested ternary operation into an independent statement. | pendiente |
-| typescript | typescript:S3358 | MAJOR | `contabilidad/src/views/Transactions.tsx:52` | Extract this nested ternary operation into an independent statement. | pendiente |
-| typescript | typescript:S3358 | MAJOR | `frontend/src/features/admin/AuditLogPage.tsx:49` | Extract this nested ternary operation into an independent statement. | pendiente |
-| typescript | typescript:S3735 | CRITICAL | `frontend/src/features/admin/ServiceKeysPage.tsx:246` | Remove this use of the "void" operator. | pendiente |
-| typescript | typescript:S3776 | CRITICAL | `contabilidad/src/auth/flow.ts:54` | Refactor this function to reduce its Cognitive Complexity from 16 to the 15 allowed. | pendiente |
-| typescript | typescript:S3776 | CRITICAL | `frontend/src/features/admin/UserDrawer.tsx:97` | Refactor this function to reduce its Cognitive Complexity from 18 to the 15 allowed. | pendiente |
-| typescript | typescript:S4624 | MAJOR | `e2e/manual/capturas.ts:114` | Refactor this code to not use nested template literals. | pendiente |
-| typescript | typescript:S4624 | MAJOR | `e2e/support/mailpit.ts:22` | Refactor this code to not use nested template literals. | pendiente |
-| typescript | typescript:S5906 | MINOR | `frontend/src/auditLog.test.tsx:136` | Prefer "expect(await within(table).findAllByText('ana@example.test')).toHaveLength(2)" over this generic assertion for b | pendiente |
-| typescript | typescript:S6479 | MAJOR | `frontend/src/features/account/MyAccountPage.tsx:36` | Do not use Array index in keys | pendiente |
-| typescript | typescript:S6479 | MAJOR | `frontend/src/features/account/PublicPages.tsx:34` | Do not use Array index in keys | pendiente |
-| typescript | typescript:S6479 | MAJOR | `frontend/src/features/admin/shared.tsx:63` | Do not use Array index in keys | pendiente |
-| typescript | typescript:S6551 | MINOR | `frontend/src/test-utils.ts:19` | 'input' may use Object's default stringification format ('[object Object]') when stringified. | pendiente |
-| typescript | typescript:S6551 | MINOR | `frontend/src/test-utils.ts:21` | 'init.body' may use Object's default stringification format ('[object Object]') when stringified. | pendiente |
-| typescript | typescript:S6819 | MAJOR | `contabilidad/src/Login.tsx:15` | Use <output> instead of the "status" role to ensure accessibility across all devices. | pendiente |
-| typescript | typescript:S6819 | MAJOR | `contabilidad/src/Toast.tsx:15` | Use <output> instead of the "status" role to ensure accessibility across all devices. | pendiente |
-| typescript | typescript:S6819 | MAJOR | `contabilidad/src/views/ConfirmDialog.tsx:61` | Use <dialog> instead of the "dialog" role to ensure accessibility across all devices. | pendiente |
-| typescript | typescript:S6819 | MAJOR | `frontend/src/App.tsx:136` | Use <output> instead of the "status" role to ensure accessibility across all devices. | pendiente |
-| typescript | typescript:S6819 | MAJOR | `frontend/src/components/LoadingSkeleton.tsx:2` | Use <output> instead of the "status" role to ensure accessibility across all devices. | pendiente |
-| typescript | typescript:S6819 | MAJOR | `frontend/src/components/Toast.tsx:16` | Use <output> instead of the "status" role to ensure accessibility across all devices. | pendiente |
-| typescript | typescript:S6819 | MAJOR | `frontend/src/features/account/MyAccountPage.tsx:37` | Use <output> instead of the "status" role to ensure accessibility across all devices. | pendiente |
-| typescript | typescript:S6819 | MAJOR | `frontend/src/features/account/PublicPages.tsx:120` | Use <output> instead of the "status" role to ensure accessibility across all devices. | pendiente |
-| typescript | typescript:S6819 | MAJOR | `frontend/src/features/account/PublicPages.tsx:155` | Use <output> instead of the "status" role to ensure accessibility across all devices. | pendiente |
-| typescript | typescript:S6819 | MAJOR | `frontend/src/features/account/PublicPages.tsx:184` | Use <output> instead of the "status" role to ensure accessibility across all devices. | pendiente |
-| typescript | typescript:S6819 | MAJOR | `frontend/src/features/admin/AuditLogPage.tsx:243` | Use <details>, <fieldset>, <optgroup>, or <address> instead of the "group" role to ensure accessibility across all devic | pendiente |
-| typescript | typescript:S6819 | MAJOR | `frontend/src/features/admin/AuditLogPage.tsx:249` | Use <details>, <fieldset>, <optgroup>, or <address> instead of the "group" role to ensure accessibility across all devic | pendiente |
-| typescript | typescript:S6819 | MAJOR | `frontend/src/features/admin/HomePage.tsx:63` | Use <details>, <fieldset>, <optgroup>, or <address> instead of the "group" role to ensure accessibility across all devic | pendiente |
-| typescript | typescript:S6819 | MAJOR | `frontend/src/features/admin/UserDrawer.tsx:140` | Use <dialog> instead of the "dialog" role to ensure accessibility across all devices. | pendiente |
-| typescript | typescript:S6819 | MAJOR | `frontend/src/features/admin/UsersPage.tsx:23` | Use <details>, <fieldset>, <optgroup>, or <address> instead of the "group" role to ensure accessibility across all devic | pendiente |
-| typescript | typescript:S6819 | MAJOR | `frontend/src/features/admin/UsersPage.tsx:188` | Use <details>, <fieldset>, <optgroup>, or <address> instead of the "group" role to ensure accessibility across all devic | pendiente |
-| typescript | typescript:S6847 | MAJOR | `contabilidad/src/views/ConfirmDialog.tsx:61` | Non-interactive elements should not be assigned mouse or keyboard event listeners. | pendiente |
-| typescript | typescript:S6847 | MAJOR | `frontend/src/features/admin/UserDrawer.tsx:140` | Non-interactive elements should not be assigned mouse or keyboard event listeners. | pendiente |
-| typescript | typescript:S6848 | MAJOR | `contabilidad/src/views/ConfirmDialog.tsx:60` | Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tab | pendiente |
-| typescript | typescript:S7503 | MINOR | `e2e/support/global-teardown.ts:9` | Async function 'globalTeardown' has no 'await' expression. | pendiente |
-| typescript | typescript:S7755 | MINOR | `contabilidad/src/aggregate.ts:48` | Prefer `.at(…)` over `[….length - index]`. | pendiente |
-| typescript | typescript:S7781 | MINOR | `frontend/src/features/csv.ts:20` | Prefer `String#replaceAll()` over `String#replace()`. | pendiente |
-| typescript | typescript:S9382 | MINOR | `e2e/manual/capturas.ts:258` | Unexpected `await` inside a loop. | pendiente |
-| typescript | typescript:S9382 | MINOR | `e2e/manual/capturas.ts:498` | Unexpected `await` inside a loop. | pendiente |
-| typescript | typescript:S9382 | MINOR | `e2e/support/mailpit.ts:33` | Unexpected `await` inside a loop. | pendiente |
-| typescript | typescript:S9382 | MINOR | `e2e/support/mailpit.ts:39` | Unexpected `await` inside a loop. | pendiente |
-| typescript | typescript:S9382 | MINOR | `e2e/support/mailpit.ts:74` | Unexpected `await` inside a loop. | pendiente |
+| javascript | javascript:S4624 | MAJOR | `docs/informe/build.mjs:138` | Refactor this code to not use nested template literals. | corregido `6841cf1` |
+| javascript | javascript:S4624 | MAJOR | `docs/informe/build.mjs:157` | Refactor this code to not use nested template literals. | corregido `6841cf1` |
+| javascript | javascript:S6582 | MINOR | `docs/informe/build.mjs:81` | Prefer using an optional chain expression instead, as it's more concise and easier to read. | corregido `6841cf1` |
+| javascript | javascript:S7758 | MINOR | `docs/informe/build.mjs:122` | Prefer `String.fromCodePoint()` over `String.fromCharCode()`. | corregido `6841cf1` |
+| javascript | javascript:S7781 | MINOR | `docs/informe/build.mjs:31` | Prefer `String#replaceAll()` over `String#replace()`. | corregido `6841cf1` |
+| javascript | javascript:S7781 | MINOR | `docs/informe/build.mjs:31` | Prefer `String#replaceAll()` over `String#replace()`. | corregido `6841cf1` |
+| javascript | javascript:S7781 | MINOR | `docs/informe/build.mjs:31` | Prefer `String#replaceAll()` over `String#replace()`. | corregido `6841cf1` |
+| javascript | javascript:S7781 | MINOR | `docs/informe/build.mjs:31` | Prefer `String#replaceAll()` over `String#replace()`. | corregido `6841cf1` |
+| javascript | javascript:S878 | MAJOR | `docs/informe/build.mjs:136` | Unexpected use of comma operator. | corregido `6841cf1` |
+| javascript | javascript:S878 | MAJOR | `docs/informe/build.mjs:137` | Unexpected use of comma operator. | corregido `6841cf1` |
+| javascript | javascript:S8786 | MAJOR | `docs/informe/build.mjs:88` | Simplify this regular expression to reduce its runtime, as it has super-linear performance due to backtracking. | corregido `6841cf1` |
+| javascript | javascript:S9382 | MINOR | `docs/informe/build.mjs:301` | Unexpected `await` inside a loop. | falso positivo (revertido tras la revisión nativa): el render secuencial deja el orden estable y reporta cada diagrama roto; la llamada única solo informaba el primer error |
+| javascript | javascript:S9382 | MINOR | `docs/informe/build.mjs:322` | Unexpected `await` inside a loop. | corregido `6841cf1` |
+| javascript | javascript:S9382 | MINOR | `docs/informe/build.mjs:322` | Unexpected `await` inside a loop. | corregido `6841cf1` |
+| plsql | plsql:OrderByExplicitAscCheck | MINOR | `db/queries/roles.sql:6` | Add ASC in order to make the order explicit. | corregido `40302a3` |
+| plsql | plsql:OrderByExplicitAscCheck | MINOR | `db/queries/roles.sql:26` | Add ASC in order to make the order explicit. | corregido `40302a3` |
+| plsql | plsql:OrderByExplicitAscCheck | MINOR | `db/queries/users.sql:39` | Add ASC in order to make the order explicit. | corregido `40302a3` |
+| plsql | plsql:S1192 | CRITICAL | `db/migrations/000001_initial_schema.up.sql:17` | Define a constant instead of duplicating this literal 5 times. | no aplicable: migración aplicada e inmutable (`db/migrations/**` pasó a `sonar.exclusions` en `.sonarcloud.properties`, `40302a3`) |
+| plsql | plsql:S1192 | CRITICAL | `db/queries/users.sql:38` | Define a constant instead of duplicating this literal 11 times. | falso positivo: los literales son etiquetas de enums (`user_status`, tipos de token, estados) en sentencias independientes; PostgreSQL/sqlc no tienen constantes entre consultas y parametrizarlas cambiaría las firmas Go y el comportamiento |
+| plsql | plsql:S1192 | CRITICAL | `db/queries/users.sql:62` | Define a constant instead of duplicating this literal 5 times. | falso positivo: los literales son etiquetas de enums (`user_status`, tipos de token, estados) en sentencias independientes; PostgreSQL/sqlc no tienen constantes entre consultas y parametrizarlas cambiaría las firmas Go y el comportamiento |
+| plsql | plsql:S1192 | CRITICAL | `db/queries/users.sql:104` | Define a constant instead of duplicating this literal 5 times. | falso positivo: los literales son etiquetas de enums (`user_status`, tipos de token, estados) en sentencias independientes; PostgreSQL/sqlc no tienen constantes entre consultas y parametrizarlas cambiaría las firmas Go y el comportamiento |
+| plsql | plsql:S1192 | CRITICAL | `db/queries/users.sql:287` | Define a constant instead of duplicating this literal 6 times. | falso positivo: los literales son etiquetas de enums (`user_status`, tipos de token, estados) en sentencias independientes; PostgreSQL/sqlc no tienen constantes entre consultas y parametrizarlas cambiaría las firmas Go y el comportamiento |
+| plsql | plsql:S1192 | CRITICAL | `db/queries/users.sql:338` | Define a constant instead of duplicating this literal 4 times. | falso positivo: los literales son etiquetas de enums (`user_status`, tipos de token, estados) en sentencias independientes; PostgreSQL/sqlc no tienen constantes entre consultas y parametrizarlas cambiaría las firmas Go y el comportamiento |
+| python | python:S1481 | MINOR | `scripts/zap-gate.py:109` | Replace the unused local variable "comment" with "_". | corregido `078f7c2` |
+| python | python:S3358 | MAJOR | `scripts/traceability.py:337` | Extract this nested conditional expression into an independent statement. | corregido `078f7c2` |
+| python | python:S3358 | MAJOR | `scripts/traceability.py:338` | Extract this nested conditional expression into an independent statement. | corregido `078f7c2` |
+| python | python:S3776 | CRITICAL | `scripts/traceability.py:69` | Refactor this function to reduce its Cognitive Complexity from 16 to the 15 allowed. | corregido `078f7c2` |
+| python | python:S3776 | CRITICAL | `scripts/traceability.py:114` | Refactor this function to reduce its Cognitive Complexity from 22 to the 15 allowed. | corregido `078f7c2` |
+| python | python:S3776 | CRITICAL | `scripts/traceability.py:167` | Refactor this function to reduce its Cognitive Complexity from 16 to the 15 allowed. | corregido `078f7c2` |
+| python | python:S3776 | CRITICAL | `scripts/traceability.py:240` | Refactor this function to reduce its Cognitive Complexity from 25 to the 15 allowed. | corregido `078f7c2` |
+| python | python:S3776 | CRITICAL | `scripts/traceability.py:288` | Refactor this function to reduce its Cognitive Complexity from 40 to the 15 allowed. | corregido `078f7c2` |
+| python | python:S3776 | CRITICAL | `scripts/zap-gate.py:80` | Refactor this function to reduce its Cognitive Complexity from 22 to the 15 allowed. | corregido `078f7c2` |
+| shell | shelldre:S131 | CRITICAL | `scripts/ip-lockout-warning.sh:26` | Add a default case (*) to handle unexpected values. | corregido `a5f8365` |
+| shell | shelldre:S7679 | MAJOR | `scripts/gen-smtp-certs.sh:48` | Assign this positional parameter to a local variable. | corregido `a5f8365` |
+| shell | shelldre:S7679 | MAJOR | `scripts/ip-lockout-warning.sh:58` | Assign this positional parameter to a local variable. | corregido `a5f8365` |
+| shell | shelldre:S7679 | MAJOR | `scripts/ip-lockout-warning.sh:58` | Assign this positional parameter to a local variable. | corregido `a5f8365` |
+| shell | shelldre:S7682 | MAJOR | `scripts/ip-lockout-warning.sh:57` | Add an explicit return statement at the end of the function. | corregido `a5f8365` |
+| shell | shelldre:S7688 | MAJOR | `deploy/postgres-init/01-identity-app-role.sh:10` | Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. | corregido `a5f8365` |
+| shell | shelldre:S7688 | MAJOR | `scripts/ip-lockout-warning.sh:55` | Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. | corregido `a5f8365` |
+| shell | shelldre:S7688 | MAJOR | `scripts/ip-lockout-warning.sh:62` | Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. | corregido `a5f8365` |
+| shell | shelldre:S7688 | MAJOR | `scripts/with-raised-login-limit.sh:15` | Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. | corregido `a5f8365` |
+| shell | shelldre:S7688 | MAJOR | `scripts/with-raised-login-limit.sh:25` | Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. | corregido `a5f8365` |
+| typescript | typescript:S3358 | MAJOR | `contabilidad/src/views/Transactions.tsx:48` | Extract this nested ternary operation into an independent statement. | corregido `e5510f9` |
+| typescript | typescript:S3358 | MAJOR | `contabilidad/src/views/Transactions.tsx:52` | Extract this nested ternary operation into an independent statement. | corregido `e5510f9` |
+| typescript | typescript:S3358 | MAJOR | `frontend/src/features/admin/AuditLogPage.tsx:49` | Extract this nested ternary operation into an independent statement. | corregido `e49e17b` |
+| typescript | typescript:S3735 | CRITICAL | `frontend/src/features/admin/ServiceKeysPage.tsx:246` | Remove this use of the "void" operator. | corregido `e49e17b` |
+| typescript | typescript:S3776 | CRITICAL | `contabilidad/src/auth/flow.ts:54` | Refactor this function to reduce its Cognitive Complexity from 16 to the 15 allowed. | corregido `e5510f9` |
+| typescript | typescript:S3776 | CRITICAL | `frontend/src/features/admin/UserDrawer.tsx:97` | Refactor this function to reduce its Cognitive Complexity from 18 to the 15 allowed. | corregido `e49e17b` |
+| typescript | typescript:S4624 | MAJOR | `e2e/manual/capturas.ts:114` | Refactor this code to not use nested template literals. | corregido `463398e` |
+| typescript | typescript:S4624 | MAJOR | `e2e/support/mailpit.ts:22` | Refactor this code to not use nested template literals. | corregido `463398e` |
+| typescript | typescript:S5906 | MINOR | `frontend/src/auditLog.test.tsx:136` | Prefer "expect(await within(table).findAllByText('ana@example.test')).toHaveLength(2)" over this generic assertion for b | corregido `e49e17b` |
+| typescript | typescript:S6479 | MAJOR | `frontend/src/features/account/MyAccountPage.tsx:36` | Do not use Array index in keys | corregido `e49e17b` |
+| typescript | typescript:S6479 | MAJOR | `frontend/src/features/account/PublicPages.tsx:34` | Do not use Array index in keys | corregido `e49e17b` |
+| typescript | typescript:S6479 | MAJOR | `frontend/src/features/admin/shared.tsx:63` | Do not use Array index in keys | corregido `e49e17b` |
+| typescript | typescript:S6551 | MINOR | `frontend/src/test-utils.ts:19` | 'input' may use Object's default stringification format ('[object Object]') when stringified. | corregido `e49e17b` |
+| typescript | typescript:S6551 | MINOR | `frontend/src/test-utils.ts:21` | 'init.body' may use Object's default stringification format ('[object Object]') when stringified. | corregido `e49e17b` |
+| typescript | typescript:S6819 | MAJOR | `contabilidad/src/Login.tsx:15` | Use <output> instead of the "status" role to ensure accessibility across all devices. | corregido `e5510f9` |
+| typescript | typescript:S6819 | MAJOR | `contabilidad/src/Toast.tsx:15` | Use <output> instead of the "status" role to ensure accessibility across all devices. | corregido `e5510f9` |
+| typescript | typescript:S6819 | MAJOR | `contabilidad/src/views/ConfirmDialog.tsx:61` | Use <dialog> instead of the "dialog" role to ensure accessibility across all devices. | corregido `e5510f9` |
+| typescript | typescript:S6819 | MAJOR | `frontend/src/App.tsx:136` | Use <output> instead of the "status" role to ensure accessibility across all devices. | corregido `e49e17b` |
+| typescript | typescript:S6819 | MAJOR | `frontend/src/components/LoadingSkeleton.tsx:2` | Use <output> instead of the "status" role to ensure accessibility across all devices. | corregido `e49e17b` |
+| typescript | typescript:S6819 | MAJOR | `frontend/src/components/Toast.tsx:16` | Use <output> instead of the "status" role to ensure accessibility across all devices. | corregido `e49e17b` |
+| typescript | typescript:S6819 | MAJOR | `frontend/src/features/account/MyAccountPage.tsx:37` | Use <output> instead of the "status" role to ensure accessibility across all devices. | corregido `e49e17b` |
+| typescript | typescript:S6819 | MAJOR | `frontend/src/features/account/PublicPages.tsx:120` | Use <output> instead of the "status" role to ensure accessibility across all devices. | corregido `e49e17b` |
+| typescript | typescript:S6819 | MAJOR | `frontend/src/features/account/PublicPages.tsx:155` | Use <output> instead of the "status" role to ensure accessibility across all devices. | corregido `e49e17b` |
+| typescript | typescript:S6819 | MAJOR | `frontend/src/features/account/PublicPages.tsx:184` | Use <output> instead of the "status" role to ensure accessibility across all devices. | corregido `e49e17b` |
+| typescript | typescript:S6819 | MAJOR | `frontend/src/features/admin/AuditLogPage.tsx:243` | Use <details>, <fieldset>, <optgroup>, or <address> instead of the "group" role to ensure accessibility across all devic | corregido `e49e17b` |
+| typescript | typescript:S6819 | MAJOR | `frontend/src/features/admin/AuditLogPage.tsx:249` | Use <details>, <fieldset>, <optgroup>, or <address> instead of the "group" role to ensure accessibility across all devic | corregido `e49e17b` |
+| typescript | typescript:S6819 | MAJOR | `frontend/src/features/admin/HomePage.tsx:63` | Use <details>, <fieldset>, <optgroup>, or <address> instead of the "group" role to ensure accessibility across all devic | corregido `e49e17b` |
+| typescript | typescript:S6819 | MAJOR | `frontend/src/features/admin/UserDrawer.tsx:140` | Use <dialog> instead of the "dialog" role to ensure accessibility across all devices. | corregido `e49e17b` |
+| typescript | typescript:S6819 | MAJOR | `frontend/src/features/admin/UsersPage.tsx:23` | Use <details>, <fieldset>, <optgroup>, or <address> instead of the "group" role to ensure accessibility across all devic | corregido `e49e17b` |
+| typescript | typescript:S6819 | MAJOR | `frontend/src/features/admin/UsersPage.tsx:188` | Use <details>, <fieldset>, <optgroup>, or <address> instead of the "group" role to ensure accessibility across all devic | corregido `e49e17b` |
+| typescript | typescript:S6847 | MAJOR | `contabilidad/src/views/ConfirmDialog.tsx:61` | Non-interactive elements should not be assigned mouse or keyboard event listeners. | corregido `e5510f9` |
+| typescript | typescript:S6847 | MAJOR | `frontend/src/features/admin/UserDrawer.tsx:140` | Non-interactive elements should not be assigned mouse or keyboard event listeners. | corregido `e49e17b` |
+| typescript | typescript:S6848 | MAJOR | `contabilidad/src/views/ConfirmDialog.tsx:60` | Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tab | corregido `e5510f9` |
+| typescript | typescript:S7503 | MINOR | `e2e/support/global-teardown.ts:9` | Async function 'globalTeardown' has no 'await' expression. | corregido `463398e` |
+| typescript | typescript:S7755 | MINOR | `contabilidad/src/aggregate.ts:48` | Prefer `.at(…)` over `[….length - index]`. | corregido `e5510f9` |
+| typescript | typescript:S7781 | MINOR | `frontend/src/features/csv.ts:20` | Prefer `String#replaceAll()` over `String#replace()`. | corregido `e49e17b` |
+| typescript | typescript:S9382 | MINOR | `e2e/manual/capturas.ts:258` | Unexpected `await` inside a loop. | falso positivo: los 4 intentos fallidos de login deben ir en serie para contar contra el bloqueo (en paralelo la cuenta podría no llegar al umbral de forma determinista) |
+| typescript | typescript:S9382 | MINOR | `e2e/manual/capturas.ts:498` | Unexpected `await` inside a loop. | corregido `463398e` |
+| typescript | typescript:S9382 | MINOR | `e2e/support/mailpit.ts:33` | Unexpected `await` inside a loop. | falso positivo: bucle de sondeo con reintento; cada intento depende del anterior |
+| typescript | typescript:S9382 | MINOR | `e2e/support/mailpit.ts:39` | Unexpected `await` inside a loop. | falso positivo: bucle de sondeo con reintento; cada intento depende del anterior |
+| typescript | typescript:S9382 | MINOR | `e2e/support/mailpit.ts:74` | Unexpected `await` inside a loop. | falso positivo: bucle de sondeo con espera entre intentos (`sleep`); no es paralelizable |
+
+Revisión nativa del lote 2 (2026-10-13): aprobada (28 archivos, 492 líneas). Correcciones posteriores: `build.mjs` vuelve a renderizar Mermaid diagrama por diagrama (la llamada única perdía diagnósticos; S9382 en esa línea pasa a falso positivo); el comentario de seguridad de `ServiceKeysPage.tsx` vuelve a quedar sobre `RevealedKey`.
+
+Revisión nativa del lote 3 (2026-10-13): aprobada (13 archivos, 514 líneas). Advertencia de orden de cascada en `styles.css` verificada con un script que compara, por selector y propiedad, la secuencia de valores y contextos `@media` antes/después: las 25 diferencias eliminan solo declaraciones que ya pisaba otra posterior del mismo contexto (el valor final no cambia; `.logout-button` `margin-top` queda `0` en ambos contextos, igual que antes). Sugerencias aplicadas: se quita el `.link-button:hover` redundante y se corrige el docstring de `requirement_state`.
+
+Verificación visual del lote 2 (2026-10-13, Playwright, sin cambios en el repo): 76 capturas por lado (escritorio 1280×800 y móvil 390×844, tema claro y oscuro) de HEAD contra `06f48d2`, con diff por píxel. Las diferencias se deben solo a datos de prueba distintos entre los dos stacks (filas, correos, id de cuenta); drawer, diálogo de confirmación, `<output>` y `<fieldset>` sin cambio visual. Teclado: foco inicial dentro del diálogo, Tab/Shift+Tab dan la vuelta, Escape y clic afuera cierran; `getByRole('status')` y `role=group` siguen expuestos. Revisión manual de Opus de las capturas del drawer y del diálogo de Contabilidad.
+
+- Pulido del informe (2026-10-13): fecha del documento retirada, diagramas en vertical junto a su texto, secciones 2.4 y 3.1 reescritas y detalles de entorno local quitados del informe; 50 páginas.
+
+## Entrega (cortes de PR, 2026-10-13)
+
+Estrategia `stacked-to-main`; el usuario eligió 5 PR por tarea con `size:exception` justificada (cada uno es una
+tarea cerrada y revisada por partes con la revisión nativa):
+
+| PR | Rama | Commits | Líneas (sin generado) |
+|---|---|---|---|
+| 1 | `docs/notas-2026-10-13` | `32e8359..d885617` (documentación de cierre + `make up`) | ~770 |
+| 2 | `feat/seguimiento-s1-s4` | `d885617..75550fa` | ~620 |
+| 3 | `feat/seguimiento-s5-s6` | `75550fa..fb568d5` | ~1 590 |
+| 4 | `feat/seguimiento-s7-go` | `fb568d5..06f48d2` | ~1 300 |
+| 5 | `feat/seguimiento-pre-v1` | `06f48d2..HEAD` (S7 resto + informe final) | ~1 170 |

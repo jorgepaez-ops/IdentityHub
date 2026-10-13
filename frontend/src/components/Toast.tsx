@@ -13,5 +13,5 @@ export function Toast({ message, onClose }: Readonly<{ message: string; onClose:
     return () => window.clearTimeout(timeout)
   }, [message])
 
-  return <div className="toast" role="status"><span>{message}</span><button className="toast-close" type="button" onClick={onClose} aria-label="Cerrar aviso"><CloseIcon /></button></div>
+  return <output className="toast"><span>{message}</span><button className="toast-close" type="button" onClick={onClose} aria-label="Cerrar aviso"><CloseIcon /></button></output>
 }

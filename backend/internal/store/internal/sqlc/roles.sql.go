@@ -92,7 +92,7 @@ func (q *Queries) DeleteApplicationRolePermissions(ctx context.Context, roleID u
 
 const getApplicationRole = `-- name: GetApplicationRole :one
 SELECT r.id, r.name, r.description, r.application_id, r.system,
-       COALESCE(array_agg(p.key ORDER BY p.key) FILTER (WHERE p.key IS NOT NULL), '{}')::text[] AS permission_keys,
+       COALESCE(array_agg(p.key ORDER BY p.key ASC) FILTER (WHERE p.key IS NOT NULL), '{}')::text[] AS permission_keys,
        (SELECT count(*) FROM user_roles ur WHERE ur.role_id = r.id)::bigint AS assigned_count
 FROM roles r
 LEFT JOIN role_permissions rp ON rp.role_id = r.id
@@ -149,7 +149,7 @@ func (q *Queries) GetRoleGridApplication(ctx context.Context, id uuid.UUID) (Get
 }
 
 const listApplicationPermissions = `-- name: ListApplicationPermissions :many
-SELECT key, description FROM permissions WHERE application_id = $1 ORDER BY key
+SELECT key, description FROM permissions WHERE application_id = $1 ORDER BY key ASC
 `
 
 type ListApplicationPermissionsRow struct {
@@ -179,14 +179,14 @@ func (q *Queries) ListApplicationPermissions(ctx context.Context, applicationID 
 
 const listApplicationRoles = `-- name: ListApplicationRoles :many
 SELECT r.id, r.name, r.description, r.application_id, r.system,
-       COALESCE(array_agg(p.key ORDER BY p.key) FILTER (WHERE p.key IS NOT NULL), '{}')::text[] AS permission_keys,
+       COALESCE(array_agg(p.key ORDER BY p.key ASC) FILTER (WHERE p.key IS NOT NULL), '{}')::text[] AS permission_keys,
        (SELECT count(*) FROM user_roles ur WHERE ur.role_id = r.id)::bigint AS assigned_count
 FROM roles r
 LEFT JOIN role_permissions rp ON rp.role_id = r.id
 LEFT JOIN permissions p ON p.id = rp.permission_id
 WHERE r.application_id = $1
 GROUP BY r.id
-ORDER BY r.name
+ORDER BY r.name ASC
 `
 
 type ListApplicationRolesRow struct {
@@ -236,7 +236,7 @@ JOIN applications ON applications.id = roles.application_id
 WHERE roles.name = ANY($1::text[])
   AND applications.client_id = $2
   AND permissions.application_id = roles.application_id
-ORDER BY permissions.key
+ORDER BY permissions.key ASC
 `
 
 type ListPermissionKeysForRolesAndApplicationParams struct {
@@ -265,7 +265,7 @@ func (q *Queries) ListPermissionKeysForRolesAndApplication(ctx context.Context, 
 }
 
 const listRoleGridApplications = `-- name: ListRoleGridApplications :many
-SELECT id, client_id, name FROM applications ORDER BY client_id
+SELECT id, client_id, name FROM applications ORDER BY client_id ASC
 `
 
 type ListRoleGridApplicationsRow struct {
@@ -299,7 +299,7 @@ SELECT roles.id, roles.name, roles.description, roles.application_id, roles.syst
        applications.client_id
 FROM roles
 LEFT JOIN applications ON applications.id = roles.application_id
-ORDER BY roles.name
+ORDER BY roles.name ASC
 `
 
 type ListRolesWithApplicationRow struct {
@@ -372,7 +372,7 @@ func (q *Queries) UpdateApplicationRoleDescription(ctx context.Context, arg Upda
 const validateApplicationPermissionKeys = `-- name: ValidateApplicationPermissionKeys :many
 SELECT key FROM permissions
 WHERE application_id = $1 AND key = ANY($2::text[])
-ORDER BY key
+ORDER BY key ASC
 `
 
 type ValidateApplicationPermissionKeysParams struct {
@@ -404,7 +404,7 @@ const validateRoleNames = `-- name: ValidateRoleNames :many
 SELECT name
 FROM roles
 WHERE name = ANY($1::text[])
-ORDER BY name
+ORDER BY name ASC
 `
 
 func (q *Queries) ValidateRoleNames(ctx context.Context, roleNames []string) ([]string, error) {

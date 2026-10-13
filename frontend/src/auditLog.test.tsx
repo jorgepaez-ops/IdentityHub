@@ -133,7 +133,7 @@ describe('audit log actors', () => {
       ...emailLookup(BETO, 'beto@example.test'),
     })
     const table = screen.getByRole('table', { name: 'Registro de auditoría' })
-    expect((await within(table).findAllByText('ana@example.test')).length).toBe(2)
+    expect(await within(table).findAllByText('ana@example.test')).toHaveLength(2)
     expect(await within(table).findByText('beto@example.test')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Cargar más' }))
     await waitFor(() => expect(within(table).getAllByText('beto@example.test')).toHaveLength(2))

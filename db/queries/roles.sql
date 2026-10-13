@@ -3,13 +3,13 @@ SELECT roles.id, roles.name, roles.description, roles.application_id, roles.syst
        applications.client_id
 FROM roles
 LEFT JOIN applications ON applications.id = roles.application_id
-ORDER BY roles.name;
+ORDER BY roles.name ASC;
 
 -- name: ValidateRoleNames :many
 SELECT name
 FROM roles
 WHERE name = ANY(sqlc.arg(role_names)::text[])
-ORDER BY name;
+ORDER BY name ASC;
 
 -- name: ListPermissionKeysForRolesAndApplication :many
 SELECT DISTINCT permissions.key
@@ -20,31 +20,31 @@ JOIN applications ON applications.id = roles.application_id
 WHERE roles.name = ANY(sqlc.arg(role_names)::text[])
   AND applications.client_id = sqlc.arg(client_id)
   AND permissions.application_id = roles.application_id
-ORDER BY permissions.key;
+ORDER BY permissions.key ASC;
 
 -- name: ListRoleGridApplications :many
-SELECT id, client_id, name FROM applications ORDER BY client_id;
+SELECT id, client_id, name FROM applications ORDER BY client_id ASC;
 
 -- name: GetRoleGridApplication :one
 SELECT id, client_id, name FROM applications WHERE id = $1;
 
 -- name: ListApplicationPermissions :many
-SELECT key, description FROM permissions WHERE application_id = $1 ORDER BY key;
+SELECT key, description FROM permissions WHERE application_id = $1 ORDER BY key ASC;
 
 -- name: ListApplicationRoles :many
 SELECT r.id, r.name, r.description, r.application_id, r.system,
-       COALESCE(array_agg(p.key ORDER BY p.key) FILTER (WHERE p.key IS NOT NULL), '{}')::text[] AS permission_keys,
+       COALESCE(array_agg(p.key ORDER BY p.key ASC) FILTER (WHERE p.key IS NOT NULL), '{}')::text[] AS permission_keys,
        (SELECT count(*) FROM user_roles ur WHERE ur.role_id = r.id)::bigint AS assigned_count
 FROM roles r
 LEFT JOIN role_permissions rp ON rp.role_id = r.id
 LEFT JOIN permissions p ON p.id = rp.permission_id
 WHERE r.application_id = $1
 GROUP BY r.id
-ORDER BY r.name;
+ORDER BY r.name ASC;
 
 -- name: GetApplicationRole :one
 SELECT r.id, r.name, r.description, r.application_id, r.system,
-       COALESCE(array_agg(p.key ORDER BY p.key) FILTER (WHERE p.key IS NOT NULL), '{}')::text[] AS permission_keys,
+       COALESCE(array_agg(p.key ORDER BY p.key ASC) FILTER (WHERE p.key IS NOT NULL), '{}')::text[] AS permission_keys,
        (SELECT count(*) FROM user_roles ur WHERE ur.role_id = r.id)::bigint AS assigned_count
 FROM roles r
 LEFT JOIN role_permissions rp ON rp.role_id = r.id
@@ -59,7 +59,7 @@ SELECT id FROM roles WHERE id = $1 AND application_id = $2 FOR UPDATE;
 -- name: ValidateApplicationPermissionKeys :many
 SELECT key FROM permissions
 WHERE application_id = $1 AND key = ANY(sqlc.arg(keys)::text[])
-ORDER BY key;
+ORDER BY key ASC;
 
 -- name: CreateApplicationRole :one
 INSERT INTO roles (name, description, application_id, system)

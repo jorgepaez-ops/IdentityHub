@@ -12,7 +12,7 @@ set -u
 
 : "${COMPOSE:?COMPOSE es obligatorio}"
 : "${LOCAL_TEST_LOGIN_IP_MAX_FAILURES:?LOCAL_TEST_LOGIN_IP_MAX_FAILURES es obligatorio}"
-[ $# -gt 0 ] || { echo "uso: $0 <comando> [args...]" >&2; exit 2; }
+[[ $# -gt 0 ]] || { echo "uso: $0 <comando> [args...]" >&2; exit 2; }
 
 here="$(cd "$(dirname "$0")" && pwd)"
 
@@ -22,7 +22,7 @@ cleanup() {
   # shellcheck disable=SC2086 # COMPOSE es un comando con argumentos, se parte a propósito.
   if ! $COMPOSE up -d --no-deps --wait api; then
     echo "ERROR: no se pudo restaurar la API con el límite por defecto; puede seguir con LOGIN_IP_MAX_FAILURES elevado. Ejecuta 'make up' para restaurarla." >&2
-    [ "$status" -ne 0 ] || status=1
+    [[ "$status" -ne 0 ]] || status=1
   fi
   "$here/ip-lockout-warning.sh" || true
   exit "$status"

@@ -12,13 +12,23 @@ export const profile = (overrides: Record<string, unknown> = {}) => ({
   roles: ['user', 'contabilidad.senior'], mfaEnabled: true, createdAt: '2026-01-01T00:00:00Z', ...overrides,
 })
 
+function requestUrl(input: RequestInfo | URL): string {
+  if (typeof input === 'string') return input
+  return input instanceof URL ? input.href : input.url
+}
+
+function requestBody(body: BodyInit): string {
+  if (typeof body === 'string') return body
+  throw new Error('stubApi only supports JSON string bodies')
+}
+
 // Routes fetch by "METHOD path"; unmatched calls fail loudly so a test cannot pass by accident.
 export function stubApi(routes: Record<string, Handler>) {
   const calls: { key: string; body: unknown; url: string }[] = []
   const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = String(input)
+    const url = requestUrl(input)
     const key = `${init?.method ?? 'GET'} ${url.split('?')[0]}`
-    const body = init?.body ? JSON.parse(String(init.body)) : undefined
+    const body = init?.body ? JSON.parse(requestBody(init.body)) : undefined
     calls.push({ key, body, url })
     const handler = routes[key]
     if (!handler) throw new Error(`unexpected request ${key}`)

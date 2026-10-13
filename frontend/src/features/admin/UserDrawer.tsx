@@ -1,4 +1,4 @@
-import { FormEvent, KeyboardEvent, useEffect, useId, useRef, useState } from 'react'
+import { FormEvent, useEffect, useId, useRef, useState } from 'react'
 import { type AdminUser, type Application, type UserStatus, createUser, listApplications, updateUser } from '../../api/client'
 import { DIRECTORY_ROLES, DIRECTORY_ROLE_DESCRIPTION, Problems, STATUS_LABEL, adminProblems, isAuthFailure } from './shared'
 import { fieldValue } from '../../formData'
@@ -32,7 +32,7 @@ export function UserDrawer({ target, currentUserId, onClose, onSaved, onSessionE
   const idleLabel = editing ? 'Guardar cambios' : 'Crear y enviar invitación'
   const busyLabel = editing ? 'Guardando…' : 'Creando…'
   const titleId = useId()
-  const dialogRef = useRef<HTMLElement>(null)
+  const dialogRef = useRef<HTMLDialogElement>(null)
   const [status, setStatus] = useState<UserStatus>(editing?.status ?? 'active')
   // Held roles keep whatever the account already has, even a role the catalog did not return.
   const [roles, setRoles] = useState<string[]>(() => (editing ? [...editing.roles] : ['user']))
@@ -69,20 +69,27 @@ export function UserDrawer({ target, currentUserId, onClose, onSaved, onSessionE
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [onClose])
 
-  const trapTab = (event: KeyboardEvent<HTMLElement>) => {
-    if (event.key !== 'Tab' || !dialogRef.current) return
-    const items = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE))
-    const first = items[0]
-    const last = items.at(-1)
-    if (!first || !last) return
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault()
-      last.focus()
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault()
-      first.focus()
+  // Native listener: the drawer is a real <dialog>, so Tab containment attaches to the DOM node.
+  useEffect(() => {
+    const dialog = dialogRef.current
+    if (!dialog) return
+    const trapTab = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== 'Tab') return
+      const items = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE))
+      const first = items[0]
+      const last = items.at(-1)
+      if (!first || !last) return
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
     }
-  }
+    dialog.addEventListener('keydown', trapTab)
+    return () => dialog.removeEventListener('keydown', trapTab)
+  }, [])
 
   // Application roles come from the API (RF-021); system roles are the two directory ones above.
   const groups = applications
@@ -94,29 +101,30 @@ export function UserDrawer({ target, currentUserId, onClose, onSaved, onSessionE
   const toggleRole = (role: string) =>
     setRoles((current) => ordered(current.includes(role) ? current.filter((item) => item !== role) : [...current, role]))
 
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    setProblems([])
-    if (editing) {
-      const changes = {
-        ...(status !== editing.status ? { status } : {}),
-        ...(!sameRoles(roles, editing.roles) ? { roles: ordered(roles) } : {}),
-      }
-      if (Object.keys(changes).length === 0) {
-        onClose()
-        return
-      }
-      setPending(true)
-      try {
-        onSaved(await updateUser(editing.id, changes), 'Cambios guardados.')
-      } catch (reason) {
-        if (isAuthFailure(reason)) onSessionEnded()
-        else setProblems(adminProblems(reason, EDIT_COPY, 'No fue posible guardar los cambios. Inténtalo de nuevo.'))
-        setPending(false)
-      }
+  const fail = (reason: unknown, copy: Record<number, string>, fallback: string) => {
+    if (isAuthFailure(reason)) onSessionEnded()
+    else setProblems(adminProblems(reason, copy, fallback))
+    setPending(false)
+  }
+
+  const saveChanges = async (account: AdminUser) => {
+    const changes = {
+      ...(status !== account.status ? { status } : {}),
+      ...(!sameRoles(roles, account.roles) ? { roles: ordered(roles) } : {}),
+    }
+    if (Object.keys(changes).length === 0) {
+      onClose()
       return
     }
-    const data = new FormData(event.currentTarget)
+    setPending(true)
+    try {
+      onSaved(await updateUser(account.id, changes), 'Cambios guardados.')
+    } catch (reason) {
+      fail(reason, EDIT_COPY, 'No fue posible guardar los cambios. Inténtalo de nuevo.')
+    }
+  }
+
+  const invite = async (data: FormData) => {
     const displayName = fieldValue(data, 'displayName').trim()
     const email = fieldValue(data, 'email').trim()
     if (displayName === '') {
@@ -128,16 +136,21 @@ export function UserDrawer({ target, currentUserId, onClose, onSaved, onSessionE
       const user = await createUser({ email, displayName, roles: ordered(roles) })
       onSaved(user, `Invitación enviada a ${user.email}.`)
     } catch (reason) {
-      if (isAuthFailure(reason)) onSessionEnded()
-      else setProblems(adminProblems(reason, CREATE_COPY, 'No fue posible crear la cuenta. Inténtalo de nuevo.'))
-      setPending(false)
+      fail(reason, CREATE_COPY, 'No fue posible crear la cuenta. Inténtalo de nuevo.')
     }
+  }
+
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setProblems([])
+    // The form data is read synchronously, before any await.
+    return editing ? saveChanges(editing) : invite(new FormData(event.currentTarget))
   }
 
   return (
     <div className="drawer-layer">
       <div className="drawer-backdrop" onClick={onClose} aria-hidden="true" />
-      <aside className="drawer" role="dialog" aria-modal="true" aria-labelledby={titleId} ref={dialogRef} onKeyDown={trapTab}>
+      <dialog className="drawer" open aria-modal="true" aria-labelledby={titleId} ref={dialogRef}>
         <header className="drawer-header">
           <h2 id={titleId}>{editing ? 'Editar usuario' : 'Nuevo usuario'}</h2>
           <button className="icon-button" onClick={onClose} type="button" aria-label="Cerrar">×</button>
@@ -189,7 +202,7 @@ export function UserDrawer({ target, currentUserId, onClose, onSaved, onSessionE
             <button className="secondary-button fit" onClick={onClose} type="button">Cancelar</button>
           </div>
         </form>
-      </aside>
+      </dialog>
     </div>
   )
 }

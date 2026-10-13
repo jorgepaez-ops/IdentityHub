@@ -20,10 +20,10 @@ const RESEND_COPY: Record<number, string> = {
 
 function StatTile({ label, value }: Readonly<{ label: string; value: number }>) {
   return (
-    <div className="stat-tile" role="group" aria-label={label}>
+    <fieldset className="stat-tile" aria-label={label}>
       <strong>{value}</strong>
       <span>{label}</span>
-    </div>
+    </fieldset>
   )
 }
 
@@ -185,11 +185,11 @@ export function UsersPage({ currentUserId, onSessionEnded }: Readonly<{ currentU
             <div className="input-with-icon"><SearchIcon /><input id="user-search" type="search" value={search} maxLength={200} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar…" /></div>
           </div>
         </div>
-        <div className="filter-group" role="group" aria-label="Filtrar por estado">
+        <fieldset className="filter-group" aria-label="Filtrar por estado">
           {STATUS_FILTERS.map((option) => (
             <button key={option ?? 'all'} className="filter-button" type="button" aria-pressed={status === option} onClick={() => chooseStatus(option)}>{STATUS_FILTER_LABEL[option ?? 'all']}</button>
           ))}
-        </div>
+        </fieldset>
         <div className="export-row">
           <button className="secondary-button fit" type="button" disabled={list.length === 0} onClick={exportUsers}><DownloadIcon />Exportar CSV</button>
           {nextCursor && list.length > 0 && <p className="hint">Exporta los {list.length} cargados; carga más para incluir el resto.</p>}

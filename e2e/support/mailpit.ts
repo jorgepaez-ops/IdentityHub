@@ -19,7 +19,8 @@ interface Summary {
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 async function messagesFor(to: string): Promise<Summary[]> {
-  const response = await get(`${mailpitUrl}/api/v1/search?query=${encodeURIComponent(`to:${to}`)}`)
+  const query = `to:${to}`
+  const response = await get(`${mailpitUrl}/api/v1/search?query=${encodeURIComponent(query)}`)
   if (!response.ok) throw new Error(`Mailpit search for ${to} returned ${response.status}`)
   const body = (await response.json()) as { messages?: Summary[] }
   return body.messages ?? []

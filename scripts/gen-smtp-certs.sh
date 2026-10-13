@@ -45,7 +45,8 @@ mkdir -p "$dir"
 # env_value NOMBRE: último valor de NOMBRE en el .env, sin comentario final ni las
 # comillas que lo rodean (Compose las quita igual). Se lee con grep, no con ".".
 env_value() {
-  grep -E "^$1=" "$env_file" | tail -n 1 | cut -d= -f2- | sed -e 's/[[:space:]]*#.*$//' \
+  var_name="$1"
+  grep -E "^${var_name}=" "$env_file" | tail -n 1 | cut -d= -f2- | sed -e 's/[[:space:]]*#.*$//' \
     -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'$/\1/" || true
 }
 

@@ -89,7 +89,6 @@ No hay un comando administrativo de desbloqueo documentado. D13 establece que co
 |---|---|---|
 | E2E o DAST local termina con 423 o bloqueo por IP | Las pruebas fallan logins desde una sola IP; los eventos de auditoría son append-only y al restaurar el límite puede durar hasta 15 minutos. | Ejecute `make e2e` o `make scan-dast`, no Playwright/ZAP directo; el wrapper eleva solo el límite IP y `scripts/ip-lockout-warning.sh` informa cuándo baja. Espere el vencimiento; no borre auditoría. |
 | Nginx devuelve 502 después de recrear `api` | Al recrear el contenedor `api` (por ejemplo `docker compose up -d api`) cambia su IP, y Nginx en `web` sigue usando la que resolvió al arrancar. | Compruebe con `make ps` y `/healthz` que la API está sana y reinicie el proxy: `docker restart identity-hub-web-1`. |
-| `go build` informa símbolos duplicados con nombres terminados en ` 2` | iCloud puede crear copias sin seguimiento, por ejemplo `gen 2.go`. | Liste con `find . -path ./.git -prune -o -path '*/node_modules' -prune -o -name "* 2*" -print`; compare cada copia con `cmp` y elimine solo las idénticas, informando siempre qué se retiró. |
 
 ## Producción
 

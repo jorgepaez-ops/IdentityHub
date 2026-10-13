@@ -1,5 +1,6 @@
 import { ApiProblemError, type AdminUser } from '../../api/client'
 import { connectionMessage } from '../account/PublicPages'
+import { keyedMessages } from '../../components/keyedMessages'
 
 // Only the two directory roles are described locally; application roles and their permissions
 // come from GET /admin/applications (RF-021).
@@ -60,7 +61,7 @@ export function adminProblems(reason: unknown, byStatus: Record<number, string>,
 
 export function Problems({ messages }: Readonly<{ messages: string[] }>) {
   if (messages.length === 0) return null
-  return <div className="error-box" role="alert">{messages.map((message, index) => <p key={index}>{message}</p>)}</div>
+  return <div className="error-box" role="alert">{keyedMessages(messages).map(({ key, message }) => <p key={key}>{message}</p>)}</div>
 }
 
 // Directory status filter: `null` is "all" and sends no `status` parameter. It is mirrored in the URL as ?estado=.

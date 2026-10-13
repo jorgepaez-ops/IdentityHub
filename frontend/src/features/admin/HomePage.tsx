@@ -60,10 +60,10 @@ async function loadRecent(): Promise<AuditEvent[]> {
 function StatTile({ label, count, tone, to }: Readonly<{ label: string; count: Count; tone?: string; to?: string }>) {
   const classes = ['stat-tile', tone ? `stat-${tone}` : '', to ? 'stat-link' : ''].filter(Boolean).join(' ')
   return (
-    <div className={classes} role="group" aria-label={label}>
+    <fieldset className={classes} aria-label={label}>
       <strong>{countText(count)}</strong>
       {to ? <Link to={to}>{label}</Link> : <span>{label}</span>}
-    </div>
+    </fieldset>
   )
 }
 

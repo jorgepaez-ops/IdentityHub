@@ -28,7 +28,7 @@ const SOURCE = path.join(here, 'informe-tecnico.md')
 const OUTPUT = path.join(here, 'informe-tecnico.pdf')
 const MERMAID_JS = require.resolve('mermaid/dist/mermaid.min.js')
 
-const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+const esc = (s) => s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;')
 const slug = (s) =>
   s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 
@@ -78,14 +78,15 @@ function redactedReport(rel, max) {
 
 function expandDirectives(body) {
   let out = body.replace(/^\{\{mermaid:([^#|}]+)#(\d+)(?:\|([^}]*))?\}\}$/gm, (_, rel, n, cap) => {
-    const land = cap && cap.startsWith('@L ')
-    const text = land ? cap.slice(3) : cap
-    return '```mermaid\n' + (land ? '%%landscape\n' : '') + (text ? `%%caption: ${text}\n` : '') + mermaidBlock(rel, Number(n)) + '\n```\n'
+    const small = cap?.startsWith('@S ')
+    const land = cap?.startsWith('@L ')
+    const text = land || small ? cap.slice(3) : cap
+    return '```mermaid\n' + (land ? '%%landscape\n' : '') + (small ? '%%small\n' : '') + (text ? `%%caption: ${text}\n` : '') + mermaidBlock(rel, Number(n)) + '\n```\n'
   })
   out = out.replace(/^\{\{code:([^:}]+):([^:}]+):(\d+-\d+)\}\}$/gm, (_, lang, rel, range) => {
     return '```' + lang + '\n' + codeLines(rel, range) + '\n```\n\n' + `<p class="src">Fuente: <code>${rel}</code>, líneas ${range}.</p>\n`
   })
-  out = out.replace(/^\{\{redact:([^|}]+)\|?([^}]*)\}\}$/gm, (_, rel) => {
+  out = out.replace(/^\{\{redact:([^|}]+)(?:\|[^}]*)?\}\}$/gm, (_, rel) => {
     return '```json\n' + redactedReport(rel, 1) + '\n```\n\n' + `<p class="src">Fuente: <code>${rel}</code> (primer hallazgo de doce; <code>Secret</code> y <code>Match</code> enmascarados).</p>\n`
   })
   return out
@@ -119,7 +120,7 @@ function render(body) {
       }
     } else {
       counters[1] += 1
-      num = inAnnex ? `${String.fromCharCode(64 + annexIdx)}.${counters[1]}` : `${counters[0]}.${counters[1]}`
+      num = inAnnex ? `${String.fromCodePoint(64 + annexIdx)}.${counters[1]}` : `${counters[0]}.${counters[1]}`
     }
     const id = slug(`${num} ${plain}`)
     headings.push({ level: depth, num, title: plain, id })
@@ -130,13 +131,13 @@ function render(body) {
   renderer.code = ({ text, lang }) => {
     if (lang === 'mermaid') {
       figN += 1
-      let src = text
-      let land = false
-      let cap = ''
-      src = src.replace(/^%%landscape\n/m, () => ((land = true), ''))
-      src = src.replace(/^%%caption: (.*)\n/m, (_, c) => ((cap = c), ''))
-      const fig = `<figure class="diagrama"><div class="mermaid">${esc(src)}</div>${cap ? `<figcaption>Figura ${figN}. ${esc(cap)}</figcaption>` : ''}</figure>\n`
-      return land ? `<div class="apaisada">${fig}</div>\n` : fig
+      const land = /^%%landscape\n/m.test(text)
+      const small = /^%%small\n/m.test(text)
+      const withoutLandscape = text.replace(/^%%landscape\n/m, '').replace(/^%%small\n/m, '')
+      const cap = /^%%caption: (.*)\n/m.exec(withoutLandscape)?.[1] ?? ''
+      const src = withoutLandscape.replace(/^%%caption: (.*)\n/m, '')
+      const caption = cap ? `<figcaption>Figura ${figN}. ${esc(cap)}</figcaption>` : ''
+      return `<figure class="diagrama${small ? ' chica' : ''}${land ? ' apaisada' : ''}"><div class="mermaid">${esc(src)}</div>${caption}</figure>\n`
     }
     return `<pre class="code"><code class="lang-${lang || 'text'}">${esc(text)}</code></pre>\n`
   }
@@ -154,13 +155,23 @@ function render(body) {
 
   renderer.table = function (token) {
     const head = token.header.map((c) => `<th>${this.parser.parseInline(c.tokens)}</th>`).join('')
-    const rows = token.rows.map((r) => `<tr>${r.map((c) => `<td>${this.parser.parseInline(c.tokens)}</td>`).join('')}</tr>`).join('')
+    const cells = (r) => r.map((c) => `<td>${this.parser.parseInline(c.tokens)}</td>`).join('')
+    const rows = token.rows.map((r) => `<tr>${cells(r)}</tr>`).join('')
     const idcol = token.header[0].text === 'Id' ? ' class="idcol"' : ''
-    return `<div class="tabla"><table${idcol}><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>\n`
+    const short = token.rows.length <= 10 ? ' corta' : ''
+    return `<div class="tabla${short}"><table${idcol}><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>\n`
   }
 
   marked.use({ renderer, gfm: true })
   let html = marked.parse(body)
+
+  // Keep each diagram with the heading and the paragraphs that introduce it (same page, never split).
+  // A wide diagram (caption prefix @L) takes the whole block to its own landscape page.
+  html = html.replace(
+    /(?:<h[234][^>]*>(?:(?!<\/h[234]>)[\s\S])*<\/h[234]>\n)?(?:<p>(?:(?!<\/p>)[\s\S])*<\/p>\n){0,2}<figure class="diagrama[^"]*">/g,
+    (m) => `<div class="bloque-fig${m.includes('apaisada">') ? ' hoja-apaisada' : ''}">${m}`
+  )
+  html = html.replace(/(<figure class="diagrama[^"]*">(?:(?!<\/figure>)[\s\S])*<\/figure>\n)/g, '$1</div>\n')
 
   html = html.replace(/«\[completar:[^\]]*\]»/g, (m) => `<span class="placeholder">${m}</span>`)
   return html
@@ -180,7 +191,6 @@ function coverHtml(meta) {
     ${row('Equipo', meta.equipo)}
     ${row('Repositorio', `<a href="${meta.repositorio}">${meta.repositorio}</a>`)}
     ${row('Licencia del producto', meta.licencia)}
-    ${row('Fecha del documento', meta.fecha)}
     ${row('Fecha de entrega', meta.entrega)}
   </table>
 </section>`
@@ -221,9 +231,13 @@ li { margin-bottom: 1mm; }
 a { color: var(--accent); text-decoration: none; }
 code { font: 8.6pt/1.3 "SF Mono", Menlo, Consolas, monospace; background: var(--soft); padding: 0 1mm; border-radius: 1mm; word-break: break-word; }
 pre.code { font: 7.6pt/1.35 "SF Mono", Menlo, Consolas, monospace; background: #f6f8fa; border: 1px solid var(--line); border-left: 3px solid var(--accent); padding: 2.5mm 3mm; margin: 0 0 1.5mm; white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; }
+pre.code { break-after: avoid; }
 pre.code code { background: none; padding: 0; font: inherit; }
 p.src { font-size: 8pt; color: var(--muted); margin-bottom: 4mm; text-align: left; }
 .tabla { margin: 0 0 4mm; }
+.tabla.corta { break-inside: avoid; }
+.bloque-fig { break-inside: avoid; }
+figure.chica svg { max-width: 86% !important; }
 table { border-collapse: collapse; width: 100%; font-size: 8.4pt; line-height: 1.3; }
 th, td { border: 1px solid var(--line); padding: 1.2mm 1.8mm; vertical-align: top; text-align: left; }
 th { background: var(--soft); color: #1b2a3a; }
@@ -231,15 +245,15 @@ thead { display: table-header-group; }
 tr { break-inside: avoid; }
 td code, th code { font-size: 7.6pt; }
 table.idcol td:first-child { white-space: nowrap; }
-figure { margin: 3mm 0 5mm; break-inside: avoid; text-align: center; }
-figure.diagrama svg { max-width: 100%; height: auto; max-height: 230mm; }
-.apaisada { page: land; break-before: page; break-after: page; }
-.apaisada figure.diagrama svg { max-height: 150mm; }
+figure { margin: 2mm 0 3mm; break-inside: avoid; text-align: center; }
+figure.diagrama svg { width: 100% !important; max-width: 100% !important; height: auto; max-height: 205mm; }
+.hoja-apaisada { page: land; break-before: page; break-after: page; }
+.hoja-apaisada figure.diagrama svg { max-height: 128mm; }
 @page land { size: A4 landscape; margin: 16mm 14mm 18mm 14mm;
   @bottom-center { content: counter(page); font: 9pt "Helvetica Neue", Arial, sans-serif; color: #555; }
   @bottom-left { content: "Identity Hub — Informe técnico"; font: 8pt "Helvetica Neue", Arial, sans-serif; color: #888; }
 }
-figure.captura img { max-width: 100%; max-height: 135mm; border: 1px solid var(--line); }
+figure.captura img { max-width: 100%; max-height: 100mm; border: 1px solid var(--line); }
 figcaption, p.caption-fig { font-size: 8.4pt; color: var(--muted); margin-top: 1.5mm; text-align: center; }
 blockquote { margin: 0 0 3mm; padding: 1mm 4mm; border-left: 3px solid var(--line); color: #444; background: #fafbfc; }
 .placeholder { background: #fff3a8; border: 1px dashed #b38f00; padding: 0 1mm; color: #5c4a00; font-weight: 600; }
@@ -257,8 +271,8 @@ blockquote { margin: 0 0 3mm; padding: 1mm 4mm; border-left: 3px solid var(--lin
 .toc h1.toc-title { break-before: page; }
 .toc ul { list-style: none; padding: 0; margin: 0; }
 .toc li { margin: 0; }
-.toc li.l1 { margin-top: 2.2mm; font-weight: 700; }
-.toc li.l2 { padding-left: 8mm; font-size: 9.2pt; }
+.toc li.l1 { margin-top: 1mm; font-weight: 700; }
+.toc li.l2 { padding-left: 8mm; font-size: 8.6pt; line-height: 1.2; }
 .toc a { display: flex; align-items: baseline; color: var(--ink); }
 .toc .t { flex: none; max-width: 85%; }
 .toc .n { display: inline-block; min-width: 9mm; }
@@ -294,6 +308,8 @@ async function printPdf(browser, html, outFile) {
       flowchart: { htmlLabels: true, useMaxWidth: true },
       sequence: { useMaxWidth: true, mirrorActors: false },
     })
+    // Sequential on purpose (Sonar S9382 does not apply): one run per diagram keeps the render order stable,
+    // so the page count does not change between builds, and records every broken diagram, not only the first.
     const bad = []
     for (const el of document.querySelectorAll('.mermaid')) {
       try {
@@ -317,11 +333,10 @@ async function pageOfHeadings(pdfFile) {
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
   const doc = await pdfjs.getDocument({ data: new Uint8Array(fs.readFileSync(pdfFile)), useSystemFonts: true }).promise
   const norm = (s) => s.replace(/\s+/g, '').toLowerCase()
-  const texts = []
-  for (let i = 1; i <= doc.numPages; i++) {
-    const tc = await (await doc.getPage(i)).getTextContent()
-    texts.push(norm(tc.items.map((it) => it.str).join(' ')))
-  }
+  const texts = await Promise.all(Array.from({ length: doc.numPages }, async (_, index) => {
+    const tc = await (await doc.getPage(index + 1)).getTextContent()
+    return norm(tc.items.map((it) => it.str).join(' '))
+  }))
   // The cover and the table of contents come first: start the search after the last page that
   // still holds TOC entries (the one right before the first body heading, a page break follows).
   const first = headings[0]
