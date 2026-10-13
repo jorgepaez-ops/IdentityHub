@@ -64,11 +64,11 @@
   desc: >
     Se ejecutó un gestor de paquetes o un descargador (apk, apt, pip, npm, curl, wget...) dentro de
     api, worker o web: típico de quien prepara herramientas tras comprometer un proceso.
-    Excepción: la sonda de salud de web usa wget contra 127.0.0.1.
+    Excepción: solo el comando exacto de la sonda de salud de web (frontend/Dockerfile).
   condition: >
     ih_spawned_process and ih_app_container and proc.name in (ih_package_managers)
     and not proc.pname in (ih_package_managers)
-    and not (proc.name = wget and container.name regex "^identity-hub[a-z0-9-]*-web-[0-9]+$" and proc.cmdline contains "127.0.0.1")
+    and not (proc.name = wget and container.name regex "^identity-hub[a-z0-9-]*-web-[0-9]+$" and proc.cmdline = "wget -q -O /dev/null http://127.0.0.1:8080/")
   output: >
     Package manager or downloader executed in application container (container=%container.name
     command=%proc.cmdline parent=%proc.pname user=%user.name)
@@ -80,7 +80,7 @@
     api, worker o web abrieron una conexión IPv4 hacia una dirección que no es privada ni loopback.
     Estos servicios solo hablan con db, broker y mailpit dentro de la red de Compose.
   condition: >
-    evt.type = connect and evt.res = SUCCESS and fd.typechar = 4
+    evt.type = connect and evt.res in (SUCCESS, EINPROGRESS) and fd.typechar = 4
     and ih_app_container
     and not fd.snet in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "127.0.0.0/8")
   output: >
