@@ -16,7 +16,11 @@ Identity Hub es un proveedor de identidad desarrollado desde cero, comparable en
 - **Semana 2 cerrada:** 47 de 47 tareas completadas; el tag
   `v0.1.0-hardened` identifica el estado remediado en `main`, con CI verde.
 - **Semana 3 cerrada:** SSO entre dominios, MFA por correo, alta de empleados y frontend funcional.
-- **Semana 4:** documentación, IaC de referencia, grilla de roles, manual, informe y guion terminados. Las imágenes ya están publicadas en Docker Hub (`docker.io/jorgeivp/identity-hub-api`, `-worker` y `-web`, firmadas con Cosign y con SBOM adjunto; validadas con el tag `v0.9.0`). Quedan el tag de entrega y el release de GitHub con el informe, y la grabación del video, que hace el equipo. El seguimiento está en [`odd/tasks/idp-semana-4.md`](odd/tasks/idp-semana-4.md).
+- **Semana 4:** documentación, IaC de referencia, grilla de roles, manual, informe y guion terminados. Las imágenes están publicadas en Docker Hub (`docker.io/jorgeivp/identity-hub-api`, `-worker` y `-web`, firmadas con Cosign y con SBOM adjunto). El seguimiento está en [`odd/tasks/idp-semana-4.md`](odd/tasks/idp-semana-4.md).
+- **Funciones de cierre (F1 a F10, PR 32 a 43), integradas en `main`:** exportación del registro de auditoría en CSV y JSON (RF-019); SMTP con STARTTLS y autenticación obligatorios en el worker y hosts configurables (`SMTP_*`, `OAUTH_*`); Falco en el perfil de observabilidad con cuatro reglas propias, alerta en Grafana y [runbook](docs/runbooks/falco-alerta.md); claves de servicio para integraciones máquina (RF-018, [manual](docs/manuales/claves-de-servicio.md), ADR 0014); columna de controles de CI en la matriz; insignia de cobertura medida; y un filtro de CI para cambios solo de documentación. La integración OAuth/OIDC de terceros y el outbox (F5) quedan como trabajo futuro ([sección 9.1](docs/manuales/integracion-terceros.md)).
+- **Release firmado:** `latest` solo se mueve después de firmar y atestar, y únicamente para el `vX.Y.Z` más alto; los pasos de red se reintentan y los artefactos se retienen 7 días. El tag `v0.9.1` (ejecución 38405885275) lo validó y se verificó con Cosign v3.1.3 sobre `v0.9.0` y `v0.9.1`.
+- **Matriz de trazabilidad:** 33 requisitos; 25 completos, 7 parciales, 1 sin cubrir (RNF-010, latencia) y 0 diferidos.
+- **Pendiente:** el tag de entrega `v1.0.0` y el release de GitHub con el informe en PDF, y la grabación del video, que hace el equipo.
 
 ## 4. Tecnologías
 
@@ -34,13 +38,13 @@ La cobertura de integración tiene un gate mínimo de 70 % en el job **`6b · Pr
 
 ## 5. Arquitectura
 
-La visión y los contratos del sistema están en [`specs/00-vision.md`](specs/00-vision.md). Para recorrer la solución visualmente, consulte los diagramas de [arquitectura](docs/diagramas/01-arquitectura.html), [flujo SSO](docs/diagramas/02-flujo-sso.html) y [ciclo de vida de usuario](docs/diagramas/03-ciclo-de-vida-usuario.html). Las decisiones de arquitectura (ADR 0001 a 0013) están en [`specs/adr/`](specs/adr/), con su formato explicado en [`specs/adr/README.md`](specs/adr/README.md).
+La visión y los contratos del sistema están en [`specs/00-vision.md`](specs/00-vision.md). Para recorrer la solución visualmente, consulte los diagramas de [arquitectura](docs/diagramas/01-arquitectura.html), [flujo SSO](docs/diagramas/02-flujo-sso.html) y [ciclo de vida de usuario](docs/diagramas/03-ciclo-de-vida-usuario.html). Las decisiones de arquitectura (ADR 0001 a 0014) están en [`specs/adr/`](specs/adr/), con su formato explicado en [`specs/adr/README.md`](specs/adr/README.md).
 
 ## 6. Inicio rápido
 
 1. Clone el repositorio y entre en su directorio.
 2. Ejecute `make setup`: genera un `.env` local con secretos aleatorios a partir de [`.env.example`](.env.example). El archivo `.env` no se versiona y un `.env` existente no se sobrescribe.
-3. Ejecute `make up`: genera los certificados SMTP locales (`make certs`, idempotente) y levanta el stack construyendo las imágenes. Si prefiere `docker compose up -d`, corra antes `make certs`: Mailpit exige STARTTLS y autenticación, y sin `deploy/certs/` el stack no arranca.
+3. Ejecute `make up`: genera los certificados SMTP locales (`make certs`, idempotente) y levanta el stack construyendo las imágenes. Si prefiere `docker compose up -d`, corra antes `make certs`: Mailpit exige STARTTLS y autenticación, y sin `deploy/certs/` el stack no arranca. Un `.env` generado antes de F2 necesita además `SMTP_PASSWORD` (ver «Si su `.env` es anterior a F2»).
 
 ```bash
 git clone <url-del-repositorio> && cd <directorio>
@@ -58,7 +62,24 @@ El `docker-compose.yml` de la raíz incluye `deploy/docker-compose.yml`; `make u
 | RabbitMQ | <http://localhost:15672> |
 | Mailpit | <http://localhost:8025> |
 
-Use `make up-obs` para incluir Grafana en <http://localhost:3000> y Prometheus en <http://localhost:9090>. [`Makefile`](Makefile) y `make help` enumeran los demás comandos disponibles.
+Use `make up-obs` para incluir Grafana en <http://localhost:3000> y Prometheus en <http://localhost:9090>; también levanta Falco (`make falco-test` dispara eventos inofensivos que activan sus reglas; ver el [runbook](docs/runbooks/falco-alerta.md)). [`Makefile`](Makefile) y `make help` enumeran los demás comandos disponibles.
+
+### Primer arranque
+
+1. `make setup`: crea `.env` desde `.env.example` con secretos aleatorios, incluida `SMTP_PASSWORD`. Si `.env` ya existe, no lo modifica.
+2. `make up`: ejecuta `make certs` por su cuenta (no hace falta correrlo a mano), construye las imágenes y levanta el stack. `make up-obs` añade la observabilidad, incluido Falco.
+3. Abra <http://identityhub.localhost:8080>.
+
+### Si su `.env` es anterior a F2
+
+`make setup` no toca un `.env` existente, así que nunca le agrega `SMTP_PASSWORD`, y `make certs` y `make up` fallan con «falta SMTP_PASSWORD». Agregue solo esa línea:
+
+```bash
+grep -q '^SMTP_PASSWORD=' .env || printf '\nSMTP_PASSWORD=%s\n' "$(openssl rand -hex 24)" >> .env
+make up
+```
+
+No use `python3 scripts/setup_env.py --force` sobre un entorno existente: regenera todos los secretos, pero PostgreSQL y RabbitMQ conservan las contraseñas antiguas en sus volúmenes y el stack deja de autenticarse (la salida sería `make clean`, que borra los datos).
 
 El compose real vive en `deploy/` y el de la raíz lo incluye, de modo que un clon nuevo arranca con `make setup && make up`. Los secretos se generan localmente y nunca se versionan.
 
@@ -88,11 +109,12 @@ Las 27 alertas de Checkov eran omisiones ya justificadas en línea (`#checkov:sk
 ## 8. Gestión del proyecto y trazabilidad
 
 - [Bitácora](docs/BITACORA.md): decisiones, avances y próximos pasos.
-- [Tareas de la semana 2](odd/tasks/idp-semana-2.md): cerradas; [tareas de la semana 3](odd/tasks/idp-semana-3.md): cerradas; [tareas de la semana 4](odd/tasks/idp-semana-4.md): cierre en curso.
+- [Tareas de la semana 2](odd/tasks/idp-semana-2.md): cerradas; [tareas de la semana 3](odd/tasks/idp-semana-3.md): cerradas; [tareas de la semana 4](odd/tasks/idp-semana-4.md) y [cierre de la entrega](odd/tasks/cierre-entrega.md): cierre en curso.
 - [Matriz de trazabilidad](specs/07-traceability.md): artefacto generado por [`scripts/traceability.py`](scripts/traceability.py).
 - [Especificaciones](specs/): requisitos, modelo de dominio, contrato [OpenAPI](specs/03-api/openapi.yaml), eventos y escenarios de aceptación.
 - [Guía de desarrollo](docs/guia-desarrollo.md): ejecución, generación y pruebas para desarrollo local.
 - [Manual de usuario](docs/manuales/usuario.md): flujos de empleado, administrador y Contabilidad con capturas.
+- [Claves de servicio](docs/manuales/claves-de-servicio.md): emisión, uso y revocación de claves para integraciones máquina (RF-018).
 - [Informe técnico](docs/informe/informe-tecnico.md): fuente del PDF final; ejecute `make informe` para regenerarlo.
 - [Guion del video](docs/video/guion.md): demostración de 13 minutos; la grabación sigue pendiente.
 

@@ -6,8 +6,12 @@ las pruebas de Go a mano y cómo configurar GoLand.
 
 ## 1. Dos formas de correr el proyecto
 
-**Todo en Docker (`make up`)** — la forma "de verdad", igual que en CI. Levanta
-`db`, `broker`, `mailpit`, `migrate`, `api`, `worker` y `web`. Útil para probar
+**Todo en Docker (`make up`)** — la forma "de verdad", igual que en CI. Primero
+ejecuta `make certs` (CA y certificado SMTP locales en `deploy/certs/`, idempotente;
+Mailpit exige STARTTLS y autenticación) y luego levanta `db`, `broker`, `mailpit`,
+`migrate`, `api`, `worker` y `web`. `make up-obs` añade Prometheus, Loki, Alloy,
+Grafana y Falco (también pasa antes por `make certs`). Un `.env` generado antes de F2
+necesita `SMTP_PASSWORD` (`openssl rand -hex 24`), o el compose no interpola. Útil para probar
 el sistema completo, no para iterar rápido en Go: cada cambio exige
 `make restart S=api`, que reconstruye la imagen.
 
@@ -15,19 +19,37 @@ el sistema completo, no para iterar rápido en Go: cada cambio exige
 `backend/`, y la que usa Claude para verificar tareas contra una base real:
 
 ```bash
-cd deploy && docker compose up -d db
+# desde la raíz del repositorio, con el .env generado por `make setup`
+docker compose --env-file .env -f deploy/docker-compose.yml up -d db
 # espera a que quede "healthy":
 docker inspect --format='{{.State.Health.Status}}' identity-hub-db-1
 
 # aplica las migraciones (usa el servicio `migrate` del compose, no un binario local):
-docker compose run --rm migrate
+docker compose --env-file .env -f deploy/docker-compose.yml run --rm migrate
 
-cd ../backend && go build ./...
+cd backend && go build ./...
 ```
+
+Hay que pasar `--env-file .env` desde la raíz: el compose interpola **todas** las variables
+obligatorias del archivo (incluida `SMTP_PASSWORD`) aunque solo se levante `db`, y desde
+`deploy/` no encuentra el `.env` de la raíz y falla con «must be set in the repository root .env».
 
 Con la base así levantada, `go test`, `go run` y el depurador de GoLand
 hablan directo con PostgreSQL en `localhost:5432` sin pasar por Nginx ni por
 el contenedor de la API.
+
+### Primer arranque y `.env` anterior a F2
+
+1. Clon nuevo: `make setup` crea `.env` desde `.env.example` con secretos aleatorios (incluida `SMTP_PASSWORD`; `scripts/setup_env.py`) y `make up` levanta el stack. `make up` ejecuta `make certs` primero, así que no hay que correrlo a mano; `make up-obs` añade la observabilidad, con Falco.
+2. `.env` creado antes de F2: `make setup` no modifica un `.env` existente, por lo que nunca agrega `SMTP_PASSWORD`. Agregue solo esa línea:
+
+   ```bash
+   grep -q '^SMTP_PASSWORD=' .env || printf '\nSMTP_PASSWORD=%s\n' "$(openssl rand -hex 24)" >> .env
+   ```
+
+3. No use `python3 scripts/setup_env.py --force` sobre un entorno existente: regenera todos los secretos, pero PostgreSQL y RabbitMQ conservan las contraseñas antiguas en sus volúmenes y el stack deja de autenticarse (habría que usar `make clean`, que borra los datos).
+
+Problema frecuente: `make certs` o `make up` terminan con `error: falta SMTP_PASSWORD en .env`. Es el caso 2: agregue la línea de arriba y repita `make up`.
 
 ## 2. `make gen`, paso a paso
 
@@ -226,8 +248,7 @@ repo ya lo rechaza, pero verlo en el editor ahorra una vuelta.
 ## 5. Variables de entorno que la API espera hoy
 
 Reflejan `backend/internal/config/config.go` (fuente real; `.env.example`
-en la raíz del repo quedó desactualizado desde la semana 1 y T21 lo pone al
-día cuando cablee `main.go`). Obligatorias = el proceso no arranca sin ellas.
+en la raíz del repo es la plantilla; `make setup` genera el `.env` con secretos aleatorios, incluida `SMTP_PASSWORD`). Obligatorias = el proceso no arranca sin ellas.
 
 | Variable | Obligatoria | Default | Qué es |
 |---|---|---|---|
@@ -236,10 +257,12 @@ día cuando cablee `main.go`). Obligatorias = el proceso no arranca sin ellas.
 | `JWT_SIGNING_KEY` | sí (no para el worker) | — | semilla Ed25519 de 32 bytes, en base64 (`openssl rand -base64 32`); el worker no la recibe ni la lee |
 | `API_PORT` | no | `8081` | puerto HTTP de la API |
 | `LOG_LEVEL` | no | `info` | |
+| `APP_VERSION` | no | `dev` | versión que reporta el servicio |
 | `JWT_ISSUER` | no | `http://identityhub.localhost:8080` | claim `iss` del token |
 | `JWT_AUDIENCE` | no | `identity-hub` | claim `aud` |
 | `JWT_ACCESS_TTL` | no | `15m` | vigencia del access token |
 | `JWT_REFRESH_TTL` | no | `720h` | vigencia del refresh token (cookie) |
+| `HUB_SESSION_TTL` | no | `720h` | vigencia de la sesión del Hub (debe ser positiva) |
 | `LOGIN_ACCOUNT_MAX_FAILURES` | no | `5` | fallos antes de bloquear la cuenta (RF-017) |
 | `LOGIN_IP_MAX_FAILURES` | no | `20` | fallos por IP antes de bloquear (RF-017 / VULN-020) |
 | `LOGIN_FAILURE_WINDOW` | no | `15m` | ventana deslizante de los dos contadores |

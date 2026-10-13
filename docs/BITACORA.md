@@ -12,6 +12,49 @@ retomar el trabajo no exija reconstruir el contexto desde cero.
 
 ---
 
+## 2026-10-13 · Cierre — funciones F1 a F10, release firmado en orden y estado previo a v1.0.0
+
+Integra en `main` las mejoras de complejidad media y alta anotadas el 12 de octubre (PR 32 a 43). El detalle por tarea y la evidencia trazable permanecen en `odd/tasks/cierre-entrega.md`.
+
+### Hecho
+
+- **F1 (RF-019):** exportación del registro de auditoría en CSV y JSON (`GET /api/v1/admin/audit-log/export`), con tope de 10 000 filas, CSV protegido contra inyección de fórmulas y exportación auditada.
+- **F2 (SMTP):** el worker abre la sesión SMTP explícitamente con STARTTLS obligatorio (TLS 1.2 mínimo) y AUTH solo después del cifrado; hosts y cliente OAuth configurables por variables (`SMTP_*`, `OAUTH_*`). `make certs` genera la CA y el certificado locales y Mailpit exige STARTTLS y credenciales; un envío en claro se rechaza (530). `make up` ejecuta `make certs` primero y un `.env` anterior necesita `SMTP_PASSWORD`.
+- **F3 (Falco):** servicio en el perfil de observabilidad (driver modern eBPF), cuatro reglas propias (AM-020), alertas a Loki por Alloy, alerta y paneles en Grafana, runbook `docs/runbooks/falco-alerta.md` y `make falco-test`.
+- **F4 (RF-018):** claves de servicio para integraciones máquina (ADR 0014, manual `docs/manuales/claves-de-servicio.md`, amenaza AM-023): alcance único `audit-log:read` en el listado del registro de auditoría.
+- **F5 (OAuth/OIDC de terceros y outbox):** queda como trabajo futuro por decisión del usuario (`docs/manuales/integracion-terceros.md`, sección 9.1).
+- **F6 (matriz):** columna «Controles CI» desde `specs/07-controls.yaml`; de 5 RNF sin cubrir a 1. La matriz queda en 33 requisitos: 25 completos, 7 parciales, 1 sin cubrir (RNF-010) y 0 diferidos.
+- **F7 y F8 (release):** `publish` sube solo `vX.Y.Z`, firma y atesta, y solo entonces mueve `latest` (únicamente para el `vX.Y.Z` más alto); pasos de red con tres reintentos y artefactos de imagen retenidos 7 días.
+- **F9:** VULN-028 reclasificado como no afectado. **F10:** insignia de cobertura medida (job 6c).
+- **Job 0 de CI (PR 43):** detecta cambios solo de documentación y omite los jobs pesados sin debilitar los checks obligatorios del ruleset.
+- **Validación `v0.9.1`** (ejecución 38405885275, commit `32e8359`): en las tres imágenes «Mover latest» empezó después de «Firmar y atestar». Verificación independiente con Cosign v3.1.3 (`verify` y `verify-attestation`) correcta sobre `v0.9.0` y `v0.9.1`.
+
+### Problemas al integrar
+
+- **CVE-2026-85091 (`zlib`) en la imagen `web`:** capa temporal `apk upgrade --no-cache zlib` hasta que la base de nginx lo incluya (PR 40).
+- **Doble envío de correo (error de F2):** el hook de revisión con IA detectó que un `QUIT` fallido tras el `250` hacía reencolar el evento; `QUIT` pasó a mejor esfuerzo, con prueba primero en rojo (PR 41).
+- **Issue 29** (escaneo semanal con go1.26.8): cerrado con un escaneo manual sobre `main` con go1.26.9 y govulncheck sin vulnerabilidades.
+- **Fallas de CI en los PR:** Checkov (CKV_AWS_273 y CKV_AWS_40, justificadas en línea), un falso positivo de Sonar (S7552) y una prueba del frontend no aislada. El PR 42, solo de notas, corrió el pipeline completo y motivó el job 0.
+- La sección «Hallazgos y correcciones posteriores al cierre de la remediación» del informe técnico recoge el detalle.
+
+### Decisiones tomadas sobre la marcha
+
+- Las notas de fin de día viven en una rama local, sin PR hasta que se pidan.
+- El diseño del filtro de documentación con `paths-ignore` se descartó: los checks obligatorios quedarían en «Expected — waiting»; un job que decide en tiempo de ejecución sí cuenta como aprobado al omitirse.
+- Los hallazgos nuevos de esta etapa no reciben identificador VULN (decisión del usuario).
+
+### Estado
+
+- `main` con CI verde, `v0.9.1` validado. Matriz: 33 requisitos (25 completos, 7 parciales, 1 sin cubrir, 0 diferidos). Informe técnico actualizado (`b4bf102`); esta rama propaga el estado final a README, manuales, diagramas y modelo de amenazas.
+
+### Siguiente paso
+
+1. Fusionar la documentación final y crear el tag `v1.0.0`; el workflow de release publica las imágenes firmadas.
+2. Publicar el release de GitHub con el PDF del informe técnico (`make informe`).
+3. Grabación del video (decisión del usuario sobre las escenas de las funciones F1 a F4).
+
+---
+
 ## 2026-10-12 · Cierre — publicación en Docker Hub (C3), avisos nuevos e informe actualizado
 
 Cierra C3 y la parte documental del cierre. El detalle por tarea y la evidencia trazable permanecen en `odd/tasks/cierre-entrega.md`.

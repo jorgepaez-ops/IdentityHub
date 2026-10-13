@@ -38,8 +38,8 @@ La columna **Ubicación actual** solo enlaza rutas que existen en este checkout.
 | Fase 3: build de imágenes, escaneo y gate de CVE | 85–89 | [`../.github/workflows/ci.yml`](../.github/workflows/ci.yml), [`../backend/Dockerfile`](../backend/Dockerfile) y [`../frontend/Dockerfile`](../frontend/Dockerfile) | hecho |
 | Fase 4: pruebas unitarias y DAST | 90–93 | [`../.github/workflows/ci.yml`](../.github/workflows/ci.yml), [`../e2e/`](../e2e/) y [`../security/zap-reports/`](../security/zap-reports/) | hecho |
 | Fase 5: IaC, Checkov/tfsec y orquestación simulada | 94–98 | [`../infraestructura/`](../infraestructura/), [`../deploy/docker-compose.prod.yml`](../deploy/docker-compose.prod.yml) y [`../.github/workflows/ci.yml`](../.github/workflows/ci.yml) | hecho (T8, T9 y T10) |
-| Fase 6: métricas, logs y detección en ejecución | 99–103 | [`../deploy/docker-compose.yml`](../deploy/docker-compose.yml) y [`../deploy/observability/`](../deploy/observability/) | parcial: Prometheus, Grafana y Loki (vía Grafana Alloy) hechos; Falco fuera salvo que sobre tiempo |
-| Repositorio GitHub público con código, pipeline, IaC y documentación | 163–166 | [`../README.md`](../README.md), [`../.github/workflows/`](../.github/workflows/) e [`../infraestructura/`](../infraestructura/) | parcial: cierre de PR de fase 4 pendiente (T21c) |
+| Fase 6: métricas, logs y detección en ejecución | 99–103 | [`../deploy/docker-compose.yml`](../deploy/docker-compose.yml) y [`../deploy/observability/`](../deploy/observability/) | hecho: Prometheus, Grafana y Loki (vía Grafana Alloy) y Falco (cuatro reglas propias, alerta en Grafana y [runbook](runbooks/falco-alerta.md)) |
+| Repositorio GitHub público con código, pipeline, IaC y documentación | 163–166 | [`../README.md`](../README.md), [`../.github/workflows/`](../.github/workflows/) e [`../infraestructura/`](../infraestructura/) | hecho (T21c; el PR de la fase 4 está fusionado) |
 | Imágenes publicadas y versionadas en Docker Hub | 163–167 | [`../specs/adr/0011-docker-hub-como-registry.md`](../specs/adr/0011-docker-hub-como-registry.md) | hecho (C3): `docker.io/jorgeivp/identity-hub-api`, `-worker` y `-web`, firmadas con Cosign y con SBOM adjunto; validado con el tag `v0.9.0` |
 | Informe técnico en PDF | 163–168 | PDF generado con `make informe` (no se versiona por tamaño; se adjunta al release de GitHub en T21), fuente en [`informe/informe-tecnico.md`](informe/informe-tecnico.md); `make informe` lo regenera | hecho (T19) |
 | Video-demostración de 10–15 minutos | 163–169 | [`video/guion.md`](video/guion.md) | guion completo de 13 minutos (T20); grabación a cargo del equipo |
@@ -59,7 +59,10 @@ No los exige el enunciado, pero responden a la demo en vivo con el profesor:
 | Entregable | Ubicación actual | Estado |
 |---|---|---|
 | Grilla de roles y permisos configurable desde el Hub | [`../specs/adr/0013-roles-y-permisos-configurables-por-aplicacion.md`](../specs/adr/0013-roles-y-permisos-configurables-por-aplicacion.md) y [`../specs/06-acceptance/roles-y-permisos.feature`](../specs/06-acceptance/roles-y-permisos.feature) | hecho (T11 a T15; RF-021) |
-| Guía de integración de plataformas de terceros | [`manuales/integracion-terceros.md`](manuales/integracion-terceros.md) | completa |
+| Guía de integración de plataformas de terceros | [`manuales/integracion-terceros.md`](manuales/integracion-terceros.md) | completa; la integración OAuth/OIDC de terceros y el outbox quedan como trabajo futuro (sección 9.1) |
+| Claves de servicio para integraciones máquina (RF-018) | [`manuales/claves-de-servicio.md`](manuales/claves-de-servicio.md) y [`../specs/adr/0014-claves-de-servicio-para-integraciones-maquina.md`](../specs/adr/0014-claves-de-servicio-para-integraciones-maquina.md) | hecho (F4) |
+| Exportación del registro de auditoría en CSV y JSON (RF-019) | [`manuales/usuario.md`](manuales/usuario.md) y [`../specs/06-acceptance/`](../specs/06-acceptance/) | hecho (F1) |
+| Runbook de alertas de Falco | [`runbooks/falco-alerta.md`](runbooks/falco-alerta.md) | hecho (F3) |
 
 ## Cómo navegar
 
@@ -74,4 +77,4 @@ No los exige el enunciado, pero responden a la demo en vivo con el profesor:
 
 ## Próximos artefactos
 
-La documentación, los diagramas, la IaC de referencia, la grilla de roles, el manual de usuario, el informe técnico y el guion del video están verificados. Las imágenes ya están publicadas en Docker Hub (C3). Quedan el tag y release finales, y la grabación del video, que hace el equipo.
+La documentación, los diagramas, la IaC de referencia, la grilla de roles, el manual de usuario, el informe técnico y el guion del video están verificados. Las imágenes ya están publicadas en Docker Hub (C3). Las funciones de cierre F1 a F4 y F6 a F10 están integradas en `main` y `v0.9.1` validó el release firmado; F5 queda como trabajo futuro. Quedan el tag `v1.0.0` y el release final, y la grabación del video, que hace el equipo.
