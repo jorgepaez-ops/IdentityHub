@@ -126,6 +126,8 @@ con esos temas abiertos.
 
 Lote 1/3 (Go), 2026-10-13: ver apéndice «S7 — inventario Sonar». Corregido: godre:S8242 (`internal/testdb/testdb.go:73`, `migrationLock` ya no guarda `context.Context`; `release`/`releaseIfHeld` lo reciben por parámetro) y de paso el `errcheck` que golangci-lint con `-tags=integration` marcaba en la misma función (`_ = dropDatabase(...)`). Sin cambio de comportamiento. No aplicado: go:S3776 x16 (todos en archivos `_test.go`, fuera de alcance por instrucción), godre:S8196 x10 (la descripción de la regla no está en la API; el nombre «método+er» daría `WithinLoginTransactioner`, peor que `Repository`; se propone marcar falso positivo en Sonar, decisión del usuario), go:S1135 (falso positivo: «todo» en español). Sin código generado marcado; `.sonarcloud.properties` ya excluye duplicados de `gen.go`/`sqlc`. Observación fuera de alcance: `gocognit` da 25 a `(*smtpMailer).Send` (`backend/cmd/worker/smtp.go:80`) y Sonar no lo marca (cuenta distinto). Evidencia: golangci-lint v2.13.2 0 issues (con y sin `-tags=integration`), `go vet`, `gofmt`, `make test-go` OK (59.9 %), `make test-integration` con Postgres 16 desechable OK (81.1 % antes y después; funciones de `testdb` sin pérdida de cobertura), `gocognit -over 15` sin hallazgos en `testdb.go`.
 
+Lote 2/3 (TS/JS), 2026-10-13: 55 hallazgos typescript/javascript; 51 corregidos y 4 falsos positivos documentados en el apéndice (`e2e/manual/capturas.ts:258`, `e2e/support/mailpit.ts:33/39/74`: bucles secuenciales intencionales). S6819 con elementos nativos: `<dialog open>` en `ConfirmDialog` (contabilidad) y `UserDrawer` (frontend), `<output>` para `role=status` (toasts, skeleton, avisos de éxito, Login), `<fieldset>` para `role=group`; el teclado de los diálogos (Escape, Tab, clic en el fondo) pasó a escuchas nativas con `addEventListener` y CSS ajustado (`.dialog`, `.drawer`, `.success-box`, reset de `fieldset`) para que la apariencia no cambie. Claves de lista sin índice con `keyedMessages` (sufijo de ocurrencia: hay una prueba con mensajes idénticos). S3776 en `completeCallback` (contabilidad) y `UserDrawer.submit`; S3358, S7755, S7781, S6551, S5906, S3735 y, en `docs/informe/build.mjs`, S6582/S8786/S7758/S878/S4624/S9382. Evidencia: frontend lint/typecheck/build OK y vitest 264/264 antes y después; contabilidad lint/typecheck/build OK y vitest 148/148 antes y después; `e2e` `tsc --noEmit` OK; `make informe` con la misma salida que antes (54 páginas, mismo índice); `make up-app && make e2e` 63/63 y `make down`. Los 11 hallazgos `css:` quedan fuera de este lote.
+
 Lote 1b/3 (Go, «incluye todo» con archivos de pruebas), 2026-10-13: corregido godre:S8196 x10 (`c623e04`; `Repository` de bootstrap/employee/invitationresend/login/logout/mfa/refresh pasan a `…Transactor`, un solo método cada una; `healthcheckHTTPClient` → `healthcheckRequester`, `userLookup` → `userByIDGetter`, `deferredConfirmation` → `confirmationWaiter`), go:S1135 (`8f8609d`) y go:S3776 x16 en pruebas, más `(*smtpMailer).Send` (gocognit 25 → `dial`/`secure`/`authenticate`/`transmit`, STARTTLS obligatorio, AUTH solo con TLS y QUIT best-effort intactos) en `0223446`; pruebas por paquete: worker `0223446`, api `b44396a`, auth + audit `7bb35fd`, store `b83f7c3`. Sin cambio de comportamiento ni de nombres de prueba. Evidencia: golangci-lint v2.13.2 0 issues (con y sin `-tags=integration`), `go vet` y `gofmt` limpios, `make test-go` OK (550 `=== RUN`, 59.9 % antes y después), `make test-integration` con Postgres 16 desechable OK (631 `=== RUN` antes y después, mismos nombres salvo UUID aleatorios en subpruebas, 0 FAIL, 0 SKIP; 81.1 % antes y después), `gocognit -over 15` sin hallazgos en las funciones tocadas (quedan otras funciones de prueba que gocognit cuenta distinto de Sonar y que Sonar no marca), `scripts/traceability.py --check` al día.
 Revisión nativa del lote Go (2026-10-13), en worktrees por corte porque el lote completo (1 233 líneas) excede el
 presupuesto de los revisores: A (`fb568d5..0223446`: testdb, interfaces, comentario, `smtpMailer.Send`) aprobada;
@@ -169,7 +171,7 @@ Estrategia: `ask-on-risk` → `stacked-to-main` (usuario, 2026-10-13). Cortes: P
 | S4 | delegado (Sonnet) | hecho | aeeb74e | — |
 | S5 | delegado (Sonnet) | hecho | d64043a | — |
 | S6 | delegado (Sonnet) | hecho | df56da3 | — |
-| S7 | delegado (Sonnet) | en curso: lote 1/3 Go hecho (godre:S8242, S8196, S3776 x16, S1135, más `smtpMailer.Send`); lotes 2/3 y 3/3 pendientes | `e8b3dd0`, `6a41c55`, `c623e04` (S8196), `8f8609d` (S1135), `0223446` (worker), `b44396a` (api), `7bb35fd` (auth + audit), `b83f7c3` (store) | — |
+| S7 | delegado (Sonnet) | en curso: lote 1/3 Go hecho (godre:S8242, S8196, S3776 x16, S1135, más `smtpMailer.Send`); lote 2/3 TS/JS hecho (51 corregidos, 4 falsos positivos e2e; `e5510f9` contabilidad, `e49e17b` frontend, `6841cf1` docs/informe, `463398e` e2e); lote 3/3 pendiente | `e8b3dd0`, `6a41c55`, `c623e04` (S8196), `8f8609d` (S1135), `0223446` (worker), `b44396a` (api), `7bb35fd` (auth + audit), `b83f7c3` (store) | — |
 
 Revisión nativa de S1-S4 (2026-10-13): aprobada (4 lentes, 15 archivos). Correcciones posteriores, también
 aprobadas: identidad de `cosign verify` restringida a `release.yml` en un tag (probada contra `v0.9.1`, y
@@ -228,20 +230,20 @@ Fuente: `api/issues/search` (CODE_SMELL, sin resolver), 123 al momento de la con
 | go | godre:S8196 | MINOR | `backend/internal/auth/refresh/refresh.go:77` | Rename this interface to follow Go naming conventions for single-method interfaces. | corregido (lote 1b, `c623e04`): renombrada a nombre de agente («…Transactor», `healthcheckRequester`, `userByIDGetter`, `confirmationWaiter`) |
 | go | godre:S8196 | MINOR | `backend/internal/events/broker.go:13` | Rename this interface to follow Go naming conventions for single-method interfaces. | corregido (lote 1b, `c623e04`): renombrada a nombre de agente («…Transactor», `healthcheckRequester`, `userByIDGetter`, `confirmationWaiter`) |
 | go | godre:S8242 | MAJOR | `backend/internal/testdb/testdb.go:73` | Remove this 'context.Context' field and pass context as a parameter to methods that need it. | corregido (lote 1/3) |
-| javascript | javascript:S4624 | MAJOR | `docs/informe/build.mjs:138` | Refactor this code to not use nested template literals. | pendiente |
-| javascript | javascript:S4624 | MAJOR | `docs/informe/build.mjs:157` | Refactor this code to not use nested template literals. | pendiente |
-| javascript | javascript:S6582 | MINOR | `docs/informe/build.mjs:81` | Prefer using an optional chain expression instead, as it's more concise and easier to read. | pendiente |
-| javascript | javascript:S7758 | MINOR | `docs/informe/build.mjs:122` | Prefer `String.fromCodePoint()` over `String.fromCharCode()`. | pendiente |
-| javascript | javascript:S7781 | MINOR | `docs/informe/build.mjs:31` | Prefer `String#replaceAll()` over `String#replace()`. | pendiente |
-| javascript | javascript:S7781 | MINOR | `docs/informe/build.mjs:31` | Prefer `String#replaceAll()` over `String#replace()`. | pendiente |
-| javascript | javascript:S7781 | MINOR | `docs/informe/build.mjs:31` | Prefer `String#replaceAll()` over `String#replace()`. | pendiente |
-| javascript | javascript:S7781 | MINOR | `docs/informe/build.mjs:31` | Prefer `String#replaceAll()` over `String#replace()`. | pendiente |
-| javascript | javascript:S878 | MAJOR | `docs/informe/build.mjs:136` | Unexpected use of comma operator. | pendiente |
-| javascript | javascript:S878 | MAJOR | `docs/informe/build.mjs:137` | Unexpected use of comma operator. | pendiente |
-| javascript | javascript:S8786 | MAJOR | `docs/informe/build.mjs:88` | Simplify this regular expression to reduce its runtime, as it has super-linear performance due to backtracking. | pendiente |
-| javascript | javascript:S9382 | MINOR | `docs/informe/build.mjs:301` | Unexpected `await` inside a loop. | pendiente |
-| javascript | javascript:S9382 | MINOR | `docs/informe/build.mjs:322` | Unexpected `await` inside a loop. | pendiente |
-| javascript | javascript:S9382 | MINOR | `docs/informe/build.mjs:322` | Unexpected `await` inside a loop. | pendiente |
+| javascript | javascript:S4624 | MAJOR | `docs/informe/build.mjs:138` | Refactor this code to not use nested template literals. | corregido `6841cf1` |
+| javascript | javascript:S4624 | MAJOR | `docs/informe/build.mjs:157` | Refactor this code to not use nested template literals. | corregido `6841cf1` |
+| javascript | javascript:S6582 | MINOR | `docs/informe/build.mjs:81` | Prefer using an optional chain expression instead, as it's more concise and easier to read. | corregido `6841cf1` |
+| javascript | javascript:S7758 | MINOR | `docs/informe/build.mjs:122` | Prefer `String.fromCodePoint()` over `String.fromCharCode()`. | corregido `6841cf1` |
+| javascript | javascript:S7781 | MINOR | `docs/informe/build.mjs:31` | Prefer `String#replaceAll()` over `String#replace()`. | corregido `6841cf1` |
+| javascript | javascript:S7781 | MINOR | `docs/informe/build.mjs:31` | Prefer `String#replaceAll()` over `String#replace()`. | corregido `6841cf1` |
+| javascript | javascript:S7781 | MINOR | `docs/informe/build.mjs:31` | Prefer `String#replaceAll()` over `String#replace()`. | corregido `6841cf1` |
+| javascript | javascript:S7781 | MINOR | `docs/informe/build.mjs:31` | Prefer `String#replaceAll()` over `String#replace()`. | corregido `6841cf1` |
+| javascript | javascript:S878 | MAJOR | `docs/informe/build.mjs:136` | Unexpected use of comma operator. | corregido `6841cf1` |
+| javascript | javascript:S878 | MAJOR | `docs/informe/build.mjs:137` | Unexpected use of comma operator. | corregido `6841cf1` |
+| javascript | javascript:S8786 | MAJOR | `docs/informe/build.mjs:88` | Simplify this regular expression to reduce its runtime, as it has super-linear performance due to backtracking. | corregido `6841cf1` |
+| javascript | javascript:S9382 | MINOR | `docs/informe/build.mjs:301` | Unexpected `await` inside a loop. | corregido `6841cf1` |
+| javascript | javascript:S9382 | MINOR | `docs/informe/build.mjs:322` | Unexpected `await` inside a loop. | corregido `6841cf1` |
+| javascript | javascript:S9382 | MINOR | `docs/informe/build.mjs:322` | Unexpected `await` inside a loop. | corregido `6841cf1` |
 | plsql | plsql:OrderByExplicitAscCheck | MINOR | `db/queries/roles.sql:6` | Add ASC in order to make the order explicit. | pendiente |
 | plsql | plsql:OrderByExplicitAscCheck | MINOR | `db/queries/roles.sql:26` | Add ASC in order to make the order explicit. | pendiente |
 | plsql | plsql:OrderByExplicitAscCheck | MINOR | `db/queries/users.sql:39` | Add ASC in order to make the order explicit. | pendiente |
@@ -270,44 +272,44 @@ Fuente: `api/issues/search` (CODE_SMELL, sin resolver), 123 al momento de la con
 | shell | shelldre:S7688 | MAJOR | `scripts/ip-lockout-warning.sh:62` | Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. | pendiente |
 | shell | shelldre:S7688 | MAJOR | `scripts/with-raised-login-limit.sh:15` | Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. | pendiente |
 | shell | shelldre:S7688 | MAJOR | `scripts/with-raised-login-limit.sh:25` | Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. | pendiente |
-| typescript | typescript:S3358 | MAJOR | `contabilidad/src/views/Transactions.tsx:48` | Extract this nested ternary operation into an independent statement. | pendiente |
-| typescript | typescript:S3358 | MAJOR | `contabilidad/src/views/Transactions.tsx:52` | Extract this nested ternary operation into an independent statement. | pendiente |
-| typescript | typescript:S3358 | MAJOR | `frontend/src/features/admin/AuditLogPage.tsx:49` | Extract this nested ternary operation into an independent statement. | pendiente |
-| typescript | typescript:S3735 | CRITICAL | `frontend/src/features/admin/ServiceKeysPage.tsx:246` | Remove this use of the "void" operator. | pendiente |
-| typescript | typescript:S3776 | CRITICAL | `contabilidad/src/auth/flow.ts:54` | Refactor this function to reduce its Cognitive Complexity from 16 to the 15 allowed. | pendiente |
-| typescript | typescript:S3776 | CRITICAL | `frontend/src/features/admin/UserDrawer.tsx:97` | Refactor this function to reduce its Cognitive Complexity from 18 to the 15 allowed. | pendiente |
-| typescript | typescript:S4624 | MAJOR | `e2e/manual/capturas.ts:114` | Refactor this code to not use nested template literals. | pendiente |
-| typescript | typescript:S4624 | MAJOR | `e2e/support/mailpit.ts:22` | Refactor this code to not use nested template literals. | pendiente |
-| typescript | typescript:S5906 | MINOR | `frontend/src/auditLog.test.tsx:136` | Prefer "expect(await within(table).findAllByText('ana@example.test')).toHaveLength(2)" over this generic assertion for b | pendiente |
-| typescript | typescript:S6479 | MAJOR | `frontend/src/features/account/MyAccountPage.tsx:36` | Do not use Array index in keys | pendiente |
-| typescript | typescript:S6479 | MAJOR | `frontend/src/features/account/PublicPages.tsx:34` | Do not use Array index in keys | pendiente |
-| typescript | typescript:S6479 | MAJOR | `frontend/src/features/admin/shared.tsx:63` | Do not use Array index in keys | pendiente |
-| typescript | typescript:S6551 | MINOR | `frontend/src/test-utils.ts:19` | 'input' may use Object's default stringification format ('[object Object]') when stringified. | pendiente |
-| typescript | typescript:S6551 | MINOR | `frontend/src/test-utils.ts:21` | 'init.body' may use Object's default stringification format ('[object Object]') when stringified. | pendiente |
-| typescript | typescript:S6819 | MAJOR | `contabilidad/src/Login.tsx:15` | Use <output> instead of the "status" role to ensure accessibility across all devices. | pendiente |
-| typescript | typescript:S6819 | MAJOR | `contabilidad/src/Toast.tsx:15` | Use <output> instead of the "status" role to ensure accessibility across all devices. | pendiente |
-| typescript | typescript:S6819 | MAJOR | `contabilidad/src/views/ConfirmDialog.tsx:61` | Use <dialog> instead of the "dialog" role to ensure accessibility across all devices. | pendiente |
-| typescript | typescript:S6819 | MAJOR | `frontend/src/App.tsx:136` | Use <output> instead of the "status" role to ensure accessibility across all devices. | pendiente |
-| typescript | typescript:S6819 | MAJOR | `frontend/src/components/LoadingSkeleton.tsx:2` | Use <output> instead of the "status" role to ensure accessibility across all devices. | pendiente |
-| typescript | typescript:S6819 | MAJOR | `frontend/src/components/Toast.tsx:16` | Use <output> instead of the "status" role to ensure accessibility across all devices. | pendiente |
-| typescript | typescript:S6819 | MAJOR | `frontend/src/features/account/MyAccountPage.tsx:37` | Use <output> instead of the "status" role to ensure accessibility across all devices. | pendiente |
-| typescript | typescript:S6819 | MAJOR | `frontend/src/features/account/PublicPages.tsx:120` | Use <output> instead of the "status" role to ensure accessibility across all devices. | pendiente |
-| typescript | typescript:S6819 | MAJOR | `frontend/src/features/account/PublicPages.tsx:155` | Use <output> instead of the "status" role to ensure accessibility across all devices. | pendiente |
-| typescript | typescript:S6819 | MAJOR | `frontend/src/features/account/PublicPages.tsx:184` | Use <output> instead of the "status" role to ensure accessibility across all devices. | pendiente |
-| typescript | typescript:S6819 | MAJOR | `frontend/src/features/admin/AuditLogPage.tsx:243` | Use <details>, <fieldset>, <optgroup>, or <address> instead of the "group" role to ensure accessibility across all devic | pendiente |
-| typescript | typescript:S6819 | MAJOR | `frontend/src/features/admin/AuditLogPage.tsx:249` | Use <details>, <fieldset>, <optgroup>, or <address> instead of the "group" role to ensure accessibility across all devic | pendiente |
-| typescript | typescript:S6819 | MAJOR | `frontend/src/features/admin/HomePage.tsx:63` | Use <details>, <fieldset>, <optgroup>, or <address> instead of the "group" role to ensure accessibility across all devic | pendiente |
-| typescript | typescript:S6819 | MAJOR | `frontend/src/features/admin/UserDrawer.tsx:140` | Use <dialog> instead of the "dialog" role to ensure accessibility across all devices. | pendiente |
-| typescript | typescript:S6819 | MAJOR | `frontend/src/features/admin/UsersPage.tsx:23` | Use <details>, <fieldset>, <optgroup>, or <address> instead of the "group" role to ensure accessibility across all devic | pendiente |
-| typescript | typescript:S6819 | MAJOR | `frontend/src/features/admin/UsersPage.tsx:188` | Use <details>, <fieldset>, <optgroup>, or <address> instead of the "group" role to ensure accessibility across all devic | pendiente |
-| typescript | typescript:S6847 | MAJOR | `contabilidad/src/views/ConfirmDialog.tsx:61` | Non-interactive elements should not be assigned mouse or keyboard event listeners. | pendiente |
-| typescript | typescript:S6847 | MAJOR | `frontend/src/features/admin/UserDrawer.tsx:140` | Non-interactive elements should not be assigned mouse or keyboard event listeners. | pendiente |
-| typescript | typescript:S6848 | MAJOR | `contabilidad/src/views/ConfirmDialog.tsx:60` | Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tab | pendiente |
-| typescript | typescript:S7503 | MINOR | `e2e/support/global-teardown.ts:9` | Async function 'globalTeardown' has no 'await' expression. | pendiente |
-| typescript | typescript:S7755 | MINOR | `contabilidad/src/aggregate.ts:48` | Prefer `.at(…)` over `[….length - index]`. | pendiente |
-| typescript | typescript:S7781 | MINOR | `frontend/src/features/csv.ts:20` | Prefer `String#replaceAll()` over `String#replace()`. | pendiente |
-| typescript | typescript:S9382 | MINOR | `e2e/manual/capturas.ts:258` | Unexpected `await` inside a loop. | pendiente |
-| typescript | typescript:S9382 | MINOR | `e2e/manual/capturas.ts:498` | Unexpected `await` inside a loop. | pendiente |
-| typescript | typescript:S9382 | MINOR | `e2e/support/mailpit.ts:33` | Unexpected `await` inside a loop. | pendiente |
-| typescript | typescript:S9382 | MINOR | `e2e/support/mailpit.ts:39` | Unexpected `await` inside a loop. | pendiente |
-| typescript | typescript:S9382 | MINOR | `e2e/support/mailpit.ts:74` | Unexpected `await` inside a loop. | pendiente |
+| typescript | typescript:S3358 | MAJOR | `contabilidad/src/views/Transactions.tsx:48` | Extract this nested ternary operation into an independent statement. | corregido `e5510f9` |
+| typescript | typescript:S3358 | MAJOR | `contabilidad/src/views/Transactions.tsx:52` | Extract this nested ternary operation into an independent statement. | corregido `e5510f9` |
+| typescript | typescript:S3358 | MAJOR | `frontend/src/features/admin/AuditLogPage.tsx:49` | Extract this nested ternary operation into an independent statement. | corregido `e49e17b` |
+| typescript | typescript:S3735 | CRITICAL | `frontend/src/features/admin/ServiceKeysPage.tsx:246` | Remove this use of the "void" operator. | corregido `e49e17b` |
+| typescript | typescript:S3776 | CRITICAL | `contabilidad/src/auth/flow.ts:54` | Refactor this function to reduce its Cognitive Complexity from 16 to the 15 allowed. | corregido `e5510f9` |
+| typescript | typescript:S3776 | CRITICAL | `frontend/src/features/admin/UserDrawer.tsx:97` | Refactor this function to reduce its Cognitive Complexity from 18 to the 15 allowed. | corregido `e49e17b` |
+| typescript | typescript:S4624 | MAJOR | `e2e/manual/capturas.ts:114` | Refactor this code to not use nested template literals. | corregido `463398e` |
+| typescript | typescript:S4624 | MAJOR | `e2e/support/mailpit.ts:22` | Refactor this code to not use nested template literals. | corregido `463398e` |
+| typescript | typescript:S5906 | MINOR | `frontend/src/auditLog.test.tsx:136` | Prefer "expect(await within(table).findAllByText('ana@example.test')).toHaveLength(2)" over this generic assertion for b | corregido `e49e17b` |
+| typescript | typescript:S6479 | MAJOR | `frontend/src/features/account/MyAccountPage.tsx:36` | Do not use Array index in keys | corregido `e49e17b` |
+| typescript | typescript:S6479 | MAJOR | `frontend/src/features/account/PublicPages.tsx:34` | Do not use Array index in keys | corregido `e49e17b` |
+| typescript | typescript:S6479 | MAJOR | `frontend/src/features/admin/shared.tsx:63` | Do not use Array index in keys | corregido `e49e17b` |
+| typescript | typescript:S6551 | MINOR | `frontend/src/test-utils.ts:19` | 'input' may use Object's default stringification format ('[object Object]') when stringified. | corregido `e49e17b` |
+| typescript | typescript:S6551 | MINOR | `frontend/src/test-utils.ts:21` | 'init.body' may use Object's default stringification format ('[object Object]') when stringified. | corregido `e49e17b` |
+| typescript | typescript:S6819 | MAJOR | `contabilidad/src/Login.tsx:15` | Use <output> instead of the "status" role to ensure accessibility across all devices. | corregido `e5510f9` |
+| typescript | typescript:S6819 | MAJOR | `contabilidad/src/Toast.tsx:15` | Use <output> instead of the "status" role to ensure accessibility across all devices. | corregido `e5510f9` |
+| typescript | typescript:S6819 | MAJOR | `contabilidad/src/views/ConfirmDialog.tsx:61` | Use <dialog> instead of the "dialog" role to ensure accessibility across all devices. | corregido `e5510f9` |
+| typescript | typescript:S6819 | MAJOR | `frontend/src/App.tsx:136` | Use <output> instead of the "status" role to ensure accessibility across all devices. | corregido `e49e17b` |
+| typescript | typescript:S6819 | MAJOR | `frontend/src/components/LoadingSkeleton.tsx:2` | Use <output> instead of the "status" role to ensure accessibility across all devices. | corregido `e49e17b` |
+| typescript | typescript:S6819 | MAJOR | `frontend/src/components/Toast.tsx:16` | Use <output> instead of the "status" role to ensure accessibility across all devices. | corregido `e49e17b` |
+| typescript | typescript:S6819 | MAJOR | `frontend/src/features/account/MyAccountPage.tsx:37` | Use <output> instead of the "status" role to ensure accessibility across all devices. | corregido `e49e17b` |
+| typescript | typescript:S6819 | MAJOR | `frontend/src/features/account/PublicPages.tsx:120` | Use <output> instead of the "status" role to ensure accessibility across all devices. | corregido `e49e17b` |
+| typescript | typescript:S6819 | MAJOR | `frontend/src/features/account/PublicPages.tsx:155` | Use <output> instead of the "status" role to ensure accessibility across all devices. | corregido `e49e17b` |
+| typescript | typescript:S6819 | MAJOR | `frontend/src/features/account/PublicPages.tsx:184` | Use <output> instead of the "status" role to ensure accessibility across all devices. | corregido `e49e17b` |
+| typescript | typescript:S6819 | MAJOR | `frontend/src/features/admin/AuditLogPage.tsx:243` | Use <details>, <fieldset>, <optgroup>, or <address> instead of the "group" role to ensure accessibility across all devic | corregido `e49e17b` |
+| typescript | typescript:S6819 | MAJOR | `frontend/src/features/admin/AuditLogPage.tsx:249` | Use <details>, <fieldset>, <optgroup>, or <address> instead of the "group" role to ensure accessibility across all devic | corregido `e49e17b` |
+| typescript | typescript:S6819 | MAJOR | `frontend/src/features/admin/HomePage.tsx:63` | Use <details>, <fieldset>, <optgroup>, or <address> instead of the "group" role to ensure accessibility across all devic | corregido `e49e17b` |
+| typescript | typescript:S6819 | MAJOR | `frontend/src/features/admin/UserDrawer.tsx:140` | Use <dialog> instead of the "dialog" role to ensure accessibility across all devices. | corregido `e49e17b` |
+| typescript | typescript:S6819 | MAJOR | `frontend/src/features/admin/UsersPage.tsx:23` | Use <details>, <fieldset>, <optgroup>, or <address> instead of the "group" role to ensure accessibility across all devic | corregido `e49e17b` |
+| typescript | typescript:S6819 | MAJOR | `frontend/src/features/admin/UsersPage.tsx:188` | Use <details>, <fieldset>, <optgroup>, or <address> instead of the "group" role to ensure accessibility across all devic | corregido `e49e17b` |
+| typescript | typescript:S6847 | MAJOR | `contabilidad/src/views/ConfirmDialog.tsx:61` | Non-interactive elements should not be assigned mouse or keyboard event listeners. | corregido `e5510f9` |
+| typescript | typescript:S6847 | MAJOR | `frontend/src/features/admin/UserDrawer.tsx:140` | Non-interactive elements should not be assigned mouse or keyboard event listeners. | corregido `e49e17b` |
+| typescript | typescript:S6848 | MAJOR | `contabilidad/src/views/ConfirmDialog.tsx:60` | Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tab | corregido `e5510f9` |
+| typescript | typescript:S7503 | MINOR | `e2e/support/global-teardown.ts:9` | Async function 'globalTeardown' has no 'await' expression. | corregido `463398e` |
+| typescript | typescript:S7755 | MINOR | `contabilidad/src/aggregate.ts:48` | Prefer `.at(…)` over `[….length - index]`. | corregido `e5510f9` |
+| typescript | typescript:S7781 | MINOR | `frontend/src/features/csv.ts:20` | Prefer `String#replaceAll()` over `String#replace()`. | corregido `e49e17b` |
+| typescript | typescript:S9382 | MINOR | `e2e/manual/capturas.ts:258` | Unexpected `await` inside a loop. | falso positivo: los 4 intentos fallidos de login deben ir en serie para contar contra el bloqueo (en paralelo la cuenta podría no llegar al umbral de forma determinista) |
+| typescript | typescript:S9382 | MINOR | `e2e/manual/capturas.ts:498` | Unexpected `await` inside a loop. | corregido `463398e` |
+| typescript | typescript:S9382 | MINOR | `e2e/support/mailpit.ts:33` | Unexpected `await` inside a loop. | falso positivo: bucle de sondeo con reintento; cada intento depende del anterior |
+| typescript | typescript:S9382 | MINOR | `e2e/support/mailpit.ts:39` | Unexpected `await` inside a loop. | falso positivo: bucle de sondeo con reintento; cada intento depende del anterior |
+| typescript | typescript:S9382 | MINOR | `e2e/support/mailpit.ts:74` | Unexpected `await` inside a loop. | falso positivo: bucle de sondeo con espera entre intentos (`sleep`); no es paralelizable |
