@@ -230,9 +230,15 @@ func TestRF018_Integration_TodasLasClavesInvalidasRecibenLaMismaRespuestaYQuedan
 		}
 		reasons[reason]++
 	}
-	for _, reason := range []string{"bad_secret", "unknown_key", "expired", "revoked", "malformed"} {
+	// Rejections tied to an existing key are audited; anonymous junk (unknown id, malformed) is not.
+	for _, reason := range []string{"bad_secret", "expired", "revoked"} {
 		if reasons[reason] != 1 {
 			t.Fatalf("rejected audit reasons=%v, want one %q", reasons, reason)
+		}
+	}
+	for _, reason := range []string{"unknown_key", "malformed"} {
+		if reasons[reason] != 0 {
+			t.Fatalf("rejected audit reasons=%v, anonymous %q must not be written to the audit log", reasons, reason)
 		}
 	}
 }

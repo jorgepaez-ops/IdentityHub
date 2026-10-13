@@ -46,7 +46,7 @@ func (s *Server) createServiceKey(w http.ResponseWriter, r *http.Request) {
 			writeValidationProblem(w, invalid.Field, invalid.Detail)
 			return
 		}
-		s.logRoleGridError(r, "service key creation failed", err)
+		s.logServiceKeyError(r, "service key creation failed", err)
 		writeProblem(w, http.StatusInternalServerError, "service-key-create-failed", titleInternalServerError, "The service key could not be created.")
 		return
 	}
@@ -64,7 +64,7 @@ func (s *Server) listServiceKeys(w http.ResponseWriter, r *http.Request) {
 	}
 	keys, err := s.serviceKeys.List(r.Context())
 	if err != nil {
-		s.logRoleGridError(r, "service key list failed", err)
+		s.logServiceKeyError(r, "service key list failed", err)
 		writeProblem(w, http.StatusInternalServerError, "service-keys-load-failed", titleInternalServerError, "Service keys could not be loaded.")
 		return
 	}
@@ -96,7 +96,7 @@ func (s *Server) revokeServiceKey(w http.ResponseWriter, r *http.Request, servic
 			writeProblem(w, http.StatusNotFound, "service-key-not-found", "Not Found", "The service key was not found.")
 			return
 		}
-		s.logRoleGridError(r, "service key revocation failed", err)
+		s.logServiceKeyError(r, "service key revocation failed", err)
 		writeProblem(w, http.StatusInternalServerError, "service-key-revoke-failed", titleInternalServerError, "The service key could not be revoked.")
 		return
 	}
@@ -109,4 +109,11 @@ func apiServiceKeyScopes(scopes []string) []ServiceKeyScope {
 		result = append(result, ServiceKeyScope(scope))
 	}
 	return result
+}
+
+// logServiceKeyError records an unexpected service key failure with the request id; the client only gets the generic problem.
+func (s *Server) logServiceKeyError(r *http.Request, message string, err error) {
+	if s.logger != nil {
+		s.logger.Error(message, "error", err, "request_id", TraceIDFrom(r.Context()))
+	}
 }

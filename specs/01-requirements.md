@@ -213,8 +213,11 @@ o sistema de reportes consulta el audit log sin sesión humana. Diseño en ADR 0
   humano no cambia.
 - Una clave desconocida, con secreto incorrecto, expirada o revocada recibe el mismo `401`, sin pistas
   sobre cuál fue la causa.
-- La emisión, la revocación y cada uso rechazado se registran en auditoría (`service_key_created`,
-  `service_key_revoked`, `service_key_rejected`) con el `publicId`, nunca con el secreto.
+- La emisión, la revocación y cada uso rechazado de una clave existente (secreto incorrecto, revocada,
+  expirada o sin alcance) se registran en auditoría (`service_key_created`, `service_key_revoked`,
+  `service_key_rejected`) con el `publicId`, nunca con el secreto. Las claves malformadas o con
+  `publicId` desconocido no se escriben en la base (evita que un cliente anónimo infle el audit log):
+  quedan en el log estructurado.
 - **Aceptación:** un admin emite una clave `audit-log:read`, la usa para listar el audit log (`200`),
   la revoca y el siguiente uso devuelve `401`; la misma clave no abre `GET /api/v1/admin/users`.
 

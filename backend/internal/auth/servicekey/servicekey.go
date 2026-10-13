@@ -14,6 +14,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/netip"
 	"strings"
 	"time"
@@ -159,9 +160,16 @@ type Manager interface {
 type Service struct {
 	repository Repository
 	now        func() time.Time
+	logger     *slog.Logger
 }
 
 func New(repository Repository) *Service { return &Service{repository: repository, now: time.Now} }
+
+// WithLogger sets where anonymous rejections and failed bookkeeping writes are reported; nil disables logging.
+func (s *Service) WithLogger(logger *slog.Logger) *Service {
+	s.logger = logger
+	return s
+}
 
 // decoyHash makes an unknown public id cost the same comparison as a known one.
 var decoyHash = sha256.Sum256([]byte("service-key-decoy"))
@@ -216,8 +224,8 @@ func (s *Service) Revoke(ctx context.Context, id uuid.UUID, input RevokeInput) e
 }
 
 // Authenticate verifies rawKey for requiredScope. Every cause of failure (malformed, unknown id,
-// wrong secret, expired, revoked) returns the same ErrUnauthenticated and is audited with the
-// real reason; a valid key without the scope returns ErrInsufficientScope.
+// wrong secret, expired, revoked) returns the same ErrUnauthenticated. The real reason is audited
+// when the failure is tied to an existing key and only logged otherwise; a valid key without the scope returns ErrInsufficientScope.
 func (s *Service) Authenticate(ctx context.Context, rawKey, requiredScope string, meta RequestMeta) (Principal, error) {
 	if s.repository == nil {
 		return Principal{}, errUnavailable
@@ -255,19 +263,35 @@ func (s *Service) Authenticate(ctx context.Context, rawKey, requiredScope string
 		s.auditRejection(ctx, publicID, true, "insufficient_scope", requiredScope, &record.ID, meta)
 		return Principal{}, ErrInsufficientScope
 	}
-	// A failed last_used_at write must not fail an otherwise valid request.
-	_ = s.repository.TouchLastUsed(ctx, record.ID, s.now())
+	// A failed last_used_at write must not fail an otherwise valid request, but it is reported.
+	if err := s.repository.TouchLastUsed(ctx, record.ID, s.now()); err != nil && s.logger != nil {
+		s.logger.Warn("service key last use could not be recorded", "key_id", record.ID, "action", "touch_last_used", "error", err)
+	}
 	return Principal{KeyID: record.ID, PublicID: record.PublicID, Scopes: append([]string(nil), record.Scopes...)}, nil
 }
 
+// auditRejection persists service_key_rejected only when the rejection is tied to an existing key.
+// Malformed and unknown-id attempts come from anonymous clients, so writing them would let anyone
+// grow the audit table; they go to the structured log instead, which the log pipeline already collects.
 func (s *Service) auditRejection(ctx context.Context, publicID string, wellFormed bool, reason, scope string, keyID *uuid.UUID, meta RequestMeta) {
-	event := AuditEvent{Action: ActionRejected, KeyID: keyID, IP: meta.IP, UserAgent: meta.UserAgent, Metadata: map[string]any{"reason": reason, "scope": scope}}
-	// Only a well-formed public id (16 hex characters) is recorded: anything else is attacker-controlled text.
-	if wellFormed {
-		event.PublicID = publicID
-		event.Metadata["publicId"] = publicID
+	if keyID == nil {
+		if s.logger != nil {
+			attrs := []any{"event", ActionRejected, "reason", reason, "scope", scope}
+			if meta.IP.IsValid() {
+				attrs = append(attrs, "ip", meta.IP.String())
+			}
+			// Only a well-formed public id (16 hex characters) is logged: anything else is attacker-controlled text.
+			if wellFormed {
+				attrs = append(attrs, "public_id", publicID)
+			}
+			s.logger.Warn("service key rejected", attrs...)
+		}
+		return
 	}
-	_ = s.repository.RecordAudit(ctx, event)
+	event := AuditEvent{Action: ActionRejected, KeyID: keyID, PublicID: publicID, IP: meta.IP, UserAgent: meta.UserAgent, Metadata: map[string]any{"reason": reason, "scope": scope, "publicId": publicID}}
+	if err := s.repository.RecordAudit(ctx, event); err != nil && s.logger != nil {
+		s.logger.Error("service key rejection could not be audited", "key_id", *keyID, "action", ActionRejected, "reason", reason, "error", err)
+	}
 }
 
 func hasScope(scopes []string, required string) bool {

@@ -280,7 +280,7 @@ Cada creación, cambio y eliminación de un rol queda registrado en la auditorí
 3. La tabla **Claves de servicio** muestra nombre, prefijo (la parte pública, que identifica la clave en la auditoría), alcances, vencimiento, último uso y estado (**Vigente**, **Expirada** o **Revocada**). Nunca muestra el secreto.
 4. **Revocar** pide confirmación (**Confirmar revocación de ...**) y deja la clave inutilizable de inmediato. Revocar dos veces es inofensivo.
 
-La emisión, la revocación y cada uso rechazado quedan en la auditoría (`service_key_created`, `service_key_revoked`, `service_key_rejected`). El formato de la clave y cómo usarla desde la integración están en la [guía de claves de servicio](claves-de-servicio.md).
+La emisión, la revocación y cada uso rechazado de una clave existente quedan en la auditoría (`service_key_created`, `service_key_revoked`, `service_key_rejected`); los intentos con una clave malformada o desconocida no se escriben ahí (para que nadie sin autenticarse pueda llenar la auditoría) y quedan en los logs del servidor. El formato de la clave y cómo usarla desde la integración están en la [guía de claves de servicio](claves-de-servicio.md).
 
 ---
 

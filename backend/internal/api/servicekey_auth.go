@@ -46,7 +46,7 @@ func (s *Server) serviceKeyOrAdmin(scope string, next http.HandlerFunc) http.Han
 		case errors.Is(err, servicekey.ErrInsufficientScope):
 			writeProblem(w, http.StatusForbidden, "forbidden", "Forbidden", "You do not have permission to access this resource.")
 		default:
-			s.logRoleGridError(r, "service key authentication failed", err)
+			s.logServiceKeyError(r, "service key authentication failed", err)
 			writeProblem(w, http.StatusInternalServerError, "authorization-load-failed", titleInternalServerError, "Authorization could not be verified.")
 		}
 	})

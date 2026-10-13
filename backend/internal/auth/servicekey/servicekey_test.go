@@ -1,9 +1,11 @@
 package servicekey
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"errors"
+	"log/slog"
 	"net/netip"
 	"strings"
 	"testing"
@@ -13,9 +15,11 @@ import (
 )
 
 type fakeRepository struct {
-	records []Record
-	audits  []AuditEvent
-	touched []uuid.UUID
+	records  []Record
+	audits   []AuditEvent
+	touched  []uuid.UUID
+	auditErr error
+	touchErr error
 }
 
 func (f *fakeRepository) Create(_ context.Context, params CreateParams, event AuditEvent) (Key, error) {
@@ -56,9 +60,12 @@ func (f *fakeRepository) GetByPublicID(_ context.Context, publicID string) (Reco
 }
 func (f *fakeRepository) TouchLastUsed(_ context.Context, id uuid.UUID, _ time.Time) error {
 	f.touched = append(f.touched, id)
-	return nil
+	return f.touchErr
 }
 func (f *fakeRepository) RecordAudit(_ context.Context, event AuditEvent) error {
+	if f.auditErr != nil {
+		return f.auditErr
+	}
 	f.audits = append(f.audits, event)
 	return nil
 }
@@ -227,8 +234,10 @@ func TestRF018_AuthenticateRejectsEveryFailureWithTheSameError(t *testing.T) {
 			}
 		}
 	}
-	if rejected != len(cases) {
-		t.Fatalf("rejected audit events=%d, want %d", rejected, len(cases))
+	// Only rejections tied to an existing key are audited (wrong value, expired, revoked);
+	// unknown ids and malformed input are anonymous junk and must not write to the database.
+	if rejected != 3 {
+		t.Fatalf("rejected audit events=%d, want 3", rejected)
 	}
 }
 
@@ -260,5 +269,127 @@ func TestRF018_RevokeIsIdempotentAndAuditedOnce(t *testing.T) {
 	}
 	if err := service.Revoke(context.Background(), uuid.New(), RevokeInput{ActorUserID: actor}); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("unknown id err=%v, want ErrNotFound", err)
+	}
+}
+
+func loggedService(repository *fakeRepository) (*Service, *bytes.Buffer) {
+	buffer := &bytes.Buffer{}
+	service := New(repository).WithLogger(slog.New(slog.NewTextHandler(buffer, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	service.now = func() time.Time { return fixedNow }
+	return service, buffer
+}
+
+func TestRF018_AnonymousJunkIsLoggedAndNeverWrittenToTheAuditLog(t *testing.T) {
+	repository := &fakeRepository{}
+	service, logs := loggedService(repository)
+	created, _ := service.Create(context.Background(), validInput())
+	_, secret, _ := parse(created.FullKey)
+	before := len(repository.audits)
+	meta := RequestMeta{IP: netip.MustParseAddr("198.51.100.7")}
+
+	cases := map[string]struct{ raw, reason string }{
+		"unknown id": {"ihk_0000000000000000_" + secret, "unknown_key"},
+		"malformed":  {"ihk_not-a-key-" + secret, "malformed"},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			logs.Reset()
+			if _, err := service.Authenticate(context.Background(), tc.raw, ScopeAuditLogRead, meta); !errors.Is(err, ErrUnauthenticated) {
+				t.Fatalf("err=%v, want ErrUnauthenticated", err)
+			}
+			if len(repository.audits) != before {
+				t.Fatalf("anonymous rejection wrote to the audit log: %+v", repository.audits[before:])
+			}
+			out := logs.String()
+			for _, want := range []string{"level=WARN", "reason=" + tc.reason, "scope=" + ScopeAuditLogRead, "ip=198.51.100.7"} {
+				if !strings.Contains(out, want) {
+					t.Fatalf("log %q lacks %q", out, want)
+				}
+			}
+			if strings.Contains(out, secret) || strings.Contains(out, tc.raw) {
+				t.Fatalf("log leaks the secret or the raw header: %q", out)
+			}
+		})
+	}
+	logs.Reset()
+	_, _ = service.Authenticate(context.Background(), "ihk_0000000000000000_"+secret, ScopeAuditLogRead, meta)
+	if !strings.Contains(logs.String(), "public_id=0000000000000000") {
+		t.Fatalf("a well-formed public id should be logged: %q", logs.String())
+	}
+	logs.Reset()
+	_, _ = service.Authenticate(context.Background(), "ihk_garbage", ScopeAuditLogRead, meta)
+	if strings.Contains(logs.String(), "public_id") || strings.Contains(logs.String(), "garbage") {
+		t.Fatalf("a malformed value must not be logged: %q", logs.String())
+	}
+}
+
+func TestRF018_RejectionsTiedToAnExistingKeyAreAudited(t *testing.T) {
+	service, repository := newService()
+	valid, _ := service.Create(context.Background(), validInput())
+	expired, _ := service.Create(context.Background(), validInput())
+	repository.records[1].ExpiresAt = fixedNow.Add(-time.Second)
+	revoked, _ := service.Create(context.Background(), validInput())
+	_ = service.Revoke(context.Background(), revoked.ID, RevokeInput{ActorUserID: uuid.New()})
+
+	cases := map[string]struct {
+		raw, scope, reason string
+		want               error
+		id                 uuid.UUID
+	}{
+		"bad_secret":         {"ihk_" + valid.PublicID + "_" + strings.Repeat("A", 43), ScopeAuditLogRead, "bad_secret", ErrUnauthenticated, valid.ID},
+		"expired":            {expired.FullKey, ScopeAuditLogRead, "expired", ErrUnauthenticated, expired.ID},
+		"revoked":            {revoked.FullKey, ScopeAuditLogRead, "revoked", ErrUnauthenticated, revoked.ID},
+		"insufficient_scope": {valid.FullKey, "users:write", "insufficient_scope", ErrInsufficientScope, valid.ID},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			before := len(repository.audits)
+			if _, err := service.Authenticate(context.Background(), tc.raw, tc.scope, RequestMeta{}); !errors.Is(err, tc.want) {
+				t.Fatalf("err=%v, want %v", err, tc.want)
+			}
+			if len(repository.audits) != before+1 {
+				t.Fatalf("audits=%d, want one new event", len(repository.audits)-before)
+			}
+			event := repository.audits[before]
+			if event.Action != ActionRejected || event.KeyID == nil || *event.KeyID != tc.id || event.Metadata["reason"] != tc.reason {
+				t.Fatalf("event=%+v", event)
+			}
+		})
+	}
+}
+
+func TestRF018_AuditWriteFailureIsLoggedAndTheRejectionStands(t *testing.T) {
+	repository := &fakeRepository{}
+	service, logs := loggedService(repository)
+	created, _ := service.Create(context.Background(), validInput())
+	repository.auditErr = errors.New("database down")
+
+	_, err := service.Authenticate(context.Background(), "ihk_"+created.PublicID+"_"+strings.Repeat("A", 43), ScopeAuditLogRead, RequestMeta{})
+	if !errors.Is(err, ErrUnauthenticated) {
+		t.Fatalf("err=%v, want ErrUnauthenticated", err)
+	}
+	out := logs.String()
+	for _, want := range []string{"level=ERROR", "database down", "key_id=" + created.ID.String(), "action=" + ActionRejected} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("log %q lacks %q", out, want)
+		}
+	}
+}
+
+func TestRF018_TouchFailureIsLoggedAndAuthenticationSucceeds(t *testing.T) {
+	repository := &fakeRepository{}
+	service, logs := loggedService(repository)
+	created, _ := service.Create(context.Background(), validInput())
+	repository.touchErr = errors.New("touch failed")
+
+	principal, err := service.Authenticate(context.Background(), created.FullKey, ScopeAuditLogRead, RequestMeta{})
+	if err != nil || principal.KeyID != created.ID {
+		t.Fatalf("principal=%+v err=%v, want success", principal, err)
+	}
+	out := logs.String()
+	for _, want := range []string{"level=WARN", "touch failed", "key_id=" + created.ID.String(), "action=touch_last_used"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("log %q lacks %q", out, want)
+		}
 	}
 }

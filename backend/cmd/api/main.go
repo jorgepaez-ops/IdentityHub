@@ -195,7 +195,7 @@ func run() error {
 	server.SetAdminUserService(admin.New(db))
 	server.SetRoleGridService(rolegrid.New(db))
 	server.SetAuditLogService(auditlog.New(db))
-	server.SetServiceKeyService(servicekey.New(db.ServiceKeys()))
+	server.SetServiceKeyService(servicekey.New(db.ServiceKeys()).WithLogger(logger))
 	server.SetCurrentUserRepository(db)
 	server.SetTrustedProxies(cfg.TrustedProxies)
 

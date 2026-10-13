@@ -30,7 +30,7 @@ La paginación y los filtros son los de siempre (`cursor`, `limit`, `action`, `a
 
 ## Qué responde la API
 
-- Una clave desconocida, con secreto incorrecto, expirada o revocada recibe el **mismo `401`**: la respuesta no dice cuál fue la causa. El motivo real queda solo en la auditoría (`service_key_rejected`, con el `publicId`, nunca el secreto).
+- Una clave desconocida, con secreto incorrecto, expirada o revocada recibe el **mismo `401`**: la respuesta no dice cuál fue la causa. El motivo real no se devuelve: si la clave existe (secreto incorrecto, expirada, revocada o sin alcance) queda en la auditoría (`service_key_rejected`, con el `publicId`, nunca el secreto); si es malformada o desconocida solo queda en el log estructurado, porque auditarla dejaría que cualquiera sin autenticarse llenara la tabla de auditoría (Alloy/Loki ya recogen esos logs).
 - En cualquier otra operación (usuarios, roles, gestión de claves, `/me`) la clave recibe `401`: una clave de servicio no puede emitir ni revocar claves.
 - Emitir, listar y revocar claves exige un access token de administrador (`403` para un usuario sin el rol `admin`).
 

@@ -25,7 +25,7 @@ a la integración todos los permisos de ese admin.
 - **Verificación:** se busca por `public_id`, se compara el hash con `crypto/subtle` en tiempo
   constante (contra un hash señuelo si el `public_id` no existe) y se rechaza si está revocada o
   vencida. Desconocida, incorrecta, expirada y revocada devuelven el mismo `401` (sin oráculo); el
-  motivo real solo queda en la auditoría.
+  motivo real solo queda en la auditoría o en los logs (ver Auditoría).
 - **Vigencia y revocación:** `expires_at` es obligatorio (1 a 365 días). La revocación es lógica
   (`revoked_at`) e idempotente, y no se puede reactivar una clave.
 - **Alcances:** lista cerrada en el servidor, hoy solo `audit-log:read`. Cada operación que admite
@@ -36,10 +36,16 @@ a la integración todos los permisos de ese admin.
 - **Gestión:** solo un admin con access token emite, lista y revoca claves. Las claves de servicio
   no gestionan claves (no hay autoescalada).
 - **Auditoría:** `service_key_created`, `service_key_revoked` y `service_key_rejected`, con el
-  `publicId` (si tiene formato válido) y nunca el secreto. `last_used_at` se actualiza como máximo una
+  `publicId` y nunca el secreto. `service_key_rejected` se escribe solo cuando el rechazo corresponde
+  a una clave existente (secreto incorrecto, revocada, expirada o sin el alcance). Una clave
+  malformada o con `public_id` desconocido la puede enviar cualquiera sin autenticarse, y auditarla
+  permitiría inflar la tabla `audit_log` sin límite (amplificación de escritura); esos intentos van a
+  un log estructurado (`Warn`, con motivo, alcance, IP y el `public_id` solo si tiene formato válido,
+  nunca el secreto ni la cabecera), que Alloy/Loki ya recogen. Si falla la escritura de auditoría o
+  la de `last_used_at`, se registra en el log (`Error` / `Warn`) y el resultado de la petición no cambia. `last_used_at` se actualiza como máximo una
   vez por minuto para no convertir cada lectura en una escritura.
 - **Límite de peticiones:** no se añade un limitador propio. La adivinanza es inviable (256 bits) y
-  Nginx ya limita el tráfico externo; los usos rechazados quedan auditados para detectar abuso.
+  Nginx ya limita el tráfico externo; los usos rechazados de claves existentes quedan auditados y los intentos anónimos quedan en logs, para detectar abuso.
 
 ## Consecuencias
 

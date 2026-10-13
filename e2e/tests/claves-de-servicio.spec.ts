@@ -127,7 +127,9 @@ test('RF-018 Una clave inválida, expirada o revocada recibe la misma respuesta'
     'GET', `${auditPath}?action=service_key_rejected&limit=100`, { token: admin.accessToken },
   )
   const reasons = rejected.body.items.map((item) => item.metadata.reason)
-  for (const reason of ['bad_secret', 'unknown_key', 'expired', 'revoked']) expect(reasons).toContain(reason)
+  // Only rejections tied to an existing key are audited; an unknown id is anonymous junk and goes to the logs.
+  for (const reason of ['bad_secret', 'expired', 'revoked']) expect(reasons).toContain(reason)
+  expect(reasons).not.toContain('unknown_key')
   expect(JSON.stringify(rejected.body)).not.toContain(secretOf(valid.key))
 })
 
