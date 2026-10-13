@@ -76,6 +76,13 @@ function KeyRow({ serviceKey, report, onRevoked }: Readonly<{ serviceKey: Servic
 }
 
 // The only place the full key is ever on screen: it is dropped from state as soon as it is dismissed.
+/** The list keeps metadata only: the secret is shown once and never stored with the rows. */
+function withoutSecret(created: CreatedServiceKey): ServiceKey {
+  const metadata: Partial<CreatedServiceKey> = { ...created }
+  delete metadata.key
+  return metadata as ServiceKey
+}
+
 function RevealedKey({ created, onDismiss, onNotify }: Readonly<{ created: CreatedServiceKey; onDismiss: () => void; onNotify: Notify }>) {
   const titleId = useId()
   const inputId = useId()
@@ -242,9 +249,7 @@ export function ServiceKeysPage({ onSessionEnded }: Readonly<{ onSessionEnded: (
       </section>
       <section className="panel role-section" aria-label="Emitir una clave">
         <NewKeyForm report={report} onCreated={(created) => {
-          const { key: _secret, ...metadata } = created
-          void _secret
-          setKeys((current) => [metadata, ...(current ?? [])])
+          setKeys((current) => [withoutSecret(created), ...(current ?? [])])
           setRevealed(created)
           showNotice(null)
         }} />

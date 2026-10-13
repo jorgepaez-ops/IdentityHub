@@ -5,6 +5,7 @@ import { describeUserAgent } from './userAgent'
 import { problemMessages } from './PublicPages'
 import { chipTone } from '../admin/shared'
 import { fieldValue } from '../../formData'
+import { keyedMessages } from '../../components/keyedMessages'
 
 
 function ProfileCard({ user, onUserChange }: Readonly<{ user: CurrentUser; onUserChange: (user: CurrentUser) => void }>) {
@@ -33,8 +34,8 @@ function ProfileCard({ user, onUserChange }: Readonly<{ user: CurrentUser; onUse
   return (
     <section className="panel" aria-labelledby="profile-title">
       <h2 id="profile-title">Perfil</h2>
-      {problems.length > 0 && <div className="error-box" role="alert">{problems.map((message, index) => <p key={index}>{message}</p>)}</div>}
-      {notice && <div className="success-box" role="status"><p>{notice}</p></div>}
+      {problems.length > 0 && <div className="error-box" role="alert">{keyedMessages(problems).map(({ key, message }) => <p key={key}>{message}</p>)}</div>}
+      {notice && <output className="success-box">{notice}</output>}
       <form onSubmit={(event) => void save(event)} noValidate>
         <label htmlFor="profile-name">Nombre para mostrar</label>
         <input id="profile-name" name="displayName" defaultValue={user.displayName} maxLength={100} required />

@@ -17,7 +17,7 @@ const neutralize = (value: string) => (FORMULA_START.test(value) ? `'${value}` :
 export function csvCell(value: CsvCell): string {
   if (value === null || value === undefined) return ''
   const text = typeof value === 'number' ? numberText(value) : neutralize(value)
-  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
+  return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text
 }
 
 /** Builds the whole file: UTF-8 BOM (so Excel reads accents), a header row and CRLF-separated records. */

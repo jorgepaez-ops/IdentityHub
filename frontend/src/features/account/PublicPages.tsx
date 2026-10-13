@@ -2,6 +2,7 @@ import { FormEvent, ReactNode, useId, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ApiProblemError, acceptInvitation, confirmPasswordReset, requestPasswordReset } from '../../api/client'
 import { fieldValue } from '../../formData'
+import { keyedMessages } from '../../components/keyedMessages'
 
 // Bounds come from InvitationAcceptRequest / PasswordResetConfirmRequest in specs/03-api/openapi.yaml.
 const PASSWORD_MIN = 12
@@ -31,7 +32,7 @@ function AuthCard({ title, lead, children }: Readonly<{ title: string; lead?: st
 
 function Problems({ messages }: Readonly<{ messages: string[] }>) {
   if (messages.length === 0) return null
-  return <div className="error-box" role="alert">{messages.map((message, index) => <p key={index}>{message}</p>)}</div>
+  return <div className="error-box" role="alert">{keyedMessages(messages).map(({ key, message }) => <p key={key}>{message}</p>)}</div>
 }
 
 function LoginLink() {
@@ -117,7 +118,7 @@ export function AcceptInvitationPage() {
       {flow === 'form' && <NewPasswordForm submitLabel="Definir contraseña" pending={pending} problems={problems} onSubmit={(password) => void submit(password)} />}
       {flow === 'done' && (
         <>
-          <div className="success-box" role="status"><p>Tu cuenta quedó activada. Ya puedes iniciar sesión.</p></div>
+          <output className="success-box">Tu cuenta quedó activada. Ya puedes iniciar sesión.</output>
           <LoginLink />
         </>
       )}
@@ -152,7 +153,7 @@ export function ForgotPasswordPage() {
   return (
     <AuthCard title="Restablecer contraseña" lead="Escribe tu correo y te enviaremos un enlace para elegir una contraseña nueva.">
       {error && <div className="error-box" role="alert"><p>{error}</p></div>}
-      {sent && <div className="success-box" role="status"><p>Si la cuenta existe, enviamos un enlace para restablecer la contraseña. Revisa tu correo.</p></div>}
+      {sent && <output className="success-box">Si la cuenta existe, enviamos un enlace para restablecer la contraseña. Revisa tu correo.</output>}
       <form onSubmit={(event) => void submit(event)}>
         <label htmlFor="reset-email">Correo electrónico</label>
         <input id="reset-email" name="email" type="email" autoComplete="email" required />
@@ -181,7 +182,7 @@ export function ResetPasswordPage() {
       {flow === 'form' && <NewPasswordForm submitLabel="Restablecer contraseña" pending={pending} problems={problems} onSubmit={(password) => void submit(password)} />}
       {flow === 'done' && (
         <>
-          <div className="success-box" role="status"><p>Tu contraseña se actualizó y cerramos tus sesiones activas. Inicia sesión con la nueva.</p></div>
+          <output className="success-box">Tu contraseña se actualizó y cerramos tus sesiones activas. Inicia sesión con la nueva.</output>
           <LoginLink />
         </>
       )}

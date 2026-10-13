@@ -45,8 +45,13 @@ function writeFilters(filters: Filters): URLSearchParams {
   return params
 }
 
+function sinceDate(since: string): Date | null {
+  if (since === LAST_24H) return new Date(Date.now() - DAY_MS)
+  return since ? new Date(since) : null
+}
+
 function toQuery(filters: Filters): AuditLogQuery {
-  const since = filters.since === LAST_24H ? new Date(Date.now() - DAY_MS) : filters.since ? new Date(filters.since) : null
+  const since = sinceDate(filters.since)
   return {
     ...(filters.action ? { action: filters.action } : {}),
     ...(filters.actorId ? { actorId: filters.actorId } : {}),
@@ -240,17 +245,17 @@ export function AuditLogPage({ onSessionEnded }: Readonly<{ onSessionEnded: () =
             <button className="secondary-button fit" onClick={clear} type="button">Limpiar</button>
           </div>
         </form>
-        <div className="filter-group" role="group" aria-label="Atajos de filtro">
+        <fieldset className="filter-group" aria-label="Atajos de filtro">
           {ACTION_SHORTCUTS.map((item) => (
             <button key={item.action} className="filter-button" type="button" aria-pressed={applied.action === item.action} onClick={() => toggleAction(item.action)}>{item.label}</button>
           ))}
           <button className="filter-button" type="button" aria-pressed={applied.since === LAST_24H} onClick={toggleLast24h}>Últimas 24 h</button>
-        </div>
-        <div className="export-row" role="group" aria-label="Exportar registro">
+        </fieldset>
+        <fieldset className="export-row" aria-label="Exportar registro">
           <button className="secondary-button fit" type="button" disabled={exporting !== null} onClick={() => void exportLog('csv')}><DownloadIcon />Exportar CSV</button>
           <button className="secondary-button fit" type="button" disabled={exporting !== null} onClick={() => void exportLog('json')}><DownloadIcon />Exportar JSON</button>
           <p className="hint">{exporting ? 'Exportando…' : `Exporta todos los eventos que cumplen los filtros aplicados (hasta ${EXPORT_LIMIT}).`}</p>
-        </div>
+        </fieldset>
         {filterError && <Problems messages={[filterError]} />}
         {error && <Problems messages={[error]} />}
         {events === null && !error && <LoadingSkeleton label="Cargando auditoría…" />}

@@ -49,7 +49,7 @@ button { cursor: pointer; border: 0; border-radius: .55rem; font-weight: 600; }
 .secondary-button { margin-top: .65rem; border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
 button:disabled { cursor: wait; opacity: .7; }
 .error-box { padding: .75rem; color: var(--danger); background: var(--danger-soft); border-radius: .55rem; }
-.success-box { padding: .75rem; color: var(--ok); background: var(--ok-soft); border-radius: .55rem; }
+.success-box { display: block; padding: .75rem; color: var(--ok); background: var(--ok-soft); border-radius: .55rem; }
 .success-box p { margin: 0; }
 .app-shell { min-height: 100vh; display: grid; grid-template-columns: 15rem minmax(0, 1fr); }
 .left-rail { display: flex; flex-direction: column; gap: 1.5rem; padding: 1.25rem; background: var(--panel); border-right: 1px solid var(--line); }
@@ -148,7 +148,7 @@ nav a.active { background: var(--accent-soft); color: var(--accent); font-weight
 .directory > .secondary-button { margin-top: 1rem; }
 .drawer-layer { position: fixed; inset: 0; z-index: 20; }
 .drawer-backdrop { position: absolute; inset: 0; background: rgb(0 0 0 / .4); }
-.drawer { position: absolute; top: 0; right: 0; bottom: 0; width: min(24rem, 92vw); padding: 1.5rem; overflow-y: auto; background: var(--panel); border-left: 1px solid var(--line); }
+.drawer { position: absolute; inset: 0 0 0 auto; width: min(24rem, 92vw); height: auto; max-width: none; max-height: none; margin: 0; color: inherit; border: 0; padding: 1.5rem; overflow-y: auto; background: var(--panel); border-left: 1px solid var(--line); }
 .drawer-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: .5rem; }
 .drawer-header h2 { margin: 0; font-family: var(--display); font-size: 1.25rem; }
 .icon-button { width: 2rem; height: 2rem; color: var(--ink); background: none; font-size: 1.4rem; line-height: 1; }
@@ -241,3 +241,6 @@ nav a { display: flex; align-items: center; gap: .65rem; padding: .65rem .7rem; 
 .export-row { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; margin-bottom: 1rem; }
 .export-row .secondary-button { margin-top: 0; }
 .export-row .hint { margin: 0; }
+
+/* Native <fieldset> carries the group role; keep it visually identical to the former div. */
+:where(fieldset.stat-tile, fieldset.filter-group, fieldset.export-row) { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
