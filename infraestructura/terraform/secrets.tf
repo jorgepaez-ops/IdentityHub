@@ -66,6 +66,7 @@ locals {
 # (ses_smtp_password_v4). Un usuario IAM dedicado solo puede enviar desde la
 # direccion configurada. Con localstack = true no existen: Mailpit no exige TLS.
 resource "aws_iam_user" "ses_smtp" {
+  #checkov:skip=CKV_AWS_273:Las credenciales SMTP de SES se derivan de una access key de usuario IAM; un rol o SSO no puede autenticarse por SMTP
   count = var.localstack ? 0 : 1
 
   name = "${var.project}-${var.environment}-ses-smtp"
@@ -87,6 +88,7 @@ data "aws_iam_policy_document" "ses_send" {
 }
 
 resource "aws_iam_user_policy" "ses_send" {
+  #checkov:skip=CKV_AWS_40:Politica minima (solo ses:SendRawEmail desde una direccion) del unico usuario tecnico de SMTP; un grupo de un solo miembro no reduce el riesgo
   count = var.localstack ? 0 : 1
 
   name   = "enviar-correo"
