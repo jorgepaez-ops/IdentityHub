@@ -204,6 +204,14 @@ func TestRF018_Integration_TodasLasClavesInvalidasRecibenLaMismaRespuestaYQuedan
 		"revoked":     revoked.Key,
 		"malformed":   "ihk_garbage",
 	}
+	h.requireSameUnauthorizedResponse(t, cases)
+	h.requireRejectedAuditReasons(t)
+}
+
+// requireSameUnauthorizedResponse sends each credential to the audit-log endpoint and checks all
+// of them get a 401 with an identical body, so the response is no oracle for the failure kind.
+func (h *harness) requireSameUnauthorizedResponse(t *testing.T, cases map[string]string) {
+	t.Helper()
 	var first string
 	for name, raw := range cases {
 		response := h.do(http.MethodGet, "/api/v1/admin/audit-log", "", raw)
@@ -216,8 +224,13 @@ func TestRF018_Integration_TodasLasClavesInvalidasRecibenLaMismaRespuestaYQuedan
 			t.Fatalf("%s: response differs from the others (oracle): %s", name, response.Body.String())
 		}
 	}
+}
 
-	rows, err := h.pool.Query(ctx, `SELECT metadata->>'reason' FROM audit_log WHERE action = 'service_key_rejected' ORDER BY id`)
+// requireRejectedAuditReasons checks the service_key_rejected audit rows: rejections tied to an
+// existing key are audited once each; anonymous junk (unknown id, malformed) is not.
+func (h *harness) requireRejectedAuditReasons(t *testing.T) {
+	t.Helper()
+	rows, err := h.pool.Query(context.Background(), `SELECT metadata->>'reason' FROM audit_log WHERE action = 'service_key_rejected' ORDER BY id`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -230,7 +243,6 @@ func TestRF018_Integration_TodasLasClavesInvalidasRecibenLaMismaRespuestaYQuedan
 		}
 		reasons[reason]++
 	}
-	// Rejections tied to an existing key are audited; anonymous junk (unknown id, malformed) is not.
 	for _, reason := range []string{"bad_secret", "expired", "revoked"} {
 		if reasons[reason] != 1 {
 			t.Fatalf("rejected audit reasons=%v, want one %q", reasons, reason)

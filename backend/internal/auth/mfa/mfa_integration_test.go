@@ -127,26 +127,9 @@ func TestRF017_CodigosMFAIncorrectosEnDesafiosSucesivosBloqueanLaCuenta(t *testi
 		}
 	}
 
-	var status string
-	var lockedUntil *time.Time
-	if err := pool.QueryRow(ctx, `SELECT status, locked_until FROM users WHERE id = $1`, userID).Scan(&status, &lockedUntil); err != nil {
-		t.Fatal(err)
-	}
-	if status != "locked" || lockedUntil == nil || !lockedUntil.After(time.Now().Add(14*time.Minute)) {
-		t.Fatalf("account after three rejected codes: status=%q locked_until=%v", status, lockedUntil)
-	}
-	var lockAudits int
-	var lockIP, lockAgent string
-	if err := pool.QueryRow(ctx, `SELECT count(*), coalesce(max(host(ip)), ''), coalesce(max(user_agent), '') FROM audit_log WHERE actor_user_id = $1 AND action = 'account_locked'`, userID).Scan(&lockAudits, &lockIP, &lockAgent); err != nil {
-		t.Fatal(err)
-	}
-	if lockAudits != 1 || lockIP != ip.String() || lockAgent != userAgent {
-		t.Fatalf("account_locked audit: count=%d ip=%q user-agent=%q", lockAudits, lockIP, lockAgent)
-	}
-	var rejected int
-	if err := pool.QueryRow(ctx, `SELECT count(*) FROM audit_log WHERE actor_user_id = $1 AND action = 'mfa_code_rejected' AND ip = $2 AND user_agent = $3`, userID, ip, userAgent).Scan(&rejected); err != nil {
-		t.Fatal(err)
-	}
+	requireAccountLockedForAbout15Minutes(t, pool, userID)
+	requireAccountLockedAudit(t, pool, userID, ip.String(), userAgent)
+	rejected := countRows(t, pool, `SELECT count(*) FROM audit_log WHERE actor_user_id = $1 AND action = 'mfa_code_rejected' AND ip = $2 AND user_agent = $3`, userID, ip, userAgent)
 	if rejected != 3 {
 		t.Fatalf("mfa_code_rejected rows with IP and user-agent = %d, want 3", rejected)
 	}
@@ -166,12 +149,46 @@ func TestRF017_CodigosMFAIncorrectosEnDesafiosSucesivosBloqueanLaCuenta(t *testi
 	if _, err := session.MFA.Verify(ctx, mfa.VerifyInput{Token: fresh.Token, Code: session.Mailbox.Code()}); !errors.Is(err, mfa.ErrChallengeInvalid) {
 		t.Fatalf("correct code on a locked account = %v, want ErrChallengeInvalid", err)
 	}
-	var sessions int
-	if err := pool.QueryRow(ctx, `SELECT count(*) FROM refresh_tokens WHERE user_id = $1`, userID).Scan(&sessions); err != nil {
+	if sessions := countRows(t, pool, `SELECT count(*) FROM refresh_tokens WHERE user_id = $1`, userID); sessions != 0 {
+		t.Fatalf("locked account obtained %d refresh sessions", sessions)
+	}
+}
+
+// countRows runs a single-value count query and fails the test if it cannot be read.
+func countRows(t *testing.T, pool *pgxpool.Pool, query string, args ...any) int {
+	t.Helper()
+	var n int
+	if err := pool.QueryRow(context.Background(), query, args...).Scan(&n); err != nil {
 		t.Fatal(err)
 	}
-	if sessions != 0 {
-		t.Fatalf("locked account obtained %d refresh sessions", sessions)
+	return n
+}
+
+// requireAccountLockedForAbout15Minutes checks the user is locked with a lock that still has
+// roughly the full 15 minutes ahead.
+func requireAccountLockedForAbout15Minutes(t *testing.T, pool *pgxpool.Pool, userID uuid.UUID) {
+	t.Helper()
+	var status string
+	var lockedUntil *time.Time
+	if err := pool.QueryRow(context.Background(), `SELECT status, locked_until FROM users WHERE id = $1`, userID).Scan(&status, &lockedUntil); err != nil {
+		t.Fatal(err)
+	}
+	if status != "locked" || lockedUntil == nil || !lockedUntil.After(time.Now().Add(14*time.Minute)) {
+		t.Fatalf("account after three rejected codes: status=%q locked_until=%v", status, lockedUntil)
+	}
+}
+
+// requireAccountLockedAudit checks there is exactly one account_locked audit row carrying the
+// client IP and user agent of the guesser.
+func requireAccountLockedAudit(t *testing.T, pool *pgxpool.Pool, userID uuid.UUID, wantIP, wantAgent string) {
+	t.Helper()
+	var count int
+	var gotIP, gotAgent string
+	if err := pool.QueryRow(context.Background(), `SELECT count(*), coalesce(max(host(ip)), ''), coalesce(max(user_agent), '') FROM audit_log WHERE actor_user_id = $1 AND action = 'account_locked'`, userID).Scan(&count, &gotIP, &gotAgent); err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 || gotIP != wantIP || gotAgent != wantAgent {
+		t.Fatalf("account_locked audit: count=%d ip=%q user-agent=%q", count, gotIP, gotAgent)
 	}
 }
 

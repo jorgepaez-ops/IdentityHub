@@ -301,11 +301,7 @@ func TestRF018_AnonymousJunkIsLoggedAndNeverWrittenToTheAuditLog(t *testing.T) {
 				t.Fatalf("anonymous rejection wrote to the audit log: %+v", repository.audits[before:])
 			}
 			out := logs.String()
-			for _, want := range []string{"level=WARN", "reason=" + tc.reason, "scope=" + ScopeAuditLogRead, "ip=198.51.100.7"} {
-				if !strings.Contains(out, want) {
-					t.Fatalf("log %q lacks %q", out, want)
-				}
-			}
+			requireLogContains(t, out, "level=WARN", "reason="+tc.reason, "scope="+ScopeAuditLogRead, "ip=198.51.100.7")
 			if strings.Contains(out, secret) || strings.Contains(out, tc.raw) {
 				t.Fatalf("log leaks the secret or the raw header: %q", out)
 			}
@@ -315,13 +311,30 @@ func TestRF018_AnonymousJunkIsLoggedAndNeverWrittenToTheAuditLog(t *testing.T) {
 	_, _ = service.Authenticate(context.Background(), "ihk_0000000000000000_"+secret, ScopeAuditLogRead, meta)
 	// Even a well-formed public id comes from the request header of an anonymous client: it is
 	// not logged (CodeQL go/log-injection and go/clear-text-logging).
-	if strings.Contains(logs.String(), "public_id") || strings.Contains(logs.String(), "0000000000000000") {
-		t.Fatalf("an unknown public id must not be logged: %q", logs.String())
-	}
+	requireLogOmits(t, "an unknown public id", logs.String(), "public_id", "0000000000000000")
 	logs.Reset()
 	_, _ = service.Authenticate(context.Background(), "ihk_garbage", ScopeAuditLogRead, meta)
-	if strings.Contains(logs.String(), "public_id") || strings.Contains(logs.String(), "garbage") {
-		t.Fatalf("a malformed value must not be logged: %q", logs.String())
+	requireLogOmits(t, "a malformed value", logs.String(), "public_id", "garbage")
+}
+
+// requireLogOmits fails the test if out contains any of the forbidden fragments; what names the
+// value that must not have been logged.
+func requireLogOmits(t *testing.T, what, out string, forbidden ...string) {
+	t.Helper()
+	for _, bad := range forbidden {
+		if strings.Contains(out, bad) {
+			t.Fatalf("%s must not be logged: %q", what, out)
+		}
+	}
+}
+
+// requireLogContains fails the test unless out contains every wanted fragment.
+func requireLogContains(t *testing.T, out string, wants ...string) {
+	t.Helper()
+	for _, want := range wants {
+		if !strings.Contains(out, want) {
+			t.Fatalf("log %q lacks %q", out, want)
+		}
 	}
 }
 
@@ -370,12 +383,7 @@ func TestRF018_AuditWriteFailureIsLoggedAndTheRejectionStands(t *testing.T) {
 	if !errors.Is(err, ErrUnauthenticated) {
 		t.Fatalf("err=%v, want ErrUnauthenticated", err)
 	}
-	out := logs.String()
-	for _, want := range []string{"level=ERROR", "database down", "key_id=" + created.ID.String(), "action=" + ActionRejected} {
-		if !strings.Contains(out, want) {
-			t.Fatalf("log %q lacks %q", out, want)
-		}
-	}
+	requireLogContains(t, logs.String(), "level=ERROR", "database down", "key_id="+created.ID.String(), "action="+ActionRejected)
 }
 
 func TestRF018_TouchFailureIsLoggedAndAuthenticationSucceeds(t *testing.T) {
