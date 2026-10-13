@@ -61,10 +61,17 @@ Validación:
   (`backend/cmd/worker/main.go:198-199`, pensado para Mailpit). La interfaz SMTP de SES exige
   credenciales y STARTTLS. Hasta que el worker los soporte, la referencia usa SES solo como
   destino documentado.
+  **Actualización (2026-10-13):** resuelto por la tarea F2. El worker abre la sesión SMTP con
+  STARTTLS obligatorio (TLS 1.2 como mínimo) y autentica solo después de cifrar; el Terraform le
+  pasa `SMTP_HOST`, `SMTP_PORT=587`, `SMTP_TLS=starttls` y las credenciales SMTP de SES desde
+  Secrets Manager. Queda sin probar la verificación real de la identidad de dominio y DKIM de SES.
 - **Brechas del código frente a un despliegue real** (encontradas al escribir el Terraform, T8a):
   - Los hosts `*.localhost` y el `redirect_uri` de OAuth están fijos en
     `backend/internal/config/config.go:66-68` y en `frontend/nginx/default.conf`; con dominios
-    reales hay que volverlos configurables.
+    reales hay que volverlos configurables. **Actualización (2026-10-13):** el cliente OAuth y sus
+    URL ya se configuran con `OAUTH_CLIENT_ID`, `OAUTH_REDIRECT_URI` y `OAUTH_CLIENT_ORIGIN`;
+    siguen fijos el `server_name` de Nginx, las constantes de Contabilidad y la fila del cliente
+    en la base de datos.
   - Detrás del ALB, Nginx reemplaza `X-Forwarded-For` con la IP del ALB, así que el límite de
     fallos por IP (RF-017) contaría a todos los clientes como uno solo: un atacante podría
     bloquear el login de todos. Antes de producción, Nginx debe confiar en el ALB y propagar la

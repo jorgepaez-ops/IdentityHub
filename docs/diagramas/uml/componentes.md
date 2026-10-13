@@ -9,7 +9,8 @@ flowchart LR
     API["api: cmd/api"]
     Worker["worker: cmd/worker"]
     Store["internal/store"]
-    Auth["internal/auth\nemployee, invitation, login, mfa, oauth,\npasswordreset, refresh, session, admin y auditlog"]
+    Auth["internal/auth\nemployee, invitation, login, mfa, oauth,\npasswordreset, refresh, session, admin, auditlog
+y servicekey (RF-018)"]
     Events["internal/events"]
     Notify["internal/notify"]
     Obs["internal/observability"]
@@ -20,6 +21,7 @@ flowchart LR
     Grafana["Grafana"]
     Loki["Loki"]
     Alloy["Grafana Alloy"]
+    Falco["Falco\nperfil observability"]
 
     Browser --> Web
     Web --> API
@@ -31,10 +33,11 @@ flowchart LR
     Events --> Broker
     Broker --> Worker
     Worker --> Notify
-    Notify --> Mailpit
+    Notify -->|"SMTP STARTTLS + AUTH"| Mailpit
     Worker --> Obs
     Prometheus --> API
     Prometheus --> Worker
+    Falco -->|"alertas JSON"| Alloy
     Alloy --> Loki
     Grafana --> Prometheus
     Grafana --> Loki
