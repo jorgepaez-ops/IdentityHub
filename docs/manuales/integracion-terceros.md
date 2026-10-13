@@ -4,6 +4,71 @@ Esta guía explica cómo una aplicación externa delega su inicio de sesión en 
 
 Tono y convenciones: el contrato es [`specs/03-api/openapi.yaml`](../../specs/03-api/openapi.yaml); donde el código hace más que el contrato, la guía lo indica. Para el contexto general vea el [manual de arquitectura](arquitectura.md) y el [manual de seguridad](seguridad.md).
 
+Contenido: [Cómo funciona](#cómo-funciona-en-pocas-palabras) · [Ejemplo completo: Contabilidad](#ejemplo-completo-contabilidad) · secciones 1 a 9 (referencia) · [10. Cómo se integra un tercero nuevo hoy](#10-cómo-se-integra-un-tercero-nuevo-hoy) · [11. Glosario](#11-glosario). Si es su primera lectura, empiece por las dos secciones siguientes y use el resto como consulta.
+
+## Cómo funciona, en pocas palabras
+
+**Los actores**
+
+- **La persona usuaria**, que quiere entrar a una aplicación (por ejemplo, Contabilidad).
+- **La aplicación del tercero**, que necesita saber quién es y qué puede hacer, pero no quiere guardar contraseñas.
+- **Identity Hub**, que es el único lugar donde la persona escribe su contraseña y su código MFA. Es quien conoce las cuentas, los roles y los permisos.
+- **El navegador**, que es el mensajero: para iniciar sesión, la aplicación envía a la persona al Hub y el Hub la devuelve a la aplicación redirigiendo el navegador. Solo al final la aplicación llama directamente al Hub, para canjear el código por el token (`POST /oauth/token`) y para obtener las claves con que verifica su firma (`/.well-known/jwks.json`).
+
+**El problema que resuelve.** Sin este esquema, cada aplicación tendría su propia tabla de usuarios y contraseñas. Con Identity Hub, la aplicación del tercero envía a la persona al Hub; el Hub la autentica (contraseña y MFA) y devuelve a la aplicación un **token firmado** que dice quién es (`sub`), para qué aplicación sirve (`aud`), qué roles tiene en ella (`roles`) y qué puede hacer (`permissions`). La aplicación nunca ve la contraseña; solo verifica la firma del token y muestra u oculta funciones según los permisos.
+
+**Una analogía.** Piense en la recepción de un hotel. Usted muestra su documento una sola vez en la recepción (el Hub) y le entregan una tarjeta-llave que solo abre las puertas que le corresponden (los permisos) y que caduca a la hora de salida (la expiración). Las puertas (las aplicaciones) no le piden el documento: leen la tarjeta y comprueban que es auténtica. Contabilidad es una de esas puertas.
+
+## Ejemplo completo: Contabilidad
+
+El recorrido real de Contabilidad, de punta a punta. Las rutas, los parámetros y las claims son los que usa el código (ver secciones 3 a 5 para el detalle).
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor B as Navegador
+    participant C as Contabilidad (SPA)
+    participant W as Hub web (login)
+    participant A as Hub API
+
+    B->>C: Pulsa Continuar (iniciar sesión)
+    C->>C: Crea code_verifier, calcula code_challenge (S256) y state
+    C->>C: Guarda verifier y state en sessionStorage
+    C->>B: Redirige a /oauth/authorize?client_id=contabilidad&redirect_uri=...&response_type=code&state=...&code_challenge=...&code_challenge_method=S256
+    B->>A: GET /oauth/authorize
+    alt Sin cookie hub_session válida
+        A-->>B: 302 a /login?continue=/oauth/authorize?...
+        B->>W: Muestra el login del Hub
+        B->>A: POST /api/v1/auth/login (contraseña) y POST /api/v1/auth/mfa/verify (código MFA)
+        A-->>B: Set-Cookie hub_session y vuelta a /oauth/authorize
+    end
+    A-->>B: 302 a /oauth/callback?code=...&state=...
+    B->>C: GET /oauth/callback
+    C->>C: Quita code y state de la URL y compara state con el guardado
+    C->>A: POST /oauth/token (grant_type=authorization_code, code, redirect_uri, client_id, code_verifier)
+    A->>A: Comprueba code, cliente, redirect_uri y SHA-256(code_verifier) = code_challenge
+    A-->>C: 200 {access_token, token_type: Bearer, expires_in: 900}
+    C->>A: GET /.well-known/jwks.json
+    A-->>C: Clave pública Ed25519 (kid)
+    C->>C: Verifica firma EdDSA, iss, aud, exp; lee roles y permissions
+    C-->>B: Muestra u oculta funciones según permissions
+    Note over C,A: A los 15 minutos (exp) Contabilidad repite el flujo; si hub_session sigue viva no se pide login
+```
+
+**Los mismos pasos, en prosa**
+
+1. **El usuario pulsa Continuar.** El botón de [`Login.tsx`](../../contabilidad/src/Login.tsx) dispara `start` en [`App.tsx`](../../contabilidad/src/App.tsx), que llama a `beginLogin`.
+2. **Se crean los secretos de un solo intento.** Un `code_verifier` aleatorio, su `code_challenge` (SHA-256 en base64url, método `S256`) y un `state` aleatorio; el verifier y el `state` se guardan en `sessionStorage` ([`pkce.ts`](../../contabilidad/src/auth/pkce.ts), [`flow.ts`](../../contabilidad/src/auth/flow.ts), `beginLogin`).
+3. **Redirección al Hub.** El navegador va a `GET /oauth/authorize` con `client_id`, `redirect_uri`, `response_type=code`, `state`, `code_challenge` y `code_challenge_method=S256` ([`flow.ts`](../../contabilidad/src/auth/flow.ts), `beginLogin`; `redirectTo` en [`navigation.ts`](../../contabilidad/src/navigation.ts)).
+4. **Login y MFA en el Hub.** Si no hay sesión, el Hub pide contraseña y código MFA. Contabilidad no participa ni ve nada de esto.
+5. **El Hub devuelve un código.** Redirige a `/oauth/callback?code=...&state=...`. El `code` es de un solo uso y vive 1 minuto; por sí solo no sirve de nada sin el `code_verifier`.
+6. **Contabilidad comprueba el `state`.** Quita `code` y `state` de la barra de direcciones y compara el `state` con el guardado; si no coincide, aborta ([`flow.ts`](../../contabilidad/src/auth/flow.ts), `completeCallback`).
+7. **Canje del código.** `POST /oauth/token` con `grant_type`, `code`, `redirect_uri`, `client_id` y `code_verifier`; el Hub verifica que el SHA-256 del verifier coincida con el `code_challenge` del paso 3 ([`flow.ts`](../../contabilidad/src/auth/flow.ts), `completeCallback`).
+8. **Se obtiene la clave pública.** `GET /.well-known/jwks.json` ([`flow.ts`](../../contabilidad/src/auth/flow.ts)).
+9. **Se valida el token.** Firma `EdDSA` con la clave elegida por `kid`, `iss`, `aud` y `exp` (con 60 s de tolerancia de reloj) ([`jwt.ts`](../../contabilidad/src/auth/jwt.ts)).
+10. **Se leen `roles` y `permissions`.** La interfaz muestra u oculta botones y secciones según las claves de `permissions` ([`access.ts`](../../contabilidad/src/access.ts), [`Shell.tsx`](../../contabilidad/src/Shell.tsx)).
+11. **Al vencer el token.** El token vive 15 minutos y no hay refresh token: un temporizador ligado a `exp` vuelve a iniciar el flujo desde el paso 2. Mientras la cookie `hub_session` siga viva el usuario no ve el login; el token solo vive en memoria, así que recargar la página también reinicia el flujo ([`App.tsx`](../../contabilidad/src/App.tsx)).
+
 ## 1. Qué ofrece Identity Hub a una plataforma externa
 
 | Capacidad | Cómo se materializa hoy |
@@ -289,6 +354,52 @@ Controles que aplica el Hub, cada uno cubierto por un escenario de [`roles-y-per
 | Sin cierre de sesión único: salir del Hub no cierra la sesión de la aplicación hasta que vence su token (15 minutos). | Cierre de sesión por canal frontal o trasero y revocación de tokens. |
 | Sin revocación ni introspección de access tokens. | Endpoint de introspección o lista de revocación. |
 | El JWKS publica una sola clave. | Publicar varias claves y un procedimiento de rotación con `kid` (el cliente de referencia ya selecciona la clave por `kid`). |
-| Roles de aplicación fijos en código; el mecanismo de declaración de permisos no existe. | Se completa tras T15 (sección 7). |
 | El Hub, el emisor y el `client_id` están fijos a mano en la configuración del cliente y en la CSP de Nginx. | Configuración por entorno en el cliente. |
 | El contrato OpenAPI no declara los `500` y `503` que el código emite en los endpoints OAuth. | Alinear el contrato con el comportamiento real. |
+
+### 9.1 Qué aportaría cada mejora (ninguna está implementada)
+
+- **Clientes guardados en la base de datos.** Hoy el único cliente está escrito en el código y registrar otra aplicación obliga a modificar el código y volver a desplegar el Hub. Con los clientes en la base de datos, un administrador daría de alta una aplicación (su `client_id`, `redirect_uri` y origen) sin redespliegue.
+- **OpenID Connect.** Añadiría un `id_token` estándar con los datos de la persona y un documento de descubrimiento (`/.well-known/openid-configuration`) que describe los endpoints. Así las librerías de mercado se configurarían solas, en lugar de que cada tercero escriba código a medida como hace Contabilidad.
+- **Refresh tokens por cliente.** Permitirían que una aplicación mantenga la sesión más allá de los 15 minutos del access token sin que la persona vuelva a pasar por el Hub; hoy la renovación depende de repetir el flujo con la cookie `hub_session`.
+- **Introspección.** Un servidor de recursos podría preguntar al Hub si un token sigue siendo válido, en lugar de confiar únicamente en su firma y su `exp`.
+- **Revocación.** Permitiría invalidar un access token antes de que venza (por ejemplo, tras cerrar sesión o bloquear una cuenta); hoy un token emitido se acepta hasta su `exp`.
+- **Outbox transaccional** ([ADR 0006](../../specs/adr/0006-publicacion-directa-sin-outbox.md)). Garantizaría que un evento (por ejemplo `user.registered`) se publique si y solo si el cambio en la base se confirma, escribiéndolo en una tabla dentro de la misma transacción y publicándolo después con un proceso aparte. Hoy la API publica directamente en RabbitMQ y existe una ventana pequeña entre el `COMMIT` y la confirmación del broker.
+
+## 10. Cómo se integra un tercero nuevo hoy
+
+Es un procedimiento honesto: **hoy requiere un cambio de código en el Hub**, porque el cliente está fijo en el repositorio (sección 2.3). No existe un alta solo por configuración. Las variables de entorno de la sección 2.1 (`JWT_ISSUER`, `PUBLIC_BASE_URL`, etc.) son configuración, pero no registran clientes.
+
+**En el Hub (cambio de código y despliegue)**
+
+1. **Definir el cliente.** Hoy `config.go` solo declara las tres constantes de Contabilidad (`OAuthClientID`, `OAuthRedirectURI`, `OAuthClientOrigin`) y [`main.go`](../../backend/cmd/api/main.go) construye con ellas un único `oauth.Client`. Para una segunda aplicación hay que permitir varios clientes (sección 2.3: buscar por `client_id` en `oauth.Service`, `IssueForAudience` con el cliente que canjeó el código y `oauthCORS` por origen). Es código, no configuración.
+2. **Registrar la fila en `applications`.** Nueva migración en [`db/migrations/`](../../db/migrations/) con `client_id`, `redirect_uri`, `allowed_origin` y `name`, como la 000007.
+3. **Declarar los permisos.** En esa migración (o una contigua, como la 000009 de Contabilidad) insertar el catálogo de `permissions` de la aplicación (sección 7.2). Los roles se arman después en la grilla de la consola, sin código.
+4. **Ajustar Nginx y CSP** si la aplicación se sirve desde este Nginx (sección 2.3, filas Nginx y Compose).
+5. **Actualizar especificaciones y pruebas.** RF-020 en [`specs/01-requirements.md`](../../specs/01-requirements.md) dice "único cliente"; [`autorizacion-oauth.feature`](../../specs/06-acceptance/autorizacion-oauth.feature), [`config_test.go`](../../backend/internal/config/config_test.go) y las pruebas de [`oauth_test.go`](../../backend/internal/auth/oauth/oauth_test.go) deben cubrir el nuevo cliente. Registrar el cambio en un ADR si cambia la decisión del [ADR 0009](../../specs/adr/0009-sso-entre-dominios-con-authorization-code-y-pkce.md).
+
+**En la aplicación del tercero (lo que implementa el tercero)**
+
+6. Implementar PKCE, `state`, callback, canje, validación del token contra el JWKS y guardas por `permissions`, siguiendo la sección 6 y tomando como modelo `contabilidad/src/auth/`.
+7. Servirse desde el origen y la ruta de callback registrados, con la CSP de la sección 6.
+8. Decidir cada capacidad por una clave de `permissions`, nunca por el nombre del rol, y repetir la validación en su propio servidor (sección 5).
+
+| Qué | Configuración | Cambio de código |
+|---|---|---|
+| Emisor, clave de firma, URL pública, duración de la sesión del Hub | Sí (variables de la sección 2.1) | No |
+| Roles de una aplicación y sus permisos asignados | Sí, desde la grilla de la consola | No |
+| Alta del cliente (`client_id`, `redirect_uri`, origen) | No | Sí (constantes y migración) |
+| Catálogo de permisos de la aplicación | No | Sí (migración) |
+| CORS, audiencia por cliente, Nginx | No | Sí |
+
+## 11. Glosario
+
+- **PKCE**: mecanismo que impide que alguien que robe el `code` lo canjee; el cliente demuestra que es quien inició el flujo.
+- **`code_verifier`**: secreto aleatorio que el cliente genera por intento y solo revela al canjear el código.
+- **`code_challenge`**: huella SHA-256 (base64url) del `code_verifier`, enviada al inicio; el Hub la guarda y la compara al canjear.
+- **`state`**: valor aleatorio que el cliente envía y espera recibir intacto; protege contra respuestas que el cliente no pidió.
+- **Authorization code (`code`)**: ticket de un solo uso y de 1 minuto que el Hub entrega por el navegador y que se cambia por el token.
+- **Access token**: JWT firmado que acredita quién es el usuario y qué roles y permisos tiene para una aplicación; vive 15 minutos.
+- **Audiencia (`aud`)**: la aplicación para la que se emitió el token; un cliente debe rechazar tokens de otra audiencia.
+- **Emisor (`iss`)**: quién emitió el token (el Hub); el cliente exige que coincida con el esperado.
+- **`redirect_uri`**: dirección a la que el Hub devuelve al usuario con el `code`; debe coincidir exactamente con la registrada.

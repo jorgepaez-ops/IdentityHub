@@ -57,6 +57,8 @@
         { "expr": "sum(rate(identity_events_published_total[5m]))", "legendFormat": "publicados" },
         { "expr": "sum(rate(identity_events_consumed_total[5m]))", "legendFormat": "consumidos" }
       ]
-    }
+    },
+    {"type": "stat", "title": "Alertas de Falco (24 h)", "description": "Alertas de prioridad Warning o superior en api, worker y web (AM-020). Cualquier valor distinto de cero merece triaje: ver docs/runbooks/falco-alerta.md.", "datasource": {"type": "loki", "uid": "loki"}, "gridPos": {"h": 8, "w": 6, "x": 0, "y": 16}, "targets": [{"datasource": {"type": "loki", "uid": "loki"}, "queryType": "instant", "expr": "sum(count_over_time({service=\"falco\", priority=~\"Warning|Error|Critical|Alert|Emergency\"}[24h]))", "instant": true}], "fieldConfig": {"defaults": {"noValue": "0", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}, "overrides": []}},
+    {"type": "logs", "title": "Alertas de Falco", "description": "Alertas JSON de Falco recogidas por Alloy. Filtre por la etiqueta rule o priority.", "datasource": {"type": "loki", "uid": "loki"}, "gridPos": {"h": 8, "w": 18, "x": 6, "y": 16}, "targets": [{"datasource": {"type": "loki", "uid": "loki"}, "expr": "{service=\"falco\"} | json | priority=~\"Warning|Error|Critical|Alert|Emergency\" | line_format \"{{.rule}} | {{.output_fields_container_name}} | {{.output_fields_proc_cmdline}}\""}], "options": {"showTime": true, "wrapLogMessage": true, "sortOrder": "Descending"}}
   ]
 }
