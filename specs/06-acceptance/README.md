@@ -10,7 +10,7 @@ ese mismo identificador. Un escenario sin prueba rompe el build.
 
 Los escenarios de `requisitos-no-funcionales.feature` solo llevan etiquetas `@RNF-NNN`: no se derivan
 en un spec de Playwright y cada uno nombra, en un comentario `# Verificación:`, la prueba o el
-control que lo ejecuta de verdad (por ejemplo `make load-test`).
+control que lo ejecuta de verdad (por ejemplo `scripts/pipeline_controls_test.py` o `make load-test`).
 
 Convención de etiquetas:
 

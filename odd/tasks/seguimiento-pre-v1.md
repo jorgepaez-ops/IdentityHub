@@ -74,10 +74,25 @@ con esos temas abiertos.
   Matriz: RNF-010 pasa de «sin cubrir» a completo (Escenarios 1 + Controles CI); 26 completos, 7 parciales,
   0 sin cubrir. `actionlint` limpio; `zizmor` 21 hallazgos antes y después (sin nuevos); `make informe` ok
   (rangos `{{code:...ci.yml}}` del informe desplazados +6). Rutas de CI no ejecutadas en un runner real.
-- [ ] **S6 — Segunda evidencia de los 7 requisitos parciales.** RF-008, RNF-001, RNF-002, RNF-006,
+- [x] **S6 — Segunda evidencia de los 7 requisitos parciales.** RF-008, RNF-001, RNF-002, RNF-006,
   RNF-007, RNF-008, RNF-012 tienen una sola columna de evidencia en `specs/07-traceability.md`
   (completo = 2 de 4: Escenarios, Pruebas Go, E2E, Controles CI). Añadir la evidencia que falte con
   pruebas reales, sin inflar la matriz.
+  Evidencia (cada una es una verificación real, con negativo): RF-008, `perfil-propio.feature` (2 escenarios)
+  + 2 E2E `RF-008 ...` (GET /me con y sin token, PATCH del nombre y 400 con nombre vacío). RNF-007, E2E
+  `RNF-007 ...`: `/metrics` de API y worker en formato Prometheus, un login fallido real sube
+  `identity_login_attempts_total{result="failed"}` en 1, todas las líneas de log son JSON y el tablero consulta las
+  cuatro señales. RNF-012, E2E `RNF-012 ...`: login fallido + completo + refresh y ningún secreto (contraseñas, mfaToken,
+  access/refresh token, código) aparece en los logs de api ni worker; RED: añadir `escuchando` a la lista de
+  secretos hace fallar la prueba. RNF-001, RNF-002, RNF-006, RNF-008: `scripts/pipeline_controls_test.py` (compose
+  renderizado, Dockerfile y workflows; 12 pruebas, en `make spec-drift` y en el job 1) + 4 escenarios en
+  `requisitos-no-funcionales.feature`; RED por mutación (worker `read_only: false`, `cosign verify` quitado de
+  `release.yml`, `continue-on-error` en `sast`): fallan 3 pruebas; restaurado, 12 OK. El generador no se tocó: los
+  Python no cuentan por sí solos en la matriz, por eso van respaldados por escenarios `@RNF-NNN` que nombran su prueba.
+  Resultado: `make e2e` 63 pruebas OK (eran 59); matriz 33 completos / 0 parciales / 0 sin cubrir. Alcances
+  honestos en el informe: RNF-006 verifica al publicar, no al desplegar; RNF-008 solo api/worker/web; RNF-002 sin
+  despliegue automatizado. Sin Go tocado (golangci-lint no aplica). `actionlint` limpio, `zizmor` 21 hallazgos (igual
+  que HEAD).
 - [ ] **S7 — Code smells de SonarCloud.** 123 abiertos al 2026-10-13 (CRITICAL 32, MAJOR 55, MINOR 34,
   INFO 2); reglas principales: go:S3776 (16), typescript:S6819 (16), css:S4666 (11), godre:S8196 (10),
   plsql:S1192 (6), python:S3776 (6). Corregir sin cambiar comportamiento, con las pruebas como red; los
@@ -111,7 +126,7 @@ Estrategia: `ask-on-risk` → `stacked-to-main` (usuario, 2026-10-13). Cortes: P
 | S3 | delegado (Sonnet) | hecho | fa6b8fe | — |
 | S4 | delegado (Sonnet) | hecho | aeeb74e | — |
 | S5 | delegado (Sonnet) | hecho | pendiente de SHA | — |
-| S6 | — | pendiente | — | — |
+| S6 | delegado (Sonnet) | hecho | pendiente de SHA | — |
 | S7 | — | pendiente | — | — |
 
 Revisión nativa de S1-S4 (2026-10-13): aprobada (4 lentes, 15 archivos). Correcciones posteriores, también

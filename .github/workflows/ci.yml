@@ -150,6 +150,10 @@ jobs:
       - name: Prueba de puertos de observabilidad en loopback
         run: python3 scripts/compose_ports_test.py
 
+      # RNF-001, RNF-002, RNF-006 y RNF-008 contra los archivos reales (compose renderizado, Dockerfile, workflows).
+      - name: Pruebas de los requisitos no funcionales del pipeline y los contenedores
+        run: python3 scripts/pipeline_controls_test.py
+
       - name: Regenerar la matriz de trazabilidad
         run: python3 scripts/traceability.py
 

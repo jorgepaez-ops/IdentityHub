@@ -167,3 +167,28 @@ test('RF-017 Bloqueo tras intentos fallidos repetidos', async ({ playwright }) =
   await expect.poll(() => psql(`SELECT status FROM users WHERE email = :'email';`, { email: assertEmail(email) })).toBe('locked')
   await waitForMail(email, 'account temporarily locked', since, existingMailIds)
 })
+
+test('RF-008 Consultar el perfil propio devuelve al usuario autenticado', async ({ playwright }) => {
+  const email = await activeAccount(playwright)
+  const session = await loginWithMfaContext(playwright, email, strongPassword)
+  const profile = await api<{ email: string; displayName: string }>('GET', '/api/v1/me', { token: session.accessToken })
+  expect(profile.status).toBe(200)
+  expect(profile.body.email).toBe(email)
+  expect(profile.body.displayName).toEqual(expect.any(String))
+  expect((await api('GET', '/api/v1/me')).status).toBe(401)
+  await session.context.dispose()
+})
+
+test('RF-008 Actualizar el nombre para mostrar', async ({ playwright }) => {
+  const email = await activeAccount(playwright)
+  const session = await loginWithMfaContext(playwright, email, strongPassword)
+  const displayName = `Perfil E2E ${Date.now()}`
+  const updated = await api<{ displayName: string }>('PATCH', '/api/v1/me', { token: session.accessToken, json: { displayName } })
+  expect(updated.status).toBe(200)
+  expect(updated.body.displayName).toBe(displayName)
+  const reread = await api<{ displayName: string }>('GET', '/api/v1/me', { token: session.accessToken })
+  expect(reread.body.displayName).toBe(displayName)
+  expect((await api('PATCH', '/api/v1/me', { token: session.accessToken, json: { displayName: '' } })).status).toBe(400)
+  expect((await api<{ displayName: string }>('GET', '/api/v1/me', { token: session.accessToken })).body.displayName).toBe(displayName)
+  await session.context.dispose()
+})

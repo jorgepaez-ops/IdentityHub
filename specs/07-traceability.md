@@ -17,7 +17,7 @@ declaración de buenas intenciones.
 | **RF-005** | Renovación de sesión | P0 | `refreshSession` | 1 | 7 | 1 | — | ✅ completo |
 | **RF-006** | Detección de reuso de refresh token | P0 | — | 1 | 5 | 1 | — | ✅ completo |
 | **RF-007** | Cierre de sesión | P0 | `logout` | 1 | 9 | 1 | — | ✅ completo |
-| **RF-008** | Perfil propio | P0 | `getCurrentUser`, `updateCurrentUser` | — | 7 | — | — | 🟡 parcial |
+| **RF-008** | Perfil propio | P0 | `getCurrentUser`, `updateCurrentUser` | 2 | 7 | 2 | — | ✅ completo |
 | **RF-009** | Control de acceso por roles | P0 | — | 5 | 17 | 5 | — | ✅ completo |
 | **RF-010** | Administración de usuarios | P0 | `listUsers`, `getUser`, `updateUser` | 3 | 13 | 3 | — | ✅ completo |
 | **RF-011** | Registro de auditoría | P0 | `listAuditLog` | 1 | 9 | 1 | — | ✅ completo |
@@ -31,20 +31,20 @@ declaración de buenas intenciones.
 | **RF-019** | Exportación del audit log | P2 | `exportAuditLog` | 2 | 13 | 2 | — | ✅ completo |
 | **RF-020** | Autorización de aplicaciones cliente | P1 | `authorizeClient`, `exchangeAuthorizationCode` | 10 | 32 | 8 | — | ✅ completo |
 | **RF-021** | Roles y permisos configurables por aplicación | P1 | `listApplications`, `listApplicationRoles`, `createApplicationRole`, `updateApplicationRole`, `deleteApplicationRole` | 6 | 31 | 6 | — | ✅ completo |
-| **RNF-001** | Contenerización total | P0 | — | — | — | — | `ci.yml#e2e`, `.github/actions/stack-up/action.yml` | 🟡 parcial |
-| **RNF-002** | Pipeline de ciclo completo | P0 | — | — | — | — | `ci.yml#secrets`, `ci.yml#sast`, `ci.yml#sca`, `ci.yml#image`, `ci.yml#dast` | 🟡 parcial |
+| **RNF-001** | Contenerización total | P0 | — | 1 | — | — | `ci.yml#e2e`, `.github/actions/stack-up/action.yml` | ✅ completo |
+| **RNF-002** | Pipeline de ciclo completo | P0 | — | 1 | — | — | `ci.yml#secrets`, `ci.yml#sast`, `ci.yml#sca`, `ci.yml#image`, `ci.yml#dast` | ✅ completo |
 | **RNF-003** | Cero secretos en el repositorio | P0 | — | — | 10 | — | `ci.yml#secrets` | ✅ completo |
 | **RNF-004** | Imágenes sin vulnerabilidades corregibles | P0 | — | — | 3 | — | `ci.yml#image`, `release.yml#gate` | ✅ completo |
 | **RNF-005** | Cobertura de pruebas ≥ 70 % | P0 | — | — | 25 | — | `ci.yml#test-integration` | ✅ completo |
-| **RNF-006** | Procedencia verificable | P0 | — | — | — | — | `release.yml#publish` | 🟡 parcial |
-| **RNF-007** | Observabilidad | P0 | — | — | 5 | — | — | 🟡 parcial |
-| **RNF-008** | Contenedores endurecidos | P0 | — | — | — | — | `docker-compose.yml#api`, `docker-compose.yml#worker`, `docker-compose.yml#web`, `backend/Dockerfile`, `frontend/Dockerfile`, `ci.yml#iac-scan`, `ci.yml#lint` | 🟡 parcial |
+| **RNF-006** | Procedencia verificable | P0 | — | 1 | — | — | `release.yml#publish` | ✅ completo |
+| **RNF-007** | Observabilidad | P0 | — | — | 5 | 1 | — | ✅ completo |
+| **RNF-008** | Contenedores endurecidos | P0 | — | 1 | — | — | `docker-compose.yml#api`, `docker-compose.yml#worker`, `docker-compose.yml#web`, `backend/Dockerfile`, `frontend/Dockerfile`, `ci.yml#iac-scan`, `ci.yml#lint` | ✅ completo |
 | **RNF-009** | Cabeceras de seguridad | P0 | — | — | — | 6 | `ci.yml#dast` | ✅ completo |
 | **RNF-010** | Latencia | P1 | — | 1 | — | — | `ci.yml#e2e`, `Makefile#load-test` | ✅ completo |
 | **RNF-011** | Los specs son la fuente de verdad | P0 | — | — | 5 | — | `ci.yml#spec-drift` | ✅ completo |
-| **RNF-012** | Logs sin datos sensibles | P0 | — | — | 5 | — | — | 🟡 parcial |
+| **RNF-012** | Logs sin datos sensibles | P0 | — | — | 5 | 1 | — | ✅ completo |
 
-**Resumen:** 33 requisitos · 26 completos · 7 parciales · 0 sin cubrir · 0 diferidos (2026-10-13).
+**Resumen:** 33 requisitos · 33 completos · 0 parciales · 0 sin cubrir · 0 diferidos (2026-10-13).
 
 Leyenda de estado: *completo* = verificado por al menos dos de las
 cuatro columnas de evidencia (Escenarios, Pruebas Go, E2E, Controles CI) · *parcial* = una sola ·
@@ -78,6 +78,9 @@ una sola fuente de evidencia.
   - rotacion-de-sesion.feature — Reutilizar un refresh token rotado revoca toda la familia
 - **RF-007**
   - rotacion-de-sesion.feature — Cierre de sesión
+- **RF-008**
+  - perfil-propio.feature — Consultar el perfil propio devuelve al usuario autenticado
+  - perfil-propio.feature — Actualizar el nombre para mostrar
 - **RF-009**
   - autorizacion-oauth.feature — El token contiene solo los roles de Contabilidad
   - control-de-acceso.feature — Un usuario corriente no accede a la administración
@@ -138,5 +141,13 @@ una sola fuente de evidencia.
   - roles-y-permisos.feature — Se rechaza un permiso de otra aplicación
   - roles-y-permisos.feature — No se elimina un rol asignado
   - roles-y-permisos.feature — Cada cambio de rol queda auditado
+- **RNF-001**
+  - requisitos-no-funcionales.feature — Cada servicio corre en su propio contenedor y todo arranca con un solo docker compose up
+- **RNF-002**
+  - requisitos-no-funcionales.feature — El pipeline recorre las etapas de seguridad y sus gates rompen la build
+- **RNF-006**
+  - requisitos-no-funcionales.feature — Una imagen se firma, se atesta y se verifica antes de mover latest
+- **RNF-008**
+  - requisitos-no-funcionales.feature — Los servicios propios corren endurecidos
 - **RNF-010**
   - requisitos-no-funcionales.feature — El p95 de los endpoints de autenticación se mantiene por debajo de 300 ms

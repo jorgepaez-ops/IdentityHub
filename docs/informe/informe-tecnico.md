@@ -34,7 +34,7 @@ La elección del lenguaje merece una nota. El backend está escrito en **Go** (A
 
 Identity Hub incluye registro por invitación por correo, contraseñas con Argon2id, JWT firmados con Ed25519 y publicados por JWKS, refresh tokens rotativos, MFA obligatorio por código enviado al correo, roles, una grilla de roles y permisos por aplicación, auditoría append-only con exportación a CSV o JSON, claves de servicio para integraciones de máquina a máquina y SSO hacia Contabilidad. El worker entrega el correo por SMTP con STARTTLS obligatorio y autenticación. Quedan fuera por decisión documentada: federación con proveedores externos, multi-tenancy efectivo, alta disponibilidad, TOTP y WebAuthn. El objetivo de despliegue es un único host con Docker Compose; la nube es una arquitectura de referencia.
 
-A la fecha de este documento están completas las semanas 1 a 4 y el cierre de la entrega. La semana 4 incluyó la publicación de las imágenes en Docker Hub con SBOM y firma Cosign mediante el workflow `release.yml` (validado primero con el tag `v0.9.0`). Entre el 12 y el 13 de octubre se fusionaron en `main` los PR 32 a 41 y el PR 43, que cerraron las funciones que habían quedado diferidas y endurecieron la entrega: exportación del audit log (RF-019), claves de servicio (RF-018), SMTP autenticado con STARTTLS y hosts configurables, detección en ejecución con Falco, una columna de controles de CI en la matriz de trazabilidad, un badge de cobertura con el valor medido, el orden de publicación del release (`latest` solo después de firmar y atestar), la reclasificación de VULN-028 y un filtro que evita correr el pipeline completo en cambios solo de documentación. La matriz de trazabilidad queda con 33 requisitos: 26 completos, 7 parciales, 0 sin cubrir y 0 diferidos (RNF-010, latencia, pasó de sin cubrir a completo con una prueba de carga). El release se revalidó con el tag `v0.9.1`, que ya publica con el orden definitivo. El tag de entrega es `v1.0.0`: el workflow de release publica cada tag `vX.Y.Z`, de modo que el resultado no depende de que ese tag ya exista al leer este informe. Lo que todavía no existe se declara en las secciones de limitaciones y trabajo futuro.
+A la fecha de este documento están completas las semanas 1 a 4 y el cierre de la entrega. La semana 4 incluyó la publicación de las imágenes en Docker Hub con SBOM y firma Cosign mediante el workflow `release.yml` (validado primero con el tag `v0.9.0`). Entre el 12 y el 13 de octubre se fusionaron en `main` los PR 32 a 41 y el PR 43, que cerraron las funciones que habían quedado diferidas y endurecieron la entrega: exportación del audit log (RF-019), claves de servicio (RF-018), SMTP autenticado con STARTTLS y hosts configurables, detección en ejecución con Falco, una columna de controles de CI en la matriz de trazabilidad, un badge de cobertura con el valor medido, el orden de publicación del release (`latest` solo después de firmar y atestar), la reclasificación de VULN-028 y un filtro que evita correr el pipeline completo en cambios solo de documentación. La matriz de trazabilidad queda con 33 requisitos, los 33 completos (0 parciales, 0 sin cubrir y 0 diferidos): RNF-010 (latencia) tiene una prueba de carga y los siete requisitos que tenían una sola fuente de evidencia recibieron una segunda, real. El release se revalidó con el tag `v0.9.1`, que ya publica con el orden definitivo. El tag de entrega es `v1.0.0`: el workflow de release publica cada tag `vX.Y.Z`, de modo que el resultado no depende de que ese tag ya exista al leer este informe. Lo que todavía no existe se declara en las secciones de limitaciones y trabajo futuro.
 
 # Arquitectura
 
@@ -290,7 +290,7 @@ El workflow principal se dispara en `push` a `main`, en cada `pull_request` y ma
 
 ## Fase 1: Planificación
 
-El modelado de amenazas con Threat Dragon y STRIDE se describe en la sección anterior. La planificación se apoya además en especificaciones versionadas en `specs/` (visión, requisitos, contrato OpenAPI, modelo de dominio, ADR y escenarios de aceptación en Gherkin). El job **1 · Deriva entre specs y código** impide que estas diverjan del código: valida el contrato OpenAPI con `openapi-spec-validator`, regenera la interfaz Go (`oapi-codegen`), las consultas (`sqlc`) y los tipos TypeScript, ejecuta las pruebas del verificador de trazabilidad y del gate de ZAP, regenera la matriz `specs/07-traceability.md` y falla si el árbol de trabajo queda sucio (`git diff --exit-code`).
+El modelado de amenazas con Threat Dragon y STRIDE se describe en la sección anterior. La planificación se apoya además en especificaciones versionadas en `specs/` (visión, requisitos, contrato OpenAPI, modelo de dominio, ADR y escenarios de aceptación en Gherkin). El job **1 · Deriva entre specs y código** impide que estas diverjan del código: valida el contrato OpenAPI con `openapi-spec-validator`, regenera la interfaz Go (`oapi-codegen`), las consultas (`sqlc`) y los tipos TypeScript, ejecuta las pruebas del verificador de trazabilidad, del gate de ZAP y de los requisitos no funcionales del pipeline y los contenedores (`scripts/pipeline_controls_test.py`: RNF-001, RNF-002, RNF-006 y RNF-008 contra el compose renderizado, los Dockerfile y los workflows), regenera la matriz `specs/07-traceability.md` y falla si el árbol de trabajo queda sucio (`git diff --exit-code`).
 
 ## Fase 2: Codificación
 
@@ -298,23 +298,23 @@ El modelado de amenazas con Threat Dragon y STRIDE se describe en la sección an
 
 **Secretos (job 3).** Gitleaks corre sobre el **historial completo** (`fetch-depth: 0`), porque un secreto borrado en el último commit sigue siendo válido en el historial. Se usa una configuración propia (`.gitleaks.toml`) con reglas adicionales: la regla por defecto dejó pasar la mayoría de los secretos sembrados (VULN-023) y se añadieron reglas para contraseñas en variables de entorno o YAML y para URLs de conexión con credenciales.
 
-{{code:yaml:.github/workflows/ci.yml:261-276}}
+{{code:yaml:.github/workflows/ci.yml:265-280}}
 
 **Lint y tipos (job 2).** `golangci-lint` v2.13.2 incluye **gosec**, que detecta patrones inseguros en Go; ESLint y la comprobación de tipos corren sobre el Hub y Contabilidad, y Hadolint analiza los Dockerfiles con `failure-threshold: warning`.
 
 **SAST (jobs 4 y 4b).** CodeQL con las consultas `security-extended` analiza Go y JavaScript/TypeScript y publica sus resultados como SARIF. Semgrep 1.86.0 usa los conjuntos `p/owasp-top-ten`, `p/golang` y `p/react`, publica un SARIF y, en un segundo paso, rompe la build con severidad `ERROR`. El enunciado menciona Bandit para Python; como el backend es Go, los equivalentes son gosec, CodeQL y govulncheck, y Semgrep se mantiene como herramienta común.
 
-{{code:yaml:.github/workflows/ci.yml:309-333}}
+{{code:yaml:.github/workflows/ci.yml:313-337}}
 
 **Dependencias (job 5).** `govulncheck` analiza **alcanzabilidad**: solo informa de vulnerabilidades cuyo código es realmente invocable, lo que elimina casi todo el ruido frente a un escáner que solo lee `go.mod`. `npm audit --audit-level=high` cubre el Hub y Contabilidad, y osv-scanner v2.6.0 (`--recursive --all-vulns`) recorre todos los manifiestos, marcando como no invocado lo que el análisis de llamadas descarta.
 
-{{code:yaml:.github/workflows/ci.yml:346-358}}
+{{code:yaml:.github/workflows/ci.yml:350-362}}
 
 ## Fase 3: Integración (build)
 
 **Imágenes (jobs 9-10).** Una matriz construye las tres imágenes (`api`, `worker` y `web`) con Buildx y caché de GitHub Actions, y las escanea con Trivy en dos pasos: primero un informe SARIF que se sube siempre a Code Scanning y luego el gate, que rompe la build ante CVE de severidad `HIGH` o `CRITICAL` **con parche disponible** (`ignore-unfixed: true`). La política es deliberada: bloquear por un CVE sin arreglo no protege de nada y entrena al equipo a ignorar el rojo. Las excepciones se registrarían en `security/.trivyignore`, que se mantiene vacío a propósito: toda excepción exige CVE, justificación, responsable, expiración y ficha asociada.
 
-{{code:yaml:.github/workflows/ci.yml:744-759}}
+{{code:yaml:.github/workflows/ci.yml:748-763}}
 
 **Configuración (job 8).** Trivy config analiza Dockerfiles y demás configuración con el mismo patrón de dos pasos (SARIF y gate en `HIGH,CRITICAL`).
 
@@ -324,11 +324,13 @@ El modelado de amenazas con Threat Dragon y STRIDE se describe en la sección an
 
 **Unitarias e integración (jobs 6 y 6b).** `go test -race` y las pruebas de Vitest del frontend y de Contabilidad. El job 6b ejecuta las pruebas con la etiqueta `integration` contra un PostgreSQL real (imagen fijada por digest) y aplica un **gate de cobertura del 70 %** sobre `./internal/...`.
 
-{{code:yaml:.github/workflows/ci.yml:484-500}}
+{{code:yaml:.github/workflows/ci.yml:488-504}}
 
 **Badge de cobertura (job 6c).** El README muestra el porcentaje que mide el job 6b, no un valor fijo. El job 6c corre solo en `push` a `main`, es el único con `contents: write` y publica un `coverage.json` en la rama huérfana `badges`, de donde lo lee el badge sin depender de un servicio externo. Distingue una rama inexistente (`git ls-remote --exit-code` devuelve 2) de un fallo de red, que se reintenta, y lleva `continue-on-error` para que un problema al publicar el badge no ponga `main` en rojo, porque el gate real es el 6b. Tras el merge se verificó `badges/coverage.json` con 78,4 %.
 
-**E2E (job 7).** Playwright ejecuta 59 pruebas en Chromium contra el stack completo levantado con Compose; cada prueba corresponde a un escenario Gherkin de los requisitos (el verificador de trazabilidad exige la correspondencia uno a uno). Si falla o se cancela, sube el informe y las trazas como artefactos.
+**E2E (job 7).** Playwright ejecuta 63 pruebas en Chromium contra el stack completo levantado con Compose; cada prueba corresponde a un escenario Gherkin de los requisitos (el verificador de trazabilidad exige la correspondencia uno a uno). Si falla o se cancela, sube el informe y las trazas como artefactos.
+
+**Pruebas de observabilidad y de logs (job 7).** Dos pruebas E2E comprueban requisitos que antes solo tenían pruebas de Go. `RNF-007` lee `/metrics` de la API y del worker en formato Prometheus, comprueba que un inicio de sesión fallido real incrementa `identity_login_attempts_total{result="failed"}`, que cada línea de log de ambos procesos es JSON y que el panel de Grafana consulta las cuatro señales del requisito. `RNF-012` hace un inicio de sesión fallido y otro completo (contraseña, código MFA, renovación) y exige que ningún log de la API ni del worker contenga las contraseñas, los tokens ni el código; se observó en rojo al añadir un texto presente en los logs a la lista de secretos. Para RF-008, dos escenarios nuevos (`perfil-propio.feature`) y sus pruebas E2E cubren la consulta y la actualización del perfil, y la ausencia de token.
 
 **Prueba de carga (RNF-010, job 7).** Tras las pruebas E2E y sobre el mismo stack, `make load-test` ejecuta k6 (imagen fijada por digest) con `tests/load/auth-latency.js`. Mide `POST /api/v1/auth/refresh`, `GET /api/v1/me` y `GET /.well-known/jwks.json` (el login con Argon2id queda fuera, como dice el requisito) y los umbrales `p(95)<300` hacen que k6 termine con código distinto de cero. Una corrida local contra `make up-app` (20 s por escenario, 2 074 peticiones, 0 % de errores) dio estos tiempos:
 
@@ -342,7 +344,7 @@ El umbral de 300 ms deja un margen de dos órdenes de magnitud respecto de lo me
 
 **DAST (job 11).** OWASP ZAP 2.17.0 corre en tres escaneos: *baseline* del Hub, *baseline* de Contabilidad y escaneo de API a partir del contrato OpenAPI, todos contra el stack levantado. ZAP se ejecuta con `-I` (no decide él); el único punto de decisión es `scripts/zap-gate.py`, que rompe la build ante alertas de riesgo medio o alto, salvo una entrada `IGNORE` justificada en `.zap/rules.tsv`. Los informes JSON y HTML se suben como artefacto aunque el job falle.
 
-{{code:yaml:.github/workflows/ci.yml:761-783}}
+{{code:yaml:.github/workflows/ci.yml:765-787}}
 
 ## Fase 5: Despliegue
 
@@ -382,7 +384,7 @@ La observabilidad (sección 7) y el reescaneo semanal cierran el ciclo. `schedul
 | Integración | 9-10 | Trivy image (api, worker, web) | SARIF y gate en `HIGH,CRITICAL` corregibles |
 | Integración | 12 | Checkov 3.3.23 | Falla ante cualquier hallazgo; SARIF |
 | Pruebas | 6 y 6b | go test, Vitest | Gate de cobertura del 70 % |
-| Pruebas | 7 | Playwright | 59 pruebas E2E |
+| Pruebas | 7 | Playwright | 63 pruebas E2E |
 | Pruebas | 6c | Badge de cobertura | Publica el porcentaje medido en la rama `badges`; solo en `main` |
 | Pruebas | 11 | OWASP ZAP 2.17.0 | `zap-gate.py` falla con riesgo medio o alto |
 | Despliegue | release.yml | Syft, Cosign | SBOM y firma keyless; `latest` se mueve solo tras firmar y atestar |
@@ -588,7 +590,7 @@ Falco, que el enunciado menciona para la detección de comportamiento anómalo e
 - **Un solo cliente OAuth y sin OpenID Connect:** la guía de integración de terceros enumera lo que falta (registro dinámico, refresh tokens para aplicaciones, cierre de sesión único, revocación).
 - **Sin outbox transaccional** (ADR 0006): la publicación al broker usa *publisher confirms*, pero no hay garantía transaccional conjunta entre la base de datos y el broker; el outbox es trabajo futuro deliberado.
 - **Sin riesgo aceptado vigente:** VULN-028 (GO-2026-5932) se reclasificó el 2026-10-12 como no afectado; solo se reabriría si algún paquete empezara a importar `x/crypto/openpgp`.
-- **Cobertura de la matriz de trazabilidad:** de 33 requisitos, 26 están completos y 7 son parciales (RF-008, RNF-001, RNF-002, RNF-006, RNF-007, RNF-008 y RNF-012, con una sola fuente de evidencia). No queda ningún requisito sin cubrir ni diferido.
+- **Cobertura de la matriz de trazabilidad:** los 33 requisitos tienen al menos dos fuentes de evidencia; «completo» no significa verificación exhaustiva. RNF-006 verifica la firma al publicar, antes de mover `latest`, pero no al desplegar (la producción simulada no la comprueba al arrancar); RNF-008 comprueba el endurecimiento solo de `api`, `worker` y `web`, no de las imágenes de terceros (base de datos, broker, observabilidad); RNF-002 cubre las etapas hasta la publicación y el DAST, sin un despliegue automatizado.
 - **La prueba de carga es mínima:** mide tres endpoints sin Argon2id en una sola máquina y con un umbral de regresión; no es una prueba de capacidad ni de saturación.
 - **Las claves de servicio tienen un único alcance:** `audit-log:read`, solo en el listado del audit log.
 
@@ -616,8 +618,7 @@ La revisión de la rama de pulido encontró tres diferencias entre lo que decía
 ## Trabajo futuro
 
 1. Evolucionar la integración de terceros: clientes OAuth en base de datos, OpenID Connect, refresh tokens por cliente, introspección y revocación; y reemplazar la publicación directa por un **outbox transaccional**.
-2. Completar la evidencia de los requisitos que la matriz marca como parciales.
-3. Ampliar los alcances de las claves de servicio más allá de la lectura del audit log.
+2. Ampliar los alcances de las claves de servicio más allá de la lectura del audit log.
 
 # Anexo A — Puesta en marcha y operación
 
@@ -684,7 +685,7 @@ Los dominios `*.localhost` se resuelven a `127.0.0.1` en los navegadores moderno
 | `make scan` | Todos los gates de seguridad en local (`scan-secrets`, `scan-deps`, `scan-config`, `scan-iac`, `scan-image`) |
 | `make load-test` | Prueba de carga de latencia con k6 (RNF-010) contra el stack levantado; falla si el p95 supera 300 ms |
 | `make scan-dast` | OWASP ZAP (baseline del Hub y de Contabilidad, y API) contra el stack levantado; informes en `security/zap-reports/` |
-| `make spec-drift` | Verifica sin red la matriz de trazabilidad y los escenarios Gherkin contra E2E |
+| `make spec-drift` | Verifica sin red la matriz de trazabilidad, los escenarios Gherkin contra E2E y los requisitos no funcionales de los contenedores y el pipeline |
 | `make gen` | Regenera todo lo derivado de los specs (Go desde OpenAPI, `sqlc`, tipos TypeScript, trazabilidad) |
 | `make lint`, `make fmt` | Lint y tipos; formato de Go |
 | `make migrate`, `make psql`, `make rabbit`, `make mail` | Migraciones pendientes, consola de PostgreSQL, abrir RabbitMQ, abrir Mailpit |
