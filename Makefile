@@ -173,6 +173,7 @@ spec-drift: ## Verifica sin red la matriz y escenarios Gherkin contra E2E
 	python3 scripts/traceability_test.py
 	python3 scripts/zap_gate_test.py
 	python3 scripts/setup_env_test.py
+	python3 scripts/ci_changes_test.py
 	python3 scripts/traceability.py --check
 
 informe: ## Genera el informe técnico en PDF (docs/informe/informe-tecnico.pdf) con Chromium de Playwright

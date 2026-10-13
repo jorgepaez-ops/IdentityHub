@@ -36,11 +36,17 @@ con esos temas abiertos.
   Evidencia: sin RED local posible (el paso solo corre en el release; no hay prueba ejecutable determinista).
   Comprobado: `actionlint` limpio; `zizmor` sin hallazgos, igual que HEAD (0 y 2 suprimidos); orden del
   paso: después de firmar/atestar y antes de mover `latest`; cosign-installer v4.1.2 (Cosign v3).
-- [ ] **S2 — Clasificador del job 0 en `scripts/` con prueba.** `scripts/ci_changes.py` (o `.sh`) con
+- [x] **S2 — Clasificador del job 0 en `scripts/` con prueba.** `scripts/ci_changes.py` (o `.sh`) con
   pruebas sobre: solo documentación, mixto, `.md` bajo `specs/`/`.github/`/`scripts/`, renombre de código a
   `docs/`, lista vacía, error de git. `ci.yml` lo invoca. Sustituir la guarda repetida en cada paso del job
   `image` por una forma que no dependa de cada paso nuevo (por ejemplo, un paso que termine el job temprano
   no existe en Actions: evaluar acción compuesta o matriz condicional; documentar la elección).
+  Evidencia: RED = `python3 scripts/ci_changes_test.py` con 12 fallos (el script no existía; las 2 pruebas del
+  lint de guardas pasaron desde el inicio porque las guardas ya existían). GREEN = 12 pruebas OK;
+  `actionlint` limpio; `zizmor` 21 hallazgos antes y después. Elección del job `image`: se mantienen las
+  guardas por paso (una acción compuesta sacaría las acciones fijadas por SHA del alcance de Dependabot,
+  `directory: "/"` no recorre `.github/actions/*`, y el checkout debe quedar fuera) y la prueba falla si un
+  paso de `image` no tiene la guarda; documentado en el encabezado de `ci.yml`.
 - [ ] **S3 — Prueba de los puertos de observabilidad en loopback.** Prueba (en CI, job barato) que lea
   `docker compose config` y falle si Prometheus, Loki o Grafana publican sin `host_ip: 127.0.0.1`.
   Aclarar en la guía el caso de `localhost` resuelto a `::1`.
@@ -81,8 +87,8 @@ Estrategia: `ask-on-risk` → `stacked-to-main` (usuario, 2026-10-13). Cortes: P
 
 | Tarea | Ruta | Estado | Commit | Revisión |
 |---|---|---|---|---|
-| S1 | delegado (Sonnet) | hecho | (SHA en el commit siguiente) | — |
-| S2 | — | pendiente | — | — |
+| S1 | delegado (Sonnet) | hecho | 118192d | — |
+| S2 | delegado (Sonnet) | hecho | (SHA en el commit siguiente) | — |
 | S3 | — | pendiente | — | — |
 | S4 | — | pendiente | — | — |
 | S5 | — | pendiente | — | — |
