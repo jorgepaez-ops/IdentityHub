@@ -65,6 +65,7 @@ Todas usan `unittest` de la biblioteca estándar y no dejan `__pycache__` (el jo
 | `zap_gate_test.py` | La puerta del DAST: umbral Medio, `IGNORE` con justificación, `WARN` que no suprime, errores de entrada. | `zap-gate.py` y `make scan-dast`. |
 | `setup_env_test.py` | Que `setup_env.py` genere secretos aleatorios, no sobrescriba un `.env` existente y complete los valores no secretos que exige el compose. | `make setup`, AM-012. |
 | `load_test_script_test.py` | La guarda de producción (`COMPOSE` y `COMPOSE_FILE`) y los códigos de salida de `load-test.sh` (k6 falla, INT 130, TERM 143, limpieza siempre), con `docker` sustituido por un stub en `PATH`: no necesita stack. | RNF-010, tarea S5 de `odd/tasks/seguimiento-pre-v1.md`. |
+| `informe_excerpts_test.py` | Que cada directiva `{{code:...:A-B}}` de `docs/informe/informe-tecnico.md` apunte a un archivo existente y a un rango válido que empiece y termine en un límite de bloque (sin línea en blanco en los extremos ni cortes a mitad de un bloque indentado). Incluye casos sintéticos del verificador. | El informe técnico: editar un workflow desplaza las líneas sin avisar. |
 
 Al añadir un script nuevo: documéntalo aquí, escríbele una prueba `*_test.py` con casos negativos y
 engánchala a `make spec-drift` y al job `spec-drift` de `ci.yml`.

@@ -158,6 +158,10 @@ jobs:
       - name: Pruebas del script de la prueba de carga
         run: python3 scripts/load_test_script_test.py
 
+      # Los extractos de código del informe usan rangos fijos de líneas: falla si una edición los deja a mitad de bloque.
+      - name: Prueba de los extractos de código del informe
+        run: python3 scripts/informe_excerpts_test.py
+
       - name: Regenerar la matriz de trazabilidad
         run: python3 scripts/traceability.py
 

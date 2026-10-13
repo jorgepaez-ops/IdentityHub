@@ -302,23 +302,23 @@ El modelado de amenazas con Threat Dragon y STRIDE se describe en la sección an
 
 **Secretos (job 3).** Gitleaks corre sobre el **historial completo** (`fetch-depth: 0`), porque un secreto borrado en el último commit sigue siendo válido en el historial. Se usa una configuración propia (`.gitleaks.toml`) con reglas adicionales: la regla por defecto dejó pasar la mayoría de los secretos sembrados (VULN-023) y se añadieron reglas para contraseñas en variables de entorno o YAML y para URLs de conexión con credenciales.
 
-{{code:yaml:.github/workflows/ci.yml:238-252}}
+{{code:yaml:.github/workflows/ci.yml:242-256}}
 
 **Lint y tipos (job 2).** `golangci-lint` v2.13.2 incluye **gosec**, que detecta patrones inseguros en Go; ESLint y la comprobación de tipos corren sobre el Hub y Contabilidad, y Hadolint analiza los Dockerfiles con `failure-threshold: warning`.
 
 **SAST (jobs 4 y 4b).** CodeQL con las consultas `security-extended` analiza Go y JavaScript/TypeScript y publica sus resultados como SARIF. Semgrep 1.86.0 usa los conjuntos `p/owasp-top-ten`, `p/golang` y `p/react`, publica un SARIF y, en un segundo paso, rompe la build con severidad `ERROR`. El enunciado menciona Bandit para Python; como el backend es Go, los equivalentes son gosec, CodeQL y govulncheck, y Semgrep se mantiene como herramienta común.
 
-{{code:yaml:.github/workflows/ci.yml:286-310}}
+{{code:yaml:.github/workflows/ci.yml:290-314}}
 
 **Dependencias (job 5).** `govulncheck` analiza **alcanzabilidad**: solo informa de vulnerabilidades cuyo código es realmente invocable, lo que elimina casi todo el ruido frente a un escáner que solo lee `go.mod`. `npm audit --audit-level=high` cubre el Hub y Contabilidad, y osv-scanner v2.6.0 (`--recursive --all-vulns`) recorre todos los manifiestos, marcando como no invocado lo que el análisis de llamadas descarta.
 
-{{code:yaml:.github/workflows/ci.yml:353-373}}
+{{code:yaml:.github/workflows/ci.yml:357-377}}
 
 ## Fase 3: Integración (build)
 
 **Imágenes (jobs 9-10).** Una matriz construye las tres imágenes (`api`, `worker` y `web`) con Buildx y caché de GitHub Actions, y las escanea con Trivy en dos pasos: primero un informe SARIF que se sube siempre a Code Scanning y luego el gate, que rompe la build ante CVE de severidad `HIGH` o `CRITICAL` **con parche disponible** (`ignore-unfixed: true`). La política es deliberada: bloquear por un CVE sin arreglo no protege de nada y entrena al equipo a ignorar el rojo. Las excepciones se registrarían en `security/.trivyignore`, que se mantiene vacío a propósito: toda excepción exige CVE, justificación, responsable, expiración y ficha asociada.
 
-{{code:yaml:.github/workflows/ci.yml:725-736}}
+{{code:yaml:.github/workflows/ci.yml:729-740}}
 
 **Configuración (job 8).** Trivy config analiza Dockerfiles y demás configuración con el mismo patrón de dos pasos (SARIF y gate en `HIGH,CRITICAL`).
 
@@ -328,7 +328,7 @@ El modelado de amenazas con Threat Dragon y STRIDE se describe en la sección an
 
 **Unitarias e integración (jobs 6 y 6b).** `go test -race` y las pruebas de Vitest del frontend y de Contabilidad. El job 6b ejecuta las pruebas con la etiqueta `integration` contra un PostgreSQL real (imagen fijada por digest) y aplica un **gate de cobertura del 70 %** sobre `./internal/...`. Al cierre son 550 pruebas unitarias y 631 de integración en Go, 264 en el frontend y 148 en Contabilidad.
 
-{{code:yaml:.github/workflows/ci.yml:460-477}}
+{{code:yaml:.github/workflows/ci.yml:464-481}}
 
 **Badge de cobertura (job 6c).** El README muestra el porcentaje que mide el job 6b, no un valor fijo. El job 6c corre solo en `push` a `main`, es el único con `contents: write` y publica un `coverage.json` en la rama huérfana `badges`, de donde lo lee el badge sin depender de un servicio externo. Distingue una rama inexistente (`git ls-remote --exit-code` devuelve 2) de un fallo de red, que se reintenta, y lleva `continue-on-error` para que un problema al publicar el badge no ponga `main` en rojo, porque el gate real es el 6b. Tras el merge se verificó `badges/coverage.json` con 78,4 %.
 
@@ -348,7 +348,7 @@ El umbral de 300 ms deja un margen de dos órdenes de magnitud respecto de lo me
 
 **DAST (job 11).** OWASP ZAP 2.17.0 corre en tres escaneos: *baseline* del Hub, *baseline* de Contabilidad y escaneo de API a partir del contrato OpenAPI, todos contra el stack levantado. ZAP se ejecuta con `-I` (no decide él); el único punto de decisión es `scripts/zap-gate.py`, que rompe la build ante alertas de riesgo medio o alto, salvo una entrada `IGNORE` justificada en `.zap/rules.tsv`. Los informes JSON y HTML se suben como artefacto aunque el job falle.
 
-{{code:yaml:.github/workflows/ci.yml:738-759}}
+{{code:yaml:.github/workflows/ci.yml:742-763}}
 
 **Evidencia de los requisitos no funcionales.** La matriz de trazabilidad (`specs/07-traceability.md`) da por cubierto un requisito cuando tiene al menos dos de cuatro fuentes de evidencia (escenarios, pruebas de Go, pruebas E2E, controles de CI). Los siete requisitos que antes solo tenían una fuente, más RNF-010, se respaldan con las pruebas de la tabla. Los escenarios `@RNF-NNN` no se derivan en un spec de Playwright: cada uno nombra en un comentario `# Verificación:` la prueba que lo ejecuta, y `scripts/traceability.py` comprueba por máquina que el archivo, la clase, el job, el paso o el objetivo `make` citados existen (`make spec-drift`, job 1).
 
@@ -402,7 +402,7 @@ Si la imagen se hubiera modificado después de firmarla, o la firma viniera de o
 
 **Publicación (`release.yml`).** El workflow se dispara solo con tags `vX.Y.Z` y tiene dos fases. El job `gate` construye `api`, `worker` y `web`, ejecuta el mismo gate de Trivy que CI y guarda cada imagen como artefacto. El job `publish` depende de `gate`, es el único con el environment protegido `dockerhub` (restringido a tags `v*`), carga la misma imagen ya escaneada y la publica solo con la etiqueta `vX.Y.Z`; después genera un SBOM CycloneDX con Syft, firma con Cosign keyless (OIDC de GitHub) y adjunta el SBOM como atestación, todo sobre el digest. Solo entonces un paso final mueve `latest` a ese mismo digest, y únicamente si el tag es el `vX.Y.Z` más alto del repositorio (repetir el release de un tag viejo no hace retroceder `latest`), y verifica que el digest de `latest` coincida con el firmado. Este orden (tarea F7) corrige el diseño original, que subía `latest` antes de firmar y dejaba una ventana en la que la etiqueta apuntaba a una imagen sin firma. Los pasos de red (push, firma, atestación y consulta de tags) se reintentan hasta tres veces con espera creciente, y los artefactos de imagen se retienen 7 días en lugar de 1 para poder repetir solo el job de publicación si falla (F8). El workflow se validó con el tag `v0.9.0` (ejecución 38319904991, en verde, 6 jobs) y el orden nuevo con el tag `v0.9.1` sobre el commit `32e8359` (ejecución 38405885275, en verde): en las tres imágenes el paso «Mover latest» empezó después de terminar «Firmar y atestar», y `latest` quedó apuntando a `v0.9.1` en Docker Hub. El tag de entrega es `v1.0.0` y el workflow publica cada tag de la misma manera.
 
-{{code:yaml:.github/workflows/release.yml:163-199}}
+{{code:yaml:.github/workflows/release.yml:155-199}}
 
 **Verificación.** `cosign verify` y `cosign verify-attestation --type cyclonedx` pasan sobre las tres imágenes con Cosign v3. Cosign v3 guarda la firma y la atestación como referrers OCI (formato *bundle*), por lo que no aparecen como etiquetas `.sig` o `.att` en Docker Hub y Cosign v2 no las encuentra: la verificación debe hacerse con Cosign v3. La verificación se repitió de forma independiente el 13 de octubre con Cosign v3.1.3 sobre `v0.9.0` y `v0.9.1`, con la identidad `^https://github.com/jorgepaez-ops/IdentityHub/` y el emisor OIDC de GitHub Actions: `cosign verify` y `cosign verify-attestation --type cyclonedx` resultaron correctos en las tres imágenes de ambas versiones. Esa comprobación manual ya es un paso del workflow: tras firmar y atestar, el job `publish` ejecuta `cosign verify` y `cosign verify-attestation --type cyclonedx` sobre el digest con la identidad fijada al propio workflow (`…/.github/workflows/release.yml@refs/tags/v…`, de modo que una firma hecha desde `ci.yml` o desde una rama no pasa; se probó contra `v0.9.1`) y el emisor OIDC de Actions, y solo si ambos pasan mueve `latest` (paso «Verificar firma y atestación»; su primera prueba real es el tag `v1.0.0`).
 
