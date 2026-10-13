@@ -64,7 +64,11 @@ def check_excerpt(lines: list[str], a: int, b: int) -> list[str]:
     before = neighbour(lines, a - 2, -1)
     if before is not None:
         parent = indent(before) < indent(first) and before.rstrip().endswith(":")
-        sibling = indent(before) >= indent(first) and STARTER.match(first) is not None
+        # Tras el fin de un bloque más indentado vale cualquier apertura; al mismo nivel solo un
+        # ítem de lista, un comentario o una clave de primer nivel (otra clave sería la mitad de un ítem).
+        opener = STARTER.match(first) is not None
+        sibling = opener and (indent(before) > indent(first) or indent(first) == 0
+                              or first.lstrip().startswith(("- ", "#")))
         if not (parent or sibling):
             problems.append(f"empieza a mitad de bloque: la línea {a} sigue a {before.strip()!r}")
     return problems
@@ -106,6 +110,10 @@ class CheckerTest(unittest.TestCase):
         src = ["a:", "  b:", "      # nota", "    c: 1"]
         self.assertEqual(check_excerpt(src, 4, 4), [])
 
+    def test_start_at_a_middle_key_of_a_step_fails(self):
+        src = ["steps:", "  - name: Paso", "    uses: x/y@1", "    with:", "      k: v"]
+        self.assertTrue(check_excerpt(src, 4, 5))  # empieza en with: y deja fuera name y uses
+
     def test_start_dropping_the_step_name_fails(self):
         src = ["steps:", "  - name: Paso", "    uses: x/y@1", "    with:", "      k: v"]
         self.assertEqual(check_excerpt(src, 2, 5), [])
@@ -126,13 +134,16 @@ class ReportExcerptsTest(unittest.TestCase):
 
     def test_every_excerpt_is_block_aligned(self):
         failures: list[str] = []
-        for _lang, rel, a, b in directives(REPORT.read_text(encoding="utf-8")):
+        for lang, rel, a, b in directives(REPORT.read_text(encoding="utf-8")):
             path = ROOT / rel
             if not path.is_file():
                 failures.append(f"{rel}:{a}-{b}: el archivo no existe")
                 continue
             lines = path.read_text(encoding="utf-8").splitlines()
-            failures += [f"{rel}:{a}-{b}: {p}" for p in check_excerpt(lines, a, b)]
+            # Las reglas de bloque son de YAML; para otros lenguajes solo se valida el rango.
+            problems = check_excerpt(lines, a, b) if lang in ("yaml", "yml") else (
+                [] if 1 <= a <= b <= len(lines) else [f"rango {a}-{b} fuera de 1..{len(lines)}"])
+            failures += [f"{rel}:{a}-{b}: {p}" for p in problems]
         self.assertEqual(failures, [], "\n" + "\n".join(failures))
 
 
