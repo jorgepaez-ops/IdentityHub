@@ -330,6 +330,18 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
   - Cierre de D (2026-10-07): `make up` con las imágenes de la rama y `make e2e`: 52/52 en verde. Entrega en un PR
     nuevo desde `chore/hallazgos-y-sonar` (el PR #20 se fusionó antes, `3d0de78`, por decisión del usuario).
 
+## Hallazgo nuevo fuera de alcance (2026-10-16)
+
+- **`github.com/getkin/kin-openapi` 0.144.0 en `tools/go.mod` (indirecta, vía oapi-codegen).** OSV-Scanner
+  (job «5 · Dependencias vulnerables») reporta 7 avisos nuevos: GHSA-23vg-4cjm-66q5, GHSA-74vm-87hj-r66f,
+  GHSA-fh4f-47mf-f2gj, GHSA-g8cf-rcjf-c8cf, GHSA-mh7x-f8wq-4jhx, GHSA-rj39-cv6w-8wv7 y
+  GHSA-vrcc-3ch7-hppw (5 altos, 2 medios). Todos se corrigen en 0.149.0. Apareció en el CI del PR #56
+  (paso de bootstrap del primer administrador), que no toca dependencias, así que el check falla en
+  cualquier rama hasta remediarlo. Solo afecta al módulo de herramientas de generación, no a los binarios
+  `api`/`worker`; `govulncheck` del backend no lo ve. Pendiente: asignar ficha y decidir la tarea que lo
+  remedia (subir a 0.149.0 y confirmar que `oapi-codegen` genera lo mismo). El PR #56 queda sin mergear
+  hasta entonces, por decisión del usuario.
+
 ## Deuda menor (no bloquea la entrega)
 
 - **SonarCloud en `main`: code smells** (125 al 2026-10-06; parte de S3776 cubierta por C1). No bloquean.

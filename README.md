@@ -44,7 +44,9 @@ La visión y los contratos del sistema están en [`specs/00-vision.md`](specs/00
 
 1. Clone el repositorio y entre en su directorio.
 2. Ejecute `make setup`: genera un `.env` local con secretos aleatorios a partir de [`.env.example`](.env.example). El archivo `.env` no se versiona y un `.env` existente no se sobrescribe.
-3. Ejecute `make up`: genera los certificados SMTP locales (`make certs`, idempotente) y levanta el stack construyendo las imágenes. Si prefiere `docker compose up -d`, corra antes `make certs`: Mailpit exige STARTTLS y autenticación, y sin `deploy/certs/` el stack no arranca. Un `.env` generado antes de F2 necesita además `SMTP_PASSWORD` (ver «Si su `.env` es anterior a F2»).
+3. Revise `BOOTSTRAP_ADMIN_EMAIL` en el `.env` (por defecto `admin@example.test`): es el primer administrador, que se crea por invitación al arrancar. No hay usuario ni contraseña por defecto; si un `.env` anterior no tiene esta variable, agréguela o la instalación arrancará sin administrador.
+4. Ejecute `make up`: genera los certificados SMTP locales (`make certs`, idempotente) y levanta el stack construyendo las imágenes. Si prefiere `docker compose up -d`, corra antes `make certs`: Mailpit exige STARTTLS y autenticación, y sin `deploy/certs/` el stack no arranca. Un `.env` generado antes de F2 necesita además `SMTP_PASSWORD` (ver «Si su `.env` es anterior a F2»).
+5. Abra Mailpit (<http://localhost:8025>), acepte la invitación del administrador y elija su contraseña. El código MFA de cada inicio de sesión también llega a Mailpit. El log de la API confirma el arranque con `bootstrap administrator invitation created`; si el `.env` se editó con el stack ya levantado, `make up` recrea la API y la invitación se crea en ese momento.
 
 ```bash
 git clone <url-del-repositorio> && cd <directorio>
@@ -69,8 +71,9 @@ El `docker-compose.yml` de la raíz incluye `deploy/docker-compose.yml`; `make u
 ### Primer arranque
 
 1. `make setup`: crea `.env` desde `.env.example` con secretos aleatorios, incluida `SMTP_PASSWORD`. Si `.env` ya existe, no lo modifica.
-2. `make up`: ejecuta `make certs` por su cuenta (no hace falta correrlo a mano), construye las imágenes y levanta el stack completo, con Grafana, Prometheus, Loki, Alloy y Falco. `make up-app` levanta solo la aplicación.
-3. Abra <http://identityhub.localhost:8080>.
+2. Revisar `BOOTSTRAP_ADMIN_EMAIL` en el `.env` (por defecto `admin@example.test`): es el primer administrador, invitado por correo a Mailpit al arrancar.
+3. `make up`: ejecuta `make certs` por su cuenta (no hace falta correrlo a mano), construye las imágenes y levanta el stack completo, con Grafana, Prometheus, Loki, Alloy y Falco. `make up-app` levanta solo la aplicación.
+4. Acepte la invitación en Mailpit (<http://localhost:8025>) y abra <http://identityhub.localhost:8080>.
 
 ### Levantar el stack
 
