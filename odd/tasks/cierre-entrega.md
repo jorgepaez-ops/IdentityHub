@@ -341,6 +341,11 @@ Dejar el código de producción legible (KISS, una responsabilidad por función)
   `api`/`worker`; `govulncheck` del backend no lo ve. Pendiente: asignar ficha y decidir la tarea que lo
   remedia (subir a 0.149.0 y confirmar que `oapi-codegen` genera lo mismo). El PR #56 queda sin mergear
   hasta entonces, por decisión del usuario.
+  - **Resuelto el 2026-10-19 en el PR #57**, tratado como mantenimiento de dependencias (sin ficha
+    VULN, por decisión del usuario tras la entrega). `kin-openapi` subió a 0.149.0, OSV-Scanner quedó
+    limpio y `make gen` genera lo mismo byte a byte. El mismo PR subió el digest de
+    `nginx-unprivileged:stable-alpine` de `web` por dos CVE altos nuevos de la base (libexpat
+    CVE-2026-77214, libx11 CVE-2026-88806).
 
 ## Deuda menor (no bloquea la entrega)
 
