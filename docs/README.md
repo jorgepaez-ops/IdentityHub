@@ -1,8 +1,86 @@
-# Índice de la entrega final
+# Documentación de Identity Hub
 
-Este índice conecta los requisitos de `ENUNCIADO-TRABAJO-FINAL.md` con los artefactos realmente versionados en Identity Hub. Úselo para revisar qué está cerrado y qué queda pendiente para el cierre en vivo de la semana 4.
+Esta página es el índice de `docs/`. Está organizada por la pregunta que usted probablemente trae: elija la suya y siga los enlaces. Si busca un término técnico, use el [glosario](glosario.md); para volver a la portada, el [README principal](../README.md).
 
-## Estructura del enunciado -> estructura del repositorio
+| Si se pregunta... | Vaya a |
+|---|---|
+| ¿Qué hace y para quién? | [Sección 1](#1-qué-hace-y-para-quién) |
+| ¿Cómo funciona por dentro? | [Sección 2](#2-cómo-funciona-por-dentro) |
+| ¿Cómo lo levanto y lo opero? | [Sección 3](#3-cómo-lo-levanto-y-lo-opero) |
+| ¿Es seguro y cómo se comprobó? | [Sección 4](#4-es-seguro-y-cómo-se-comprobó) |
+| ¿Cómo integro mi aplicación? | [Sección 5](#5-cómo-integro-mi-aplicación) |
+| ¿Qué se decidió y por qué? | [Sección 6](#6-qué-se-decidió-y-por-qué-adr) |
+| ¿Cómo se desarrolló y se siguió el trabajo? | [Sección 7](#7-cómo-se-desarrolló-y-se-siguió-el-trabajo) |
+| ¿Dónde se cumple cada punto del enunciado? | [Anexo](#anexo-cumplimiento-del-enunciado) |
+
+## 1. ¿Qué hace y para quién?
+
+- [Visión](../specs/00-vision.md): el problema que resuelve, el alcance y lo que queda fuera.
+- [Manual de usuario](manuales/usuario.md): cómo usan el Hub las personas empleadas y las administradoras, y la aplicación Contabilidad, con capturas.
+- [Guion de la demo](guion-demo.md): un recorrido de unos 5 minutos (más 4 opcionales) del sistema funcionando.
+- [Guion del video](video/guion.md): la demostración de 15 minutos del ciclo DevSecOps.
+- [Informe técnico](informe/informe-tecnico.md): la narración completa del proyecto, fuente del PDF final.
+
+## 2. ¿Cómo funciona por dentro?
+
+- [Manual de arquitectura](manuales/arquitectura.md): componentes, decisiones y patrones.
+- Diagramas navegables: [arquitectura](diagramas/01-arquitectura.html), [flujo SSO](diagramas/02-flujo-sso.html) y [ciclo de vida del usuario](diagramas/03-ciclo-de-vida-usuario.html).
+- Diagramas UML: [componentes](diagramas/uml/componentes.md), [despliegue local](diagramas/uml/despliegue.md), [despliegue en AWS](diagramas/uml/despliegue-aws.md), [casos de uso](diagramas/uml/casos-de-uso.md), [estados de la cuenta](diagramas/uml/estados-usuario.md) y las secuencias de [login con MFA](diagramas/uml/secuencia-login-mfa.md) y [SSO con PKCE](diagramas/uml/secuencia-sso-pkce.md).
+- [Modelo de dominio](../specs/02-domain-model.md), [contrato OpenAPI](../specs/03-api/openapi.yaml) y [eventos y colas](../specs/04-events/topology.md): los datos y los contratos del sistema.
+- [Mapa del repositorio](../README.md#mapa-del-repositorio): qué hay en cada carpeta.
+
+## 3. ¿Cómo lo levanto y lo opero?
+
+- [README principal, «Levantarlo»](../README.md#levantarlo): el camino más corto desde un clon nuevo.
+- [Manual de despliegue y operación](manuales/despliegue-y-operacion.md): configuración, verificación, operaciones comunes y problemas frecuentes.
+- [Guía de desarrollo](guia-desarrollo.md): entorno local, generación de código, pruebas y contribución.
+- [Runbook de Falco](runbooks/falco-alerta.md): qué hacer cuando Falco detecta actividad anómala en un contenedor.
+- [Runbook de la cola de notificaciones](runbooks/dlq-notificaciones.md): qué hacer cuando la cola de mensajes fallidos tiene mensajes.
+- [`deploy/`](../deploy/README.md) e [`infraestructura/`](../infraestructura/README.md): los compose, la observabilidad y la referencia en AWS.
+
+## 4. ¿Es seguro y cómo se comprobó?
+
+- [Manual de seguridad](manuales/seguridad.md): amenazas, herramientas del pipeline, reportes y vulnerabilidades.
+- [Modelo de amenazas (STRIDE)](../specs/05-security/threat-model.md) y [DFD en Threat Dragon](threat-model/README.md): riesgos y mitigaciones por componente.
+- [Informe de seguridad](security-report.html): la evidencia versionada, con la remediación de cada hallazgo.
+- [Evidencia por vulnerabilidad](evidencia/README.md): el «antes» y el «después» de cada hallazgo.
+- [Fichas de vulnerabilidades](../security/README.md): VULN-001 a VULN-031 y la evidencia cruda de los escáneres.
+- [Matriz de trazabilidad](../specs/07-traceability.md): requisito, escenario, prueba y control de CI.
+- [Escenarios de aceptación](../specs/06-acceptance/README.md): el comportamiento esperado, en Gherkin.
+
+## 5. ¿Cómo integro mi aplicación?
+
+- [Guía de integración de terceros](manuales/integracion-terceros.md): el flujo OAuth 2.0 con PKCE paso a paso, el contenido del token y un checklist de seguridad, con Contabilidad como ejemplo.
+- [Claves de servicio](manuales/claves-de-servicio.md): credenciales para sistemas que consultan el registro de auditoría sin sesión humana.
+- [Contrato OpenAPI](../specs/03-api/openapi.yaml): los endpoints exactos.
+- [`contabilidad/`](../contabilidad/README.md): el código de la aplicación de ejemplo.
+
+## 6. ¿Qué se decidió y por qué (ADR)?
+
+- [Índice de decisiones (ADR 0001 a 0014)](../specs/adr/README.md): cada decisión con contexto, alternativas y consecuencias, incluidas las malas.
+- Tres que ayudan a entender el resto: [IdP propio en lugar de Keycloak](../specs/adr/0002-idp-propio-en-lugar-de-keycloak.md), [SSO con Authorization Code y PKCE](../specs/adr/0009-sso-entre-dominios-con-authorization-code-y-pkce.md) y [línea base vulnerable deliberada](../specs/adr/0007-linea-base-vulnerable-deliberada.md).
+
+## 7. ¿Cómo se desarrolló y se siguió el trabajo?
+
+- [Bitácora](BITACORA.md): decisiones, hallazgos y avances, la entrada más reciente arriba.
+- [Archivos de tareas](../odd/tasks/): el plan y el avance por semana, incluido el [cierre de la entrega](../odd/tasks/cierre-entrega.md).
+- [Guía de desarrollo](guia-desarrollo.md): cómo se trabaja y se contribuye.
+- [Scripts](../scripts/README.md): las utilidades de automatización.
+
+## Estado final de la entrega
+
+Con datos del repositorio al 2026-10-19:
+
+- **`v1.0.0` está publicado** (tag del 2026-10-13, ejecución de `release.yml` 38460792159 en verde), con las imágenes `docker.io/jorgeivp/identity-hub-api`, `-worker` y `-web` firmadas con Cosign y con SBOM adjunto, y el release de GitHub con el informe técnico en PDF adjunto. Detalle en [`odd/tasks/cierre-entrega.md`](../odd/tasks/cierre-entrega.md) (tareas C2 y C3).
+- **Matriz de trazabilidad:** 33 requisitos completos, 0 parciales, 0 sin cubrir y 0 diferidos ([matriz](../specs/07-traceability.md)).
+- **Video:** el repositorio versiona solo el [guion](video/guion.md); la grabación la hace el equipo y no aparece versionada.
+- **Trabajo futuro deliberado:** las mejoras de la integración de terceros (clientes en la base de datos, OpenID Connect, refresh tokens por cliente, introspección y revocación) y el outbox transaccional ([sección 9.1](manuales/integracion-terceros.md) de la guía de integración y [ADR 0006](../specs/adr/0006-publicacion-directa-sin-outbox.md)).
+
+## Anexo: cumplimiento del enunciado
+
+El contenido que sigue conecta los requisitos de `ENUNCIADO-TRABAJO-FINAL.md` con los artefactos realmente versionados. Es útil para calificar; para leer, use las secciones de arriba.
+
+### Estructura del enunciado -> estructura del repositorio
 
 | Estructura propuesta por el enunciado | Ubicación real | Justificación |
 |---|---|---|
@@ -15,7 +93,7 @@ Este índice conecta los requisitos de `ENUNCIADO-TRABAJO-FINAL.md` con los arte
 | `servicios/` | [`../backend/`](../backend/), [`../frontend/`](../frontend/), [`../contabilidad/`](../contabilidad/) y [`../e2e/`](../e2e/) | Los servicios se separan por responsabilidad; `e2e/` contiene sus pruebas de extremo a extremo. |
 | `docs/` | [`docs/`](./), [`../specs/`](../specs/), [`../security/`](../security/) y [`../scripts/`](../scripts/) | `docs/` reúne la entrega; las especificaciones, evidencia de seguridad y trazabilidad versionada la respaldan. |
 
-## Entregables y requisitos del enunciado
+### Entregables y requisitos del enunciado
 
 La columna **Ubicación actual** solo enlaza rutas que existen en este checkout. `Parcial` indica que hay evidencia o una base reutilizable, pero no satisface todavía el requisito completo.
 
@@ -52,7 +130,7 @@ La columna **Ubicación actual** solo enlaza rutas que existen en este checkout.
 | PDF: monitoreo y observabilidad, si aplica | 180 | [`informe/informe-tecnico.md`](informe/informe-tecnico.md) | hecho (T19) |
 | PDF: conclusiones | 181 | [`informe/informe-tecnico.md`](informe/informe-tecnico.md) | hecho (T19) |
 
-## Entregables propios de la semana 4
+### Entregables propios de la semana 4
 
 No los exige el enunciado, pero responden a la demo en vivo con el profesor:
 
@@ -63,18 +141,3 @@ No los exige el enunciado, pero responden a la demo en vivo con el profesor:
 | Claves de servicio para integraciones máquina (RF-018) | [`manuales/claves-de-servicio.md`](manuales/claves-de-servicio.md) y [`../specs/adr/0014-claves-de-servicio-para-integraciones-maquina.md`](../specs/adr/0014-claves-de-servicio-para-integraciones-maquina.md) | hecho (F4) |
 | Exportación del registro de auditoría en CSV y JSON (RF-019) | [`manuales/usuario.md`](manuales/usuario.md) y [`../specs/06-acceptance/`](../specs/06-acceptance/) | hecho (F1) |
 | Runbook de alertas de Falco | [`runbooks/falco-alerta.md`](runbooks/falco-alerta.md) | hecho (F3) |
-
-## Cómo navegar
-
-1. Empiece por el [`README principal`](../README.md) para ejecutar y ubicar el proyecto.
-2. Consulte [`../specs/`](../specs/) para requisitos, contratos, ADR y trazabilidad.
-3. Use la [`guía de desarrollo`](guia-desarrollo.md) para el entorno local, generación, pruebas y contribución.
-4. Consulte los manuales de [`arquitectura`](manuales/arquitectura.md), [`despliegue y operación`](manuales/despliegue-y-operacion.md) y [`seguridad`](manuales/seguridad.md).
-5. Revise el [`informe de seguridad`](security-report.html) junto con las evidencias de seguridad.
-6. Lea la [`bitácora`](BITACORA.md) para avances, decisiones y estado histórico.
-7. Prepare la demo en vivo de la sustentación con el [`guion de la demo`](guion-demo.md) (unos 5 minutos, más 4 opcionales) y el video con el [`guion del video`](video/guion.md) (15 minutos; la grabación sigue pendiente).
-8. Siga el avance de la entrega en [`../odd/tasks/`](../odd/tasks/).
-
-## Próximos artefactos
-
-La documentación, los diagramas, la IaC de referencia, la grilla de roles, el manual de usuario, el informe técnico y el guion del video están verificados. Las imágenes ya están publicadas en Docker Hub (C3). Las funciones de cierre F1 a F4 y F6 a F10 están integradas en `main` y `v0.9.1` validó el release firmado; F5 queda como trabajo futuro. Quedan el tag `v1.0.0` y el release final, y la grabación del video, que hace el equipo.

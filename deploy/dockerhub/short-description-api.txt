@@ -1,1 +1,1 @@
-Servicio HTTP de Identity Hub: API REST, OAuth/OIDC y claves JWT. Va con worker y web.
+Servicio HTTP de Identity Hub: API REST, OAuth 2.0 con PKCE y claves JWT. Va con worker y web.

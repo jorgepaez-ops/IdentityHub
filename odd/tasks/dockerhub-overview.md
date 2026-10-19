@@ -36,10 +36,10 @@ Fuera de alcance: cambiar `release.yml` o el environment `dockerhub`.
 - [x] **D1. Descripciones y workflow.** Ruta: delegada (writer: 3 documentos y 1 workflow, más de un
   archivo no trivial). Checks: validación de los workflows con las herramientas que use CI, límites de
   tamaño, comandos `cosign verify` probados contra los digests reales de `v1.0.0`.
-- [ ] **D2. Configuración remota.** El usuario crea en Docker Hub un token con permiso Read, Write,
+- [x] **D2. Configuración remota.** El usuario crea en Docker Hub un token con permiso Read, Write,
   Delete. Se crean el environment `dockerhub-description` (solo `main`) y su secreto. Requiere
   autorización explícita del usuario para cada operación remota.
-- [ ] **D3. Publicación y verificación.** Merge, ejecución del workflow y comprobación con la API
+- [x] **D3. Publicación y verificación.** Merge, ejecución del workflow y comprobación con la API
   pública de Docker Hub de que los tres repositorios muestran la descripción.
 
 ## Criterios de aceptación
@@ -68,6 +68,14 @@ Fuera de alcance: cambiar `release.yml` o el environment `dockerhub`.
   con política de despliegue limitada a la rama `main` (leída de vuelta con la API de GitHub).
   Pendiente: el usuario crea el token Read, Write, Delete y carga `DOCKERHUB_DESCRIPTION_TOKEN`.
 
+- 2026-10-19, D2: el usuario creó el token Read, Write, Delete y cargó `DOCKERHUB_DESCRIPTION_TOKEN` en el
+  environment (verificado con `gh secret list --env dockerhub-description`).
+- 2026-10-19, D3: PR #58 mergeado tras CI verde (22 jobs; el job de detección de cambios lo canceló el
+  incidente de GitHub Actions y pasó al relanzarlo). Workflow `dockerhub-description.yml` (run 39287353466)
+  en verde para api, worker y web; la API pública de Docker Hub muestra la descripción corta y el overview
+  (5 888, 5 670 y 5 268 bytes). Al leerlo publicado se vio «OAuth/OIDC» en api, incorrecto (el Hub no
+  implementa OIDC); corregido en el PR #59, que al mergear vuelve a sincronizar.
+
 ## Próximo paso
 
-D2: secreto `DOCKERHUB_DESCRIPTION_TOKEN` (lo carga el usuario); luego D3.
+Ninguno: tarea cerrada al mergear el PR #59.
