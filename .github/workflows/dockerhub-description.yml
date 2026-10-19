@@ -1,0 +1,65 @@
+# ═══════════════════════════════════════════════════════════════════════════
+#  Descripción en Docker Hub — sincroniza el overview de api, worker y web.
+#
+#  La fuente de verdad son los archivos de deploy/dockerhub/ (api.md, worker.md,
+#  web.md y short-description-*.txt). Cada vez que cambian en main, este workflow
+#  actualiza la descripción corta y el overview de jorgeivp/identity-hub-<nombre>
+#  en Docker Hub; también se puede lanzar a mano con workflow_dispatch.
+#
+#  Credenciales: variable DOCKERHUB_NAMESPACE (del repositorio) y secreto
+#  DOCKERHUB_DESCRIPTION_TOKEN (del environment "dockerhub-description",
+#  limitado a la rama main). NO reutiliza el environment "dockerhub" del release:
+#  ese está restringido a tags v* y su token publica imágenes; ampliarlo para
+#  este trabajo daría a un workflow de documentación el poder de publicar.
+#  El token debe tener alcance Read, Write, Delete: la API de Docker Hub exige
+#  ese alcance para editar la descripción de un repositorio.
+# ═══════════════════════════════════════════════════════════════════════════
+name: Descripción en Docker Hub
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "deploy/dockerhub/**"
+      - ".github/workflows/dockerhub-description.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dockerhub-description
+  cancel-in-progress: false
+
+jobs:
+  sincronizar:
+    name: Sincronizar ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: dockerhub-description
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        name: [api, worker, web]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # La acción recibe la descripción corta como texto, no como archivo.
+      - name: Leer la descripción corta
+        id: short
+        env:
+          NAME: ${{ matrix.name }}
+        run: echo "text=$(head -n 1 "deploy/dockerhub/short-description-${NAME}.txt")" >> "$GITHUB_OUTPUT"
+
+      - name: Actualizar Docker Hub
+        uses: peter-evans/dockerhub-description@1b9a80c056b620d92cedb9d9b5a223409c68ddfa # v5.0.0
+        with:
+          username: ${{ vars.DOCKERHUB_NAMESPACE }}
+          password: ${{ secrets.DOCKERHUB_DESCRIPTION_TOKEN }}
+          repository: ${{ vars.DOCKERHUB_NAMESPACE }}/identity-hub-${{ matrix.name }}
+          short-description: ${{ steps.short.outputs.text }}
+          readme-filepath: deploy/dockerhub/${{ matrix.name }}.md

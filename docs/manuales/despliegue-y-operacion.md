@@ -154,3 +154,4 @@ Límites conocidos:
 - Los secretos siguen llegando como variables de entorno desde `.env`: la API no soporta variables `*_FILE`, así que no hay secretos por archivo.
 - El worker autentica por SMTP y exige STARTTLS (`SMTP_TLS=starttls`, puerto 587). La CA local de desarrollo no se monta aquí: el relay se verifica con las raíces del sistema.
 - Las imágenes ya están publicadas en Docker Hub; sin tener a mano sus digests, la validación sin arrancar se limita a `docker compose ... config`.
+- El texto que Docker Hub muestra para cada imagen (etiquetas, digests y verificación de la firma) vive en [`deploy/dockerhub/`](../../deploy/dockerhub/README.md) y un workflow lo sincroniza al cambiar en `main`.

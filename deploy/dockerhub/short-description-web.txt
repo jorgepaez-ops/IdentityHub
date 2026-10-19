@@ -1,0 +1,1 @@
+Nginx de Identity Hub: sirve la consola y Contabilidad y hace proxy a la API. Va con api y worker.
