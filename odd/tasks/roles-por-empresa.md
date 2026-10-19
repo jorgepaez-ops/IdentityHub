@@ -289,8 +289,19 @@ ramas locales y se suben después.
   comentario del DAST, que ahora menciona Inventario. Comprobado que `make scan-dast` escanea Inventario de
   verdad (baseline propio, `--add-host inventario.localhost`, informe en el gate). DAST no corrido en local:
   lo corre CI.
+- 2026-10-19, revisiones nativas de R4 y R5 (todas aprobadas). R4 completo (2481 líneas) excedía el
+  presupuesto de contexto: se revisó en dos cortes armados solo para la revisión con `git commit-tree` en un
+  worktree aparte, sin reescribir la rama (backend 1375 líneas, 4 lentes; consola y E2E 1106 líneas). R5 se
+  revisó solo (4 lentes). Avisos no bloqueantes para R6:
+  - R4 backend: motivo de auditoría duplicado en `employee.go`; tres avisos de robustez en
+    `organizations.go` y `admin_users.go`. El aviso «el listado por empresa descarta filtros» no se
+    confirma: `ListOrganizationUsers` aplica búsqueda, estado y cursor igual que `ListAdminUsers`.
+  - R4 consola: `e2e/tests/empresas.spec.ts:81-88` (confiabilidad de la prueba).
+  - R5: auth duplicada entre Contabilidad e Inventario (decisión consciente); párrafo desactualizado en
+    `docs/informe/informe-tecnico.md:351`; en el login de Inventario (y probablemente Contabilidad, de donde
+    se copió): `fetch` del callback sin timeout, estado «validando» que puede quedar trabado y control de
+    reloj sin prueba.
 
 ## Próximo paso
 
-Revisión nativa de R4 y de R5 por separado (el rango completo excede el presupuesto de contexto) y R6
-(documentación y cierre).
+R6: documentación y cierre (lista de pendientes arriba), luego PRs encadenados a `main`.
