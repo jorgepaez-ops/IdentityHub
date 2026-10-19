@@ -4,7 +4,7 @@ La evidencia de seguridad del proyecto.
 
 - `findings/`: una ficha por vulnerabilidad (VULN-001 a VULN-031): qué se encontró, dónde, cómo se remedió y su estado.
 - `evidence/`: salidas crudas de los escáneres, conservadas por ejecución como evidencia «antes».
-- `zap-reports/`: informes del escáner dinámico OWASP ZAP (los genera `make scan-dast`).
+- `zap-reports/`: informes del escáner dinámico OWASP ZAP. Los genera `make scan-dast` en local y no se versionan (están en `.gitignore`); en CI quedan como artefacto `zap-reports-<run_id>`.
 
 ```bash
 make scan        # todos los escaneos de seguridad en local

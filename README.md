@@ -23,7 +23,7 @@ Es el proyecto final de una especialización universitaria en ciberseguridad (é
 | Observabilidad | Prometheus, Loki, Grafana Alloy, Grafana y Falco (detección en tiempo de ejecución) |
 | Seguridad en CI | Gitleaks, CodeQL, Semgrep, gosec mediante golangci-lint, govulncheck, npm audit, osv-scanner, Hadolint y Trivy |
 
-El backend está escrito en Go por decisión del proyecto: el profesor permitió elegir el stack siempre que se cumplieran los requisitos de DevSecOps y de gestor de identidad.
+El backend está escrito en Go: cada servicio compila a un binario estático que corre en una imagen distroless, sin shell ni gestor de paquetes.
 
 Para ver cómo encajan las piezas, abra los diagramas de [arquitectura](docs/diagramas/01-arquitectura.html), [flujo SSO](docs/diagramas/02-flujo-sso.html) y [ciclo de vida del usuario](docs/diagramas/03-ciclo-de-vida-usuario.html), o lea el [manual de arquitectura](docs/manuales/arquitectura.md).
 
@@ -78,7 +78,7 @@ El repositorio versiona el guion del video de demostración; la grabación la ha
 | [`infraestructura/`](infraestructura/README.md) | Terraform de la arquitectura de referencia en AWS | Para ver cómo se desplegaría en la nube (no hace falta para correr el proyecto) |
 | [`e2e/`](e2e/README.md) | Pruebas de extremo a extremo con Playwright | Para ver cómo se comprueba el sistema como lo usaría una persona |
 | [`tests/`](tests/README.md) | Prueba de carga de latencia (k6) | Para revisar el requisito de rendimiento |
-| [`security/`](security/README.md) | Fichas de vulnerabilidades, evidencia de escáneres e informes de ZAP | Para auditar qué se encontró y cómo se remedió |
+| [`security/`](security/README.md) | Fichas de vulnerabilidades y evidencia de los escáneres (los informes de ZAP se generan con `make scan-dast` y no se versionan) | Para auditar qué se encontró y cómo se remedió |
 | [`scripts/`](scripts/README.md) | Utilidades de automatización y sus pruebas | Para entender qué hacen los comandos de `make` por dentro |
 | [`tools/`](tools/README.md) | Versiones fijadas de las herramientas de desarrollo y CI | Al actualizar generadores o escáneres |
 | [`.github/`](.github/workflows/README.md) | Workflows de CI/CD, escaneos y release, y Dependabot | Para ver el pipeline DevSecOps |
@@ -95,7 +95,7 @@ La raíz también guarda la configuración de herramientas: `.pre-commit-config.
 
 Cada ruta va en orden: lea solo hasta donde necesite.
 
-### Profesor o evaluador
+### Evaluador o revisor
 
 1. [Índice de la entrega](docs/README.md#anexo-cumplimiento-del-enunciado): cada requisito del enunciado y dónde se cumple.
 2. [Informe técnico](docs/informe/informe-tecnico.md): la narración completa del proyecto y del pipeline.
