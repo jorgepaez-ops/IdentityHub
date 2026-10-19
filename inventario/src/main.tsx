@@ -1,14 +1,12 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
 import { App } from './App'
-import { paintFirstFrame } from './colorScheme'
-import './fonts.css'
-import './styles.css'
+import './theme.css'
 
-paintFirstFrame()
-
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
+const container = document.getElementById('root')
+if (!container) throw new Error('index.html has no #root element')
+createRoot(container).render(
+  <StrictMode>
     <App />
-  </React.StrictMode>,
+  </StrictMode>,
 )

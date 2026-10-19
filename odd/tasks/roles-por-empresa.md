@@ -328,6 +328,27 @@ ramas locales y se suben después.
   `.env.example` líneas 51-54 (comentarios `OAUTH_*`; el entorno niega acceso a ese archivo, lo edita el
   usuario); pruebas del camino de error de `restartLogin` en `App.tsx` de Contabilidad e Inventario (aviso
   de revisión); base de datos local del stack con la versión anterior del trigger de 000011.
+- 2026-10-19 (R7, reescritura de `inventario/src/`; escrito por el ejecutor, sin marcar; revisión y commit del orquestador):
+  - Motivo: SonarCloud marcó el PR #63 con 47,8 % de líneas duplicadas en código nuevo (umbral 3 %) porque `inventario/src/**` se había
+    construido copiando `contabilidad/src/**`. Criterio ya aplicado a Contabilidad el 2026-10-06: cada aplicación de terceros es una empresa
+    independiente y su código se escribe desde cero; solo el protocolo y el comportamiento son equivalentes. Sin paquete compartido, sin
+    exclusiones de Sonar y sin bajar el umbral. Esto reemplaza la nota de R5 «auth duplicada (decisión consciente)».
+  - Cómo: se descartó todo `src/` y se reescribió desde el comportamiento (pruebas previas, README, esta ficha, la guía de integración y las
+    pruebas E2E), sin abrir `contabilidad/src` ni `frontend/src`. Arquitectura propia: `oauth/` (cliente de login con PKCE S256, verificador de
+    token EdDSA con WebCrypto y base64url), `session.ts` (hook con reducer de fases), `permissions.ts`, `warehouse/ledger.ts` (datos de
+    ejemplo y regla de stock no negativo), `screens/` (Gate, Workspace con pestañas, CatalogPanel, MovementsPanel), CSS propio con nombres BEM.
+    Sin iconos, sin fuentes de terceros (se retiraron `@fontsource/*` y su entrada del lock) y sin selector de tema (el esquema claro/oscuro
+    sigue al sistema operativo con `prefers-color-scheme`). Configuración (`vite.config.ts`, `tsconfig.json`, `.eslintrc.cjs`, `index.html`,
+    `package.json`) reescrita con estructura propia; los scripts `lint`, `typecheck`, `test` y `build` no cambian.
+  - Comportamiento conservado: client_id `inventario`, redirect `http://inventario.localhost:8080/oauth/callback`, PKCE S256, estado de un
+    solo uso, firma contra el JWKS, `iss`, `aud`, `exp`/`nbf` con holgura de 60 s, solo EdDSA, plazo de 10 s por petición (cuerpo incluido),
+    «validando» siempre termina, `access_denied` sin pedir token ni JWKS, sin permisos de Inventario = sin acceso, pantallas por permiso,
+    stock sin negativos, datos de ejemplo rotulados, cabecera con usuario y «Empresa B». Cambio de estructura visible: la navegación
+    «Secciones» pasa de barra lateral a pestañas (mismo rol y nombres); los selectores de `empresas.spec.ts` y `nginx.spec.ts` no cambiaron.
+  - Verificación: Vitest 74/74 (antes 66), lint y typecheck limpios, `npm ci`, build y `npm audit` (0 vulnerabilidades);
+    `npx jscpd@4.0.5 --min-lines 5 inventario/src contabilidad/src frontend/src`: 0 clones que involucren a Inventario (antes: la mayoría de
+    sus archivos); `make e2e` completo 77/77 (incluye `empresas.spec.ts` y `nginx.spec.ts`); `scripts/traceability.py --check` al día.
+  - Pendiente: confirmar en SonarCloud tras el push que la duplicación en código nuevo baja del 3 %.
 
 ## Próximo paso
 

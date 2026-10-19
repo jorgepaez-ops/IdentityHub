@@ -1,102 +1,22 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { accessFor } from './access'
-import { AppearanceProvider } from './AppearanceProvider'
-import { beginLogin, completeCallback, type CallbackError, type Session } from './auth/flow'
-import { CLOCK_LEEWAY_SECONDS } from './auth/jwt'
-import { CALLBACK_PATH } from './config'
-import { AccessDenied, LoginScreen, type LoginState } from './Login'
-import { Shell } from './Shell'
+import { grantsFor } from './permissions'
+import { NoAccessScreen, SignInScreen } from './screens/Gate'
+import { Workspace } from './screens/Workspace'
+import { useHubSession } from './session'
 
-export const MINIMUM_SESSION_LIFETIME_MS = CLOCK_LEEWAY_SECONDS * 1000
-
-type CallbackMessageKind = CallbackError['kind'] | 'clock'
-
-const CALLBACK_MESSAGES: Record<Exclude<CallbackMessageKind, 'no_access'>, string> = {
-  state: 'No se pudo validar el inicio de sesión (la respuesta no corresponde a esta solicitud). Inténtalo de nuevo.',
-  denied: 'Identity Hub no autorizó el acceso. Inténtalo de nuevo.',
-  exchange: 'No se pudo completar el inicio de sesión con Identity Hub. Inténtalo de nuevo.',
-  token: 'La credencial recibida de Identity Hub no es válida. Inténtalo de nuevo.',
-  hub_unavailable: 'Identity Hub no está disponible en este momento. Inténtalo de nuevo.',
-  clock: 'No se pudo iniciar sesión por un problema de reloj. Verifica la hora de tu dispositivo e inténtalo de nuevo.',
-}
-
+/** Picks the screen that matches where the person is in the sign-in life cycle. */
 export function App() {
-  return (
-    <AppearanceProvider>
-      <AppContent />
-    </AppearanceProvider>
-  )
-}
+  const { phase, signIn, signOut } = useHubSession()
 
-function AppContent() {
-  const returning = window.location.pathname === CALLBACK_PATH
-  const [login, setLogin] = useState<LoginState>(returning ? { kind: 'validating' } : { kind: 'idle' })
-  // The access token lives only in this component's memory: never in storage.
-  const [session, setSession] = useState<Session | null>(null)
-  // Survives the simulated remount of React.StrictMode: the code is single use.
-  const callbackHandled = useRef(false)
-  // The Hub refused the authorization: no token exists.
-  const [deniedByHub, setDeniedByHub] = useState(false)
-
-  useEffect(() => {
-    if (!returning || callbackHandled.current) return
-    callbackHandled.current = true
-    completeCallback(window.location.search).then(
-      (result) => {
-        if (result.verified.expiresAt * 1000 - Date.now() <= MINIMUM_SESSION_LIFETIME_MS) {
-          setLogin({ kind: 'error', message: CALLBACK_MESSAGES.clock })
-          return
-        }
-        setSession(result)
-      },
-      (reason: unknown) => {
-        const kind = (reason as CallbackError)?.kind
-        if (kind === 'no_access') {
-          setDeniedByHub(true)
-          return
-        }
-        setLogin({ kind: 'error', message: CALLBACK_MESSAGES[kind] ?? CALLBACK_MESSAGES.exchange })
-      },
-    ).catch(() => {
-      // Whatever went wrong while handling the outcome, "validating" must never be the last screen.
-      setLogin({ kind: 'error', message: CALLBACK_MESSAGES.exchange })
-    })
-  }, [returning])
-
-  // Starts the redirect to the Hub; if it cannot even start (blocked navigation, no crypto, storage
-  // refused) the person lands on an error screen with a retry button instead of a stuck spinner.
-  const restartLogin = useCallback(async () => {
-    try {
-      await beginLogin()
-    } catch {
-      setSession(null)
-      setLogin({ kind: 'error', message: CALLBACK_MESSAGES.exchange })
+  switch (phase.tag) {
+    case 'no_access':
+      return <NoAccessScreen onSignOut={signOut} />
+    case 'active': {
+      const { identity } = phase.session
+      const grants = grantsFor(identity.roles, identity.permissions)
+      if (!grants) return <NoAccessScreen onSignOut={signOut} />
+      return <Workspace grants={grants} subject={identity.subject} onSignOut={signOut} />
     }
-  }, [])
-
-  const expiresAt = session?.verified.expiresAt
-  useEffect(() => {
-    if (expiresAt === undefined) return
-    // There is no refresh token by design (ADR 0009): when the access token
-    // expires the app asks the Hub again, which answers silently while the Hub
-    // session lives.
-    const timer = window.setTimeout(() => { void restartLogin() }, Math.max(0, expiresAt * 1000 - Date.now()))
-    return () => window.clearTimeout(timer)
-  }, [expiresAt, restartLogin])
-
-  const start = useCallback(() => {
-    setLogin({ kind: 'validating' })
-    void restartLogin()
-  }, [restartLogin])
-  const logout = useCallback(() => {
-    setSession(null)
-    setDeniedByHub(false)
-    setLogin({ kind: 'idle' })
-  }, [])
-
-  if (deniedByHub) return <AccessDenied onLogout={logout} />
-  if (!session) return <LoginScreen state={login} onContinue={start} />
-  const access = accessFor(session.verified.permissions, session.verified.roles)
-  if (!access.granted) return <AccessDenied onLogout={logout} />
-  return <Shell access={access} subject={session.verified.subject} onLogout={logout} />
+    default:
+      return <SignInScreen checking={phase.tag === 'checking'} problem={phase.tag === 'failed' ? phase.message : null} onContinue={() => { void signIn() }} />
+  }
 }

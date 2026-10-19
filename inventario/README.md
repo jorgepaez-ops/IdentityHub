@@ -15,7 +15,7 @@ Aplicación mínima de ejemplo de la empresa «Empresa B». Demuestra que Identi
 |---|---|
 | Dirección local | `http://inventario.localhost:8080` (el mismo Nginx del Hub, bloque en [`frontend/nginx/default.conf`](../frontend/nginx/default.conf)) |
 | Cliente, empresa, permisos y roles en el Hub | [`db/migrations/000011_organizations.up.sql`](../db/migrations/000011_organizations.up.sql) |
-| Configuración de compilación | [`src/config.ts`](src/config.ts) |
+| Configuración de compilación | [`src/hub.ts`](src/hub.ts) |
 | Guía de integración | [`docs/manuales/integracion-terceros.md`](../docs/manuales/integracion-terceros.md) |
 
 ## Comandos
