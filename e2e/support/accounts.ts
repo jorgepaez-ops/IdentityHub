@@ -32,8 +32,9 @@ export async function seedAdmin(): Promise<Admin> {
   const hash = createHash('sha256').update(raw).digest('hex')
   psql(
     `WITH u AS (
-       INSERT INTO users (email, password_hash, display_name)
-       VALUES (:'email', '$argon2id$e2e-placeholder', 'E2E Admin') RETURNING id
+       INSERT INTO users (email, password_hash, display_name, organization_id)
+       VALUES (:'email', '$argon2id$e2e-placeholder', 'E2E Admin',
+               (SELECT id FROM organizations WHERE slug = 'hub')) RETURNING id
      ), r AS (
        INSERT INTO user_roles (user_id, role_id)
        SELECT u.id, roles.id FROM u, roles WHERE roles.name IN ('admin', 'user') RETURNING 1

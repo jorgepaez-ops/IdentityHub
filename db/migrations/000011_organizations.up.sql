@@ -101,7 +101,10 @@ BEGIN
     IF role_organization IS NULL THEN
         RETURN NEW;
     END IF;
-    SELECT organization_id INTO user_organization FROM users WHERE id = NEW.user_id;
+    -- FOR SHARE serializes against a concurrent UPDATE of users.organization_id (which takes the row
+    -- lock): the check waits for that transaction and then reads the committed company, so a role can
+    -- never slip in under the old company while the user is being moved.
+    SELECT organization_id INTO user_organization FROM users WHERE id = NEW.user_id FOR SHARE;
     IF user_organization IS DISTINCT FROM role_organization THEN
         RAISE EXCEPTION 'role_organization_mismatch: the role belongs to an application of another organization'
             USING ERRCODE = 'IH001';
