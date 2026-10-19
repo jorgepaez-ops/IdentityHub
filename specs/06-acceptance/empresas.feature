@@ -46,6 +46,13 @@ Característica: Empresas y aislamiento de roles
     Y el claim "aud" identifica a Contabilidad
 
   @RF-022 @RF-020 @p1
+  Escenario: Un usuario de Empresa B entra a Inventario
+    Dado que existe un empleado de "Empresa B" con un rol de "inventario"
+    Cuando completa el flujo OAuth de Inventario
+    Entonces Identity Hub redirige con un código y el mismo estado
+    Y el claim "aud" identifica a Inventario
+
+  @RF-022 @RF-020 @p1
   Escenario: Un usuario de Empresa B que abre Contabilidad es rechazado
     Dado que existe un empleado de "Empresa B" con un rol de "inventario"
     Cuando completa el flujo OAuth de Contabilidad
@@ -64,3 +71,16 @@ Característica: Empresas y aislamiento de roles
     Cuando inicia sesión en Identity Hub
     Entonces el menú de aplicaciones muestra "Contabilidad"
     Y no muestra "Inventario"
+
+  @RF-022 @p1
+  Escenario: Con una sola aplicación el login lleva directamente a ella
+    Dado que existe un empleado de "Empresa B" con un rol de "inventario"
+    Cuando inicia sesión en Identity Hub
+    Entonces Identity Hub lo lleva a la aplicación "Inventario"
+
+  @RF-022 @RF-009 @RF-020 @p1
+  Escenario: El token de Inventario contiene solo roles de Inventario
+    Dado que mi cuenta de "Empresa B" tiene los roles "user" y un rol de "inventario"
+    Cuando completo el flujo OAuth de Inventario
+    Entonces el claim "roles" contiene únicamente roles de "inventario"
+    Y el claim "permissions" contiene solo permisos de "inventario"

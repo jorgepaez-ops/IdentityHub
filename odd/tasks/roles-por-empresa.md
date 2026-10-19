@@ -75,7 +75,7 @@ aplicaciones desde la consola (se declaran por migración, como hoy Contabilidad
   rechazo en `/oauth/authorize` por empresa o sin rol; pruebas.
 - [x] **R4. Administración y enrutamiento.** API: empresa del usuario, roles asignables, aplicaciones del
   usuario; consola: alta con empresa, `UserDrawer` filtrado, menú dinámico y redirección tras el login.
-- [ ] **R5. Inventario.** App mínima, Nginx, build en `web`, compose, E2E del cruce entre empresas.
+- [x] **R5. Inventario.** App mínima, Nginx, build en `web`, compose, E2E del cruce entre empresas.
 - [ ] **R6. Documentación y cierre.** Guía de integración, manual de usuario, README, matriz; checks completos.
 
 ## Criterios de aceptación
@@ -253,8 +253,44 @@ ramas locales y se suben después.
   aplicaciones de la propia empresa con rol del usuario. Pedido y verificado el orden 401/403 antes que 400.
   Comportamiento aceptado: un usuario con una sola aplicación va directo a ella y solo ve la lista si vuelve
   al Hub.
+- 2026-10-19 (R5, escrito por el ejecutor, sin marcar; revisión y commit del orquestador):
+  - `inventario/`: SPA mínima (React 18 + Vite + Vitest, mismas dependencias que Contabilidad menos Fraunces) con login OAuth
+    Authorization Code + PKCE (`client_id` `inventario`), verificación EdDSA del token contra el JWKS (copiados de Contabilidad:
+    `auth/`, `colorScheme`, `AppearanceProvider`), cabecera con usuario y empresa (la empresa es constante en `config.ts` porque el
+    token no trae claim de empresa), «Catálogo» (`productos.ver`; editar con `productos.editar`) y «Movimientos»
+    (`movimientos.registrar`; una salida no baja de cero), datos de ejemplo en memoria rotulados como tales. Pantalla «Sin acceso a
+    Inventario» si el Hub devuelve `error=access_denied` (sin pedir token ni JWKS) o si el token no trae rol `inventario.*` con al
+    menos un permiso de Inventario. Acento verde azulado, distinto del ámbar de Contabilidad. Vitest: 59 pruebas (flujo PKCE,
+    `access_denied`, token sin permisos, pantallas por permiso, ejemplo en memoria, tema).
+  - Servicio: bloque `inventario.localhost` en `frontend/nginx/default.conf` con las mismas cabeceras y CSP que Contabilidad; etapa
+    `inventario-builder` (mismo digest de Node) y `COPY` a `/usr/share/nginx/inventario` en `frontend/Dockerfile`. Compose no
+    necesitó cambios (los `*.localhost` resuelven solos; solo se actualizó un comentario).
+  - Makefile (`lint`, `test-front`, `scan-deps`, `scan-dast` con baseline de Inventario y `--add-host`, URLs impresas) y `ci.yml`
+    (caché npm, `npm ci`, ESLint, tipos, `npm audit` y Vitest de Inventario) extendidos igual que Contabilidad. `dependabot.yml` no
+    tiene entradas npm (ni para el Hub ni Contabilidad), así que no se tocó.
+  - Spec y E2E: `empresas.feature` recupera los 3 escenarios aparcados sin cambiar su redacción (11 en total); tres pruebas nuevas
+    en `e2e/tests/empresas.spec.ts` (`RF-022 …`), tres de seguridad HTTP de `inventario.localhost` en `nginx.spec.ts`;
+    `python3 scripts/traceability.py` regeneró `specs/07-traceability.md` y `--check` queda al día.
+  - Verificación: Inventario `npm ci`, lint, typecheck, Vitest 59/59, build y `npm audit` (0 vulnerabilidades); `make test-front`
+    verde (Hub 285, Contabilidad 150, Inventario 59); `pipeline_controls_test.py` (13), `traceability_test.py` (31) y los demás
+    `scripts/*_test.py` verdes salvo `informe_excerpts_test.py`; `docker build --target web` y Trivy 0.70.0 (HIGH/CRITICAL,
+    `--ignore-unfixed`) con 0 hallazgos; `make up-app` + `make e2e` completo 77/77 (incluye las 6 pruebas nuevas, `empresas`,
+    `autorizacion-oauth` y `control-de-acceso`); `make down` al terminar.
+  - Pendiente (fuera de las superficies permitidas): `scripts/informe_excerpts_test.py` falla porque las líneas añadidas a `ci.yml`
+    desplazan los extractos `{{code:yaml:.github/workflows/ci.yml:A-B}}` de `docs/informe/informe-tecnico.md`; los rangos nuevos son
+    242-256 a 256-270, 290-314 a 304-328, 357-377 a 377-397, 464-481 a 490-507, 729-740 a 755-766 y 742-782 a 768-808. También falta
+    añadir `inventario.localhost` a `/etc/hosts` en `.github/actions/stack-up/action.yml` (línea 47) y su espera (línea 65), y
+    actualizar el comentario de `frontend/Dockerfile.dockerignore` («solo necesita frontend/ y contabilidad/»; inventario/ ya entra
+    al contexto).
+- 2026-10-19, revisión de R5 (sesión principal): completado fuera de las superficies del writer:
+  `.github/actions/stack-up/action.yml` registra `inventario.localhost` en `/etc/hosts` y espera su respuesta
+  (sin esto la E2E de Inventario fallaría en CI); `frontend/Dockerfile.dockerignore` (comentario); rangos de
+  `ci.yml` citados en `docs/informe/informe-tecnico.md` desplazados, con contenido verificado idéntico salvo el
+  comentario del DAST, que ahora menciona Inventario. Comprobado que `make scan-dast` escanea Inventario de
+  verdad (baseline propio, `--add-host inventario.localhost`, informe en el gate). DAST no corrido en local:
+  lo corre CI.
 
 ## Próximo paso
 
-R5 (Inventario: app mínima, Nginx, build en `web`, E2E de los escenarios de Inventario) y R6 (documentación
-y cierre).
+Revisión nativa de R4 y de R5 por separado (el rango completo excede el presupuesto de contexto) y R6
+(documentación y cierre).

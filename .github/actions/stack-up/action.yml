@@ -44,7 +44,7 @@ runs:
       # pero el /etc/hosts explícito quita la dependencia de ese comportamiento del runner.
       - name: Resolver los hosts *.localhost
         shell: bash
-        run: echo "127.0.0.1 identityhub.localhost contabilidad.localhost" | sudo tee -a /etc/hosts
+        run: echo "127.0.0.1 identityhub.localhost contabilidad.localhost inventario.localhost" | sudo tee -a /etc/hosts
 
       # make up-app depende de make certs (y no levanta Grafana, Loki ni Falco): genera la CA local y el certificado de Mailpit
       # (deploy/certs/) antes de que compose monte esos archivos.
@@ -63,3 +63,5 @@ runs:
             http://identityhub.localhost:8080/ > /dev/null
           curl --fail --silent --show-error --retry 30 --retry-delay 2 --retry-all-errors \
             http://contabilidad.localhost:8080/ > /dev/null
+          curl --fail --silent --show-error --retry 30 --retry-delay 2 --retry-all-errors \
+            http://inventario.localhost:8080/ > /dev/null

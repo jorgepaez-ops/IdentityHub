@@ -1,0 +1,45 @@
+import { useEffect } from 'react'
+import { HUB_ORIGIN } from './config'
+import { LogoutIcon, WarningIcon } from './icons'
+
+export type LoginState = { kind: 'idle' } | { kind: 'validating' } | { kind: 'error'; message: string }
+
+export function LoginScreen({ state, onContinue }: Readonly<{ state: LoginState; onContinue: () => void }>) {
+  useEffect(() => { document.title = 'Iniciar sesión · Inventario' }, [])
+  return (
+    <main className="login-page">
+      <section className="login-card" aria-labelledby="login-title">
+        <div className="brand-mark" aria-hidden="true">I</div>
+        <h1 id="login-title">Inventario</h1>
+        {state.kind === 'validating' ? (
+          <output className="validating"><span className="pulse" aria-hidden="true" />Validando con Identity Hub…</output>
+        ) : (
+          <>
+            <p className="muted">Inicia sesión con tu cuenta de Identity Hub. Esta aplicación no tiene usuarios propios.</p>
+            {state.kind === 'error' && (
+              <div className="error-box" role="alert"><WarningIcon /><p>{state.message}</p></div>
+            )}
+            <button className="primary-button wide" type="button" onClick={onContinue}>
+              {state.kind === 'error' ? 'Reintentar' : 'Continuar con Identity Hub'}
+            </button>
+          </>
+        )}
+      </section>
+    </main>
+  )
+}
+
+export function AccessDenied({ onLogout }: Readonly<{ onLogout: () => void }>) {
+  useEffect(() => { document.title = 'Sin acceso · Inventario' }, [])
+  return (
+    <main className="login-page">
+      <section className="login-card" aria-labelledby="denied-title">
+        <div className="brand-mark" aria-hidden="true">I</div>
+        <h1 id="denied-title">Sin acceso a Inventario</h1>
+        <p className="muted">Tu cuenta se autenticó, pero no tiene acceso a Inventario: pertenece a otra empresa o no tiene un rol de esta aplicación. Pide a un administrador que te lo asigne en Identity Hub.</p>
+        <a className="primary-button wide" href={HUB_ORIGIN}>Ir a Identity Hub</a>
+        <button className="secondary-button wide" type="button" onClick={onLogout}><LogoutIcon />Cerrar sesión</button>
+      </section>
+    </main>
+  )
+}

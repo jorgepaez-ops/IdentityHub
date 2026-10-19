@@ -18,7 +18,7 @@ declaración de buenas intenciones.
 | **RF-006** | Detección de reuso de refresh token | P0 | — | 1 | 5 | 1 | — | ✅ completo |
 | **RF-007** | Cierre de sesión | P0 | `logout` | 1 | 9 | 1 | — | ✅ completo |
 | **RF-008** | Perfil propio | P0 | `getCurrentUser`, `updateCurrentUser` | 2 | 7 | 2 | — | ✅ completo |
-| **RF-009** | Control de acceso por roles | P0 | — | 5 | 17 | 5 | — | ✅ completo |
+| **RF-009** | Control de acceso por roles | P0 | — | 6 | 17 | 5 | — | ✅ completo |
 | **RF-010** | Administración de usuarios | P0 | `listUsers`, `getUser`, `updateUser` | 3 | 13 | 3 | — | ✅ completo |
 | **RF-011** | Registro de auditoría | P0 | `listAuditLog` | 1 | 9 | 1 | — | ✅ completo |
 | **RF-012** | Notificaciones asíncronas | P0 | — | 1 | 25 | — | — | ✅ completo |
@@ -29,9 +29,9 @@ declaración de buenas intenciones.
 | **RF-017** | Bloqueo por fuerza bruta | P1 | — | 4 | 23 | 1 | — | ✅ completo |
 | **RF-018** | Claves de servicio | P2 | `listServiceKeys`, `createServiceKey`, `revokeServiceKey` | 5 | 29 | 5 | — | ✅ completo |
 | **RF-019** | Exportación del audit log | P2 | `exportAuditLog` | 2 | 13 | 2 | — | ✅ completo |
-| **RF-020** | Autorización de aplicaciones cliente | P1 | `authorizeClient`, `exchangeAuthorizationCode` | 13 | 34 | 8 | — | ✅ completo |
+| **RF-020** | Autorización de aplicaciones cliente | P1 | `authorizeClient`, `exchangeAuthorizationCode` | 15 | 34 | 8 | — | ✅ completo |
 | **RF-021** | Roles y permisos configurables por aplicación | P1 | `listApplications`, `listApplicationRoles`, `createApplicationRole`, `updateApplicationRole`, `deleteApplicationRole` | 9 | 31 | 6 | — | ✅ completo |
-| **RF-022** | Empresas y aislamiento de roles | P1 | `listMyApplications`, `listOrganizations` | 9 | 34 | 8 | — | ✅ completo |
+| **RF-022** | Empresas y aislamiento de roles | P1 | `listMyApplications`, `listOrganizations` | 12 | 34 | 11 | — | ✅ completo |
 | **RNF-001** | Contenerización total | P0 | — | 1 | — | — | `ci.yml#e2e`, `.github/actions/stack-up/action.yml` | ✅ completo |
 | **RNF-002** | Pipeline de ciclo completo | P0 | — | 1 | — | — | `ci.yml#secrets`, `ci.yml#sast`, `ci.yml#sca`, `ci.yml#image`, `ci.yml#dast` | ✅ completo |
 | **RNF-003** | Cero secretos en el repositorio | P0 | — | — | 10 | — | `ci.yml#secrets` | ✅ completo |
@@ -40,7 +40,7 @@ declaración de buenas intenciones.
 | **RNF-006** | Procedencia verificable | P0 | — | 1 | — | — | `release.yml#publish` | ✅ completo |
 | **RNF-007** | Observabilidad | P0 | — | — | 5 | 1 | — | ✅ completo |
 | **RNF-008** | Contenedores endurecidos | P0 | — | 1 | — | — | `docker-compose.yml#api`, `docker-compose.yml#worker`, `docker-compose.yml#web`, `backend/Dockerfile`, `frontend/Dockerfile`, `ci.yml#iac-scan`, `ci.yml#lint` | ✅ completo |
-| **RNF-009** | Cabeceras de seguridad | P0 | — | — | — | 6 | `ci.yml#dast` | ✅ completo |
+| **RNF-009** | Cabeceras de seguridad | P0 | — | — | — | 9 | `ci.yml#dast` | ✅ completo |
 | **RNF-010** | Latencia | P1 | — | 1 | — | — | `ci.yml#e2e`, `Makefile#load-test` | ✅ completo |
 | **RNF-011** | Los specs son la fuente de verdad | P0 | — | — | 5 | — | `ci.yml#spec-drift` | ✅ completo |
 | **RNF-012** | Logs sin datos sensibles | P0 | — | — | 5 | 1 | — | ✅ completo |
@@ -88,6 +88,7 @@ una sola fuente de evidencia.
   - control-de-acceso.feature — Añadir el rol admin al token no concede privilegios
   - control-de-acceso.feature — Un empleado sin rol de aplicación no accede a Contabilidad
   - control-de-acceso.feature — El rol base "user" no se puede quitar
+  - empresas.feature — El token de Inventario contiene solo roles de Inventario
 - **RF-010**
   - control-de-acceso.feature — Un administrador deshabilita una cuenta
   - control-de-acceso.feature — Un administrador no puede deshabilitarse a sí mismo
@@ -136,8 +137,10 @@ una sola fuente de evidencia.
   - autorizacion-oauth.feature — Un "continue" absoluto o externo no provoca una redirección abierta
   - control-de-acceso.feature — Un empleado sin rol de aplicación no accede a Contabilidad
   - empresas.feature — Un usuario de Contabilidad S.A. entra a Contabilidad
+  - empresas.feature — Un usuario de Empresa B entra a Inventario
   - empresas.feature — Un usuario de Empresa B que abre Contabilidad es rechazado
   - empresas.feature — Un usuario sin rol en una aplicación de su empresa es rechazado
+  - empresas.feature — El token de Inventario contiene solo roles de Inventario
 - **RF-021**
   - empresas.feature — La grilla de roles muestra solo las aplicaciones y roles de la empresa seleccionada
   - empresas.feature — Al asignar un rol solo se ofrecen roles de la empresa del usuario
@@ -155,9 +158,12 @@ una sola fuente de evidencia.
   - empresas.feature — Al asignar un rol solo se ofrecen roles de la empresa del usuario
   - empresas.feature — El backend rechaza asignar un rol de otra empresa
   - empresas.feature — Un usuario de Contabilidad S.A. entra a Contabilidad
+  - empresas.feature — Un usuario de Empresa B entra a Inventario
   - empresas.feature — Un usuario de Empresa B que abre Contabilidad es rechazado
   - empresas.feature — Un usuario sin rol en una aplicación de su empresa es rechazado
   - empresas.feature — Tras el login se listan solo las aplicaciones de la empresa del usuario
+  - empresas.feature — Con una sola aplicación el login lleva directamente a ella
+  - empresas.feature — El token de Inventario contiene solo roles de Inventario
 - **RNF-001**
   - requisitos-no-funcionales.feature — Cada servicio corre en su propio contenedor y todo arranca con un solo docker compose up
 - **RNF-002**

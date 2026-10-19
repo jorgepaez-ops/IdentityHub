@@ -192,7 +192,7 @@ services:
 
   web:
     build:
-      # T13: la imagen compila frontend/ y contabilidad/, así que el contexto es la raíz.
+      # T13: la imagen compila frontend/, contabilidad/ e inventario/, así que el contexto es la raíz.
       context: ..
       dockerfile: frontend/Dockerfile
       target: web

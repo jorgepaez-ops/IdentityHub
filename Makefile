@@ -11,6 +11,7 @@ COMPOSE_PROD := docker compose --env-file .env -f deploy/docker-compose.yml -f d
 PRINT_APP_URLS := printf '%s\n' '' \
 	'  Hub             http://identityhub.localhost:8080  (localhost:8080 también sirve el Hub)' \
 	'  Contabilidad    http://contabilidad.localhost:8080' \
+	'  Inventario      http://inventario.localhost:8080' \
 	'  API             http://localhost:8081/healthz' \
 	'  RabbitMQ        http://localhost:15672   (credentials from .env)' \
 	'  Mailpit         http://localhost:8025'
@@ -97,6 +98,7 @@ lint: ## Lint y comprobación de tipos
 	@if command -v golangci-lint >/dev/null 2>&1; then cd backend && golangci-lint run --timeout=5m; else echo "  (golangci-lint no instalado: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2)"; fi
 	cd frontend && npm run lint
 	cd contabilidad && npm run lint && npm run typecheck
+	cd inventario && npm run lint && npm run typecheck
 
 test: test-go test-front ## Todas las pruebas
 
@@ -108,9 +110,10 @@ test-integration: ## Pruebas de integración con PostgreSQL temporal (imprime la
 	cd backend && go test -race -tags=integration -coverprofile=coverage.out -covermode=atomic -coverpkg=./internal/... ./...
 	cd backend && go tool cover -func=coverage.out | tail -1
 
-test-front: ## Pruebas del frontend (consola del Hub y Contabilidad)
+test-front: ## Pruebas del frontend (consola del Hub, Contabilidad e Inventario)
 	cd frontend && npm run test
 	cd contabilidad && npm run test
+	cd inventario && npm run test
 
 # Límite por IP mientras corren las suites locales (e2e, scan-dast). E2E_LOGIN_IP_MAX_FAILURES
 # sigue funcionando como alias retrocompatible.
@@ -149,11 +152,12 @@ ZAP_IMAGE ?= ghcr.io/zaproxy/zaproxy:2.17.0
 ZAP_REPORTS := security/zap-reports
 ZAP_RUN = docker run --rm --add-host identityhub.localhost:host-gateway \
     --add-host contabilidad.localhost:host-gateway \
+    --add-host inventario.localhost:host-gateway \
     -v "$(CURDIR)/$(ZAP_REPORTS):/zap/wrk:rw" \
     -v "$(CURDIR)/.zap/rules.tsv:/zap/wrk/rules.tsv:ro" \
     -v "$(CURDIR)/specs/03-api/openapi.yaml:/zap/wrk/openapi.yaml:ro" $(ZAP_IMAGE)
 
-scan-dast: ## DAST con OWASP ZAP (baseline Hub y Contabilidad + API) contra el stack levantado; rompe con riesgo medio o más
+scan-dast: ## DAST con OWASP ZAP (baseline Hub, Contabilidad e Inventario + API) contra el stack levantado; rompe con riesgo medio o más
 	@# ZAP corre con -I: no decide él. scripts/zap-gate.py es el único punto de decisión.
 	@# El escaneo de API golpea /api/v1/auth/ desde una sola IP: se sube el límite por IP
 	@# (RF-017) mientras corre y se restaura al terminar, igual que en make e2e.
@@ -171,10 +175,12 @@ _scan-dast-run:
 	    -J hub.json -r hub.html && \
 	  $(ZAP_RUN) zap-baseline.py -t http://contabilidad.localhost:8080 -c rules.tsv -I \
 	    -J contabilidad.json -r contabilidad.html && \
+	  $(ZAP_RUN) zap-baseline.py -t http://inventario.localhost:8080 -c rules.tsv -I \
+	    -J inventario.json -r inventario.html && \
 	  $(ZAP_RUN) zap-api-scan.py -t openapi.yaml -f openapi -O http://identityhub.localhost:8081 \
 	    -I -J api.json -r api.html && \
 	  python3 scripts/zap-gate.py --rules .zap/rules.tsv \
-	    $(ZAP_REPORTS)/hub.json $(ZAP_REPORTS)/contabilidad.json $(ZAP_REPORTS)/api.json
+	    $(ZAP_REPORTS)/hub.json $(ZAP_REPORTS)/contabilidad.json $(ZAP_REPORTS)/inventario.json $(ZAP_REPORTS)/api.json
 
 spec-drift: ## Verifica sin red la matriz y escenarios Gherkin contra E2E
 	python3 scripts/traceability_test.py
@@ -218,6 +224,7 @@ scan-deps: ## govulncheck y npm audit (RNF-004)
 	@echo "── npm audit ─────────────────────────────────────────────"
 	cd frontend && npm audit --audit-level=high || true
 	cd contabilidad && npm audit --audit-level=high || true
+	cd inventario && npm audit --audit-level=high || true
 
 # Same Trivy as CI (trivy-action v0.36.0 defaults to v0.70.0), pinned by digest. baseline-scan.yml keeps
 # 0.56.2 on purpose so the before/after VULN evidence stays comparable with its historical runs.
