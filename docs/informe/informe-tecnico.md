@@ -16,7 +16,7 @@ entrega: 23 de octubre de 2026
 
 El enunciado del trabajo final deja claro que la aplicación es el vehículo y el pipeline DevSecOps es el producto evaluado. Para que el pipeline tenga algo que proteger de verdad, el equipo eligió construir **un proveedor de identidad (IdP)**: Identity Hub gestiona cuentas, autenticación, autorización y auditoría, y es comparable en alcance didáctico a un Entra ID pequeño. Un IdP concentra los riesgos que más importan a un curso de ciberseguridad: manejo de contraseñas, emisión y validación de tokens, control de acceso por roles, límites contra la fuerza bruta, auditoría inmutable y una cadena de suministro con dependencias criptográficas.
 
-La aplicación se completa con una **segunda aplicación cliente, Contabilidad**, que delega su inicio de sesión en el Hub mediante SSO (OAuth 2.0 Authorization Code con PKCE). Esa pareja permite demostrar, de punta a punta, un caso real: un administrador define un rol y sus permisos en el Hub, se lo asigna a un empleado, y Contabilidad lo respeta sin cambiar código ni redesplegar.
+La aplicación se completa con una **segunda aplicación cliente, Contabilidad**, que delega su inicio de sesión en el Hub mediante SSO (OAuth 2.0 Authorization Code con PKCE). Esa pareja permite demostrar, de punta a punta, un caso real: un administrador define un rol y sus permisos en el Hub, se lo asigna a un empleado, y Contabilidad lo respeta sin cambiar código ni redesplegar. Una tercera pieza, **Inventario**, aplicación mínima de una segunda empresa, demuestra el aislamiento por empresa ([ADR 0015](../../specs/adr/0015-empresas-y-aislamiento-de-roles.md)): cada aplicación y cada usuario pertenecen a una empresa, los roles no se mezclan y el Hub rechaza el acceso a una aplicación de otra empresa.
 
 La elección del lenguaje merece una nota. El backend está escrito en **Go** (API y worker) y no en Python o Node.js como sugería el enunciado. La decisión se documentó en el ADR 0001: Go reduce la superficie de las imágenes (binarios estáticos sobre bases mínimas), aporta criptografía en su biblioteca estándar y `govulncheck` con análisis de alcanzabilidad. El enunciado deja al equipo la libertad de elegir el stack siempre que se cumplan los requisitos de DevSecOps y de gestor de identidad, y las alternativas del material del curso eran sugerencias, no una restricción.
 
@@ -31,7 +31,7 @@ La elección del lenguaje merece una nota. El backend está escrito en **Go** (A
 
 ## Alcance y estado de la entrega
 
-Identity Hub incluye registro por invitación por correo, contraseñas con Argon2id, JWT firmados con Ed25519 y publicados por JWKS, refresh tokens rotativos, MFA obligatorio por código enviado al correo, roles, una grilla de roles y permisos por aplicación, auditoría append-only con exportación a CSV o JSON, claves de servicio para integraciones de máquina a máquina y SSO hacia Contabilidad. El worker entrega el correo por SMTP con STARTTLS obligatorio y autenticación. Quedan fuera por decisión documentada: federación con proveedores externos, multi-tenancy efectivo, alta disponibilidad, TOTP y WebAuthn. El objetivo de despliegue es un único host con Docker Compose; la nube es una arquitectura de referencia.
+Identity Hub incluye registro por invitación por correo, contraseñas con Argon2id, JWT firmados con Ed25519 y publicados por JWKS, refresh tokens rotativos, MFA obligatorio por código enviado al correo, roles, una grilla de roles y permisos por aplicación, auditoría append-only con exportación a CSV o JSON, claves de servicio para integraciones de máquina a máquina y SSO hacia Contabilidad e Inventario con aislamiento por empresa. El worker entrega el correo por SMTP con STARTTLS obligatorio y autenticación. Quedan fuera por decisión documentada: federación con proveedores externos, multi-tenancy efectivo, alta disponibilidad, TOTP y WebAuthn. El objetivo de despliegue es un único host con Docker Compose; la nube es una arquitectura de referencia.
 
 A la fecha de entrega están completas las semanas 1 a 4 y el cierre de la entrega. La semana 4 incluyó la publicación de las imágenes en Docker Hub con SBOM y firma Cosign mediante el workflow `release.yml` (validado primero con el tag `v0.9.0`). Entre el 12 y el 13 de octubre se fusionaron en `main` los PR 32 a 41 y el PR 43, que cerraron las funciones que habían quedado diferidas y endurecieron la entrega: exportación del audit log (RF-019), claves de servicio (RF-018), SMTP autenticado con STARTTLS y hosts configurables, detección en ejecución con Falco, una columna de controles de CI en la matriz de trazabilidad, un badge de cobertura con el valor medido, el orden de publicación del release (`latest` solo después de firmar y atestar), la reclasificación de VULN-028 y un filtro que evita correr el pipeline completo en cambios solo de documentación. La matriz de trazabilidad queda con 33 requisitos, los 33 completos (0 parciales, 0 sin cubrir y 0 diferidos): RNF-010 (latencia) tiene una prueba de carga y los siete requisitos que tenían una sola fuente de evidencia recibieron una segunda, real. El release se revalidó con el tag `v0.9.1`, que ya publica con el orden definitivo. El tag de entrega es `v1.0.0`: el workflow de release publica cada tag `vX.Y.Z`, de modo que el resultado no depende de que ese tag ya exista al leer este informe. Lo que todavía no existe se declara en las secciones de limitaciones y trabajo futuro.
 
@@ -47,7 +47,7 @@ Identity Hub es un conjunto de contenedores orquestados por Docker Compose. La t
 
 | Componente | Responsabilidad |
 |---|---|
-| web | Nginx que sirve las dos SPA (Hub y Contabilidad), aplica cabeceras de seguridad y el límite de peticiones de autenticación, y hace de proxy hacia la API. |
+| web | Nginx que sirve las tres SPA (Hub, Contabilidad e Inventario), aplica cabeceras de seguridad y el límite de peticiones de autenticación, y hace de proxy hacia la API. |
 | api | API HTTP en Go: autenticación, autorización, dominio, persistencia y publicación de eventos. |
 | worker | Proceso asíncrono en Go que consume eventos y entrega notificaciones por SMTP con STARTTLS y autenticación; publica métricas y salud. |
 | PostgreSQL 16 | Usuarios, sesiones, roles, permisos y auditoría; la aplicación usa un rol de mínimo privilegio sin permiso de `UPDATE`/`DELETE` sobre la auditoría. |
@@ -302,23 +302,23 @@ El modelado de amenazas con Threat Dragon y STRIDE se describe en la sección an
 
 **Secretos (job 3).** Gitleaks corre sobre el **historial completo** (`fetch-depth: 0`), porque un secreto borrado en el último commit sigue siendo válido en el historial. Se usa una configuración propia (`.gitleaks.toml`) con reglas adicionales: la regla por defecto dejó pasar la mayoría de los secretos sembrados (VULN-023) y se añadieron reglas para contraseñas en variables de entorno o YAML y para URLs de conexión con credenciales.
 
-{{code:yaml:.github/workflows/ci.yml:242-256}}
+{{code:yaml:.github/workflows/ci.yml:256-270}}
 
 **Lint y tipos (job 2).** `golangci-lint` v2.13.2 incluye **gosec**, que detecta patrones inseguros en Go; ESLint y la comprobación de tipos corren sobre el Hub y Contabilidad, y Hadolint analiza los Dockerfiles con `failure-threshold: warning`.
 
 **SAST (jobs 4 y 4b).** CodeQL con las consultas `security-extended` analiza Go y JavaScript/TypeScript y publica sus resultados como SARIF. Semgrep 1.86.0 usa los conjuntos `p/owasp-top-ten`, `p/golang` y `p/react`, publica un SARIF y, en un segundo paso, rompe la build con severidad `ERROR`. El enunciado menciona Bandit para Python; como el backend es Go, los equivalentes son gosec, CodeQL y govulncheck, y Semgrep se mantiene como herramienta común.
 
-{{code:yaml:.github/workflows/ci.yml:290-314}}
+{{code:yaml:.github/workflows/ci.yml:304-328}}
 
 **Dependencias (job 5).** `govulncheck` analiza **alcanzabilidad**: solo informa de vulnerabilidades cuyo código es realmente invocable, lo que elimina casi todo el ruido frente a un escáner que solo lee `go.mod`. `npm audit --audit-level=high` cubre el Hub y Contabilidad, y osv-scanner v2.6.0 (`--recursive --all-vulns`) recorre todos los manifiestos, marcando como no invocado lo que el análisis de llamadas descarta.
 
-{{code:yaml:.github/workflows/ci.yml:357-377}}
+{{code:yaml:.github/workflows/ci.yml:377-397}}
 
 ## Fase 3: Integración (build)
 
 **Imágenes (jobs 9-10).** Una matriz construye las tres imágenes (`api`, `worker` y `web`) con Buildx y caché de GitHub Actions, y las escanea con Trivy en dos pasos: primero un informe SARIF que se sube siempre a Code Scanning y luego el gate, que rompe la build ante CVE de severidad `HIGH` o `CRITICAL` **con parche disponible** (`ignore-unfixed: true`). La política es deliberada: bloquear por un CVE sin arreglo no protege de nada y entrena al equipo a ignorar el rojo. Las excepciones se registrarían en `security/.trivyignore`, que se mantiene vacío a propósito: toda excepción exige CVE, justificación, responsable, expiración y ficha asociada.
 
-{{code:yaml:.github/workflows/ci.yml:729-740}}
+{{code:yaml:.github/workflows/ci.yml:755-766}}
 
 **Configuración (job 8).** Trivy config analiza Dockerfiles y demás configuración con el mismo patrón de dos pasos (SARIF y gate en `HIGH,CRITICAL`).
 
@@ -328,7 +328,7 @@ El modelado de amenazas con Threat Dragon y STRIDE se describe en la sección an
 
 **Unitarias e integración (jobs 6 y 6b).** `go test -race` y las pruebas de Vitest del frontend y de Contabilidad. El job 6b ejecuta las pruebas con la etiqueta `integration` contra un PostgreSQL real (imagen fijada por digest) y aplica un **gate de cobertura del 70 %** sobre `./internal/...`. Al cierre son 550 pruebas unitarias y 631 de integración en Go, 264 en el frontend y 148 en Contabilidad.
 
-{{code:yaml:.github/workflows/ci.yml:464-481}}
+{{code:yaml:.github/workflows/ci.yml:490-507}}
 
 **Badge de cobertura (job 6c).** El README muestra el porcentaje que mide el job 6b, no un valor fijo. El job 6c corre solo en `push` a `main`, es el único con `contents: write` y publica un `coverage.json` en la rama huérfana `badges`, de donde lo lee el badge sin depender de un servicio externo. Distingue una rama inexistente (`git ls-remote --exit-code` devuelve 2) de un fallo de red, que se reintenta, y lleva `continue-on-error` para que un problema al publicar el badge no ponga `main` en rojo, porque el gate real es el 6b. Tras el merge se verificó `badges/coverage.json` con 78,4 %.
 
@@ -346,9 +346,9 @@ El modelado de amenazas con Threat Dragon y STRIDE se describe en la sección an
 
 El umbral de 300 ms deja un margen de dos órdenes de magnitud respecto de lo medido; sigue siendo un gate de regresión, no una afirmación de capacidad (es una sola máquina, sin red real).
 
-**DAST (job 11).** OWASP ZAP 2.17.0 corre en tres escaneos: *baseline* del Hub, *baseline* de Contabilidad y escaneo de API a partir del contrato OpenAPI, todos contra el stack levantado. ZAP se ejecuta con `-I` (no decide él); el único punto de decisión es `scripts/zap-gate.py`, que rompe la build ante alertas de riesgo medio o alto, salvo una entrada `IGNORE` justificada en `.zap/rules.tsv`. Los informes JSON y HTML se suben como artefacto aunque el job falle.
+**DAST (job 11).** OWASP ZAP 2.17.0 corre en cuatro escaneos: *baseline* del Hub, *baseline* de Contabilidad, *baseline* de Inventario y escaneo de API a partir del contrato OpenAPI, todos contra el stack levantado. ZAP se ejecuta con `-I` (no decide él); el único punto de decisión es `scripts/zap-gate.py`, que rompe la build ante alertas de riesgo medio o alto, salvo una entrada `IGNORE` justificada en `.zap/rules.tsv`. Los informes JSON y HTML se suben como artefacto aunque el job falle.
 
-{{code:yaml:.github/workflows/ci.yml:742-782}}
+{{code:yaml:.github/workflows/ci.yml:768-808}}
 
 **Evidencia de los requisitos no funcionales.** La matriz de trazabilidad (`specs/07-traceability.md`) da por cubierto un requisito cuando tiene al menos dos de cuatro fuentes de evidencia (escenarios, pruebas de Go, pruebas E2E, controles de CI). Los siete requisitos que antes solo tenían una fuente, más RNF-010, se respaldan con las pruebas de la tabla. Los escenarios `@RNF-NNN` no se derivan en un spec de Playwright: cada uno nombra en un comentario `# Verificación:` la prueba que lo ejecuta, y `scripts/traceability.py` comprueba por máquina que el archivo, la clase, el job, el paso o el objetivo `make` citados existen (`make spec-drift`, job 1).
 
@@ -637,8 +637,8 @@ Falco, que el enunciado menciona para la detección de comportamiento anómalo e
 ## Limitaciones
 
 - **Falco solo en el perfil local de observabilidad:** no corre en CI y requiere un kernel Linux con BTF; la DLQ (AM-019) y Falco tienen alerta y runbook.
-- **La nube es solo una referencia:** el Terraform no se aplica. El worker ya autentica por SMTP con STARTTLS, y el cliente OAuth y sus URL se configuran por variables, pero siguen fijos el `server_name` de Nginx, las constantes de Contabilidad y la fila del cliente en la base de datos. Un `.env` anterior a F2 necesita `SMTP_PASSWORD` y ejecutar `make certs`.
-- **Un solo cliente OAuth y sin OpenID Connect:** la guía de integración de terceros enumera lo que falta (registro dinámico, refresh tokens para aplicaciones, cierre de sesión único, revocación).
+- **La nube es solo una referencia:** el Terraform no se aplica. El worker ya autentica por SMTP con STARTTLS, y los clientes OAuth ya no se configuran por variables sino que se leen de la tabla `applications` al arrancar, pero siguen fijos el `server_name` de Nginx, las constantes de compilación de Contabilidad e Inventario y las filas de esos clientes en la base de datos. Un `.env` anterior a F2 necesita `SMTP_PASSWORD` y ejecutar `make certs`.
+- **Clientes OAuth por migración y sin OpenID Connect:** los clientes viven en la base de datos, pero se registran con una migración y la API los lee al arrancar; empresas y aplicaciones tampoco se crean desde la consola, el administrador es global y la auditoría es única. La guía de integración de terceros enumera lo que falta (alta desde la consola, refresh tokens para aplicaciones, cierre de sesión único, revocación).
 - **Sin outbox transaccional** (ADR 0006): la publicación al broker usa *publisher confirms*, pero no hay garantía transaccional conjunta entre la base de datos y el broker; el outbox es trabajo futuro deliberado.
 - **Sin riesgo aceptado vigente:** VULN-028 (GO-2026-5932) se reclasificó el 2026-10-12 como no afectado; solo se reabriría si algún paquete empezara a importar `x/crypto/openpgp`.
 - **Cobertura de la matriz de trazabilidad:** los 33 requisitos tienen al menos dos fuentes de evidencia; «completo» no significa verificación exhaustiva. RNF-006 verifica la firma al publicar, antes de mover `latest`, pero no al desplegar (la producción simulada no la comprueba al arrancar); RNF-008 comprueba el endurecimiento solo de `api`, `worker` y `web`, no de las imágenes de terceros (base de datos, broker, observabilidad); RNF-002 cubre las etapas hasta la publicación y el DAST, sin un despliegue automatizado.
@@ -669,7 +669,7 @@ La revisión final encontró tres diferencias entre lo que decía la especificac
 
 ## Trabajo futuro
 
-1. (F5) Evolucionar la integración de terceros: clientes OAuth en base de datos, OpenID Connect, refresh tokens por cliente, introspección y revocación; y reemplazar la publicación directa por un **outbox transaccional**.
+1. (F5) Evolucionar la integración de terceros: alta de clientes y empresas desde la consola, OpenID Connect, refresh tokens por cliente, introspección y revocación; y reemplazar la publicación directa por un **outbox transaccional**.
 2. Ampliar los alcances de las claves de servicio más allá de la lectura del audit log.
 
 # Anexo A — Puesta en marcha y operación
@@ -707,6 +707,7 @@ make ps                   # 3. estado de los contenedores
 |---|---|
 | Hub (consola y cuenta) | `http://identityhub.localhost:8080` (`http://localhost:8080` también sirve el Hub) |
 | Contabilidad (aplicación cliente con SSO) | `http://contabilidad.localhost:8080` |
+| Inventario (aplicación cliente con SSO de la segunda empresa) | `http://inventario.localhost:8080` |
 | API (salud) | `http://localhost:8081/healthz`; disponibilidad de dependencias en `http://localhost:8081/readyz` |
 | Métricas del worker | `http://localhost:9091/metrics` |
 | Mailpit (buzón de pruebas) | `http://localhost:8025` |
@@ -736,7 +737,7 @@ Los dominios `*.localhost` se resuelven a `127.0.0.1` en los navegadores moderno
 | `make capturas` | Regenera las 48 capturas del manual de usuario contra el stack levantado |
 | `make scan` | Todos los gates de seguridad en local (`scan-secrets`, `scan-deps`, `scan-config`, `scan-iac`, `scan-image`) |
 | `make load-test` | Prueba de carga de latencia con k6 (RNF-010) contra el stack levantado (con el límite por IP elevado, como `make e2e`); falla si el p95 supera 300 ms |
-| `make scan-dast` | OWASP ZAP (baseline del Hub y de Contabilidad, y API) contra el stack levantado; informes en `security/zap-reports/` |
+| `make scan-dast` | OWASP ZAP (baseline del Hub, de Contabilidad y de Inventario, y API) contra el stack levantado; informes en `security/zap-reports/` |
 | `make spec-drift` | Verifica sin red la matriz de trazabilidad, los escenarios Gherkin contra E2E y los requisitos no funcionales de los contenedores y el pipeline, además de las pruebas de `scripts/` (clasificador del job 0, puertos en loopback, script de carga) |
 | `make gen` | Regenera todo lo derivado de los specs (Go desde OpenAPI, `sqlc`, tipos TypeScript, trazabilidad) |
 | `make lint`, `make fmt` | Lint y tipos; formato de Go |
@@ -754,7 +755,6 @@ Todas se definen en `.env` (nunca en Git). Solo se enumeran los nombres y su uso
 | RabbitMQ | `RABBITMQ_DEFAULT_USER`, `RABBITMQ_DEFAULT_PASS`, `RABBITMQ_URL` |
 | API y JWT | `API_PORT`, `LOG_LEVEL`, `JWT_SIGNING_KEY`, `JWT_ISSUER`, `TRUSTED_PROXIES`, `JWT_ACCESS_TTL`, `JWT_REFRESH_TTL` |
 | Correo (SMTP) | `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM`, `SMTP_TLS`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_CA_FILE` |
-| Cliente OAuth (opcionales) | `OAUTH_CLIENT_ID`, `OAUTH_REDIRECT_URI`, `OAUTH_CLIENT_ORIGIN` |
 | Observabilidad | `GRAFANA_ADMIN_USER`, `GRAFANA_ADMIN_PASSWORD` |
 | Arranque inicial | `BOOTSTRAP_ADMIN_EMAIL` |
 

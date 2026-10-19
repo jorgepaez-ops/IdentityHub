@@ -75,8 +75,8 @@ aplicaciones desde la consola (se declaran por migración, como hoy Contabilidad
   rechazo en `/oauth/authorize` por empresa o sin rol; pruebas.
 - [x] **R4. Administración y enrutamiento.** API: empresa del usuario, roles asignables, aplicaciones del
   usuario; consola: alta con empresa, `UserDrawer` filtrado, menú dinámico y redirección tras el login.
-- [ ] **R5. Inventario.** App mínima, Nginx, build en `web`, compose, E2E del cruce entre empresas.
-- [ ] **R6. Documentación y cierre.** Guía de integración, manual de usuario, README, matriz; checks completos.
+- [x] **R5. Inventario.** App mínima, Nginx, build en `web`, compose, E2E del cruce entre empresas.
+- [x] **R6. Documentación y cierre.** Guía de integración, manual de usuario, README, matriz; checks completos.
 
 ## Criterios de aceptación
 
@@ -253,8 +253,111 @@ ramas locales y se suben después.
   aplicaciones de la propia empresa con rol del usuario. Pedido y verificado el orden 401/403 antes que 400.
   Comportamiento aceptado: un usuario con una sola aplicación va directo a ella y solo ve la lista si vuelve
   al Hub.
+- 2026-10-19 (R5, escrito por el ejecutor, sin marcar; revisión y commit del orquestador):
+  - `inventario/`: SPA mínima (React 18 + Vite + Vitest, mismas dependencias que Contabilidad menos Fraunces) con login OAuth
+    Authorization Code + PKCE (`client_id` `inventario`), verificación EdDSA del token contra el JWKS (copiados de Contabilidad:
+    `auth/`, `colorScheme`, `AppearanceProvider`), cabecera con usuario y empresa (la empresa es constante en `config.ts` porque el
+    token no trae claim de empresa), «Catálogo» (`productos.ver`; editar con `productos.editar`) y «Movimientos»
+    (`movimientos.registrar`; una salida no baja de cero), datos de ejemplo en memoria rotulados como tales. Pantalla «Sin acceso a
+    Inventario» si el Hub devuelve `error=access_denied` (sin pedir token ni JWKS) o si el token no trae rol `inventario.*` con al
+    menos un permiso de Inventario. Acento verde azulado, distinto del ámbar de Contabilidad. Vitest: 59 pruebas (flujo PKCE,
+    `access_denied`, token sin permisos, pantallas por permiso, ejemplo en memoria, tema).
+  - Servicio: bloque `inventario.localhost` en `frontend/nginx/default.conf` con las mismas cabeceras y CSP que Contabilidad; etapa
+    `inventario-builder` (mismo digest de Node) y `COPY` a `/usr/share/nginx/inventario` en `frontend/Dockerfile`. Compose no
+    necesitó cambios (los `*.localhost` resuelven solos; solo se actualizó un comentario).
+  - Makefile (`lint`, `test-front`, `scan-deps`, `scan-dast` con baseline de Inventario y `--add-host`, URLs impresas) y `ci.yml`
+    (caché npm, `npm ci`, ESLint, tipos, `npm audit` y Vitest de Inventario) extendidos igual que Contabilidad. `dependabot.yml` no
+    tiene entradas npm (ni para el Hub ni Contabilidad), así que no se tocó.
+  - Spec y E2E: `empresas.feature` recupera los 3 escenarios aparcados sin cambiar su redacción (11 en total); tres pruebas nuevas
+    en `e2e/tests/empresas.spec.ts` (`RF-022 …`), tres de seguridad HTTP de `inventario.localhost` en `nginx.spec.ts`;
+    `python3 scripts/traceability.py` regeneró `specs/07-traceability.md` y `--check` queda al día.
+  - Verificación: Inventario `npm ci`, lint, typecheck, Vitest 59/59, build y `npm audit` (0 vulnerabilidades); `make test-front`
+    verde (Hub 285, Contabilidad 150, Inventario 59); `pipeline_controls_test.py` (13), `traceability_test.py` (31) y los demás
+    `scripts/*_test.py` verdes salvo `informe_excerpts_test.py`; `docker build --target web` y Trivy 0.70.0 (HIGH/CRITICAL,
+    `--ignore-unfixed`) con 0 hallazgos; `make up-app` + `make e2e` completo 77/77 (incluye las 6 pruebas nuevas, `empresas`,
+    `autorizacion-oauth` y `control-de-acceso`); `make down` al terminar.
+  - Pendiente (fuera de las superficies permitidas): `scripts/informe_excerpts_test.py` falla porque las líneas añadidas a `ci.yml`
+    desplazan los extractos `{{code:yaml:.github/workflows/ci.yml:A-B}}` de `docs/informe/informe-tecnico.md`; los rangos nuevos son
+    242-256 a 256-270, 290-314 a 304-328, 357-377 a 377-397, 464-481 a 490-507, 729-740 a 755-766 y 742-782 a 768-808. También falta
+    añadir `inventario.localhost` a `/etc/hosts` en `.github/actions/stack-up/action.yml` (línea 47) y su espera (línea 65), y
+    actualizar el comentario de `frontend/Dockerfile.dockerignore` («solo necesita frontend/ y contabilidad/»; inventario/ ya entra
+    al contexto).
+- 2026-10-19, revisión de R5 (sesión principal): completado fuera de las superficies del writer:
+  `.github/actions/stack-up/action.yml` registra `inventario.localhost` en `/etc/hosts` y espera su respuesta
+  (sin esto la E2E de Inventario fallaría en CI); `frontend/Dockerfile.dockerignore` (comentario); rangos de
+  `ci.yml` citados en `docs/informe/informe-tecnico.md` desplazados, con contenido verificado idéntico salvo el
+  comentario del DAST, que ahora menciona Inventario. Comprobado que `make scan-dast` escanea Inventario de
+  verdad (baseline propio, `--add-host inventario.localhost`, informe en el gate). DAST no corrido en local:
+  lo corre CI.
+- 2026-10-19, revisiones nativas de R4 y R5 (todas aprobadas). R4 completo (2481 líneas) excedía el
+  presupuesto de contexto: se revisó en dos cortes armados solo para la revisión con `git commit-tree` en un
+  worktree aparte, sin reescribir la rama (backend 1375 líneas, 4 lentes; consola y E2E 1106 líneas). R5 se
+  revisó solo (4 lentes). Avisos no bloqueantes para R6:
+  - R4 backend: motivo de auditoría duplicado en `employee.go`; tres avisos de robustez en
+    `organizations.go` y `admin_users.go`. El aviso «el listado por empresa descarta filtros» no se
+    confirma: `ListOrganizationUsers` aplica búsqueda, estado y cursor igual que `ListAdminUsers`.
+  - R4 consola: `e2e/tests/empresas.spec.ts:81-88` (confiabilidad de la prueba).
+  - R5: auth duplicada entre Contabilidad e Inventario (decisión consciente); párrafo desactualizado en
+    `docs/informe/informe-tecnico.md:351`; en el login de Inventario (y probablemente Contabilidad, de donde
+    se copió): `fetch` del callback sin timeout, estado «validando» que puede quedar trabado y control de
+    reloj sin prueba.
+- 2026-10-19 (R6, escrito por el ejecutor, sin marcar; revisión y commit del orquestador):
+  - Docs: variables `OAUTH_*` retiradas de `docs/guia-desarrollo.md`, `docs/manuales/despliegue-y-operacion.md`, informe, README de Terraform,
+    `docs/diagramas/uml/despliegue-aws.md` y README; nota fechada en el ADR 0012 y en `docs/BITACORA.md` (historia conservada). La guía de
+    integración pasa al modelo multicliente (secciones 2.1, 2.3, 3.3, 9, 9.1, 10, más «Empresas» y «Segundo ejemplo: Inventario»); manual de
+    usuario con selector de empresa, alta con empresa, rechazo entre empresas, lanzador y sección 4.9 (Inventario); arquitectura, seguridad,
+    informe (párrafo de DAST con cuatro escaneos, límites de cliente por migración), README, `docs/README.md` e `inventario/README.md`.
+  - Pendiente por permisos: `.env.example` (líneas 51-54, comentarios `OAUTH_*`) no se pudo editar (el entorno deniega el acceso al archivo).
+    Sustituir por: «los clientes salen de la tabla applications; ver docs/manuales/integracion-terceros.md».
+  - Pendiente: `specs/adr/0010-...md:44` menciona al profesor (fuera de las superficies permitidas). Capturas desactualizadas (no se corrió
+    `make capturas`): administrador-01, 02, 04, 05, 06, 07 a 16, 19 y 22 (falta el selector de Empresa; 02 también el campo Empresa),
+    contabilidad-14 (texto de «Sin acceso») y empleado-09/10 si el usuario tiene aplicaciones (falta «Aplicaciones conectadas»).
+  - Código: Contabilidad dice «pertenece a otra empresa o no tiene un rol» (prueba actualizada, RED/GREEN); `oauth_test.go` prueba ahora un
+    `redirect_uri` ajeno único (400, sin redirección ni auditoría) y el repetido por separado; Contabilidad e Inventario: `FETCH_TIMEOUT_MS`
+    (10 s, `AbortController`, cubre también el cuerpo) en canje y JWKS, y «validando» siempre termina en error (fallo de `beginLogin` y cualquier
+    rechazo del manejador), con pruebas de timeout, de fallo y de la guarda de reloj (límite derivado de `CLOCK_LEEWAY_SECONDS`);
+    `employee.go` reutiliza `admin.ReasonOrganizationMismatch`; `empresas.spec.ts` usa `expect.poll` en el listado de usuarios.
+  - Verificación: Vitest Contabilidad 157/157 e Inventario 66/66, lint y typecheck limpios; `go test` api y employee, `golangci-lint` (ambos
+    tags) sin hallazgos; `informe_excerpts_test.py` OK; `traceability.py --check` al día; enlaces de los .md tocados: 0 rotos;
+    `make up-app` + `empresas.spec.ts` 11/11; `make down`.
+- 2026-10-19, cierre de R6 (sesión principal): R6 commiteado (`27dbc63`); `main` (#57 a #61) integrado en la
+  rama (`bc634ca`), con los README reconstruidos sobre la versión de `main` más Inventario y empresas, y dos
+  términos nuevos en el glosario. Revisiones nativas aprobadas: R6 solo y el merge por separado (juntos
+  excedían el presupuesto). Corregidos después: rango de ADR en `docs/README.md`, nota del alcance del token
+  de Docker Hub, próximo paso viejo en `documentacion-lector-externo.md` (`da6a043`). Pendientes menores:
+  `.env.example` líneas 51-54 (comentarios `OAUTH_*`; el entorno niega acceso a ese archivo, lo edita el
+  usuario); pruebas del camino de error de `restartLogin` en `App.tsx` de Contabilidad e Inventario (aviso
+  de revisión); base de datos local del stack con la versión anterior del trigger de 000011.
+- 2026-10-19 (R7, reescritura de `inventario/src/`; escrito por el ejecutor, sin marcar; revisión y commit del orquestador):
+  - Motivo: SonarCloud marcó el PR #63 con 47,8 % de líneas duplicadas en código nuevo (umbral 3 %) porque `inventario/src/**` se había
+    construido copiando `contabilidad/src/**`. Criterio ya aplicado a Contabilidad el 2026-10-06: cada aplicación de terceros es una empresa
+    independiente y su código se escribe desde cero; solo el protocolo y el comportamiento son equivalentes. Sin paquete compartido, sin
+    exclusiones de Sonar y sin bajar el umbral. Esto reemplaza la nota de R5 «auth duplicada (decisión consciente)».
+  - Cómo: se descartó todo `src/` y se reescribió desde el comportamiento (pruebas previas, README, esta ficha, la guía de integración y las
+    pruebas E2E), sin abrir `contabilidad/src` ni `frontend/src`. Arquitectura propia: `oauth/` (cliente de login con PKCE S256, verificador de
+    token EdDSA con WebCrypto y base64url), `session.ts` (hook con reducer de fases), `permissions.ts`, `warehouse/ledger.ts` (datos de
+    ejemplo y regla de stock no negativo), `screens/` (Gate, Workspace con pestañas, CatalogPanel, MovementsPanel), CSS propio con nombres BEM.
+    Sin iconos, sin fuentes de terceros (se retiraron `@fontsource/*` y su entrada del lock) y sin selector de tema (el esquema claro/oscuro
+    sigue al sistema operativo con `prefers-color-scheme`). Configuración (`vite.config.ts`, `tsconfig.json`, `.eslintrc.cjs`, `index.html`,
+    `package.json`) reescrita con estructura propia; los scripts `lint`, `typecheck`, `test` y `build` no cambian.
+  - Comportamiento conservado: client_id `inventario`, redirect `http://inventario.localhost:8080/oauth/callback`, PKCE S256, estado de un
+    solo uso, firma contra el JWKS, `iss`, `aud`, `exp`/`nbf` con holgura de 60 s, solo EdDSA, plazo de 10 s por petición (cuerpo incluido),
+    «validando» siempre termina, `access_denied` sin pedir token ni JWKS, sin permisos de Inventario = sin acceso, pantallas por permiso,
+    stock sin negativos, datos de ejemplo rotulados, cabecera con usuario y «Empresa B». Cambio de estructura visible: la navegación
+    «Secciones» pasa de barra lateral a pestañas (mismo rol y nombres); los selectores de `empresas.spec.ts` y `nginx.spec.ts` no cambiaron.
+  - Verificación: Vitest 74/74 (antes 66), lint y typecheck limpios, `npm ci`, build y `npm audit` (0 vulnerabilidades);
+    `npx jscpd@4.0.5 --min-lines 5 inventario/src contabilidad/src frontend/src`: 0 clones que involucren a Inventario (antes: la mayoría de
+    sus archivos); `make e2e` completo 77/77 (incluye `empresas.spec.ts` y `nginx.spec.ts`); `scripts/traceability.py --check` al día.
+  - Pendiente: confirmar en SonarCloud tras el push que la duplicación en código nuevo baja del 3 %.
+  - Avisos de la revisión nativa corregidos (2026-10-19, ejecutor; sin marcar, el orquestador revisa y commitea): (1) tras el callback,
+    éxito o fallo, la URL se reemplaza por la raíz con `history.replaceState` (el `code` no queda en la barra ni en el historial y una
+    recarga entra por el flujo normal); (2) un `sub` vacío o en blanco se rechaza como `claims`; (3) pruebas directas de `session.ts`
+    (`session.test.tsx`: reducer, fases, StrictMode, reloj, cierre de sesión, vencimiento: al vencer el token se vuelve a pedir al Hub con
+    `checking` y se descarta el token); (4) la fecha del movimiento usa el día local (`warehouse/day.ts`; Vitest corre con `TZ=America/Bogota`
+    desde `vite.config.ts` para que la diferencia con UTC sea observable); (5) `hubLogin.test.ts` documenta qué hace `FakeHub`.
+    Para no duplicar el montaje de pruebas se añadió `testkit/hubEnvironment.ts`. RED observado antes de cada arreglo (6 fallos); luego
+    Vitest 97/97 (antes 74), lint, typecheck y build limpios, jscpd 0 clones con Inventario, `make e2e` 77/77.
 
 ## Próximo paso
 
-R5 (Inventario: app mínima, Nginx, build en `web`, E2E de los escenarios de Inventario) y R6 (documentación
-y cierre).
+PRs encadenados a `main` (pendiente de confirmación del usuario).

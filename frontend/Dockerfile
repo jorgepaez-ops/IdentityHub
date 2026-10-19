@@ -6,8 +6,9 @@
 # ╚══════════════════════════════════════════════════════════════════════════╝
 
 # T13 — el contexto de construcción es la raíz del repositorio (no `frontend/`):
-# la imagen compila las dos SPA, la consola del Hub (frontend/) y Contabilidad
-# (contabilidad/), y sirve cada una desde su propio `server` de Nginx.
+# la imagen compila las tres SPA, la consola del Hub (frontend/), Contabilidad
+# (contabilidad/) e Inventario (inventario/), y sirve cada una desde su propio
+# `server` de Nginx.
 
 # node:24-bookworm — Node 24, LTS activa (desde octubre de 2025).
 FROM node@sha256:64af3819f9275802414d7cdc38c27e9d82bd564dec4d4da87d008255d36c63b4 AS builder
@@ -36,6 +37,18 @@ RUN npm ci --ignore-scripts
 COPY contabilidad/ ./
 RUN npm run build
 
+# ── Inventario (R5) ───────────────────────────────────────────────────────
+# Mismo Node fijado por digest que los otros builders.
+FROM node@sha256:64af3819f9275802414d7cdc38c27e9d82bd564dec4d4da87d008255d36c63b4 AS inventario-builder
+
+WORKDIR /app
+
+COPY inventario/package.json inventario/package-lock.json* ./
+RUN npm ci --ignore-scripts
+
+COPY inventario/ ./
+RUN npm run build
+
 # ── Imagen final ──────────────────────────────────────────────────────────
 # nginxinc/nginx-unprivileged:stable-alpine — corre como uid 101 por defecto y ya
 # escucha en el puerto 8080 que usa este proyecto, sin cambiar nada más.
@@ -45,6 +58,7 @@ COPY frontend/nginx/default.conf /etc/nginx/conf.d/default.conf
 COPY frontend/nginx/security-headers.conf /etc/nginx/security-headers.conf
 COPY --from=builder /app/dist /usr/share/nginx/html
 COPY --from=contabilidad-builder /app/dist /usr/share/nginx/contabilidad
+COPY --from=inventario-builder /app/dist /usr/share/nginx/inventario
 
 # P9d (2026-10-06): este digest de stable-alpine ya trae pcre2 10.49, libpng 1.6.59 y
 # nghttp2 1.70; se retiró la capa "apk upgrade pcre2" (CVE-2026-103111) que parchaba la base anterior.

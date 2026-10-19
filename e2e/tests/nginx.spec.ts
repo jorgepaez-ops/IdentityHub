@@ -3,6 +3,7 @@ import { nginxAddress } from '../support/config'
 
 const hub = { host: 'identityhub.localhost', connect: "connect-src 'self';" }
 const contabilidad = { host: 'contabilidad.localhost', connect: "connect-src 'self' http://identityhub.localhost:8080;" }
+const inventario = { host: 'inventario.localhost', connect: "connect-src 'self' http://identityhub.localhost:8080;" }
 
 const staticHeaders = {
   'strict-transport-security': 'max-age=31536000; includeSubDomains',
@@ -62,6 +63,14 @@ test('RNF-009 contabilidad.localhost keeps the security headers on /assets/ file
   await expectAssetHeaders(contabilidad.host, contabilidad.connect)
 })
 
+test('RNF-009 inventario.localhost sends the five security headers on the SPA', async () => {
+  await expectSpaHeaders(inventario.host, inventario.connect)
+})
+
+test('RNF-009 inventario.localhost keeps the security headers on /assets/ files', async () => {
+  await expectAssetHeaders(inventario.host, inventario.connect)
+})
+
 test('RNF-009 the Hub proxies /oauth/ to the API instead of the SPA index', async () => {
   const ctx = await request.newContext({ baseURL: nginxAddress, extraHTTPHeaders: { Host: 'identityhub.localhost' } })
   // Without client_id/redirect_uri the API answers a 400 problem; the SPA would answer 200 HTML.
@@ -85,4 +94,18 @@ test('RNF-009 Contabilidad serves its own SPA, distinct from the Hub', async () 
   expect(contaIndex).not.toBe(hubIndex)
   await hubCtx.dispose()
   await contaCtx.dispose()
+})
+
+test('RNF-009 Inventario serves its own SPA, distinct from the Hub and Contabilidad', async () => {
+  const contaCtx = await request.newContext({ baseURL: nginxAddress, extraHTTPHeaders: { Host: contabilidad.host } })
+  const invCtx = await request.newContext({ baseURL: nginxAddress, extraHTTPHeaders: { Host: inventario.host } })
+  const contaIndex = await (await contaCtx.get('/')).text()
+  const invResponse = await invCtx.get('/oauth/callback')
+  const invIndex = await invResponse.text()
+  expect(invResponse.status()).toBe(200)
+  expect(invIndex).toContain('<div id="root"')
+  expect(invIndex).toContain('<title>Inventario</title>')
+  expect(invIndex).not.toBe(contaIndex)
+  await contaCtx.dispose()
+  await invCtx.dispose()
 })

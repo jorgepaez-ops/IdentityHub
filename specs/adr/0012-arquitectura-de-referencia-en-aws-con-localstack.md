@@ -92,3 +92,10 @@ Validación:
   Cada excepción se documenta con `skip` y su justificación, nunca con `soft_fail`.
 - **La arquitectura no se ejecuta de punta a punta** (D8): `validate` y Checkov prueban que el
   código es correcto y seguro de configurar, no que los servicios arranquen juntos en AWS.
+
+## Nota (2026-10-19)
+
+Las variables `OAUTH_CLIENT_ID`, `OAUTH_REDIRECT_URI` y `OAUTH_CLIENT_ORIGIN` citadas arriba (actualización
+del 2026-10-13) ya no existen: desde la ADR 0015 los clientes OAuth se leen de la tabla `applications` al
+arrancar la API. El resto de las brechas (`server_name` de Nginx y constantes de compilación de las
+aplicaciones) sigue vigente. Se conserva el texto original por ser el registro de lo que se decidió entonces.

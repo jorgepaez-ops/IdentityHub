@@ -130,11 +130,11 @@ quitar `deletion_protection` antes en una cuenta real).
 - **RabbitMQ autogestionado:** un solo nodo y sin disco persistente (decision D7); Amazon MQ no se
   usa porque LocalStack no lo soporta.
 - **Imagen de migrate:** debe incluir `db/migrations` (el compose las monta como volumen).
-- **Hosts fijos en la aplicacion:** el cliente OAuth ya se configura con `OAUTH_CLIENT_ID`,
-  `OAUTH_REDIRECT_URI` y `OAUTH_CLIENT_ORIGIN` (esta referencia no los define: usa los valores
-  locales). Siguen fijos Nginx (`server_name *.localhost` y la CSP de Contabilidad), las constantes
-  de compilacion de `contabilidad/src/config.ts` y la fila de `oauth_clients` (migracion 000007);
-  con dominios reales hay que cambiarlos en conjunto (ver `docs/manuales/despliegue-y-operacion.md`).
+- **Hosts fijos en la aplicacion:** los clientes OAuth ya no se configuran con variables: la API los
+  lee de la tabla `applications` (migraciones 000007 y 000011), que trae las URL locales. Siguen
+  fijos Nginx (`server_name *.localhost` y la CSP de cada aplicacion), las constantes de compilacion
+  de `contabilidad/src/config.ts` e `inventario/src/config.ts` y esas filas; con dominios reales hay
+  que cambiarlos en conjunto (ver `docs/manuales/despliegue-y-operacion.md`).
 - **IP de cliente:** Nginx sobrescribe `X-Forwarded-For` con la IP del ALB, asi que detras del ALB
   la API ve la IP del balanceador; ajustar `TRUSTED_PROXIES` y esa cabecera es trabajo futuro.
 - **Nginx resuelve `api` solo al arrancar:** Terraform fuerza un despliegue de web cuando cambia la

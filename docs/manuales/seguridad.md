@@ -12,12 +12,12 @@ La fuente de amenazas es [`specs/05-security/threat-model.md`](../../specs/05-se
 | 4 · SAST | CodeQL | Consultas `security-extended` para Go y JavaScript/TypeScript | Publica resultados SARIF; el workflow no declara un umbral de severidad adicional. |
 | 4b · Semgrep (OWASP) | Semgrep | Reglas OWASP Top Ten, Go y React | El informe SARIF se publica y el gate falla con `ERROR`. |
 | 5 · Dependencias vulnerables | `govulncheck` | Vulnerabilidades Go alcanzables | El comando no define umbral numérico; un fallo del análisis falla el job. |
-| 5 · Dependencias vulnerables | `npm audit` | Dependencias de frontend y Contabilidad | `--audit-level=high`. |
+| 5 · Dependencias vulnerables | `npm audit` | Dependencias de frontend, Contabilidad e Inventario | `--audit-level=high`. |
 | 5 · Dependencias vulnerables | osv-scanner | Vulnerabilidades de dependencias recursivas, incluidas no invocadas | `--recursive --all-vulns`; no hay un umbral de severidad configurado. |
 | 8 · Configuración de contenedores | Trivy config | Misconfiguraciones de configuración e infraestructura | Gate en `HIGH,CRITICAL`; primero publica SARIF y luego falla si las encuentra. |
 | 12 · IaC (Checkov) | Checkov 3.3.23 | Misconfiguraciones en Terraform (`infraestructura/terraform/`), Dockerfiles y workflows de GitHub Actions | Falla ante cualquier hallazgo (sin `soft_fail` ni lista global de omisión); las excepciones aceptadas son `#checkov:skip=ID:motivo` en línea sobre el recurso. Publica SARIF (categoría `checkov`) aunque falle. |
 | 9-10 · Construir y escanear imágenes | Trivy image | CVE en `api`, `worker` y `web` | Gate en `HIGH,CRITICAL` corregibles con `ignore-unfixed: true`. |
-| 11 · DAST | OWASP ZAP | Baseline del Hub y Contabilidad y API basada en OpenAPI | `scripts/zap-gate.py` falla ante riesgo medio o alto, salvo `IGNORE` justificado. |
+| 11 · DAST | OWASP ZAP | Baseline del Hub, Contabilidad e Inventario y API basada en OpenAPI | `scripts/zap-gate.py` falla ante riesgo medio o alto, salvo `IGNORE` justificado. |
 | 7 · E2E | Playwright | Flujos de navegador contra el stack levantado | Cualquier prueba fallida falla el job; informe y trazas se suben al fallar o cancelar. |
 | **Externo — no es job de `ci.yml`** | SonarCloud | Análisis de calidad y seguridad del código nuevo; la evidencia registrada incluye reglas S6505/S8543 y S2068. | Revise el resultado de SonarCloud asociado al PR y sus hallazgos. El archivo `ci.yml` no configura este análisis ni declara un umbral general; el historial solo registra que el PR #9 fue bloqueado por una calificación de seguridad del código nuevo de 3 > 1. |
 

@@ -3,18 +3,34 @@ import { seedAdmin, seedCompanyUser, strongPassword } from '../support/accounts'
 import { api, paced } from '../support/api'
 import { browserLoginWithMfa } from '../support/browser'
 import { loginWithMfaContext } from '../support/auth'
-import { contabilidadUrl, hubUrl } from '../support/config'
+import { contabilidadUrl, hubUrl, inventarioUrl } from '../support/config'
 import { psql } from '../support/db'
 import { mailIds } from '../support/mailpit'
 import { organizations } from '../support/organizations'
 import { ownId } from '../support/roles'
 
-type Claims = { aud?: string | string[]; roles?: string[] }
+type Claims = { aud?: string | string[]; roles?: string[]; permissions?: string[] }
 
 function decodeClaims(accessToken: string): Claims {
   const payload = accessToken.split('.')[1]
   if (!payload) throw new Error('OAuth access token has no payload')
   return JSON.parse(Buffer.from(payload, 'base64url').toString()) as Claims
+}
+
+/** Runs the OAuth flow of Inventario in the browser and returns what the Hub sent back. */
+async function signInToInventario(page: Page, employee: { email: string }, existingMailIds: Awaited<ReturnType<typeof mailIds>>, since: Date) {
+  await page.goto(inventarioUrl)
+  const authorizeRequest = page.waitForRequest((request) => request.url().startsWith(`${hubUrl}/oauth/authorize?`))
+  await page.getByRole('button', { name: 'Continuar con Identity Hub' }).click()
+  const requestedState = new URL((await authorizeRequest).url()).searchParams.get('state')
+  const authorizeRedirect = page.waitForResponse((response) => response.url().startsWith(`${hubUrl}/oauth/authorize?`) &&
+    response.status() === 302 &&
+    (response.headers().location ?? '').startsWith(`${inventarioUrl}/oauth/callback?`))
+  const tokenResponse = page.waitForResponse((response) => response.url() === `${hubUrl}/oauth/token` && response.request().method() === 'POST')
+  await browserLoginWithMfa(page, employee.email, strongPassword, { existingMailIds, since })
+  const redirect = new URL((await authorizeRedirect).headers().location)
+  const token = (await (await tokenResponse).json()) as { access_token: string }
+  return { redirect, requestedState, claims: decodeClaims(token.access_token) }
 }
 
 /** A global administrator signed in to the console in a browser of its own. */
@@ -85,10 +101,10 @@ test('RF-022 El listado de usuarios muestra solo los usuarios de la empresa sele
     // The directory pages by 100 and E2E runs pile up accounts, so each check searches for its own account.
     await search.fill(empresaB.email)
     await expect(page.getByRole('row', { name: new RegExp(empresaB.email) })).toBeVisible()
-    expect((await listedEmails(page)).filter((email) => !companyB.has(email))).toEqual([])
+    await expect.poll(async () => (await listedEmails(page)).filter((email) => !companyB.has(email))).toEqual([])
     await search.fill(conta.email)
     await expect(page.getByText('No hay usuarios que coincidan con la búsqueda.')).toBeVisible()
-    expect(await listedEmails(page)).not.toContain(conta.email)
+    await expect.poll(() => listedEmails(page)).not.toContain(conta.email)
 
     await chooseCompany(page, 'Contabilidad S.A.')
 
@@ -162,6 +178,20 @@ test('RF-022 Un usuario de Contabilidad S.A. entra a Contabilidad', async ({ pag
   const token = (await (await tokenResponse).json()) as { access_token: string }
   expect([decodeClaims(token.access_token).aud].flat()).toEqual(['contabilidad'])
   await expect(page.getByText('Analista contable', { exact: true })).toBeVisible()
+})
+
+test('RF-022 Un usuario de Empresa B entra a Inventario', async ({ page }) => {
+  const employee = await seedCompanyUser(organizations.empresaB, ['inventario.consulta'])
+  const existingMailIds = await mailIds(employee.email)
+  const since = new Date()
+
+  const { redirect, requestedState, claims } = await signInToInventario(page, employee, existingMailIds, since)
+
+  expect(redirect.searchParams.get('code')).toBeTruthy()
+  expect(redirect.searchParams.get('state')).toBe(requestedState)
+  expect([claims.aud].flat()).toEqual(['inventario'])
+  await expect(page.getByText('Consulta de inventario', { exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Catálogo' })).toBeVisible()
 })
 
 test('RF-022 Un usuario de Empresa B que abre Contabilidad es rechazado', async ({ page }) => {
@@ -239,4 +269,29 @@ test('RF-022 Tras el login se listan solo las aplicaciones de la empresa del usu
   const apps = page.locator('.connected-apps')
   await expect(apps.getByRole('link', { name: 'Contabilidad', exact: true })).toBeVisible()
   await expect(apps.getByRole('link', { name: 'Inventario' })).toHaveCount(0)
+})
+
+test('RF-022 Con una sola aplicación el login lleva directamente a ella', async ({ page }) => {
+  const employee = await seedCompanyUser(organizations.empresaB, ['inventario.consulta'])
+
+  await page.goto(`${hubUrl}/login`)
+  await browserLoginWithMfa(page, employee.email, strongPassword)
+
+  await page.waitForURL(`${inventarioUrl}/**`)
+  await expect(page.getByRole('button', { name: 'Continuar con Identity Hub' })).toBeVisible()
+})
+
+test('RF-022 El token de Inventario contiene solo roles de Inventario', async ({ page }) => {
+  const employee = await seedCompanyUser(organizations.empresaB, ['inventario.bodeguero'])
+  const existingMailIds = await mailIds(employee.email)
+  const since = new Date()
+  // The account holds the plain "user" role as well; the token must not carry it.
+  expect(psql(`SELECT string_agg(r.name, ',' ORDER BY r.name) FROM user_roles ur JOIN roles r ON r.id = ur.role_id
+               WHERE ur.user_id = :'id'::uuid;`, { id: employee.id })).toBe('inventario.bodeguero,user')
+
+  const { claims } = await signInToInventario(page, employee, existingMailIds, since)
+
+  expect(claims.roles).toEqual(['inventario.bodeguero'])
+  expect([...(claims.permissions ?? [])].sort()).toEqual(['movimientos.registrar', 'productos.editar', 'productos.ver'])
+  await expect(page.getByText('Bodeguero', { exact: true })).toBeVisible()
 })

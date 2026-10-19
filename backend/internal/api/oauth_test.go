@@ -389,16 +389,18 @@ func TestRF022_AuthorizeConClienteOUriInvalidosNoRedirigeNiAudita(t *testing.T) 
 	server := NewServer(nil, "test", nil)
 	server.SetOAuthService(oauth.New(repo, []oauth.Client{client}, nil, time.Now), hubSessionUser{id: uuid.New()}, "http://identityhub.localhost:8080/login", time.Hour)
 	for name, path := range map[string]string{
-		"redirect ajeno":   oauthAuthorizePath(client) + "&redirect_uri=" + url.QueryEscape("https://evil.example/cb"),
-		"cliente inexiste": strings.Replace(oauthAuthorizePath(client), "client_id=inventario", "client_id=nope", 1),
+		// One redirect_uri that is not the registered one (not a duplicated parameter).
+		"redirect ajeno":    strings.Replace(oauthAuthorizePath(client), url.QueryEscape(client.RedirectURI), url.QueryEscape("https://evil.example/cb"), 1),
+		"redirect repetido": oauthAuthorizePath(client) + "&redirect_uri=" + url.QueryEscape("https://evil.example/cb"),
+		"cliente inexiste":  strings.Replace(oauthAuthorizePath(client), "client_id=inventario", "client_id=nope", 1),
 	} {
 		t.Run(name, func(t *testing.T) {
 			request := httptest.NewRequest(http.MethodGet, path, nil)
 			request.AddCookie(&http.Cookie{Name: hubSessionCookieName, Value: "c2VjcmV0LWh1Yi10b2tlbg"})
 			response := httptest.NewRecorder()
 			server.Routes().ServeHTTP(response, request)
-			if response.Code == http.StatusFound || response.Header().Get("Location") != "" || len(repo.audits) != 0 {
-				t.Fatalf("status=%d location=%q audits=%d", response.Code, response.Header().Get("Location"), len(repo.audits))
+			if response.Code != http.StatusBadRequest || response.Header().Get("Location") != "" || len(repo.audits) != 0 {
+				t.Fatalf("status=%d location=%q audits=%d, want 400, no redirect and no audit", response.Code, response.Header().Get("Location"), len(repo.audits))
 			}
 		})
 	}

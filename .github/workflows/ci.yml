@@ -201,6 +201,7 @@ jobs:
           cache-dependency-path: |
             frontend/package-lock.json
             contabilidad/package-lock.json
+            inventario/package-lock.json
 
       - name: Instalar dependencias del frontend
         working-directory: frontend
@@ -225,6 +226,19 @@ jobs:
 
       - name: Comprobación de tipos (Contabilidad)
         working-directory: contabilidad
+        run: npm run typecheck
+
+      # R5 — Inventario (Empresa B) pasa por los mismos gates.
+      - name: Instalar dependencias de Inventario
+        working-directory: inventario
+        run: npm ci --ignore-scripts
+
+      - name: ESLint (Inventario)
+        working-directory: inventario
+        run: npm run lint
+
+      - name: Comprobación de tipos (Inventario)
+        working-directory: inventario
         run: npm run typecheck
 
       - name: Hadolint sobre los Dockerfiles
@@ -354,6 +368,12 @@ jobs:
           npm install --package-lock-only --ignore-scripts
           npm audit --audit-level=high
 
+      - name: npm audit (Inventario)
+        working-directory: inventario
+        run: |
+          npm install --package-lock-only --ignore-scripts
+          npm audit --audit-level=high
+
       # v1.9.0 traía Go 1.22.7 embebido: el análisis de alcanzabilidad (govulncheck)
       # fallaba porque backend/go.mod exige >= 1.26.0 (desde T34b; >= 1.25.0 antes), y
       # el escáner degradaba a listar cada advisory de go.mod sin filtrar (ruido,
@@ -420,6 +440,12 @@ jobs:
 
       - name: Pruebas de Contabilidad
         working-directory: contabilidad
+        run: |
+          npm ci --ignore-scripts
+          npm run test
+
+      - name: Pruebas de Inventario
+        working-directory: inventario
         run: |
           npm ci --ignore-scripts
           npm run test
@@ -685,7 +711,7 @@ jobs:
             context: backend
             file: backend/Dockerfile
             target: worker
-          # T13: la imagen web compila frontend/ y contabilidad/, así que su contexto es la raíz.
+          # T13: la imagen web compila frontend/, contabilidad/ e inventario/, así que su contexto es la raíz.
           - name: web
             label: frontend
             context: .
@@ -741,7 +767,7 @@ jobs:
 
   # ── 11. DAST con OWASP ZAP ──────────────────────────────────────────────
   # Mismo arranque del stack que el job 7. `make scan-dast` corre ZAP (baseline del Hub y de
-  # Contabilidad + escaneo de API con el OpenAPI) y scripts/zap-gate.py rompe la build con
+  # Contabilidad e Inventario + escaneo de API con el OpenAPI) y scripts/zap-gate.py rompe la build con
   # hallazgos de severidad media o más (T15; las reglas aceptadas viven en .zap/rules.tsv).
   # El arranque es el mismo del job 7: acción compuesta .github/actions/stack-up.
   dast:

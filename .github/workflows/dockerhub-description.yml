@@ -8,11 +8,13 @@
 #
 #  Credenciales: variable DOCKERHUB_NAMESPACE (del repositorio) y secreto
 #  DOCKERHUB_DESCRIPTION_TOKEN (del environment "dockerhub-description",
-#  limitado a la rama main). NO reutiliza el environment "dockerhub" del release:
-#  ese está restringido a tags v* y su token publica imágenes; ampliarlo para
-#  este trabajo daría a un workflow de documentación el poder de publicar.
-#  El token debe tener alcance Read, Write, Delete: la API de Docker Hub exige
-#  ese alcance para editar la descripción de un repositorio.
+#  limitado a la rama main). NO reutiliza el environment "dockerhub" del release
+#  (restringido a tags v*): así cada token se revoca por separado y un problema
+#  con este no afecta al release.
+#  El token debe tener alcance Read, Write, Delete, porque la API de Docker Hub lo
+#  exige para editar la descripción. Ese alcance también permite publicar y borrar
+#  imágenes: este workflow solo llama a la acción de descripción, corre solo en
+#  main y su token vive en un environment propio, que es lo que acota el riesgo.
 # ═══════════════════════════════════════════════════════════════════════════
 name: Descripción en Docker Hub
 

@@ -69,4 +69,4 @@ Fuera de alcance: reescribir los manuales existentes, cambiar código o workflow
 
 ## Próximo paso
 
-PR y CI; al integrar con el PR #58, añadir `deploy/dockerhub/` a la fila de `deploy/` del mapa.
+Ninguno: tarea cerrada. El PR #59 se mergeó el 2026-10-19 y la fila de `deploy/` del mapa ya enlaza `deploy/dockerhub/`.

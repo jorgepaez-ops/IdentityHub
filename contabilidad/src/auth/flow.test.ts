@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { challengeFor } from './pkce'
-import { beginLogin, completeCallback } from './flow'
+import { beginLogin, completeCallback, FETCH_TIMEOUT_MS } from './flow'
 import * as navigation from '../navigation'
 import { AUDIENCE, HUB_ORIGIN, ISSUER } from '../config'
 import { makeKey, signToken, validClaims, type TestKey } from '../testing'
@@ -182,5 +182,55 @@ describe('completeCallback: code exchange and token handling', () => {
     const { state } = await startedFlow()
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
     await expect(completeCallback(`?code=c&state=${state}`)).rejects.toMatchObject({ kind: 'exchange' })
+  })
+
+  describe('requests that never answer', () => {
+    afterEach(() => { vi.useRealTimers() })
+
+    /** A fetch that only settles when the caller aborts it, like a Hub that accepts the connection and goes silent. */
+    const silent = (init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(new DOMException('The operation was aborted.', 'AbortError')))
+    })
+
+    it('TestRF020_TokenRequestIsAbortedAfterTheTimeoutAndReportedAsExchangeError', async () => {
+      const { state } = await startedFlow()
+      const fetchMock = vi.fn((_input: RequestInfo | URL, init?: RequestInit) => silent(init))
+      vi.stubGlobal('fetch', fetchMock)
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+      const outcome = completeCallback(`?code=c&state=${state}`).then(() => null, (reason: unknown) => reason)
+      await vi.advanceTimersByTimeAsync(FETCH_TIMEOUT_MS - 1)
+      expect(fetchMock.mock.calls[0]?.[1]?.signal?.aborted).toBe(false)
+      await vi.advanceTimersByTimeAsync(1)
+      expect(await outcome).toMatchObject({ kind: 'exchange' })
+      expect(fetchMock.mock.calls[0]?.[1]?.signal?.aborted).toBe(true)
+    })
+
+    it('TestRF020_JwksRequestIsAbortedAfterTheTimeoutAndReportedAsHubUnavailable', async () => {
+      const { state } = await startedFlow()
+      const access = await signToken(key, validClaims({ exp: Math.floor(Date.now() / 1000) + 900 }))
+      vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input) === `${HUB}/oauth/token`) return jsonResponse(200, { access_token: access })
+        return silent(init)
+      }))
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+      const outcome = completeCallback(`?code=c&state=${state}`).then(() => null, (reason: unknown) => reason)
+      await vi.advanceTimersByTimeAsync(0)
+      await vi.advanceTimersByTimeAsync(FETCH_TIMEOUT_MS)
+      expect(await outcome).toMatchObject({ kind: 'hub_unavailable' })
+    })
+
+    it('TestRF020_ABodyThatNeverArrivesIsAlsoCutOffByTheTimeout', async () => {
+      const { state } = await startedFlow()
+      vi.stubGlobal('fetch', vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+        const stream = new ReadableStream({
+          start(controller) { init?.signal?.addEventListener('abort', () => controller.error(new DOMException('aborted', 'AbortError'))) },
+        })
+        return new Response(stream, { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }))
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+      const outcome = completeCallback(`?code=c&state=${state}`).then(() => null, (reason: unknown) => reason)
+      await vi.advanceTimersByTimeAsync(FETCH_TIMEOUT_MS)
+      expect(await outcome).toMatchObject({ kind: 'exchange' })
+    })
   })
 })

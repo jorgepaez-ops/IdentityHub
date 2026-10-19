@@ -22,6 +22,19 @@ export interface Session {
   verified: VerifiedToken
 }
 
+/** Longest a request to the Hub may take, response body included, before the sign-in fails instead of hanging. */
+export const FETCH_TIMEOUT_MS = 10_000
+
+async function withTimeout<T>(run: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+  try {
+    return await run(controller.signal)
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 export async function beginLogin(): Promise<void> {
   const verifier = generateVerifier()
   const state = generateState()
@@ -48,23 +61,26 @@ function takeStoredFlow() {
 
 async function exchangeCode(code: string, verifier: string): Promise<string> {
   try {
-    const response = await fetch(`${HUB_ORIGIN}/oauth/token`, {
-      method: 'POST',
-      credentials: 'omit',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        grant_type: 'authorization_code',
-        code,
-        redirect_uri: redirectUri(),
-        client_id: CLIENT_ID,
-        code_verifier: verifier,
-      }).toString(),
+    return await withTimeout(async (signal) => {
+      const response = await fetch(`${HUB_ORIGIN}/oauth/token`, {
+        method: 'POST',
+        credentials: 'omit',
+        signal,
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          grant_type: 'authorization_code',
+          code,
+          redirect_uri: redirectUri(),
+          client_id: CLIENT_ID,
+          code_verifier: verifier,
+        }).toString(),
+      })
+      if (!response.ok) throw new Error(`token endpoint answered ${response.status}`)
+      const body: unknown = await response.json()
+      const candidate = (body as { access_token?: unknown } | null)?.access_token
+      if (typeof candidate !== 'string' || candidate === '') throw new Error('token response without access_token')
+      return candidate
     })
-    if (!response.ok) throw new Error(`token endpoint answered ${response.status}`)
-    const body: unknown = await response.json()
-    const candidate = (body as { access_token?: unknown } | null)?.access_token
-    if (typeof candidate !== 'string' || candidate === '') throw new Error('token response without access_token')
-    return candidate
   } catch (reason) {
     throw new CallbackError('exchange', reason instanceof Error ? reason.message : 'token exchange failed')
   }
@@ -72,13 +88,15 @@ async function exchangeCode(code: string, verifier: string): Promise<string> {
 
 async function fetchJwks(): Promise<Jwks> {
   try {
-    const response = await fetch(`${HUB_ORIGIN}/.well-known/jwks.json`, { credentials: 'omit' })
-    if (!response.ok) throw new Error(`jwks answered ${response.status}`)
-    const body: unknown = await response.json()
-    if (typeof body !== 'object' || body === null || !Array.isArray((body as { keys?: unknown }).keys)) {
-      throw new Error('jwks response without keys array')
-    }
-    return body as Jwks
+    return await withTimeout(async (signal) => {
+      const response = await fetch(`${HUB_ORIGIN}/.well-known/jwks.json`, { credentials: 'omit', signal })
+      if (!response.ok) throw new Error(`jwks answered ${response.status}`)
+      const body: unknown = await response.json()
+      if (typeof body !== 'object' || body === null || !Array.isArray((body as { keys?: unknown }).keys)) {
+        throw new Error('jwks response without keys array')
+      }
+      return body as Jwks
+    })
   } catch (reason) {
     throw new CallbackError('hub_unavailable', reason instanceof Error ? reason.message : 'JWKS retrieval failed')
   }

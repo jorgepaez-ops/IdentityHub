@@ -43,7 +43,8 @@ make up        # genera certificados SMTP locales, construye las imágenes y lev
 | Servicio | Dirección |
 |---|---|
 | Hub (aplicación web) | <http://identityhub.localhost:8080> |
-| Contabilidad (aplicación de ejemplo) | <http://contabilidad.localhost:8080> |
+| Contabilidad (aplicación de ejemplo de «Contabilidad S.A.») | <http://contabilidad.localhost:8080> |
+| Inventario (aplicación de ejemplo de «Empresa B») | <http://inventario.localhost:8080> |
 | API (estado de salud) | <http://localhost:8081/healthz> |
 | Mailpit (correo local) | <http://localhost:8025> |
 | RabbitMQ (cola de mensajes) | <http://localhost:15672> |
@@ -62,6 +63,8 @@ La versión `v1.0.0` (2026-10-13) está publicada con su [release en GitHub](htt
 | Worker | [`jorgeivp/identity-hub-worker`](https://hub.docker.com/r/jorgeivp/identity-hub-worker) |
 | Web | [`jorgeivp/identity-hub-web`](https://hub.docker.com/r/jorgeivp/identity-hub-web) |
 
+El Hub atiende a varias empresas sin mezclarlas: cada aplicación y cada usuario pertenecen a una empresa, los roles de una empresa nunca se asignan a usuarios de otra, la consola trabaja una empresa a la vez y el Hub rechaza el acceso a una aplicación de otra empresa ([ADR 0015](specs/adr/0015-empresas-y-aislamiento-de-roles.md)).
+
 El repositorio versiona el guion del video de demostración; la grabación la hace el equipo. El historial semana a semana y una foto del estado al cierre (incluidas las alertas de seguridad que seguían abiertas en ese momento) están en la [bitácora](docs/BITACORA.md); el estado vigente de cada alerta se ve en la pestaña *Security* de GitHub.
 
 ## Mapa del repositorio
@@ -72,7 +75,8 @@ El repositorio versiona el guion del video de demostración; la grabación la ha
 | [`specs/`](specs/README.md) | Visión, requisitos, modelo de dominio, contratos (OpenAPI y eventos), modelo de amenazas, decisiones (ADR) y escenarios de aceptación | Para saber qué debe hacer el sistema y por qué se diseñó así |
 | [`backend/`](backend/README.md) | API y worker en Go | Para leer o modificar la lógica del servidor |
 | [`frontend/`](frontend/README.md) | Consola web del Hub (React) y su Nginx | Para leer o modificar lo que ve el usuario del Hub |
-| [`contabilidad/`](contabilidad/README.md) | Aplicación de ejemplo que usa el Hub para iniciar sesión | Para ver cómo integra su aplicación un tercero |
+| [`contabilidad/`](contabilidad/README.md) | Aplicación de ejemplo de «Contabilidad S.A.», que usa el Hub para iniciar sesión | Para ver cómo integra su aplicación un tercero |
+| [`inventario/`](inventario/README.md) | Aplicación de ejemplo de «Empresa B», la segunda empresa | Para ver que dos empresas usan el Hub sin mezclar roles ni datos |
 | [`db/`](db/README.md) | Migraciones y consultas SQL de PostgreSQL | Para cambiar o entender el esquema de datos |
 | [`deploy/`](deploy/README.md) | Docker Compose (desarrollo y producción simulada), observabilidad (Prometheus, Grafana, Loki, Alloy, Falco) y la descripción de las imágenes en Docker Hub ([`deploy/dockerhub/`](deploy/dockerhub/README.md)) | Para levantar, operar u observar el sistema |
 | [`infraestructura/`](infraestructura/README.md) | Terraform de la arquitectura de referencia en AWS | Para ver cómo se desplegaría en la nube (no hace falta para correr el proyecto) |
@@ -126,10 +130,11 @@ Cada ruta va en orden: lea solo hasta donde necesite.
 
 ### Empresa que integra su aplicación
 
-1. [Guía de integración de terceros](docs/manuales/integracion-terceros.md): cómo una aplicación externa delega su inicio de sesión en el Hub (OAuth 2.0 con PKCE), con Contabilidad como ejemplo completo.
-2. [`contabilidad/`](contabilidad/README.md): el código de la aplicación de ejemplo.
-3. [Claves de servicio](docs/manuales/claves-de-servicio.md): credenciales para integraciones entre sistemas, sin sesión humana.
-4. [Manual de usuario](docs/manuales/usuario.md): cómo se administran aplicaciones, roles y permisos desde el Hub.
+1. [Guía de integración de terceros](docs/manuales/integracion-terceros.md): cómo una aplicación externa delega su inicio de sesión en el Hub (OAuth 2.0 con PKCE), cómo se registra su empresa y su cliente, y dos ejemplos completos: Contabilidad e Inventario.
+2. [ADR 0015](specs/adr/0015-empresas-y-aislamiento-de-roles.md): por qué cada empresa tiene sus propios roles y cómo el Hub impide mezclarlos.
+3. [`contabilidad/`](contabilidad/README.md) e [`inventario/`](inventario/README.md): el código de las dos aplicaciones de ejemplo.
+4. [Claves de servicio](docs/manuales/claves-de-servicio.md): credenciales para integraciones entre sistemas, sin sesión humana.
+5. [Manual de usuario](docs/manuales/usuario.md): cómo se administran, empresa por empresa, los usuarios, los roles y los permisos desde el Hub.
 
 ## Seguridad y evidencia
 

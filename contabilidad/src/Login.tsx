@@ -36,7 +36,7 @@ export function AccessDenied({ onLogout }: Readonly<{ onLogout: () => void }>) {
       <section className="login-card" aria-labelledby="denied-title">
         <div className="brand-mark" aria-hidden="true">C</div>
         <h1 id="denied-title">Sin acceso a Contabilidad</h1>
-        <p className="muted">Tu cuenta se autenticó, pero no tiene un rol de Contabilidad. Pide a un administrador que te lo asigne en Identity Hub.</p>
+        <p className="muted">Tu cuenta se autenticó, pero no tiene acceso a Contabilidad: pertenece a otra empresa o no tiene un rol de esta aplicación. Pide a un administrador que te lo asigne en Identity Hub.</p>
         <a className="primary-button wide" href={HUB_ORIGIN}>Ir a Identity Hub</a>
         <button className="secondary-button wide" type="button" onClick={onLogout}><LogoutIcon />Cerrar sesión</button>
       </section>

@@ -7,7 +7,7 @@
 **/.env
 **/*.env
 !**/.env.example
-# Esta imagen solo necesita frontend/ y contabilidad/.
+# Esta imagen solo necesita frontend/, contabilidad/ e inventario/.
 backend
 db
 deploy

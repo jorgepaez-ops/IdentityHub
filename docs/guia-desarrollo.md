@@ -359,7 +359,6 @@ en la raíz del repo es la plantilla; `make setup` genera el `.env` con secretos
 | `SMTP_TLS` | no | `starttls` | `starttls` (exige STARTTLS y falla si el servidor no lo ofrece), `tls` (TLS implícito) o `none` (solo desarrollo; se rechaza con credenciales) |
 | `SMTP_USERNAME` / `SMTP_PASSWORD` | no (juntas) | vacío | autenticación SMTP PLAIN, solo tras TLS; la contraseña es `Secret` y nunca se registra |
 | `SMTP_CA_FILE` | no | vacío | PEM con la CA que se confía además de las raíces del sistema (en local, la CA de `make certs`) |
-| `OAUTH_CLIENT_ID` / `OAUTH_REDIRECT_URI` / `OAUTH_CLIENT_ORIGIN` | no | `contabilidad` / `http://contabilidad.localhost:8080/oauth/callback` / `http://contabilidad.localhost:8080` | cliente OAuth registrado; la redirect URI debe ser absoluta http(s) sin fragmento y el origen, exactamente su esquema y host. Debe coincidir con la fila de `oauth_clients` (migración 000007) |
 | `PUBLIC_BASE_URL` | no | `http://identityhub.localhost:8080` | usado para armar enlaces en los correos |
 | `BOOTSTRAP_ADMIN_EMAIL` | no | vacío | crea el primer administrador con su invitación y la reemite al arrancar si venció sin aceptarse; debe ser un correo válido si se define |
 

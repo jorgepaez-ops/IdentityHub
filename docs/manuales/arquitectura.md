@@ -4,13 +4,13 @@ Identity Hub es un proveedor de identidad autocontenido y, sobre todo, el vehíc
 
 ## Alcance
 
-Incluye registro e invitaciones por correo, contraseñas Argon2id, JWT Ed25519 y JWKS, refresh tokens rotativos, MFA por correo, roles y auditoría inmutable. Quedan fuera la federación con proveedores externos, multi-tenancy efectivo, alta disponibilidad, escalado horizontal, TOTP y WebAuthn. El objetivo de despliegue actual es un solo host con Docker Compose.
+Incluye registro e invitaciones por correo, contraseñas Argon2id, JWT Ed25519 y JWKS, refresh tokens rotativos, MFA por correo, roles y auditoría inmutable. Incluye también el aislamiento por empresa (cada aplicación y cada usuario pertenecen a una empresa; [ADR 0015](../../specs/adr/0015-empresas-y-aislamiento-de-roles.md)). Quedan fuera la federación con proveedores externos, la multi-tenencia completa (administrador y auditoría por empresa), alta disponibilidad, escalado horizontal, TOTP y WebAuthn. El objetivo de despliegue actual es un solo host con Docker Compose.
 
 ## Componentes y responsabilidades
 
 | Componente | Responsabilidad | Evidencia principal |
 |---|---|---|
-| `web` | Sirve las SPA del Hub y Contabilidad con Nginx; aplica cabeceras, límite de autenticación y proxy HTTP. | [`frontend/nginx/default.conf`](../../frontend/nginx/default.conf) |
+| `web` | Sirve las SPA del Hub, Contabilidad e Inventario con Nginx; aplica cabeceras, límite de autenticación y proxy HTTP. | [`frontend/nginx/default.conf`](../../frontend/nginx/default.conf) |
 | `api` | Expone la API HTTP, aplica autenticación/autorización y coordina dominio, persistencia y eventos. | [`backend/cmd/api/main.go`](../../backend/cmd/api/main.go), [`backend/internal/api/`](../../backend/internal/api/) |
 | `worker` | Consume eventos y entrega notificaciones por SMTP; también publica métricas y salud. | [`backend/cmd/worker/main.go`](../../backend/cmd/worker/main.go) |
 | PostgreSQL | Conserva usuarios, sesiones, auditoría y demás estado transaccional. | [`db/migrations/`](../../db/migrations/) |
@@ -27,9 +27,9 @@ Incluye registro e invitaciones por correo, contraseñas Argon2id, JWT Ed25519 y
 | `api` ↔ PostgreSQL | SQL | Persistencia transaccional mediante consultas generadas por `sqlc`. |
 | `api` → RabbitMQ → `worker` | AMQP | Eventos persistentes; la publicación usa *publisher confirms* sin outbox transaccional. |
 | `worker` → Mailpit | SMTP con STARTTLS y autenticación | Invitaciones, códigos MFA y avisos de seguridad. El worker exige STARTTLS (TLS 1.2 como mínimo) antes de autenticarse y no envía nada si el servidor no lo ofrece; en local, Mailpit usa la CA y las credenciales que genera `make certs`. |
-| Hub ↔ Contabilidad | OAuth 2.0 Authorization Code con PKCE sobre HTTP local | Son dos orígenes (`identityhub.localhost` y `contabilidad.localhost`); la aplicación canjea código y verifica JWT con JWKS. |
+| Hub ↔ Contabilidad e Inventario | OAuth 2.0 Authorization Code con PKCE sobre HTTP local | Son tres orígenes (`identityhub.localhost`, `contabilidad.localhost` e `inventario.localhost`); cada aplicación canjea código y verifica JWT con JWKS. |
 
-La implementación OAuth es mínima: Contabilidad es el cliente configurado, el `redirect_uri` se compara exactamente y PKCE S256 sustituye un secreto de cliente en la SPA. No hay registro dinámico de clientes ni federación externa.
+La implementación OAuth es mínima: los clientes (Contabilidad e Inventario) son filas de la tabla `applications` que la API lee al arrancar, el `redirect_uri` se compara exactamente contra el del cliente solicitado y PKCE S256 sustituye un secreto de cliente en la SPA. Cada cliente pertenece a una empresa: `/oauth/authorize` rechaza con `access_denied` a quien sea de otra empresa o no tenga rol en la aplicación, y el token lleva solo los roles de esa aplicación. No hay registro dinámico de clientes (se agregan por migración) ni federación externa; la guía de [integración de terceros](integracion-terceros.md) lo detalla.
 
 ## Panorama de datos
 
@@ -66,6 +66,7 @@ La implementación OAuth es mínima: Contabilidad es el cliente configurado, el 
 | [0012](../../specs/adr/0012-arquitectura-de-referencia-en-aws-con-localstack.md) | Arquitectura de producción de referencia en AWS (ECS Fargate, ALB, RDS, RabbitMQ en ECS, Secrets Manager) en Terraform, validada con LocalStack; la implementación llega en T8-T10. |
 | [0013](../../specs/adr/0013-roles-y-permisos-configurables-por-aplicacion.md) | Roles y permisos configurables por aplicación desde el Hub, sin límite de roles de aplicación. |
 | [0014](../../specs/adr/0014-claves-de-servicio-para-integraciones-maquina.md) | Claves de servicio `ihk_<publicId>_<secreto>` para integraciones máquina (RF-018): solo se guarda el SHA-256 del secreto, alcance `audit-log:read` y un único 401 para toda causa ([manual](claves-de-servicio.md)). |
+| [0015](../../specs/adr/0015-empresas-y-aislamiento-de-roles.md) | Empresas ligeras: cada aplicación y usuario pertenecen a una empresa, los roles no se mezclan, la consola trabaja una empresa a la vez y el Hub rechaza el acceso entre empresas. |
 
 El README y el ADR 0001 documentan la elección técnica de Go y sus razones para el proyecto. El enunciado deja al equipo la libertad de elegir el stack siempre que se cumplan los requisitos de DevSecOps y de gestor de identidad; Python y Node.js eran sugerencias del material del curso, no una restricción, así que la elección no requiere autorización adicional.
 

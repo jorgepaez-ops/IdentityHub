@@ -1,10 +1,10 @@
 # Guía de integración de plataformas de terceros
 
-Esta guía explica cómo una aplicación externa delega su inicio de sesión en Identity Hub y qué debe cambiar en su frontend. Describe únicamente lo que el repositorio implementa hoy: OAuth 2.0 Authorization Code con PKCE, en versión mínima ([ADR 0009](../../specs/adr/0009-sso-entre-dominios-con-authorization-code-y-pkce.md)). La aplicación de referencia es Contabilidad ([`contabilidad/`](../../contabilidad/)); no se construye una segunda aplicación cliente (D5 de [`odd/tasks/idp-semana-4.md`](../../odd/tasks/idp-semana-4.md)).
+Esta guía explica cómo una aplicación externa delega su inicio de sesión en Identity Hub y qué debe cambiar en su frontend. Describe únicamente lo que el repositorio implementa hoy: OAuth 2.0 Authorization Code con PKCE, en versión mínima ([ADR 0009](../../specs/adr/0009-sso-entre-dominios-con-authorization-code-y-pkce.md)). Hay dos aplicaciones de ejemplo, cada una de una empresa distinta: Contabilidad ([`contabilidad/`](../../contabilidad/)), la de referencia, e Inventario ([`inventario/`](../../inventario/)), que demuestra que un segundo cliente se incorpora sin tocar el código del flujo OAuth ([ADR 0015](../../specs/adr/0015-empresas-y-aislamiento-de-roles.md)).
 
 Tono y convenciones: el contrato es [`specs/03-api/openapi.yaml`](../../specs/03-api/openapi.yaml); donde el código hace más que el contrato, la guía lo indica. Para el contexto general vea el [manual de arquitectura](arquitectura.md) y el [manual de seguridad](seguridad.md).
 
-Contenido: [Cómo funciona](#cómo-funciona-en-pocas-palabras) · [Ejemplo completo: Contabilidad](#ejemplo-completo-contabilidad) · secciones 1 a 9 (referencia) · [10. Cómo se integra un tercero nuevo hoy](#10-cómo-se-integra-un-tercero-nuevo-hoy) · [11. Glosario](#11-glosario). Si es su primera lectura, empiece por las dos secciones siguientes y use el resto como consulta.
+Contenido: [Cómo funciona](#cómo-funciona-en-pocas-palabras) · [Ejemplo completo: Contabilidad](#ejemplo-completo-contabilidad) · [Empresas](#empresas-quién-puede-entrar-a-qué) · [Segundo ejemplo: Inventario](#segundo-ejemplo-inventario) · secciones 1 a 9 (referencia) · [10. Cómo se integra un tercero nuevo hoy](#10-cómo-se-integra-un-tercero-nuevo-hoy) · [11. Glosario](#11-glosario). Si es su primera lectura, empiece por las dos secciones siguientes y use el resto como consulta.
 
 ## Cómo funciona, en pocas palabras
 
@@ -69,6 +69,44 @@ sequenceDiagram
 10. **Se leen `roles` y `permissions`.** La interfaz muestra u oculta botones y secciones según las claves de `permissions` ([`access.ts`](../../contabilidad/src/access.ts), [`Shell.tsx`](../../contabilidad/src/Shell.tsx)).
 11. **Al vencer el token.** El token vive 15 minutos y no hay refresh token: un temporizador ligado a `exp` vuelve a iniciar el flujo desde el paso 2. Mientras la cookie `hub_session` siga viva el usuario no ve el login; el token solo vive en memoria, así que recargar la página también reinicia el flujo ([`App.tsx`](../../contabilidad/src/App.tsx)).
 
+## Empresas: quién puede entrar a qué
+
+Cada aplicación y cada persona usuaria pertenecen a **una sola empresa** ([ADR 0015](../../specs/adr/0015-empresas-y-aislamiento-de-roles.md), tabla `organizations`). En el repositorio hay dos empresas de ejemplo: «Contabilidad S.A.» (con Contabilidad) y «Empresa B» (con Inventario). Una tercera, «Identity Hub (operador)», es la del administrador global. Las empresas y las aplicaciones se declaran en una migración; la consola no las crea.
+
+Piense en un edificio con dos oficinas: cada empresa tiene su propia puerta y sus propias llaves. La tarjeta de una oficina nunca abre la otra, aunque las dos oficinas estén en el mismo edificio y la recepción sea la misma.
+
+| Regla | Qué ocurre |
+|---|---|
+| Un rol solo se asigna a personas de la empresa de su aplicación. | La API responde `400` y la base de datos lo impide con un trigger (`IH001`), de modo que ninguna otra vía lo evade. Los roles `admin` y `user` no pertenecen a ninguna aplicación y no se restringen. |
+| El Hub rechaza el acceso a una aplicación de otra empresa o sin rol. | `GET /oauth/authorize` no emite código: responde `302` a la `redirect_uri` registrada con `error=access_denied` y el `state` original, y audita `oauth_authorization_rejected` con el motivo (`organization_mismatch` si la empresa es distinta, `no_application_role` si no tiene ningún rol de la aplicación). Fuente: [`oauth.go`](../../backend/internal/auth/oauth/oauth.go). |
+| Los roles de las empresas no se mezclan. | El token de una aplicación lleva solo los roles de esa aplicación (por `roles.application_id`) y `aud` es su `client_id`. |
+| La consola trabaja una empresa a la vez. | El administrador elige la empresa y ve solo sus usuarios, aplicaciones y roles; al asignar un rol solo se ofrecen los de la empresa de la persona. La API de administración filtra igual (`organizationId` en `GET /admin/users` y `GET /admin/applications`). |
+| Tras iniciar sesión en el Hub, la persona ve las aplicaciones de su empresa. | `GET /me/applications` devuelve las aplicaciones de su empresa en las que tiene al menos un rol; con una sola, el Hub la lleva directo a ella. |
+
+Una persona que trabaja para dos empresas necesita dos cuentas (el correo es único). No hay administrador por empresa: el administrador del Hub es global.
+
+## Segundo ejemplo: Inventario
+
+Inventario ([`inventario/`](../../inventario/)) es una SPA mínima de «Empresa B», servida en `http://inventario.localhost:8080` por el mismo Nginx. Usa exactamente el mismo flujo que Contabilidad (PKCE, `state`, canje, verificación con el JWKS); lo único propio es su configuración ([`config.ts`](../../inventario/src/config.ts): `CLIENT_ID` `inventario`) y sus datos en el Hub, sembrados por la migración [`000011_organizations.up.sql`](../../db/migrations/000011_organizations.up.sql):
+
+| Dato | Valor |
+|---|---|
+| Cliente | `inventario`, `redirect_uri` `http://inventario.localhost:8080/oauth/callback`, origen `http://inventario.localhost:8080` |
+| Empresa | «Empresa B» |
+| Permisos | `productos.ver`, `productos.editar`, `movimientos.registrar` |
+| Roles | `inventario.consulta` (solo `productos.ver`) e `inventario.bodeguero` (los tres permisos) |
+
+Lo que se ve en cada caso:
+
+| Persona | Resultado en `/oauth/authorize?client_id=inventario…` |
+|---|---|
+| De «Empresa B» con `inventario.bodeguero` | Código y token con `aud` `inventario`, `roles` `["inventario.bodeguero"]` y los tres permisos. Inventario muestra Catálogo (editable) y Movimientos. |
+| De «Empresa B» con `inventario.consulta` | Token con solo `productos.ver`: Catálogo en modo lectura y Movimientos deshabilitado. |
+| De «Contabilidad S.A.», aunque tenga un rol de Contabilidad | `302` con `error=access_denied` (`organization_mismatch`). Inventario muestra «Sin acceso a Inventario» sin pedir token. |
+| De «Empresa B» sin ningún rol de Inventario | `302` con `error=access_denied` (`no_application_role`). Misma pantalla. |
+
+Los datos de Inventario (productos, movimientos) son de ejemplo y viven en memoria, igual que los de Contabilidad: la aplicación demuestra la integración, no un backend de negocio. Las pruebas del cruce entre empresas están en [`empresas.spec.ts`](../../e2e/tests/empresas.spec.ts) (escenarios de [`empresas.feature`](../../specs/06-acceptance/empresas.feature)).
+
 ## 1. Qué ofrece Identity Hub a una plataforma externa
 
 | Capacidad | Cómo se materializa hoy |
@@ -76,24 +114,27 @@ sequenceDiagram
 | Autenticación centralizada | El usuario inicia sesión en el Hub (contraseña y MFA por correo, [ADR 0010](../../specs/adr/0010-mfa-por-codigo-enviado-por-correo.md)); la aplicación nunca recibe su contraseña. |
 | SSO entre sitios | Tras el primer inicio de sesión el Hub guarda una cookie propia (`hub_session`); un segundo `GET /oauth/authorize` no vuelve a pedir credenciales mientras esa sesión viva. |
 | Credencial verificable sin llamar al Hub | Un access token JWT firmado con Ed25519, verificable con la clave pública del JWKS (`/.well-known/jwks.json`). |
-| Autorización por roles de la aplicación | El token lleva solo los roles cuyo prefijo coincide con el `client_id` (por ejemplo `contabilidad.senior`), no los roles del directorio ([`roles.go`](../../backend/internal/auth/roles/roles.go), `ForApplication`). |
-| Auditoría | La emisión, el canje y el reuso de un código de autorización generan eventos de auditoría (`authorization_code_issued`, `authorization_code_exchanged`, `authorization_code_reused`). |
+| Autorización por roles de la aplicación | El token lleva solo los roles que pertenecen a esa aplicación (`roles.application_id`; por ejemplo `contabilidad.senior`), no los roles del directorio ni los de otra aplicación. |
+| Aislamiento por empresa | Un usuario solo entra a las aplicaciones de su empresa y solo recibe roles de ellas (sección «Empresas»). |
+| Auditoría | La emisión, el canje y el reuso de un código de autorización generan eventos de auditoría (`authorization_code_issued`, `authorization_code_exchanged`, `authorization_code_reused`), y un acceso rechazado por empresa o falta de rol genera `oauth_authorization_rejected`. |
 
-Lo que **no** ofrece: no es OpenID Connect (sin `id_token`, discovery ni `userinfo`), no tiene registro dinámico de clientes, no entrega refresh tokens a las aplicaciones y no implementa cierre de sesión único. Los detalles están en la sección 9.
+Lo que **no** ofrece: no es OpenID Connect (sin `id_token`, discovery ni `userinfo`), no tiene registro dinámico de clientes (se registran por migración), no entrega refresh tokens a las aplicaciones y no implementa cierre de sesión único. Los detalles están en la sección 9.
 
 ## 2. Requisitos previos y registro del cliente
 
 ### 2.1 Cómo se registra un cliente hoy
 
-Hay **un único cliente**, `contabilidad`, y su registro **no es configurable por variables de entorno**. Se define en tres lugares que deben coincidir:
+Cada cliente es una fila de la tabla `applications`, y no se configura con variables de entorno. La API lee todas las filas **una sola vez al arrancar** ([`ListOAuthClients`](../../backend/internal/store/) y `oauth.New` en [`main.go`](../../backend/cmd/api/main.go)): para que un cliente nuevo exista hay que sembrar la fila con una migración y reiniciar la API.
 
-| Dato | Valor actual | Dónde vive |
-|---|---|---|
-| `client_id` | `contabilidad` | Constante `OAuthClientID` en [`backend/internal/config/config.go`](../../backend/internal/config/config.go) y fila de la tabla `applications` sembrada por la migración [`000007_oauth_authorization_code.up.sql`](../../db/migrations/000007_oauth_authorization_code.up.sql). |
-| `redirect_uri` | `http://contabilidad.localhost:8080/oauth/callback` | Constante `OAuthRedirectURI` y columna `redirect_uri`. Se compara por **coincidencia exacta** en `/oauth/authorize` y en `/oauth/token`. |
-| Origen permitido (CORS) | `http://contabilidad.localhost:8080` | Constante `OAuthClientOrigin` y columna `allowed_origin`. Es el único origen al que el Hub responde con `Access-Control-Allow-Origin` en `/oauth/token` y en el JWKS. |
+| Dato | Contabilidad | Inventario | Dónde vive |
+|---|---|---|---|
+| `client_id` (y `aud` del token) | `contabilidad` | `inventario` | Columna `client_id`. |
+| `redirect_uri` | `http://contabilidad.localhost:8080/oauth/callback` | `http://inventario.localhost:8080/oauth/callback` | Columna `redirect_uri`. Coincidencia **exacta** en `/oauth/authorize` y `/oauth/token`, contra la del cliente solicitado. |
+| Origen permitido (CORS) | `http://contabilidad.localhost:8080` | `http://inventario.localhost:8080` | Columna `allowed_origin`. El Hub responde con `Access-Control-Allow-Origin` en `/oauth/token` y en el JWKS solo si el `Origin` coincide exactamente con el de **algún** cliente registrado; nunca con comodín. |
+| Empresa | «Contabilidad S.A.» | «Empresa B» | Columna `organization_id`. |
+| Migración | [`000007`](../../db/migrations/000007_oauth_authorization_code.up.sql) (cliente) y [`000009`](../../db/migrations/000009_application_permissions.up.sql) (permisos) | [`000011`](../../db/migrations/000011_organizations.up.sql) | |
 
-Al arrancar, la API compara la configuración con la fila registrada (`ValidateOAuthClient` en [`backend/cmd/api/main.go`](../../backend/cmd/api/main.go) y `ValidateRegisteredClient` en [`oauth.go`](../../backend/internal/auth/oauth/oauth.go)); si no coinciden, no inicia. No hay secreto de cliente: es un **cliente público** y PKCE sustituye al secreto.
+Al arrancar, la API se niega a iniciar si no hay ningún cliente o si alguno está mal formado ([`ValidateClients`](../../backend/internal/auth/oauth/oauth.go)): `client_id` vacío o con espacios o repetido, `redirect_uri` que no sea absoluta http(s) o que lleve fragmento, u origen que no sea solo esquema y host y que no coincida con el de la `redirect_uri`. No hay secreto de cliente: es un **cliente público** y PKCE sustituye al secreto.
 
 Variables de entorno que sí afectan a la integración (ver [`config.go`](../../backend/internal/config/config.go) y [`docker-compose.yml`](../../deploy/docker-compose.yml)):
 
@@ -112,26 +153,35 @@ Variables de entorno que sí afectan a la integración (ver [`config.go`](../../
 - Las cuentas deben existir en el Hub y tener asignado un rol de la aplicación; el tercero no crea usuarios.
 - En local el flujo corre sobre `http://*.localhost:8080`. Las cookies del Hub llevan `Secure`; un despliegue real debe servir el Hub y el tercero por HTTPS.
 
-### 2.3 Qué cambiaría para agregar un segundo cliente
+### 2.3 Cómo se agrega un cliente nuevo
 
-Hoy **no se puede agregar un segundo cliente solo con configuración**. El código fija un cliente en varias capas, así que un segundo cliente exige trabajo de desarrollo (futuro, no disponible):
+Agregar un cliente **no exige cambios en el código del flujo OAuth**: el registro, la `redirect_uri`, el CORS y la audiencia salen de la fila de `applications`. Lo que sí hay que hacer, en orden:
 
-| Capa | Estado actual | Cambio necesario |
-|---|---|---|
-| Registro | Constantes en `config.go`; `oauth.Service` recibe un único `oauth.Client`. | Cargar la lista de clientes desde la tabla `applications` (ya admite varias filas) y buscar por `client_id` en cada petición. |
-| Base de datos | Una fila sembrada por la migración 000007. | Nueva migración (o un mecanismo de alta) con `client_id`, `redirect_uri`, `allowed_origin`, `name`. |
-| Token | `IssueForAudience` recibe el `client_id` configurado; `aud` = ese cliente. | Emitir `aud` con el cliente que canjeó el código. |
-| Roles | En código solo viven los roles de sistema `admin` y `user` ([`roles.go`](../../backend/internal/auth/roles/roles.go)); los roles de aplicación son datos que se crean en la grilla ([ADR 0013](../../specs/adr/0013-roles-y-permisos-configurables-por-aplicacion.md)). | Una migración que siembre la aplicación y su catálogo de permisos (como la 000009 de Contabilidad); los roles se arman después en la grilla, sin tocar `roles.go` (ver sección 7). |
-| CORS | `oauthCORS` compara `Origin` con un solo valor. | Comparar contra el `allowed_origin` del cliente que corresponda. |
-| Nginx | Un `server` para el Hub y otro para Contabilidad; la CSP de Contabilidad permite el origen del Hub. | Un `server` (o dominio) para la nueva aplicación con su propia CSP, o alojarla fuera de este Nginx. |
-| Compose | El servicio `web` sirve ambas SPA; las imágenes se construyen desde la raíz. | Incluir el artefacto del tercero o apuntar su dominio al Nginx. |
+1. **Escribir una migración** en [`db/migrations/`](../../db/migrations/) que, como la 000011 con Inventario, inserte:
+   - la aplicación en `applications` (`client_id`, `redirect_uri`, `allowed_origin`, `name`, `organization_id`), con la empresa a la que pertenece (si es una empresa nueva, también su fila en `organizations`);
+   - su catálogo de claves en `permissions` (sección 7.2);
+   - los roles iniciales en `roles` (`<client_id>.<nombre>`, con `application_id`) y sus filas en `role_permissions`. Los roles también se pueden armar después desde la grilla de la consola.
+2. **Reiniciar la API** (`make restart` en local) para que lea la fila nueva.
+3. **Servir la aplicación.** En este repositorio: un bloque `server` en [`frontend/nginx/default.conf`](../../frontend/nginx/default.conf) con su CSP (`connect-src` con el origen del Hub), el artefacto compilado en [`frontend/Dockerfile`](../../frontend/Dockerfile) y, si se usa un nombre `*.localhost` nuevo, su entrada en la acción [`stack-up`](../../.github/actions/stack-up/action.yml) de CI. Una aplicación alojada fuera de este Nginx solo necesita su propio origen.
+4. **Dar de alta a las personas** en la consola (empresa y roles de esa empresa).
+
+El resto lo resuelve el código existente:
+
+| Capa | Comportamiento |
+|---|---|
+| Registro | `oauth.Service` conoce todos los clientes de la tabla y busca por `client_id` en cada petición. |
+| Token | `aud` es el `client_id` del código canjeado; los roles son los de esa aplicación ([`ListApplicationRolesForUser`](../../db/queries/)). |
+| CORS | Se compara el `Origin` con el `allowed_origin` de cada cliente registrado. |
+| Empresa | `/oauth/authorize` rechaza a quien no sea de la empresa de la aplicación o no tenga rol en ella. |
+| Roles | En código solo viven los roles de sistema `admin` y `user` ([`roles.go`](../../backend/internal/auth/roles/roles.go)); los demás son datos ([ADR 0013](../../specs/adr/0013-roles-y-permisos-configurables-por-aplicacion.md)). |
 
 ### 2.4 Limitaciones del registro
 
 - Sin registro dinámico ni pantalla de consentimiento (la aplicación se asume de la propia empresa).
 - Sin secreto de cliente ni autenticación del cliente en el canje; solo PKCE.
-- Un cambio de `redirect_uri` u origen exige modificar el código y la migración, y volver a desplegar.
-- El origen del Hub está escrito a mano en la configuración del cliente (`contabilidad/src/config.ts`) y en la CSP de Nginx.
+- Registrar o cambiar un cliente (`redirect_uri`, origen) exige una migración y reiniciar la API; no hay alta desde la consola.
+- Las empresas y las aplicaciones tampoco se crean desde la consola.
+- El origen del Hub está escrito a mano en la configuración de cada cliente (`contabilidad/src/config.ts`, `inventario/src/config.ts`) y en la CSP de Nginx.
 
 ## 3. Flujo paso a paso
 
@@ -181,8 +231,8 @@ Todos son obligatorios y deben aparecer **una sola vez** (un parámetro repetido
 
 | Parámetro | Regla (código y contrato) |
 |---|---|
-| `client_id` | Debe ser el cliente registrado (`contabilidad`). |
-| `redirect_uri` | Coincidencia exacta con la registrada. |
+| `client_id` | Debe ser un cliente registrado en `applications` (`contabilidad`, `inventario`…). |
+| `redirect_uri` | Coincidencia exacta con la registrada para ese `client_id`. |
 | `response_type` | Solo `code`. |
 | `state` | No vacío. Es opaco para el Hub y se devuelve sin cambios. |
 | `code_challenge` | `BASE64URL(SHA256(code_verifier))`, de 43 a 128 caracteres del alfabeto `A-Z a-z 0-9 - _`. |
@@ -194,7 +244,9 @@ Si la petición no trae una cookie `hub_session` válida (ausente, mal formada, 
 
 ### 3.3 Callback
 
-El Hub redirige a la `redirect_uri` registrada con `code` y `state`. Cuando el error es atribuible a la petición pero el cliente y la `redirect_uri` son los registrados, el Hub redirige igualmente con `error=invalid_request` (y `state` si llegó). El tercero debe tratar `error` como fallo. Si el `client_id` o la `redirect_uri` no son los registrados, el Hub **no redirige** y responde `400`.
+El Hub redirige a la `redirect_uri` registrada con `code` y `state`. Cuando el error es atribuible a la petición pero el cliente y la `redirect_uri` son los registrados, el Hub redirige igualmente con `error=invalid_request` (y `state` si llegó). El tercero debe tratar `error` como fallo.
+
+**Acceso denegado.** Si la persona autenticada pertenece a otra empresa o no tiene ningún rol de la aplicación, el Hub no emite código y redirige a la `redirect_uri` registrada con `error=access_denied` (más el `state`), y audita `oauth_authorization_rejected`. La aplicación debe mostrar «sin acceso» sin intentar canjear nada, como hacen Contabilidad e Inventario ([`flow.ts`](../../inventario/src/auth/flow.ts), `completeCallback`, error `no_access`). Si el `client_id` o la `redirect_uri` no son los registrados, el Hub **no redirige** y responde `400`.
 
 ### 3.4 Canje del código
 
@@ -210,9 +262,9 @@ Los tres endpoints no requieren autenticación previa (`security: []` en el cont
 
 | Método y ruta | Parámetros | Respuestas y errores |
 |---|---|---|
-| `GET /oauth/authorize` | Query: `client_id`, `redirect_uri`, `response_type`, `state`, `code_challenge`, `code_challenge_method` (ver 3.1). Cookie `hub_session` (la gestiona el navegador). | `302` con `Location`: al cliente con `code` y `state`; al cliente con `error=invalid_request` y `state`; o al login del Hub si no hay sesión. `400` `application/problem+json` (RFC 7807) cuando la petición no puede redirigirse de forma segura (cliente o `redirect_uri` no registrados, parámetros repetidos). Sin CORS. |
-| `POST /oauth/token` | Cuerpo `application/x-www-form-urlencoded`: `grant_type` (`authorization_code`), `code`, `redirect_uri`, `client_id`, `code_verifier`. | `200` JSON `{access_token, token_type: "Bearer", expires_in}` (`expires_in` = 900). `400` problem: `oauth-invalid-request` (cuerpo mal formado, `grant_type` distinto o `code_verifier` con formato inválido) u `oauth-invalid-grant` (código inexistente, vencido, ya usado, o `client_id`, `redirect_uri` o verifier que no coinciden). CORS sin credenciales solo para el origen del cliente; el preflight `OPTIONS` responde `204` con `Access-Control-Allow-Methods: POST` y `Access-Control-Allow-Headers: Content-Type`. |
-| `GET /.well-known/jwks.json` | Ninguno. | `200` JSON `{keys: [{kty: OKP, crv: Ed25519, x, kid, use: sig, alg: EdDSA}]}`; el Hub publica una sola clave. CORS sin credenciales solo para el origen del cliente. `503` si el servicio de tokens no está listo. |
+| `GET /oauth/authorize` | Query: `client_id`, `redirect_uri`, `response_type`, `state`, `code_challenge`, `code_challenge_method` (ver 3.1). Cookie `hub_session` (la gestiona el navegador). | `302` con `Location`: al cliente con `code` y `state`; al cliente con `error=invalid_request` o `error=access_denied` y `state`; o al login del Hub si no hay sesión. `400` `application/problem+json` (RFC 7807) cuando la petición no puede redirigirse de forma segura (cliente o `redirect_uri` no registrados, parámetros repetidos). Sin CORS. |
+| `POST /oauth/token` | Cuerpo `application/x-www-form-urlencoded`: `grant_type` (`authorization_code`), `code`, `redirect_uri`, `client_id`, `code_verifier`. | `200` JSON `{access_token, token_type: "Bearer", expires_in}` (`expires_in` = 900). `400` problem: `oauth-invalid-request` (cuerpo mal formado, `grant_type` distinto o `code_verifier` con formato inválido) u `oauth-invalid-grant` (código inexistente, vencido, ya usado, o `client_id`, `redirect_uri` o verifier que no coinciden). CORS sin credenciales solo para el origen de un cliente registrado; el preflight `OPTIONS` responde `204` con `Access-Control-Allow-Methods: POST` y `Access-Control-Allow-Headers: Content-Type`. |
+| `GET /.well-known/jwks.json` | Ninguno. | `200` JSON `{keys: [{kty: OKP, crv: Ed25519, x, kid, use: sig, alg: EdDSA}]}`; el Hub publica una sola clave. CORS sin credenciales solo para el origen de un cliente registrado. `503` si el servicio de tokens no está listo. |
 
 Códigos que el código emite y el contrato no declara (conviene que el cliente los trate como fallo genérico): `500` en `/oauth/authorize` (`oauth-session-failed`, `oauth-authorization-failed`) y en `/oauth/token` (`oauth-token-failed`), y `503` (`oauth-unavailable`) en ambos cuando OAuth no está disponible. Fuente: [`backend/internal/api/oauth.go`](../../backend/internal/api/oauth.go).
 
@@ -228,7 +280,7 @@ El access token es un JWT firmado con `EdDSA` (Ed25519) emitido por [`token.go`]
 |---|---|---|
 | `iss` | Valor de `JWT_ISSUER` (`http://identityhub.localhost:8080` por defecto). | Igualdad exacta con el emisor esperado. |
 | `sub` | UUID del usuario. | Debe ser una cadena no vacía; es el identificador estable de la cuenta. |
-| `aud` | Lista con un elemento: el `client_id` (`contabilidad`). | Debe contener el `client_id` propio. Un token con otra audiencia no es para esta aplicación. |
+| `aud` | Lista con un elemento: el `client_id` de la aplicación (`contabilidad`, `inventario`…). | Debe contener el `client_id` propio. Un token con otra audiencia no es para esta aplicación. |
 | `exp` | Emisión más 15 minutos (`expires_in` = 900). | Obligatorio; rechazar si venció. |
 | `iat` | Instante de emisión. | Informativo. |
 | `jti` | Identificador aleatorio (hexadecimal). | Informativo; el Hub no ofrece endpoint de revocación ni introspección. |
@@ -249,7 +301,7 @@ Esta verificación en el navegador sirve para mostrar la interfaz; no autoriza d
 
 ## 6. Cambios en el frontend del tercero
 
-Contabilidad es la implementación de referencia; cada punto enlaza el archivo correspondiente.
+Contabilidad es la implementación de referencia (Inventario la repite con su propio `client_id`); cada punto enlaza el archivo correspondiente.
 
 | Cambio | Qué hacer | Referencia |
 |---|---|---|
@@ -263,7 +315,7 @@ Contabilidad es la implementación de referencia; cada punto enlaza el archivo c
 | Reautenticación | Programar el inicio de un nuevo flujo cuando `exp` se cumpla (no hay refresh token). | [`App.tsx`](../../contabilidad/src/App.tsx) |
 | CSP | `connect-src` debe incluir el origen del Hub; el resto en `'self'`, sin scripts inline. | [`default.conf`](../../frontend/nginx/default.conf) |
 
-Las pruebas que respaldan el flujo están en [`flow.test.ts`](../../contabilidad/src/auth/flow.test.ts), [`jwt.test.ts`](../../contabilidad/src/auth/jwt.test.ts) y [`pkce.test.ts`](../../contabilidad/src/auth/pkce.test.ts).
+Las pruebas que respaldan el flujo (incluido el tiempo máximo de 10 segundos para el canje y el JWKS) están en [`flow.test.ts`](../../contabilidad/src/auth/flow.test.ts), [`jwt.test.ts`](../../contabilidad/src/auth/jwt.test.ts) y [`pkce.test.ts`](../../contabilidad/src/auth/pkce.test.ts).
 
 ## 7. Declaración de permisos de la aplicación
 
@@ -290,7 +342,7 @@ Hoy el catálogo se declara con una **migración** que siembra la aplicación y 
 | `cierre.ejecutar` | Sección y botón de cierre contable. | ✓ | |
 | `reportes.ver` | Resumen con totales del período. | ✓ | ✓ |
 
-Para una aplicación nueva: elegir claves que describan capacidades (no puestos de trabajo), escribir la migración que inserte la aplicación y sus `permissions`, y hacer que el frontend decida cada capacidad por una clave. Los roles los arma después el administrador; la aplicación no debe conocer sus nombres.
+La de Inventario es la 000011 (`productos.ver`, `productos.editar`, `movimientos.registrar`; ver «Segundo ejemplo: Inventario»). Para una aplicación nueva: elegir claves que describan capacidades (no puestos de trabajo), escribir la migración que inserte la aplicación y sus `permissions`, y hacer que el frontend decida cada capacidad por una clave. Los roles los arma después el administrador; la aplicación no debe conocer sus nombres.
 
 ### 7.3 Cómo llegan al token
 
@@ -306,11 +358,11 @@ Contabilidad le muestra todos los movimientos y el Resumen, pero no le ofrece re
 
 ### 7.4 Administración y controles
 
-Los endpoints de la grilla exigen `admin` (contrato en [`openapi.yaml`](../../specs/03-api/openapi.yaml)):
+Los endpoints de la grilla exigen `admin` (contrato en [`openapi.yaml`](../../specs/03-api/openapi.yaml)). El listado se acota a una empresa (`organizationId`, obligatorio en la práctica: sin él responde `400`); las demás operaciones apuntan a una aplicación, que pertenece a una sola empresa:
 
 | Operación | Endpoint |
 |---|---|
-| Listar aplicaciones, permisos y roles | `GET /api/v1/admin/applications` |
+| Listar aplicaciones, permisos y roles de una empresa | `GET /api/v1/admin/applications?organizationId=<empresa>` |
 | Listar roles de una aplicación | `GET /api/v1/admin/applications/{applicationId}/roles` |
 | Crear rol | `POST /api/v1/admin/applications/{applicationId}/roles` |
 | Actualizar permisos | `PATCH /api/v1/admin/applications/{applicationId}/roles/{roleId}` |
@@ -345,7 +397,8 @@ Controles que aplica el Hub, cada uno cubierto por un escenario de [`roles-y-per
 
 | Limitación actual | Qué haría falta (trabajo futuro, no disponible hoy) |
 |---|---|
-| Un solo cliente fijo en el código (`contabilidad`). | Cargar clientes desde `applications`, con alta administrable y CORS y audiencia por cliente (sección 2.3). |
+| Los clientes se leen de `applications` solo al arrancar; registrar uno exige una migración y reiniciar la API (sección 2.3). | Alta administrable desde la consola, con recarga sin reinicio. |
+| Empresas y aplicaciones solo se declaran por migración; el administrador es global y la auditoría es única. | Administración delegada por empresa y auditoría separada ([ADR 0015](../../specs/adr/0015-empresas-y-aislamiento-de-roles.md), alternativas consideradas). |
 | Sin registro dinámico de clientes ni consentimiento. | Un endpoint o consola de registro y una pantalla de consentimiento para terceros ajenos a la empresa. |
 | Sin secreto de cliente; solo clientes públicos con PKCE. | Autenticación de cliente confidencial para aplicaciones con backend. |
 | Sin refresh tokens para aplicaciones; la renovación pasa por un nuevo `/oauth/authorize`. | Un refresh token acotado por cliente, con rotación y revocación (el del Hub, [ADR 0005](../../specs/adr/0005-refresh-tokens-rotativos-con-familia.md), es solo de la consola). |
@@ -354,12 +407,12 @@ Controles que aplica el Hub, cada uno cubierto por un escenario de [`roles-y-per
 | Sin cierre de sesión único: salir del Hub no cierra la sesión de la aplicación hasta que vence su token (15 minutos). | Cierre de sesión por canal frontal o trasero y revocación de tokens. |
 | Sin revocación ni introspección de access tokens. | Endpoint de introspección o lista de revocación. |
 | El JWKS publica una sola clave. | Publicar varias claves y un procedimiento de rotación con `kid` (el cliente de referencia ya selecciona la clave por `kid`). |
-| El Hub, el emisor y el `client_id` están fijos a mano en la configuración del cliente y en la CSP de Nginx. | Configuración por entorno en el cliente. |
+| El Hub, el emisor y el `client_id` están fijos a mano en la configuración de cada cliente y en la CSP de Nginx. | Configuración por entorno en el cliente. |
 | El contrato OpenAPI no declara los `500` y `503` que el código emite en los endpoints OAuth. | Alinear el contrato con el comportamiento real. |
 
 ### 9.1 Qué aportaría cada mejora (ninguna está implementada)
 
-- **Clientes guardados en la base de datos.** Hoy el único cliente está escrito en el código y registrar otra aplicación obliga a modificar el código y volver a desplegar el Hub. Con los clientes en la base de datos, un administrador daría de alta una aplicación (su `client_id`, `redirect_uri` y origen) sin redespliegue.
+- **Alta de clientes desde la consola.** Hoy los clientes ya viven en la base de datos, pero se siembran con una migración y la API los lee al arrancar. Con una pantalla de alta, un administrador registraría una aplicación (su `client_id`, `redirect_uri`, origen y empresa) sin migración ni reinicio.
 - **OpenID Connect.** Añadiría un `id_token` estándar con los datos de la persona y un documento de descubrimiento (`/.well-known/openid-configuration`) que describe los endpoints. Así las librerías de mercado se configurarían solas, en lugar de que cada tercero escriba código a medida como hace Contabilidad.
 - **Refresh tokens por cliente.** Permitirían que una aplicación mantenga la sesión más allá de los 15 minutos del access token sin que la persona vuelva a pasar por el Hub; hoy la renovación depende de repetir el flujo con la cookie `hub_session`.
 - **Introspección.** Un servidor de recursos podría preguntar al Hub si un token sigue siendo válido, en lugar de confiar únicamente en su firma y su `exp`.
@@ -368,29 +421,33 @@ Controles que aplica el Hub, cada uno cubierto por un escenario de [`roles-y-per
 
 ## 10. Cómo se integra un tercero nuevo hoy
 
-Es un procedimiento honesto: **hoy requiere un cambio de código en el Hub**, porque el cliente está fijo en el repositorio (sección 2.3). No existe un alta solo por configuración. Las variables de entorno de la sección 2.1 (`JWT_ISSUER`, `PUBLIC_BASE_URL`, etc.) son configuración, pero no registran clientes.
+El procedimiento es de datos y de despliegue, no de código del flujo OAuth: el cliente se declara en la base (sección 2.3) y el Hub lo reconoce al reiniciar. Lo hizo Inventario con la migración 000011.
 
-**En el Hub (cambio de código y despliegue)**
+**En el Hub (migración y despliegue)**
 
-1. **Definir el cliente.** Hoy `config.go` solo declara las tres constantes de Contabilidad (`OAuthClientID`, `OAuthRedirectURI`, `OAuthClientOrigin`) y [`main.go`](../../backend/cmd/api/main.go) construye con ellas un único `oauth.Client`. Para una segunda aplicación hay que permitir varios clientes (sección 2.3: buscar por `client_id` en `oauth.Service`, `IssueForAudience` con el cliente que canjeó el código y `oauthCORS` por origen). Es código, no configuración.
-2. **Registrar la fila en `applications`.** Nueva migración en [`db/migrations/`](../../db/migrations/) con `client_id`, `redirect_uri`, `allowed_origin` y `name`, como la 000007.
-3. **Declarar los permisos.** En esa migración (o una contigua, como la 000009 de Contabilidad) insertar el catálogo de `permissions` de la aplicación (sección 7.2). Los roles se arman después en la grilla de la consola, sin código.
-4. **Ajustar Nginx y CSP** si la aplicación se sirve desde este Nginx (sección 2.3, filas Nginx y Compose).
-5. **Actualizar especificaciones y pruebas.** RF-020 en [`specs/01-requirements.md`](../../specs/01-requirements.md) dice "único cliente"; [`autorizacion-oauth.feature`](../../specs/06-acceptance/autorizacion-oauth.feature), [`config_test.go`](../../backend/internal/config/config_test.go) y las pruebas de [`oauth_test.go`](../../backend/internal/auth/oauth/oauth_test.go) deben cubrir el nuevo cliente. Registrar el cambio en un ADR si cambia la decisión del [ADR 0009](../../specs/adr/0009-sso-entre-dominios-con-authorization-code-y-pkce.md).
+1. **Elegir la empresa.** Una existente (`organizations`) o una nueva, insertada en la misma migración. La aplicación y todas las personas que la usen pertenecen a esa empresa.
+2. **Registrar la aplicación.** En una migración de [`db/migrations/`](../../db/migrations/), insertar la fila de `applications` con `client_id`, `redirect_uri`, `allowed_origin`, `name` y `organization_id`, como en la 000011.
+3. **Declarar los permisos y los roles iniciales** (sección 7.2): filas de `permissions`, `roles` (`<client_id>.<nombre>`) y `role_permissions`. Los roles se pueden ajustar después en la grilla, sin código.
+4. **Servirla.** Bloque `server` y CSP en Nginx si se aloja en este Nginx (sección 2.3, paso 3).
+5. **Desplegar y reiniciar la API** para que lea el cliente nuevo.
+6. **Cubrir con pruebas y especificación.** Un escenario en [`empresas.feature`](../../specs/06-acceptance/empresas.feature) o el `.feature` que corresponda, con su prueba E2E (el script `scripts/traceability.py` exige una por escenario), y un ADR solo si cambia una decisión como la del [ADR 0009](../../specs/adr/0009-sso-entre-dominios-con-authorization-code-y-pkce.md) o la del [ADR 0015](../../specs/adr/0015-empresas-y-aislamiento-de-roles.md).
+7. **Dar de alta a las personas** en la consola, en la vista de su empresa, con roles de esa empresa.
 
 **En la aplicación del tercero (lo que implementa el tercero)**
 
-6. Implementar PKCE, `state`, callback, canje, validación del token contra el JWKS y guardas por `permissions`, siguiendo la sección 6 y tomando como modelo `contabilidad/src/auth/`.
-7. Servirse desde el origen y la ruta de callback registrados, con la CSP de la sección 6.
-8. Decidir cada capacidad por una clave de `permissions`, nunca por el nombre del rol, y repetir la validación en su propio servidor (sección 5).
+8. Implementar PKCE, `state`, callback, canje, validación del token contra el JWKS y guardas por `permissions`, siguiendo la sección 6 y tomando como modelo `contabilidad/src/auth/` o `inventario/src/auth/`.
+9. Tratar `error=access_denied` en el callback como «sin acceso» (sección 3.3).
+10. Servirse desde el origen y la ruta de callback registrados, con la CSP de la sección 6.
+11. Decidir cada capacidad por una clave de `permissions`, nunca por el nombre del rol, y repetir la validación en su propio servidor (sección 5).
 
-| Qué | Configuración | Cambio de código |
+| Qué | Configuración | Migración o código |
 |---|---|---|
 | Emisor, clave de firma, URL pública, duración de la sesión del Hub | Sí (variables de la sección 2.1) | No |
 | Roles de una aplicación y sus permisos asignados | Sí, desde la grilla de la consola | No |
-| Alta del cliente (`client_id`, `redirect_uri`, origen) | No | Sí (constantes y migración) |
-| Catálogo de permisos de la aplicación | No | Sí (migración) |
-| CORS, audiencia por cliente, Nginx | No | Sí |
+| Alta del cliente (`client_id`, `redirect_uri`, origen, empresa) | No | Migración y reinicio de la API; sin cambios en el código OAuth |
+| Catálogo de permisos de la aplicación | No | Migración |
+| CORS, audiencia por cliente, rechazo por empresa | Automático a partir de la fila | No |
+| Nginx y CSP de la aplicación | No | Cambio en `frontend/nginx/default.conf` |
 
 ## 11. Glosario
 

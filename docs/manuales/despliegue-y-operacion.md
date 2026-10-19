@@ -29,7 +29,6 @@ Complete `.env` sin guardar secretos en Git. Las variables que se muestran a con
 | RabbitMQ | `RABBITMQ_DEFAULT_USER`, `RABBITMQ_DEFAULT_PASS`, `RABBITMQ_URL` | Usuario, contraseña y URL AMQP del broker. |
 | API y JWT | `API_PORT`, `API_BASE_URL`, `LOG_LEVEL`, `JWT_SIGNING_KEY`, `JWT_ISSUER`, `TRUSTED_PROXIES`, `JWT_ACCESS_TTL`, `JWT_REFRESH_TTL` | Puerto, URL local, nivel de log, firma y parámetros de token; `JWT_SIGNING_KEY` no tiene valor por defecto. Solo la API los recibe: el worker no firma tokens ni usa `TRUSTED_PROXIES`. |
 | Correo (SMTP) | `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM`, `SMTP_TLS`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_CA_FILE` | Destino y seguridad del SMTP del worker; por defecto apunta a Mailpit con STARTTLS y autenticación (ver "Correo SMTP"). `SMTP_PASSWORD` lo genera `make setup`. |
-| Cliente OAuth | `OAUTH_CLIENT_ID`, `OAUTH_REDIRECT_URI`, `OAUTH_CLIENT_ORIGIN` | Opcionales; por defecto los valores locales de Contabilidad (ver "Hosts configurables y fijos"). |
 | Observabilidad | `GRAFANA_ADMIN_USER`, `GRAFANA_ADMIN_PASSWORD` | Acceso inicial de Grafana (los levanta `make up`). |
 | Arranque inicial | `BOOTSTRAP_ADMIN_EMAIL` | Variable opcional consumida por Compose: crea o reemite por invitación el primer administrador bajo D17. No hay contraseña en esta variable. |
 | Límite local de E2E | `LOGIN_IP_MAX_FAILURES` | Compose lo admite para el límite por IP; `make e2e` lo eleva temporalmente y lo restaura. |
@@ -116,14 +115,13 @@ Crea `deploy/certs/` (ignorado por git): `ca.pem` y `ca-key.pem` (CA local), `se
 
 ### Hosts configurables y fijos
 
-`OAUTH_CLIENT_ID`, `OAUTH_REDIRECT_URI` y `OAUTH_CLIENT_ORIGIN` sustituyen a las constantes del backend; sus valores por defecto son los locales de siempre. La configuración rechaza una redirect URI relativa, con fragmento o que no sea http(s), un origen con ruta y un origen que no coincida con el de la redirect URI. `ValidateRegisteredClient` sigue comparando esa configuración con la fila de `oauth_clients`, de modo que cambiar estas variables exige también actualizar esa fila (la sembró la migración 000007).
+Los clientes OAuth ya no se configuran con variables de entorno: la API los lee de la tabla `applications` una sola vez al arrancar (`client_id`, `redirect_uri` y `allowed_origin` de cada fila; ver `docs/manuales/integracion-terceros.md`, sección 2.3). Para registrar otra aplicación hay que agregar una migración y reiniciar la API. Al arrancar, la API se niega a iniciar si no hay ninguna aplicación o si alguna tiene una redirect URI relativa, con fragmento o que no sea http(s), un origen con ruta o un origen que no coincida con el de la redirect URI.
 
 Siguen fijos, y hay que cambiarlos en conjunto para otro dominio, porque no son valores de ejecución sino de compilación o de configuración de Nginx:
 
-- `frontend/nginx/default.conf`: los `server_name` `identityhub.localhost` y `contabilidad.localhost` y el `connect-src` de la CSP de Contabilidad.
-- `contabilidad/src/config.ts`: `HUB_ORIGIN`, `CLIENT_ID` y `AUDIENCE`, constantes de compilación acopladas a esa CSP.
-- `frontend/src/App.tsx`: el enlace "Contabilidad" del Hub.
-- `db/migrations/000007_oauth_authorization_code.up.sql`: la fila del cliente registrado.
+- `frontend/nginx/default.conf`: los `server_name` `identityhub.localhost`, `contabilidad.localhost` e `inventario.localhost` y el `connect-src` de la CSP de cada aplicación.
+- `contabilidad/src/config.ts` e `inventario/src/config.ts`: `HUB_ORIGIN`, `CLIENT_ID` y `AUDIENCE`, constantes de compilación acopladas a esa CSP.
+- Las filas de `applications` sembradas por las migraciones 000007 (Contabilidad) y 000011 (Inventario): sus URL son las locales.
 - Los valores por defecto de `PUBLIC_BASE_URL` y `JWT_ISSUER` (estos dos sí se pueden sobrescribir por entorno).
 
 Hacerlos configurables exige plantillas de Nginx (`envsubst`) y argumentos de compilación del frontend; se dejó fuera para no cambiar la superficie de seguridad (CSP) sin una prueba de extremo a extremo con otro dominio.

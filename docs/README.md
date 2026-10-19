@@ -53,11 +53,12 @@ Esta página es el índice de `docs/`. Está organizada por la pregunta que uste
 - [Guía de integración de terceros](manuales/integracion-terceros.md): el flujo OAuth 2.0 con PKCE paso a paso, el contenido del token y un checklist de seguridad, con Contabilidad como ejemplo.
 - [Claves de servicio](manuales/claves-de-servicio.md): credenciales para sistemas que consultan el registro de auditoría sin sesión humana.
 - [Contrato OpenAPI](../specs/03-api/openapi.yaml): los endpoints exactos.
-- [`contabilidad/`](../contabilidad/README.md): el código de la aplicación de ejemplo.
+- [`contabilidad/`](../contabilidad/README.md) e [`inventario/`](../inventario/README.md): el código de las dos aplicaciones de ejemplo, una por empresa.
+- [ADR 0015](../specs/adr/0015-empresas-y-aislamiento-de-roles.md) y [escenarios de empresas](../specs/06-acceptance/empresas.feature): cómo el Hub separa los roles y los datos de cada empresa.
 
 ## 6. ¿Qué se decidió y por qué (ADR)?
 
-- [Índice de decisiones (ADR 0001 a 0014)](../specs/adr/README.md): cada decisión con contexto, alternativas y consecuencias, incluidas las malas.
+- [Índice de decisiones (ADR 0001 a 0015)](../specs/adr/README.md): cada decisión con contexto, alternativas y consecuencias, incluidas las malas.
 - Tres que ayudan a entender el resto: [IdP propio en lugar de Keycloak](../specs/adr/0002-idp-propio-en-lugar-de-keycloak.md), [SSO con Authorization Code y PKCE](../specs/adr/0009-sso-entre-dominios-con-authorization-code-y-pkce.md) y [línea base vulnerable deliberada](../specs/adr/0007-linea-base-vulnerable-deliberada.md).
 
 ## 7. ¿Cómo se desarrolló y se siguió el trabajo?
@@ -90,7 +91,7 @@ El contenido que sigue conecta los requisitos de `ENUNCIADO-TRABAJO-FINAL.md` co
 | `.github/workflows/` | [`../.github/workflows/`](../.github/workflows/) y [`../e2e/`](../e2e/) | Los workflows automatizan CI/CD y ejecutan la suite E2E versionada. |
 | `infraestructura/` | [`../infraestructura/`](../infraestructura/) | Módulos Terraform para la arquitectura AWS de referencia; no requieren una nube de pago para levantar el proyecto local. |
 | `orquestacion/` | [`../deploy/`](../deploy/), [`../deploy/docker-compose.yml`](../deploy/docker-compose.yml) y [`../deploy/docker-compose.prod.yml`](../deploy/docker-compose.prod.yml) | `deploy/` concentra Docker Compose y observabilidad; el compose de producción simulada está terminado. |
-| `servicios/` | [`../backend/`](../backend/), [`../frontend/`](../frontend/), [`../contabilidad/`](../contabilidad/) y [`../e2e/`](../e2e/) | Los servicios se separan por responsabilidad; `e2e/` contiene sus pruebas de extremo a extremo. |
+| `servicios/` | [`../backend/`](../backend/), [`../frontend/`](../frontend/), [`../contabilidad/`](../contabilidad/), [`../inventario/`](../inventario/) y [`../e2e/`](../e2e/) | Los servicios se separan por responsabilidad; `e2e/` contiene sus pruebas de extremo a extremo. |
 | `docs/` | [`docs/`](./), [`../specs/`](../specs/), [`../security/`](../security/) y [`../scripts/`](../scripts/) | `docs/` reúne la entrega; las especificaciones, evidencia de seguridad y trazabilidad versionada la respaldan. |
 
 ### Entregables y requisitos del enunciado
@@ -141,3 +142,4 @@ No los exige el enunciado; amplían el alcance del Hub:
 | Claves de servicio para integraciones máquina (RF-018) | [`manuales/claves-de-servicio.md`](manuales/claves-de-servicio.md) y [`../specs/adr/0014-claves-de-servicio-para-integraciones-maquina.md`](../specs/adr/0014-claves-de-servicio-para-integraciones-maquina.md) | hecho (F4) |
 | Exportación del registro de auditoría en CSV y JSON (RF-019) | [`manuales/usuario.md`](manuales/usuario.md) y [`../specs/06-acceptance/`](../specs/06-acceptance/) | hecho (F1) |
 | Runbook de alertas de Falco | [`runbooks/falco-alerta.md`](runbooks/falco-alerta.md) | hecho (F3) |
+| Empresas y aislamiento de roles (RF-022) | [`../specs/adr/0015-empresas-y-aislamiento-de-roles.md`](../specs/adr/0015-empresas-y-aislamiento-de-roles.md), [`../specs/06-acceptance/empresas.feature`](../specs/06-acceptance/empresas.feature) y la aplicación [`../inventario/`](../inventario/) | hecho (R1 a R5) |

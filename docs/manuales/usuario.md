@@ -1,12 +1,13 @@
 # Manual de usuario
 
-Esta guía explica cómo usar Identity Hub y la aplicación conectada Contabilidad, paso a paso y con capturas. Describe únicamente lo que las pantallas ofrecen hoy; no promete funciones que no existen. Está organizada por tipo de usuario:
+Esta guía explica cómo usar Identity Hub y las aplicaciones conectadas Contabilidad e Inventario, paso a paso y con capturas. Describe únicamente lo que las pantallas ofrecen hoy; no promete funciones que no existen. Está organizada por tipo de usuario:
 
 | Si usted es... | Lea | Qué hace |
 |---|---|---|
 | Empleado | [sección 2](#2-empleado) | Activa su cuenta, inicia sesión con código por correo, recupera su contraseña y gestiona su perfil y sesiones. |
 | Administrador | [sección 3](#3-administrador-consola-del-hub) | Ve el resumen del Hub, invita y administra usuarios, configura roles y permisos, consulta y exporta la auditoría, y emite claves de servicio para integraciones. |
 | Usuario de Contabilidad | [sección 4](#4-contabilidad-sso-con-identity-hub) | Entra a Contabilidad con su cuenta del Hub, ve gráficos y movimientos, y actúa según lo que su rol permite. |
+| Usuario de Inventario | [sección 4.9](#49-inventario-la-aplicación-de-la-segunda-empresa) | Entra a Inventario, la aplicación de la segunda empresa, y consulta o edita el catálogo según su rol. |
 
 > **Perfiles y roles no son lo mismo.** La tabla de arriba lista *perfiles de lector* de este manual (qué sección le toca leer a cada persona), no roles del sistema. Identity Hub tiene exactamente **dos roles de sistema**, `admin` y `user`, fijos en el código y que nadie edita desde la consola. Además existen los **roles de aplicación** (por ejemplo `contabilidad.senior`, `contabilidad.analista` o el `contabilidad.auditor` de la historia de la sección 5): los crea un administrador **sin límite** en **Roles**, eligiendo qué permisos lleva cada uno ([sección 3.4](#34-roles-y-permisos)). Una misma persona puede tener `user` y varios roles de aplicación a la vez.
 
@@ -19,7 +20,8 @@ La [sección 5](#5-historia-de-usuario-para-la-sustentación) cuenta de punta a 
 | Pieza | Dirección local | Para qué sirve |
 |---|---|---|
 | Identity Hub (consola y cuenta) | `http://identityhub.localhost:8080` | Inicio de sesión, "Mi cuenta" y consola de administración. |
-| Contabilidad | `http://contabilidad.localhost:8080` | Aplicación conectada al Hub (SSO). |
+| Contabilidad | `http://contabilidad.localhost:8080` | Aplicación conectada al Hub (SSO), de la empresa «Contabilidad S.A.». |
+| Inventario | `http://inventario.localhost:8080` | Aplicación conectada al Hub (SSO), de la empresa «Empresa B». |
 | Mailpit | `http://localhost:8025` | Buzón de pruebas: en este entorno los correos no salen a Internet, se leen aquí. |
 
 Para levantar el stack, vea la [guía de desarrollo](../guia-desarrollo.md) o ejecute `make up` desde la raíz del repositorio.
@@ -33,6 +35,8 @@ Para levantar el stack, vea la [guía de desarrollo](../guia-desarrollo.md) o ej
 - Las capturas de este manual se generaron con cuentas de prueba (`...@example.test`) y datos de ejemplo. Ninguna muestra contraseñas, códigos ni enlaces de invitación o de restablecimiento.
 
 ### 1.3 Cómo regenerar las capturas
+
+> **Capturas pendientes de regenerar.** Las pantallas que cambiaron con las empresas (selector **Empresa** en Inicio, Usuarios y Roles; campo **Empresa** al invitar; bloque **Aplicaciones conectadas**; texto de «Sin acceso») conservan la imagen anterior y llevan una nota donde corresponde. Se actualizarán con `make capturas`.
 
 Las imágenes de [`img/usuario/`](img/usuario/) las produce un script que maneja el stack real, de modo que siguen el comportamiento actual:
 
@@ -87,12 +91,13 @@ Si el enlace está incompleto, venció o ya se usó, la pantalla lo dice (**La i
 
 5. Un código incorrecto o vencido muestra **El código no es válido o el desafío expiró.** con el botón **Volver a iniciar sesión**.
 
-6. Al verificar, entra a **Mi cuenta** (los administradores entran a **Inicio**).
+6. Al verificar, el Hub lo lleva según su perfil: los administradores entran a **Inicio**; una persona con acceso a **una sola** aplicación pasa directo a ella (Contabilidad o Inventario); el resto entra a **Mi cuenta**, donde el menú lateral lista sus aplicaciones.
 
 ### 2.3 Mi cuenta: perfil y sesiones
 
-**Mi cuenta** muestra dos paneles:
+**Mi cuenta** muestra dos paneles (y, en el menú, el bloque de aplicaciones):
 
+- **Aplicaciones conectadas** (en el menú lateral, no aparece en pantallas angostas): enlaces a las aplicaciones de su empresa en las que tiene un rol. Si no tiene ninguna, el bloque no se muestra.
 - **Perfil**: el nombre para mostrar (editable), el correo (solo lectura) y sus roles.
 - **Sesiones activas**: cada dispositivo con una sesión abierta, con su dirección IP y fechas. La sesión actual lleva la etiqueta **Esta sesión**. **Revocar** cierra una sesión; si revoca la actual, se cierra aquí mismo.
 
@@ -144,6 +149,8 @@ En el menú lateral, pulse **Cerrar sesión**: vuelve al formulario de inicio de
 
 Los administradores ven en el menú lateral seis entradas: **Inicio**, **Usuarios**, **Roles**, **Auditoría**, **Claves de servicio** y **Mi cuenta**. Las cinco primeras solo existen para el rol `admin`; un empleado que escriba esas direcciones es devuelto a **Mi cuenta**. Inicie sesión como se explica en la sección 2.2: entrará directamente a **Inicio**.
 
+**Una empresa a la vez.** En **Inicio**, **Usuarios** y **Roles** aparece arriba el selector **Empresa**: usted elige primero la empresa y la página muestra solo lo suyo (sus usuarios, sus aplicaciones y roles, sus indicadores). Al cambiar de empresa la página se recarga sin nada de la anterior. Por defecto se abre la primera empresa que no es «Identity Hub (operador)», que es la del administrador global; su elección queda guardada en este navegador. La **Auditoría** y las **Claves de servicio** no se dividen por empresa. Las capturas de las secciones 3.0 a 3.5 son anteriores al selector y no lo muestran.
+
 ### 3.0 Inicio
 
 **Inicio** resume el estado del Hub con los datos actuales de la API:
@@ -153,13 +160,15 @@ Los administradores ven en el menú lateral seis entradas: **Inicio**, **Usuario
 - **Actividad reciente**: las diez últimas acciones del registro de auditoría.
 - **Accesos directos** a **Usuarios**, **Roles** y **Auditoría**.
 
+Los indicadores de usuarios corresponden a la empresa elegida en el selector **Empresa**.
+
 ![Inicio de la consola con los indicadores, la actividad reciente y los accesos directos](img/usuario/administrador-22-inicio.png)
 
 **Qué significa «100+».** La API no entrega totales exactos, así que cada indicador cuenta hasta una página de 100 resultados. Si hay más, la tarjeta muestra **100+** (por ejemplo, «100+» usuarios activos) en lugar de un número exacto. La tarjeta de inicios fallidos suma dos consultas (contraseñas y códigos rechazados), por lo que puede llegar a mostrar **200+**. Si una de las tres consultas falla, solo su parte de la página muestra un aviso y el botón **Reintentar**; las demás siguen visibles.
 
 ### 3.1 Directorio de usuarios, filtro por estado y exportación
 
-**Usuarios** muestra tres indicadores (**Usuarios activos**, **Cuentas bloqueadas**, **Invitaciones pendientes**) y el **Directorio**: nombre, correo, estado (**Activo**, **Pendiente**, **Bloqueado**, **Deshabilitado**), roles y último acceso. Los indicadores cuentan solo los usuarios cargados; si hay más, aparece **Cargar más**.
+**Usuarios** (de la empresa elegida) muestra tres indicadores (**Usuarios activos**, **Cuentas bloqueadas**, **Invitaciones pendientes**) y el **Directorio**: nombre, correo, estado (**Activo**, **Pendiente**, **Bloqueado**, **Deshabilitado**), roles y último acceso. Los indicadores cuentan solo los usuarios cargados; si hay más, aparece **Cargar más**.
 
 ![Directorio de usuarios con una cuenta de cada estado](img/usuario/administrador-01-directorio.png)
 
@@ -177,7 +186,7 @@ Para buscar, escriba en **Buscar por correo o nombre**; la lista se filtra mient
 
 ### 3.2 Invitar a un usuario
 
-1. Pulse **Nuevo usuario**. Se abre el panel lateral con el nombre, el correo y los roles. El rol `user` va siempre marcado; puede añadir roles de aplicaciones (por ejemplo `contabilidad.senior`), cada uno con su descripción y sus permisos.
+1. Pulse **Nuevo usuario**. Se abre el panel lateral con el nombre, el correo, la **Empresa** (viene con la empresa elegida en el selector) y los roles. El rol `user` va siempre marcado; puede añadir roles de las aplicaciones de esa empresa (por ejemplo `contabilidad.senior`); si cambia la empresa en el panel, los roles marcados se descartan porque pertenecen a la anterior, cada uno con su descripción y sus permisos.
 
    ![Panel Nuevo usuario](img/usuario/administrador-02-nuevo-usuario.png)
 
@@ -204,13 +213,13 @@ Reglas que el panel hace cumplir: un administrador **no puede deshabilitarse ni 
 
 ### 3.4 Roles y permisos
 
-**Roles** ofrece una grilla por aplicación conectada. Cada aplicación declara sus permisos (columnas) y usted decide qué permisos lleva cada rol (filas). Los roles `admin` y `user` son del sistema y no se editan aquí. Un cambio de permisos rige desde el siguiente token de acceso de la persona (hasta 15 minutos).
+**Roles** ofrece una grilla por cada aplicación conectada de la empresa elegida (Contabilidad S.A. muestra Contabilidad; Empresa B, Inventario); nunca se mezclan roles de dos empresas en la misma pantalla. Cada aplicación declara sus permisos (columnas) y usted decide qué permisos lleva cada rol (filas). Los roles `admin` y `user` son del sistema y no se editan aquí. Un cambio de permisos rige desde el siguiente token de acceso de la persona (hasta 15 minutos).
 
 ![Grilla de roles y permisos de Contabilidad](img/usuario/administrador-07-roles-grilla.png)
 
 > En pantallas de 1280 px la grilla se desplaza horizontalmente dentro de su panel. Las capturas de esta sección se tomaron en una ventana más ancha para mostrarla completa.
 
-**Crear un rol.** Pulse **Nuevo rol de Contabilidad**, escriba el nombre (con el prefijo `contabilidad.`), marque los permisos y pulse **Crear rol**. Cada permiso se explica en la leyenda al pie de la grilla.
+**Crear un rol.** Pulse **Nuevo rol de Contabilidad** (en Empresa B, **Nuevo rol de Inventario**), escriba el nombre (con el prefijo `contabilidad.`), marque los permisos y pulse **Crear rol**. Cada permiso se explica en la leyenda al pie de la grilla.
 
 ![Formulario Nuevo rol con dos permisos marcados](img/usuario/administrador-08-nuevo-rol.png)
 
@@ -237,7 +246,7 @@ Cada creación, cambio y eliminación de un rol queda registrado en la auditorí
 ### 3.5 Asignar un rol de aplicación a un usuario
 
 1. En **Usuarios**, busque a la persona y pulse **Editar**.
-2. Marque el rol en la sección de la aplicación (por ejemplo `contabilidad.auditor`; el panel muestra sus permisos).
+2. Marque el rol en la sección de la aplicación (por ejemplo `contabilidad.auditor`; el panel muestra sus permisos). Solo se ofrecen roles de las aplicaciones de la **empresa de la persona**: a una cuenta de Empresa B no se le ofrece ningún rol de Contabilidad.
 
    ![Editar usuario con el rol contabilidad.auditor marcado](img/usuario/administrador-14-asignar-rol.png)
 
@@ -248,6 +257,8 @@ Cada creación, cambio y eliminación de un rol queda registrado en la auditorí
 4. De vuelta en **Roles**, la fila del rol muestra ahora **Asignado a 1 usuario** y **Eliminar** deshabilitado.
 
    ![Rol asignado: Eliminar deshabilitado y aviso de asignación](img/usuario/administrador-16-rol-asignado-sin-eliminar.png)
+
+*Si se intentara asignar por la API un rol de otra empresa, el Hub responde `400` y deja el rol sin asignar; queda en la auditoría como `role_assignment_rejected` con el motivo `organization_mismatch`. Tampoco se puede cambiar la empresa de una cuenta que aún tiene roles de la anterior.*
 
 ### 3.6 Registro de auditoría
 
@@ -363,9 +374,11 @@ Tras cerrar, el botón pasa a **Mes cerrado** y el aviso indica que son datos de
 
 Un rol con solo `reportes.ver` y `movimientos.ver_todos` ve el **Resumen** de toda la organización y todas las transacciones, pero no tiene botones de registrar, aprobar ni rechazar, y **Cierre contable** está bloqueado. La historia completa está en la [sección 5](#5-historia-de-usuario-para-la-sustentación).
 
-### 4.6 Cuenta sin rol de Contabilidad
+### 4.6 Cuenta sin acceso a Contabilidad
 
-Si su cuenta se autenticó pero no tiene ningún rol `contabilidad.*`, Contabilidad muestra **Sin acceso a Contabilidad**. Use **Ir a Identity Hub** o pida a un administrador que le asigne un rol (sección 3.5).
+Contabilidad muestra **Sin acceso a Contabilidad** en dos casos: la cuenta pertenece a **otra empresa** (por ejemplo, es de Empresa B) o no tiene ningún rol `contabilidad.*`. En ambos el Hub no entrega credencial alguna: rechaza la solicitud y registra el intento en la auditoría (`oauth_authorization_rejected`). Use **Ir a Identity Hub** o pida a un administrador que le asigne un rol (sección 3.5); si su cuenta es de otra empresa, la aplicación que le corresponde es la de su propia empresa (menú **Aplicaciones conectadas**).
+
+> La captura es anterior al texto actual, que dice «pertenece a otra empresa o no tiene un rol de esta aplicación».
 
 ![Pantalla Sin acceso a Contabilidad](img/usuario/contabilidad-14-sin-acceso.png)
 
@@ -389,6 +402,18 @@ Pulse **Cerrar sesión** en la barra superior (o en la pantalla "Sin acceso"): C
 ![Transacciones con búsqueda, filtro de estado y orden por monto](img/usuario/contabilidad-16-transacciones-filtros.png)
 
 **Exportar CSV.** El botón **Exportar CSV** descarga exactamente las filas que ve en pantalla (con la búsqueda, los filtros y el orden aplicados) en seis columnas: folio, fecha, descripción, categoría, monto y estado. Los montos van como números, el archivo usa UTF-8 con marca BOM para que Excel muestre las tildes, y el botón se deshabilita si no hay filas.
+
+
+### 4.9 Inventario: la aplicación de la segunda empresa
+
+Inventario (`http://inventario.localhost:8080`) es una aplicación mínima de **Empresa B** que demuestra que el Hub atiende a otra empresa sin mezclar sus roles con los de Contabilidad. Funciona como Contabilidad: no tiene usuarios propios, se entra con **Continuar con Identity Hub**, y los productos y movimientos son **datos de ejemplo** que viven en el navegador. Tiene dos roles:
+
+| | `inventario.consulta` | `inventario.bodeguero` |
+|---|---|---|
+| Catálogo de productos | Solo lectura | Lectura y edición |
+| Movimientos de bodega (entradas y salidas) | Deshabilitado | Sí; una salida no deja el saldo bajo cero |
+
+Quien no sea de Empresa B, o no tenga un rol `inventario.*`, ve **Sin acceso a Inventario**. Para dar acceso a una persona, un administrador elige **Empresa B** en el selector, la invita (o la edita) y le asigna el rol. Esta sección no tiene capturas.
 
 ---
 
@@ -424,7 +449,8 @@ Qué demuestra esta historia ([criterio de aceptación 2 de la semana 4](../../o
 | **La cuenta está bloqueada** | Espere el fin del bloqueo, restablezca la contraseña (2.4) o pida a un administrador que ponga la cuenta en **Activo** (3.3). |
 | **Demasiados intentos** | Se superó el límite de intentos o de solicitudes; espere unos minutos. |
 | El rol nuevo no aparece en Contabilidad | El cambio rige desde el siguiente token (hasta 15 minutos): cierre sesión en Contabilidad y vuelva a entrar. |
-| **Sin acceso a Contabilidad** | La cuenta no tiene un rol `contabilidad.*`; pídalo a un administrador (3.5). |
+| **Sin acceso a Contabilidad** (o **a Inventario**) | La cuenta es de otra empresa o no tiene un rol de esa aplicación; pida el rol a un administrador (3.5) o use la aplicación de su propia empresa (4.6). |
+| No veo el selector **Empresa** | Solo existe en la consola de administración (Inicio, Usuarios y Roles). |
 | No puedo eliminar un rol | Tiene usuarios asignados (3.4): quite la asignación primero. |
 | El CSV exportado trae menos filas de las esperadas | En usuarios solo incluye lo cargado en pantalla y en movimientos lo visible tras filtros; pulse **Cargar más** y vuelva a exportar (3.1, 4.8). La auditoría se exporta completa desde el servidor, con un tope de 10 000 eventos (3.6). |
 | Un indicador de Inicio dice **100+** | Es un conteo con tope de 100 por consulta; para el detalle abra el directorio o la auditoría desde la tarjeta (3.0). |
