@@ -35,6 +35,13 @@ pasa con una empresa tercera. Mapa del estado actual (2026-10-19, exploración c
 - **Demostración con una segunda aplicación mínima:** «Inventario» de «Empresa B» en
   `inventario.localhost:8080`, servida por el mismo Nginx, con su propio cliente OAuth, roles y permisos.
 
+- **Aclaración del usuario (2026-10-19), objetivo principal:** que la consola del Hub separe las empresas.
+  El administrador elige primero la empresa y trabaja en una vista solo de ella: la grilla de roles muestra
+  solo sus aplicaciones y roles (crear un rol nunca muestra roles de dos empresas juntos), el listado de
+  usuarios solo sus usuarios, y al asignar un rol solo se ofrecen roles de la empresa del usuario. Inventario
+  sigue en alcance como aplicación de la segunda empresa, pero la separación en la consola es lo central.
+  Confirmado por el usuario: se construye la app básica de Inventario («por si me preguntan»).
+
 ## Alcance autorizado
 
 - ADR nuevo, requisitos (RF-020 y RF-021 ajustados o RF nuevo), modelo de dominio, escenarios de aceptación.
@@ -62,7 +69,7 @@ aplicaciones desde la consola (se declaran por migración, como hoy Contabilidad
 
 ## Tareas
 
-- [ ] **R1. Especificación.** ADR 0015, requisitos, modelo de dominio y escenarios `empresas.feature`.
+- [x] **R1. Especificación.** ADR 0015, requisitos, modelo de dominio y escenarios `empresas.feature`.
 - [ ] **R2. Datos.** Migración de empresas y semillas; consultas sqlc; trigger o validación de que un rol
   asignado pertenece a la empresa del usuario; pruebas de integración.
 - [ ] **R3. OAuth multi-cliente.** Clientes desde `applications`; `redirect_uri`, CORS y `aud` por cliente;
@@ -91,7 +98,24 @@ ramas locales y se suben después.
 
 - 2026-10-19: exploración hecha; modelo y demostración decididos con el usuario; rama
   `feat/roles-por-empresa` creada desde `main` (local).
+- 2026-10-19 (R1, redactado, sin marcar): `specs/adr/0015-empresas-y-aislamiento-de-roles.md` (con la
+  separación por empresa en la consola como objetivo principal), índice en `specs/adr/README.md`,
+  RF-022 nuevo y RF-020/RF-021 ajustados en `specs/01-requirements.md`, entidad `organizations` e
+  invariantes 12 a 14 en `specs/02-domain-model.md`, `specs/06-acceptance/empresas.feature` (11
+  escenarios) y un escenario ajustado en `control-de-acceso.feature` (rechazo en authorize en lugar de
+  token vacío). Comprobaciones: `traceability.py --check` y `make spec-drift` fallan solo por los 11
+  escenarios de RF-022 sin E2E (esperado hasta R5; la matriz no se regenera hasta entonces);
+  `traceability_test.py` y los demás `*_test.py` de `spec-drift` pasan.
+
+- 2026-10-19, revisión de R1 (sesión principal): ADR 0015 refleja la separación en la consola como
+  objetivo principal (punto 6) y el filtrado también en la API. Decisiones aceptadas: cambiar la empresa de
+  un usuario se rechaza mientras tenga roles de la anterior. Pendientes para R2–R4: nombre de la acción de
+  auditoría del rechazo en `/oauth/authorize` (R3), forma del parámetro de empresa en la API (R4), y a qué
+  empresa pertenece el administrador global (R2; `users.organization_id` es `NOT NULL`).
+- **Consecuencia para la entrega:** `empresas.feature` se guarda fuera del repo hasta tener sus E2E (el hook de pre-commit también corre la matriz). `scripts/traceability.py` y `make spec-drift` exigen una E2E por cada
+  escenario con tag `@RF`, así que en esta rama fallan hasta que existan. Cada escenario entra a `main` en
+  el mismo PR que su E2E; el corte de PR se ajusta al subir (el primero será más grande que R1+R2).
 
 ## Próximo paso
 
-R1 (writer delegado).
+R2 (datos).

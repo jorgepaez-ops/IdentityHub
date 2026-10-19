@@ -226,8 +226,9 @@ Un admin exporta el registro de auditoría filtrado en CSV o JSON.
 
 ### RF-020 — Autorización de aplicaciones cliente · P1
 Una aplicación cliente obtiene un access token mediante authorization code con PKCE S256.
-- Existe un único cliente público, Contabilidad, con `client_id` y `redirect_uri` fijos en
-  configuración; la URI de retorno exige coincidencia exacta y `state` es obligatorio.
+- Los clientes públicos se registran en `applications` (Contabilidad e Inventario), cada uno con su
+  `client_id`, `redirect_uri` y origen permitido; la URI de retorno exige coincidencia exacta con la del
+  cliente solicitado y `state` es obligatorio.
 - El código de autorización es aleatorio, se guarda solo como hash, vence en aproximadamente un
   minuto, es de un solo uso y queda ligado al cliente, la URI y el `code_challenge` S256.
 - El Hub mantiene una sesión propia en cookie `HttpOnly`, `Secure`, `SameSite=Lax`, separada de la
@@ -239,16 +240,23 @@ Una aplicación cliente obtiene un access token mediante authorization code con 
 - El access token tiene `aud` igual al cliente, solo sus roles de aplicación y los permisos
   resueltos para esa audiencia; no se entrega refresh token a la aplicación.
 - CORS se permite únicamente en `/oauth/token` y `/.well-known/jwks.json`, sin credenciales y solo
-  para el origen configurado del cliente.
+  para el origen registrado del cliente.
+- `/oauth/authorize` rechaza, sin emitir código, al usuario de una empresa distinta de la de la
+  aplicación o sin ningún rol en ella (RF-022).
 - **Aceptación:** el flujo correcto redirige con `code` y el mismo `state`; una segunda entrada usa
   la sesión SSO sin contraseña; URI incorrecta, `state` ausente, PKCE `plain`, reuso del código
-  o un `continue` absoluto o externo se rechazan; el JWT contiene solo los roles de Contabilidad.
+  o un `continue` absoluto o externo se rechazan; el JWT contiene solo los roles de la aplicación solicitada; un usuario de otra empresa o sin rol en
+la aplicación se rechaza en `/oauth/authorize`.
 
 > **Enmienda T3 · 2026-09-27 · ADR 0009:** se añade el contrato mínimo de SSO entre dominios.
 
 > **Enmienda T11 · 2026-10-05 · D9/ADR 0013:** el token de Contabilidad incorpora `permissions`
 > resueltos para su audiencia además de `roles`; el cliente público único y sus valores fijos se
 > mantienen.
+
+> **Enmienda R1 · 2026-10-19 · ADR 0015:** deja de existir un único cliente fijo: los clientes se
+> cargan de `applications` y `/oauth/authorize` rechaza por empresa o falta de rol en lugar de emitir
+> un token sin roles.
 
 ### RF-021 — Roles y permisos configurables por aplicación · P1
 Cada aplicación declara sus permisos y un administrador configura los roles que podrán asignarse
@@ -262,10 +270,46 @@ para esa aplicación.
   15 minutos por la vigencia del access token.
 - **Aceptación:** (1) solo se crean roles de aplicación; (2) un administrador no edita los permisos
   de un rol que posee; (3) un permiso desconocido o de otra aplicación devuelve `400`; (4) no se
-  elimina un rol asignado; (5) crear, actualizar y eliminar un rol deja auditoría.
+  elimina un rol asignado; (5) crear, actualizar y eliminar un rol deja auditoría; (6) la grilla
+  muestra solo las aplicaciones y roles de la empresa seleccionada en la consola, y un rol de la
+  aplicación de otra empresa no se asigna a un usuario (`400`, auditado; RF-022).
 
 > **Decisión T11 · 2026-10-05 · D9/ADR 0013:** se define la grilla configurable y el alcance del
 > token por aplicación.
+
+> **Enmienda R1 · 2026-10-19 · ADR 0015:** la grilla opera dentro de una empresa y la asignación de
+> roles queda restringida a la empresa del usuario.
+
+### RF-022 — Empresas y aislamiento de roles · P1
+Cada aplicación y cada usuario pertenecen a una sola empresa, y la consola del Hub separa las
+empresas.
+- Existen empresas (`organizations`); toda aplicación y toda cuenta pertenecen a exactamente una. Las
+  empresas y aplicaciones se declaran por migración; la consola no las crea.
+- La consola obliga a elegir una empresa y trabaja en una vista acotada a ella: la página de Roles lista
+  solo las aplicaciones y roles de esa empresa, el listado de Usuarios muestra solo sus cuentas, y al
+  asignar un rol a un usuario solo se ofrecen roles de la empresa del usuario. Cambiar de empresa
+  muestra una vista sin nada de la anterior. La API de administración filtra por empresa, no solo la
+  interfaz.
+- Un rol de aplicación solo se asigna a un usuario de la misma empresa que la aplicación del rol; el
+  backend rechaza otra combinación con `400` y la base de datos lo impone con una restricción.
+  El rechazo se audita como `role_assignment_rejected`.
+- `/oauth/authorize` rechaza, sin emitir código ni token, al usuario cuya empresa difiere de la de la
+  aplicación o que no tiene ningún rol en ella. El token de una aplicación lleva solo los roles de esa
+  aplicación (`aud`).
+- Tras el login, el Hub lista las aplicaciones de la empresa del usuario en las que tiene rol y, si hay
+  exactamente una, lo lleva a ella.
+- El administrador del Hub es global: puede cambiar de empresa, pero en cada vista trabaja con una
+  sola. No hay administrador por empresa.
+- **Aceptación:** (1) un usuario de Contabilidad S.A. entra a Contabilidad y uno de Empresa B entra a
+  Inventario; (2) un usuario de Empresa B que abre Contabilidad es rechazado sin token; (3) un usuario
+  sin rol en una aplicación de su empresa es rechazado en `/oauth/authorize`; (4) el backend rechaza
+  asignar un rol de otra empresa y lo audita; (5) la grilla de roles, el listado de usuarios y las
+  opciones de asignación muestran solo recursos de la empresa seleccionada; (6) tras el login, el
+  usuario ve solo las aplicaciones de su empresa; (7) el token de Inventario lleva solo roles de
+  Inventario.
+
+> **Decisión R1 · 2026-10-19 · ADR 0015:** modelo de «empresa ligera» para responder a cómo servir a
+> una empresa tercera sin mezclar roles ni datos.
 
 ---
 

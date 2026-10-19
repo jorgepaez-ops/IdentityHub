@@ -16,11 +16,11 @@ Característica: Control de acceso por roles
     Cuando presento un token cuyo claim "roles" fue alterado para incluir "admin"
     Entonces recibo una respuesta 401
 
-  @RF-009 @RF-020 @p1
+  @RF-009 @RF-020 @RF-022 @p1
   Escenario: Un empleado sin rol de aplicación no accede a Contabilidad
-    Dado que existe un empleado con únicamente el rol base "user"
+    Dado que existe un empleado de Contabilidad S.A. con únicamente el rol base "user"
     Cuando completa el flujo OAuth de Contabilidad
-    Entonces el token no contiene roles de Contabilidad
+    Entonces Identity Hub rechaza la autorización sin emitir código ni token
     Y Contabilidad muestra "sin acceso"
 
   @RF-010 @p0
