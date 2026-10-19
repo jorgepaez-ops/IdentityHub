@@ -37,7 +37,9 @@ func TestRF021_StoreListaAplicacionesConPermisosRolesYConteos(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListApplications() error = %v", err)
 	}
-	if len(applications) != 1 || applications[0].ClientID != "contabilidad" || applications[0].Name != "Contabilidad" || len(applications[0].Permissions) != 5 {
+	// Migration 000011 also seeds Inventario (3 permissions) for Empresa B; the grid is filtered by company in R4.
+	if len(applications) != 2 || applications[0].ClientID != "contabilidad" || applications[0].Name != "Contabilidad" || len(applications[0].Permissions) != 5 ||
+		applications[1].ClientID != "inventario" || len(applications[1].Permissions) != 3 {
 		t.Fatalf("applications = %+v", applications)
 	}
 	roles := map[string]rolegrid.Role{}
@@ -247,7 +249,7 @@ func TestRF021_StoreMapeaElTriggerYLaRestriccionDeAsignaciones(t *testing.T) {
 	}
 	// A role of another application is not addressable through this application (404).
 	var foreignID uuid.UUID
-	if err := pool.QueryRow(ctx, `INSERT INTO applications (client_id, redirect_uri, allowed_origin, name) VALUES ('otra', 'http://otra.test/cb', 'http://otra.test', 'Otra') RETURNING id`).Scan(&foreignID); err != nil {
+	if err := pool.QueryRow(ctx, `INSERT INTO applications (client_id, redirect_uri, allowed_origin, name, organization_id) VALUES ('otra', 'http://otra.test/cb', 'http://otra.test', 'Otra', '00000000-0000-4000-8000-0000000000a3') RETURNING id`).Scan(&foreignID); err != nil {
 		t.Fatal(err)
 	}
 	err = repository.WithinRoleGridTransaction(ctx, func(w rolegrid.Writer) error {

@@ -35,7 +35,7 @@ func TestRF006_DosRenovacionesConcurrentesUnaGana(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Hash: %v", err)
 	}
-	user, err := repository.CreateUser(ctx, store.CreateUserParams{Email: "refresh-race@example.test", PasswordHash: passwordHash, DisplayName: "Refresh race"})
+	user, err := repository.CreateUser(ctx, store.CreateUserParams{OrganizationID: store.ContabilidadOrganizationID, Email: "refresh-race@example.test", PasswordHash: passwordHash, DisplayName: "Refresh race"})
 	if err != nil {
 		t.Fatalf("CreateUser: %v", err)
 	}

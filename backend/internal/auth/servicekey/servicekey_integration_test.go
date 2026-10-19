@@ -54,7 +54,7 @@ func (h *harness) user(admin bool) (uuid.UUID, string) {
 	ctx := context.Background()
 	id := uuid.New()
 	hash := "$argon2id$v=19$m=65536,t=3,p=2$c29tZXNhbHQ$c29tZWhhc2hzb21laGFzaHNvbWVoYXNoc29tZWhhc2g"
-	if _, err := h.pool.Exec(ctx, `INSERT INTO users (id, email, password_hash, display_name, status) VALUES ($1, $2, $3, 'Test', 'active')`, id, id.String()+"@example.test", hash); err != nil {
+	if _, err := h.pool.Exec(ctx, `INSERT INTO users (id, email, password_hash, display_name, status, organization_id) VALUES ($1, $2, $3, 'Test', 'active', '00000000-0000-4000-8000-0000000000a2')`, id, id.String()+"@example.test", hash); err != nil {
 		h.t.Fatalf("insert user: %v", err)
 	}
 	roles := []string{"user"}

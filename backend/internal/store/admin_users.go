@@ -126,7 +126,7 @@ func (w *adminWriter) ReplaceRoles(ctx context.Context, id uuid.UUID, roles []st
 	for _, role := range roles {
 		rows, err := w.queries.AddUserRole(ctx, generated.AddUserRoleParams{UserID: id, Name: role, GrantedBy: pgtype.UUID{Bytes: grantedBy, Valid: true}})
 		if err != nil {
-			return fmt.Errorf("add user role: %w", err)
+			return fmt.Errorf("add user role: %w", mapOrganizationError(err))
 		}
 		if rows != 1 {
 			return fmt.Errorf("add user role: role %q is missing", role)

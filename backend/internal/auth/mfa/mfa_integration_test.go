@@ -43,7 +43,7 @@ func newActiveUser(t *testing.T, pool *pgxpool.Pool, repository *store.Store, em
 	if err != nil {
 		t.Fatal(err)
 	}
-	user, err := repository.CreateUser(ctx, store.CreateUserParams{Email: email, PasswordHash: hash, DisplayName: "MFA"})
+	user, err := repository.CreateUser(ctx, store.CreateUserParams{OrganizationID: store.ContabilidadOrganizationID, Email: email, PasswordHash: hash, DisplayName: "MFA"})
 	if err != nil {
 		t.Fatal(err)
 	}

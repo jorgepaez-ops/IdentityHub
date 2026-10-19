@@ -31,7 +31,7 @@ declaración de buenas intenciones.
 | **RF-019** | Exportación del audit log | P2 | `exportAuditLog` | 2 | 13 | 2 | — | ✅ completo |
 | **RF-020** | Autorización de aplicaciones cliente | P1 | `authorizeClient`, `exchangeAuthorizationCode` | 10 | 32 | 8 | — | ✅ completo |
 | **RF-021** | Roles y permisos configurables por aplicación | P1 | `listApplications`, `listApplicationRoles`, `createApplicationRole`, `updateApplicationRole`, `deleteApplicationRole` | 6 | 31 | 6 | — | ✅ completo |
-| **RF-022** | Empresas y aislamiento de roles | P1 | — | 1 | — | — | — | 🟡 parcial |
+| **RF-022** | Empresas y aislamiento de roles | P1 | — | 1 | 7 | — | — | ✅ completo |
 | **RNF-001** | Contenerización total | P0 | — | 1 | — | — | `ci.yml#e2e`, `.github/actions/stack-up/action.yml` | ✅ completo |
 | **RNF-002** | Pipeline de ciclo completo | P0 | — | 1 | — | — | `ci.yml#secrets`, `ci.yml#sast`, `ci.yml#sca`, `ci.yml#image`, `ci.yml#dast` | ✅ completo |
 | **RNF-003** | Cero secretos en el repositorio | P0 | — | — | 10 | — | `ci.yml#secrets` | ✅ completo |
@@ -45,7 +45,7 @@ declaración de buenas intenciones.
 | **RNF-011** | Los specs son la fuente de verdad | P0 | — | — | 5 | — | `ci.yml#spec-drift` | ✅ completo |
 | **RNF-012** | Logs sin datos sensibles | P0 | — | — | 5 | 1 | — | ✅ completo |
 
-**Resumen:** 34 requisitos · 33 completos · 1 parciales · 0 sin cubrir · 0 diferidos (2026-10-13).
+**Resumen:** 34 requisitos · 34 completos · 0 parciales · 0 sin cubrir · 0 diferidos (2026-10-13).
 
 Leyenda de estado: *completo* = verificado por al menos dos de las
 cuatro columnas de evidencia (Escenarios, Pruebas Go, E2E, Controles CI) · *parcial* = una sola ·

@@ -76,7 +76,7 @@ func TestRF017_DesbloqueaUsuarioReactivaLaCuentaBloqueada(t *testing.T) {
 		t.Fatalf("NewWithPool: %v", err)
 	}
 
-	created, err := repository.CreateUser(ctx, store.CreateUserParams{
+	created, err := repository.CreateUser(ctx, store.CreateUserParams{OrganizationID: store.ContabilidadOrganizationID,
 		Email:        "lockout-writer@example.test",
 		PasswordHash: "$argon2id$fixed-test-value",
 		DisplayName:  "Lockout Writer",

@@ -38,7 +38,7 @@ func TestRNF011_MigracionesSeAplicanSobreBaseVacia(t *testing.T) {
 		}
 	}
 
-	_, err := pool.Exec(ctx, "INSERT INTO users (email, password_hash, display_name) VALUES ($1, $2, $3)", "md5@example.test", "d41d8cd98f00b204e9800998ecf8427e", "MD5 user")
+	_, err := pool.Exec(ctx, "INSERT INTO users (email, password_hash, display_name, organization_id) VALUES ($1, $2, $3, '00000000-0000-4000-8000-0000000000a2')", "md5@example.test", "d41d8cd98f00b204e9800998ecf8427e", "MD5 user")
 	var pgErr *pgconn.PgError
 	if !errors.As(err, &pgErr) {
 		t.Fatalf("insert MD5 password hash error = %v, want PostgreSQL constraint error", err)
@@ -50,7 +50,7 @@ func TestRNF011_MigracionesSeAplicanSobreBaseVacia(t *testing.T) {
 		t.Errorf("MD5 constraint name = %q, want users_password_hash_is_argon2id", pgErr.ConstraintName)
 	}
 
-	_, err = pool.Exec(ctx, "INSERT INTO users (email, password_hash, display_name) VALUES ($1, $2, $3)", "argon@example.test", "$argon2id$fixed-test-value", "Argon2id user")
+	_, err = pool.Exec(ctx, "INSERT INTO users (email, password_hash, display_name, organization_id) VALUES ($1, $2, $3, '00000000-0000-4000-8000-0000000000a2')", "argon@example.test", "$argon2id$fixed-test-value", "Argon2id user")
 	if err != nil {
 		t.Fatalf("insert Argon2id password hash: %v", err)
 	}

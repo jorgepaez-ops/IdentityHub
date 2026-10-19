@@ -93,7 +93,7 @@ func TestRF020_StoreResuelvePermisosPorRolesYAplicacion(t *testing.T) {
 	if _, err := admin.New(repository).UpdateUser(ctx, admin.UpdateInput{ActorUserID: uuid.New(), UserID: uuid.New(), Roles: rolesPointer([]string{"user", "unknown.application"})}); !errors.Is(err, admin.ErrInvalidRole) {
 		t.Fatalf("database role validation error=%v, want %v", err, admin.ErrInvalidRole)
 	}
-	user, err := repository.CreateUser(ctx, store.CreateUserParams{Email: "permissions@example.test", PasswordHash: "$argon2id$fixed-test-value", DisplayName: "Permissions"})
+	user, err := repository.CreateUser(ctx, store.CreateUserParams{OrganizationID: store.ContabilidadOrganizationID, Email: "permissions@example.test", PasswordHash: "$argon2id$fixed-test-value", DisplayName: "Permissions"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +108,7 @@ func TestRF020_StoreResuelvePermisosPorRolesYAplicacion(t *testing.T) {
 	}
 
 	var foreignApplicationID, foreignPermissionID, seniorRoleID uuid.UUID
-	if err := pool.QueryRow(ctx, `INSERT INTO applications (client_id, redirect_uri, allowed_origin, name) VALUES ('foreign', 'http://foreign.test/callback', 'http://foreign.test', 'Foreign') RETURNING id`).Scan(&foreignApplicationID); err != nil {
+	if err := pool.QueryRow(ctx, `INSERT INTO applications (client_id, redirect_uri, allowed_origin, name, organization_id) VALUES ('foreign', 'http://foreign.test/callback', 'http://foreign.test', 'Foreign', '00000000-0000-4000-8000-0000000000a3') RETURNING id`).Scan(&foreignApplicationID); err != nil {
 		t.Fatal(err)
 	}
 	if err := pool.QueryRow(ctx, `INSERT INTO permissions (application_id, key, description) VALUES ($1, 'foreign.escalate', 'Foreign permission') RETURNING id`, foreignApplicationID).Scan(&foreignPermissionID); err != nil {

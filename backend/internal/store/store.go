@@ -31,6 +31,8 @@ type CreateUserParams struct {
 	Email        string
 	PasswordHash string
 	DisplayName  string
+	// OrganizationID is required: every user belongs to exactly one organization (RF-022).
+	OrganizationID uuid.UUID
 }
 
 // User is the application-facing representation returned by base user
@@ -122,11 +124,10 @@ func (s *Store) WithLogger(logger *slog.Logger) *Store {
 
 // CreateUser persists a user through the generated parameterized query.
 func (s *Store) CreateUser(ctx context.Context, params CreateUserParams) (User, error) {
-	user, err := s.queries.CreateUser(ctx, generated.CreateUserParams{
-		Email:        params.Email,
-		PasswordHash: params.PasswordHash,
-		DisplayName:  params.DisplayName,
-	})
+	if params.OrganizationID == uuid.Nil {
+		return User{}, ErrOrganizationRequired
+	}
+	user, err := s.queries.CreateUser(ctx, createUserParamsToGenerated(params))
 	if err != nil {
 		return User{}, fmt.Errorf("create user: %w", err)
 	}
@@ -187,6 +188,15 @@ func (s *Store) InsertAuditEvent(ctx context.Context, params InsertAuditEventPar
 		return AuditEvent{}, fmt.Errorf("insert audit event: %w", err)
 	}
 	return auditEventFromGenerated(event), nil
+}
+
+func createUserParamsToGenerated(params CreateUserParams) generated.CreateUserParams {
+	return generated.CreateUserParams{
+		Email:          params.Email,
+		PasswordHash:   params.PasswordHash,
+		DisplayName:    params.DisplayName,
+		OrganizationID: params.OrganizationID,
+	}
 }
 
 func userFromGenerated(user generated.User) User {

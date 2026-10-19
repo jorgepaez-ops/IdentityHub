@@ -53,8 +53,11 @@ type Input struct {
 	Email, DisplayName string
 	Roles              []string
 	ActorUserID        uuid.UUID
-	IP                 *netip.Addr
-	UserAgent          *string
+	// OrganizationID is the company of the new account. Transitional (R2): when zero, the account joins
+	// Contabilidad S.A.; R4 removes that default once the console sends the company.
+	OrganizationID uuid.UUID
+	IP             *netip.Addr
+	UserAgent      *string
 }
 
 type Result struct {
@@ -125,7 +128,11 @@ func (s *Service) createWithinTransaction(ctx context.Context, writer store.Empl
 	if len(found) != len(finalRoles) {
 		return Result{}, &InvalidInputError{Field: "roles", Detail: "contains an unknown role"}
 	}
-	user, err := writer.CreateUser(ctx, store.CreateUserParams{Email: input.Email, PasswordHash: passwordHash, DisplayName: input.DisplayName})
+	organizationID := input.OrganizationID
+	if organizationID == uuid.Nil {
+		organizationID = store.ContabilidadOrganizationID // transitional default, removed in R4
+	}
+	user, err := writer.CreateUser(ctx, store.CreateUserParams{Email: input.Email, PasswordHash: passwordHash, DisplayName: input.DisplayName, OrganizationID: organizationID})
 	if err != nil {
 		return Result{}, mapCreateUserError(err)
 	}

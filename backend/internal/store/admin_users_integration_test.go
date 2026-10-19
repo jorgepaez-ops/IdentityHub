@@ -19,7 +19,7 @@ import (
 
 func createAdminTestUser(t *testing.T, ctx context.Context, repository *store.Store, email, displayName, status string) store.User {
 	t.Helper()
-	user, err := repository.CreateUser(ctx, store.CreateUserParams{
+	user, err := repository.CreateUser(ctx, store.CreateUserParams{OrganizationID: store.ContabilidadOrganizationID,
 		Email:        email,
 		PasswordHash: "$argon2id$fixed-test-value",
 		DisplayName:  displayName,
@@ -249,7 +249,7 @@ func TestRF009_Migracion000004AgregaCatalogoDeRolesDeNegocio(t *testing.T) {
 	if err := rows.Err(); err != nil {
 		t.Fatalf("iterate roles: %v", err)
 	}
-	want := []string{"admin", "contabilidad.analista", "contabilidad.senior", "user"}
+	want := []string{"admin", "contabilidad.analista", "contabilidad.senior", "inventario.bodeguero", "inventario.consulta", "user"} // inventario.* seeded by migration 000011
 	if !equalStrings(names, want) {
 		t.Fatalf("roles catalog = %v, want %v", names, want)
 	}

@@ -172,7 +172,7 @@ func (s *Service) createBootstrapAdmin(ctx context.Context, writer store.Bootstr
 	if err != nil {
 		return ensureResult{}, fmt.Errorf("hash bootstrap placeholder password: %w", err)
 	}
-	user, err := writer.CreateUser(ctx, store.CreateUserParams{Email: email, PasswordHash: passwordHash, DisplayName: "Bootstrap Admin"})
+	user, err := writer.CreateUser(ctx, store.CreateUserParams{Email: email, PasswordHash: passwordHash, DisplayName: "Bootstrap Admin", OrganizationID: store.HubOrganizationID})
 	if err != nil {
 		return ensureResult{}, safeOperationError{message: "bootstrap administrator creation failed", cause: err}
 	}

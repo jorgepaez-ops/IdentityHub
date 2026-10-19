@@ -70,7 +70,7 @@ aplicaciones desde la consola (se declaran por migración, como hoy Contabilidad
 ## Tareas
 
 - [x] **R1. Especificación.** ADR 0015, requisitos, modelo de dominio y escenarios `empresas.feature`.
-- [ ] **R2. Datos.** Migración de empresas y semillas; consultas sqlc; trigger o validación de que un rol
+- [x] **R2. Datos.** Migración de empresas y semillas; consultas sqlc; trigger o validación de que un rol
   asignado pertenece a la empresa del usuario; pruebas de integración.
 - [ ] **R3. OAuth multi-cliente.** Clientes desde `applications`; `redirect_uri`, CORS y `aud` por cliente;
   rechazo en `/oauth/authorize` por empresa o sin rol; pruebas.
@@ -115,7 +115,42 @@ ramas locales y se suben después.
 - **Consecuencia para la entrega:** `empresas.feature` se guarda fuera del repo hasta tener sus E2E (el hook de pre-commit también corre la matriz). `scripts/traceability.py` y `make spec-drift` exigen una E2E por cada
   escenario con tag `@RF`, así que en esta rama fallan hasta que existan. Cada escenario entra a `main` en
   el mismo PR que su E2E; el corte de PR se ajusta al subir (el primero será más grande que R1+R2).
+- 2026-10-19, revisión nativa de R1 (aprobada, 4 avisos, todos ya en la lista de pendientes): referencia del
+  ADR a `empresas.feature` (entra con sus E2E); contrato del rechazo en `/oauth/authorize` (R3); empresa del
+  administrador global (decidida: «Identity Hub (operador)», reflejar en `specs/02-domain-model.md` en R2 o
+  R6); el escenario ajustado de `control-de-acceso.feature` describe el rechazo antes de existir: su E2E
+  sigue probando el comportamiento viejo hasta R3, que debe actualizarla.
+- 2026-10-19 (R2, escrito por el ejecutor, sin marcar; la revisión y el commit son del orquestador):
+  - Migración `000011_organizations` (up/down; ida, vuelta e ida verificada en un Postgres desechable):
+    tabla `organizations` con tres empresas de UUID fijo (`hub` «Identity Hub (operador)»
+    `...0a1`, `contabilidad-sa` `...0a2`, `empresa-b` `...0a3`); `applications.organization_id` y
+    `users.organization_id` `NOT NULL` con respaldo (admins → hub, resto → contabilidad-sa) e índice en
+    usuarios; aplicación `inventario` de Empresa B con 3 permisos (`productos.ver`, `productos.editar`,
+    `movimientos.registrar`, sin prefijo como en 000009) y 2 roles (`inventario.consulta`,
+    `inventario.bodeguero`). Triggers con SQLSTATE propio `IH001`: `user_roles` INSERT/UPDATE (rol de
+    aplicación de otra empresa; los roles de directorio quedan exentos) y `users` UPDATE OF
+    `organization_id` (rechaza mientras tenga roles de aplicaciones de la empresa anterior).
+  - sqlc: `CreateUser` recibe la empresa; consultas nuevas en `db/queries/organizations.sql`
+    (`ListOrganizations`, `GetUserOrganization`, `ListOrganizationApplications`, `ListOrganizationUsers`
+    con el mismo filtro y cursor que `ListAdminUsers`).
+  - Store (`backend/internal/store/organizations.go`): constantes `HubOrganizationID`,
+    `ContabilidadOrganizationID`, `EmpresaBOrganizationID`; errores tipados `ErrCrossOrganizationRole`
+    (mapea `IH001` en `ReplaceRoles` y en `AddUserRole` del alta de empleados) y `ErrOrganizationRequired`
+    (`CreateUser` exige empresa). Sin cambios al contrato OpenAPI.
+  - **Transitorio (se retira en R4):** el alta de empleados sin empresa usa `contabilidad-sa`
+    (`employee.Input.OrganizationID` cero); el administrador de arranque (`BOOTSTRAP_ADMIN_EMAIL`) va a `hub`.
+    La grilla de roles (`ListApplications`) sigue sin filtrar por empresa hasta R4, por lo que ahora lista
+    también Inventario.
+  - Pruebas existentes ajustadas por el cambio de datos (no de comportamiento): altas de usuario con
+    empresa; catálogo de roles de 000004 y listado de aplicaciones de la grilla incluyen Inventario; las
+    aplicaciones ajenas insertadas por SQL crudo llevan empresa.
+  - Pruebas nuevas `TestRF022_*` (7, `organizations_integration_test.go`). RED observado quitando los
+    triggers de la migración: fallaron las 3 que dependen de ellos (asignación vía store, SQL crudo y
+    cambio de empresa); GREEN con los triggers. Las de siembra, listados por empresa, roles de
+    directorio y «alta exige empresa» describen datos/consultas que no compilan ni existen sin la
+    implementación, así que no tienen RED separado.
+  - `make gen` regeneró `specs/07-traceability.md` (RF-022 pasa de parcial a completo por las 7 pruebas
+    Go; los escenarios siguen sin E2E hasta R5 porque `empresas.feature` aún no está en el repo).
 
-## Próximo paso
 
 R2 (datos).

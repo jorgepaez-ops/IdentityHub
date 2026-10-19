@@ -70,7 +70,7 @@ UPDATE users
 SET password_hash = $2, status = 'active', updated_at = now()
 WHERE id = (SELECT user_id FROM consumed)
   AND status = 'pending_verification'
-RETURNING id, email, password_hash, display_name, status, mfa_enabled, mfa_secret_enc, failed_login_count, locked_until, last_login_at, created_at, updated_at
+RETURNING id, email, password_hash, display_name, status, mfa_enabled, mfa_secret_enc, failed_login_count, locked_until, last_login_at, created_at, updated_at, organization_id
 `
 
 type ConsumeInvitationTokenParams struct {
@@ -98,6 +98,7 @@ func (q *Queries) ConsumeInvitationToken(ctx context.Context, arg ConsumeInvitat
 		&i.LastLoginAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.OrganizationID,
 	)
 	return i, err
 }
@@ -138,7 +139,7 @@ WITH consumed AS (
         status = CASE WHEN status = 'locked' THEN 'active' ELSE status END,
         locked_until = CASE WHEN status = 'locked' THEN NULL ELSE locked_until END
     WHERE id = (SELECT id FROM previous_user)
-    RETURNING id, email, password_hash, display_name, status, mfa_enabled, mfa_secret_enc, failed_login_count, locked_until, last_login_at, created_at, updated_at
+    RETURNING id, email, password_hash, display_name, status, mfa_enabled, mfa_secret_enc, failed_login_count, locked_until, last_login_at, created_at, updated_at, organization_id
 ), revoked AS (
     UPDATE refresh_tokens
     SET status = 'revoked'
@@ -152,7 +153,7 @@ WITH consumed AS (
       AND revoked_at IS NULL
     RETURNING id
 )
-SELECT updated_user.id, updated_user.email, updated_user.password_hash, updated_user.display_name, updated_user.status, updated_user.mfa_enabled, updated_user.mfa_secret_enc, updated_user.failed_login_count, updated_user.locked_until, updated_user.last_login_at, updated_user.created_at, updated_user.updated_at, (previous_user.status = 'locked') AS unlocked
+SELECT updated_user.id, updated_user.email, updated_user.password_hash, updated_user.display_name, updated_user.status, updated_user.mfa_enabled, updated_user.mfa_secret_enc, updated_user.failed_login_count, updated_user.locked_until, updated_user.last_login_at, updated_user.created_at, updated_user.updated_at, updated_user.organization_id, (previous_user.status = 'locked') AS unlocked
 FROM updated_user
 JOIN previous_user ON previous_user.id = updated_user.id
 `
@@ -175,6 +176,7 @@ type ConsumePasswordResetTokenAndRevokeSessionsRow struct {
 	LastLoginAt      pgtype.Timestamptz
 	CreatedAt        pgtype.Timestamptz
 	UpdatedAt        pgtype.Timestamptz
+	OrganizationID   uuid.UUID
 	Unlocked         bool
 }
 
@@ -202,6 +204,7 @@ func (q *Queries) ConsumePasswordResetTokenAndRevokeSessions(ctx context.Context
 		&i.LastLoginAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.OrganizationID,
 		&i.Unlocked,
 	)
 	return i, err
@@ -378,19 +381,25 @@ func (q *Queries) CreateRefreshToken(ctx context.Context, arg CreateRefreshToken
 }
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (email, password_hash, display_name)
-VALUES ($1, $2, $3)
-RETURNING id, email, password_hash, display_name, status, mfa_enabled, mfa_secret_enc, failed_login_count, locked_until, last_login_at, created_at, updated_at
+INSERT INTO users (email, password_hash, display_name, organization_id)
+VALUES ($1, $2, $3, $4)
+RETURNING id, email, password_hash, display_name, status, mfa_enabled, mfa_secret_enc, failed_login_count, locked_until, last_login_at, created_at, updated_at, organization_id
 `
 
 type CreateUserParams struct {
-	Email        string
-	PasswordHash string
-	DisplayName  string
+	Email          string
+	PasswordHash   string
+	DisplayName    string
+	OrganizationID uuid.UUID
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
-	row := q.db.QueryRow(ctx, createUser, arg.Email, arg.PasswordHash, arg.DisplayName)
+	row := q.db.QueryRow(ctx, createUser,
+		arg.Email,
+		arg.PasswordHash,
+		arg.DisplayName,
+		arg.OrganizationID,
+	)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -405,6 +414,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.LastLoginAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.OrganizationID,
 	)
 	return i, err
 }
@@ -584,7 +594,7 @@ func (q *Queries) GetUsedAuthorizationCodeOwner(ctx context.Context, codeHash []
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, password_hash, display_name, status, mfa_enabled, mfa_secret_enc, failed_login_count, locked_until, last_login_at, created_at, updated_at
+SELECT id, email, password_hash, display_name, status, mfa_enabled, mfa_secret_enc, failed_login_count, locked_until, last_login_at, created_at, updated_at, organization_id
 FROM users
 WHERE email = $1
 `
@@ -605,12 +615,13 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.LastLoginAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.OrganizationID,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, email, password_hash, display_name, status, mfa_enabled, mfa_secret_enc, failed_login_count, locked_until, last_login_at, created_at, updated_at
+SELECT id, email, password_hash, display_name, status, mfa_enabled, mfa_secret_enc, failed_login_count, locked_until, last_login_at, created_at, updated_at, organization_id
 FROM users
 WHERE id = $1
 `
@@ -631,12 +642,13 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.LastLoginAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.OrganizationID,
 	)
 	return i, err
 }
 
 const getUserByIDForUpdate = `-- name: GetUserByIDForUpdate :one
-SELECT id, email, password_hash, display_name, status, mfa_enabled, mfa_secret_enc, failed_login_count, locked_until, last_login_at, created_at, updated_at
+SELECT id, email, password_hash, display_name, status, mfa_enabled, mfa_secret_enc, failed_login_count, locked_until, last_login_at, created_at, updated_at, organization_id
 FROM users
 WHERE id = $1
 FOR UPDATE
@@ -658,6 +670,7 @@ func (q *Queries) GetUserByIDForUpdate(ctx context.Context, id uuid.UUID) (User,
 		&i.LastLoginAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.OrganizationID,
 	)
 	return i, err
 }
@@ -766,7 +779,7 @@ func (q *Queries) ListActiveRefreshSessions(ctx context.Context, userID uuid.UUI
 }
 
 const listAdminUsers = `-- name: ListAdminUsers :many
-SELECT id, email, password_hash, display_name, status, mfa_enabled, mfa_secret_enc, failed_login_count, locked_until, last_login_at, created_at, updated_at
+SELECT id, email, password_hash, display_name, status, mfa_enabled, mfa_secret_enc, failed_login_count, locked_until, last_login_at, created_at, updated_at, organization_id
 FROM users
 WHERE ($1::text = ''
        OR email::text ILIKE '%' || $1::text || '%'
@@ -811,6 +824,7 @@ func (q *Queries) ListAdminUsers(ctx context.Context, arg ListAdminUsersParams) 
 			&i.LastLoginAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.OrganizationID,
 		); err != nil {
 			return nil, err
 		}
@@ -1242,7 +1256,7 @@ const updateAdminUserStatus = `-- name: UpdateAdminUserStatus :one
 UPDATE users
 SET status = $2, locked_until = NULL
 WHERE id = $1
-RETURNING id, email, password_hash, display_name, status, mfa_enabled, mfa_secret_enc, failed_login_count, locked_until, last_login_at, created_at, updated_at
+RETURNING id, email, password_hash, display_name, status, mfa_enabled, mfa_secret_enc, failed_login_count, locked_until, last_login_at, created_at, updated_at, organization_id
 `
 
 type UpdateAdminUserStatusParams struct {
@@ -1268,6 +1282,7 @@ func (q *Queries) UpdateAdminUserStatus(ctx context.Context, arg UpdateAdminUser
 		&i.LastLoginAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.OrganizationID,
 	)
 	return i, err
 }
@@ -1276,7 +1291,7 @@ const updateDisplayName = `-- name: UpdateDisplayName :one
 UPDATE users
 SET display_name = $2
 WHERE id = $1
-RETURNING id, email, password_hash, display_name, status, mfa_enabled, mfa_secret_enc, failed_login_count, locked_until, last_login_at, created_at, updated_at
+RETURNING id, email, password_hash, display_name, status, mfa_enabled, mfa_secret_enc, failed_login_count, locked_until, last_login_at, created_at, updated_at, organization_id
 `
 
 type UpdateDisplayNameParams struct {
@@ -1300,6 +1315,7 @@ func (q *Queries) UpdateDisplayName(ctx context.Context, arg UpdateDisplayNamePa
 		&i.LastLoginAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.OrganizationID,
 	)
 	return i, err
 }

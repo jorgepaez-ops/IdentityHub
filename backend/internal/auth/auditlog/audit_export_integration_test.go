@@ -42,7 +42,7 @@ func newExportFixture(t *testing.T) exportFixture {
 	if err != nil {
 		t.Fatalf("Hash: %v", err)
 	}
-	admin, err := repository.CreateUser(ctx, store.CreateUserParams{Email: "export-admin@example.test", PasswordHash: hash, DisplayName: "Export Admin"})
+	admin, err := repository.CreateUser(ctx, store.CreateUserParams{OrganizationID: store.ContabilidadOrganizationID, Email: "export-admin@example.test", PasswordHash: hash, DisplayName: "Export Admin"})
 	if err != nil {
 		t.Fatalf("CreateUser: %v", err)
 	}
@@ -168,7 +168,7 @@ func TestRF019_ExportarRequiereAdminEnPostgres(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Hash: %v", err)
 	}
-	plain, err := f.repo.CreateUser(context.Background(), store.CreateUserParams{Email: "export-plain@example.test", PasswordHash: hash, DisplayName: "Plain User"})
+	plain, err := f.repo.CreateUser(context.Background(), store.CreateUserParams{OrganizationID: store.ContabilidadOrganizationID, Email: "export-plain@example.test", PasswordHash: hash, DisplayName: "Plain User"})
 	if err != nil {
 		t.Fatalf("CreateUser: %v", err)
 	}

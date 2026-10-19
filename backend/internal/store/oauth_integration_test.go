@@ -30,7 +30,7 @@ func TestRF020_PostgresCodigoPKCEAtomicoYHashOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	user, err := repository.CreateUser(ctx, store.CreateUserParams{Email: "oauth@example.test", PasswordHash: "$argon2id$fixed-test-value", DisplayName: "OAuth"})
+	user, err := repository.CreateUser(ctx, store.CreateUserParams{OrganizationID: store.ContabilidadOrganizationID, Email: "oauth@example.test", PasswordHash: "$argon2id$fixed-test-value", DisplayName: "OAuth"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,7 +129,7 @@ func TestRF020_PostgresReusoDeCodigoAuditaConElPropietarioComoActor(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	user, err := repository.CreateUser(ctx, store.CreateUserParams{Email: "oauth-reuse@example.test", PasswordHash: "$argon2id$fixed-test-value", DisplayName: "Reuse"})
+	user, err := repository.CreateUser(ctx, store.CreateUserParams{OrganizationID: store.ContabilidadOrganizationID, Email: "oauth-reuse@example.test", PasswordHash: "$argon2id$fixed-test-value", DisplayName: "Reuse"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -183,7 +183,7 @@ func TestRF020_PostgresPurgaCodigosYSesionesHubInutilizables(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	user, err := repository.CreateUser(ctx, store.CreateUserParams{Email: "oauth-purge@example.test", PasswordHash: "$argon2id$fixed-test-value", DisplayName: "Purge"})
+	user, err := repository.CreateUser(ctx, store.CreateUserParams{OrganizationID: store.ContabilidadOrganizationID, Email: "oauth-purge@example.test", PasswordHash: "$argon2id$fixed-test-value", DisplayName: "Purge"})
 	if err != nil {
 		t.Fatal(err)
 	}

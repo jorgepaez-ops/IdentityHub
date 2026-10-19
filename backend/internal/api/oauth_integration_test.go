@@ -44,7 +44,7 @@ func newHubFixture(t *testing.T, email string) hubFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	user, err := repository.CreateUser(ctx, store.CreateUserParams{Email: email, PasswordHash: "$argon2id$placeholder", DisplayName: "Hub"})
+	user, err := repository.CreateUser(ctx, store.CreateUserParams{OrganizationID: store.ContabilidadOrganizationID, Email: email, PasswordHash: "$argon2id$placeholder", DisplayName: "Hub"})
 	if err != nil {
 		t.Fatal(err)
 	}

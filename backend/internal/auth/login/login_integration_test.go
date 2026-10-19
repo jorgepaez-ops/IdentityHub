@@ -35,7 +35,7 @@ func TestRF003_LoginPersisteRefreshTokenYAuditoriaEnPostgres(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Hash: %v", err)
 	}
-	user, err := repository.CreateUser(ctx, store.CreateUserParams{Email: "login-integration@example.test", PasswordHash: hash, DisplayName: "Login test"})
+	user, err := repository.CreateUser(ctx, store.CreateUserParams{OrganizationID: store.ContabilidadOrganizationID, Email: "login-integration@example.test", PasswordHash: hash, DisplayName: "Login test"})
 	if err != nil {
 		t.Fatalf("CreateUser: %v", err)
 	}
@@ -122,7 +122,7 @@ func TestRF017_BloqueoSePersisteEnPostgres(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Hash: %v", err)
 	}
-	user, err := repository.CreateUser(ctx, store.CreateUserParams{Email: "lockout-integration@example.test", PasswordHash: hash, DisplayName: "Lockout test"})
+	user, err := repository.CreateUser(ctx, store.CreateUserParams{OrganizationID: store.ContabilidadOrganizationID, Email: "lockout-integration@example.test", PasswordHash: hash, DisplayName: "Lockout test"})
 	if err != nil {
 		t.Fatalf("CreateUser: %v", err)
 	}

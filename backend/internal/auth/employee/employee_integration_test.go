@@ -37,7 +37,7 @@ func TestRF001_AltaPersisteHashArgon2idRolesYTokenDeInvitacion(t *testing.T) {
 	// account, exactly like the authenticated admin the RequireRole
 	// middleware already resolved before any real request reaches this
 	// service (backend/internal/api/rbac.go).
-	actorUser, err := repository.CreateUser(ctx, store.CreateUserParams{Email: "admin-actor@example.test", PasswordHash: "$argon2id$actor-placeholder", DisplayName: "Admin actor"})
+	actorUser, err := repository.CreateUser(ctx, store.CreateUserParams{OrganizationID: store.ContabilidadOrganizationID, Email: "admin-actor@example.test", PasswordHash: "$argon2id$actor-placeholder", DisplayName: "Admin actor"})
 	if err != nil {
 		t.Fatalf("create actor user: %v", err)
 	}
@@ -102,7 +102,7 @@ func TestRF001_CorreoDuplicadoDevuelveErrEmailExists(t *testing.T) {
 		t.Fatalf("NewWithPool: %v", err)
 	}
 	ctx := context.Background()
-	actorUser, err := repository.CreateUser(ctx, store.CreateUserParams{Email: "admin-actor-2@example.test", PasswordHash: "$argon2id$actor-placeholder", DisplayName: "Admin actor"})
+	actorUser, err := repository.CreateUser(ctx, store.CreateUserParams{OrganizationID: store.ContabilidadOrganizationID, Email: "admin-actor-2@example.test", PasswordHash: "$argon2id$actor-placeholder", DisplayName: "Admin actor"})
 	if err != nil {
 		t.Fatalf("create actor user: %v", err)
 	}

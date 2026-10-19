@@ -35,7 +35,7 @@ func TestRF002_AceptarPersisteHashArgon2idYActivaLaCuenta(t *testing.T) {
 		t.Fatalf("NewWithPool: %v", err)
 	}
 	ctx := context.Background()
-	user, err := repository.CreateUser(ctx, store.CreateUserParams{Email: "invitation-integration@example.test", PasswordHash: "$argon2id$placeholder-integration-test", DisplayName: "Invitation integration"})
+	user, err := repository.CreateUser(ctx, store.CreateUserParams{OrganizationID: store.ContabilidadOrganizationID, Email: "invitation-integration@example.test", PasswordHash: "$argon2id$placeholder-integration-test", DisplayName: "Invitation integration"})
 	if err != nil {
 		t.Fatalf("CreateUser: %v", err)
 	}
@@ -87,7 +87,7 @@ func TestRF002_TokenExpiradoDevuelve410YConservaCuentaPendiente(t *testing.T) {
 	}
 	ctx := context.Background()
 	const originalPasswordHash = "$argon2id$placeholder-expired-invitation"
-	user, err := repository.CreateUser(ctx, store.CreateUserParams{Email: "expired-invitation@example.test", PasswordHash: originalPasswordHash, DisplayName: "Expired invitation"})
+	user, err := repository.CreateUser(ctx, store.CreateUserParams{OrganizationID: store.ContabilidadOrganizationID, Email: "expired-invitation@example.test", PasswordHash: originalPasswordHash, DisplayName: "Expired invitation"})
 	if err != nil {
 		t.Fatalf("CreateUser: %v", err)
 	}
@@ -133,7 +133,7 @@ func TestRF002_UnTokenDeVerificacionDeCorreoNoActivaPorInvitacion(t *testing.T) 
 		t.Fatalf("NewWithPool: %v", err)
 	}
 	ctx := context.Background()
-	user, err := repository.CreateUser(ctx, store.CreateUserParams{Email: "wrong-purpose@example.test", PasswordHash: "$argon2id$placeholder", DisplayName: "Wrong purpose"})
+	user, err := repository.CreateUser(ctx, store.CreateUserParams{OrganizationID: store.ContabilidadOrganizationID, Email: "wrong-purpose@example.test", PasswordHash: "$argon2id$placeholder", DisplayName: "Wrong purpose"})
 	if err != nil {
 		t.Fatalf("CreateUser: %v", err)
 	}
