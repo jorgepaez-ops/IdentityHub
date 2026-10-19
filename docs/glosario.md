@@ -27,7 +27,7 @@ Los términos técnicos de esta documentación, explicados en simple. Cada uno d
 
 ## Seguridad en el pipeline
 
-El *pipeline* es la cadena automática (en GitHub Actions) que comprueba cada cambio antes de aceptarlo. Se describe en el [manual de seguridad](manuales/seguridad.md) y en [`.github/`](../.github/README.md).
+El *pipeline* es la cadena automática (en GitHub Actions) que comprueba cada cambio antes de aceptarlo. Se describe en el [manual de seguridad](manuales/seguridad.md) y en [`.github/`](../.github/workflows/README.md).
 
 | Término | Qué significa | Dónde aparece en este proyecto |
 |---|---|---|
