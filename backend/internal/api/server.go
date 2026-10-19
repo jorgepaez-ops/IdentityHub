@@ -10,7 +10,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/netip"
-	"net/url"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -48,8 +47,6 @@ type Server struct {
 	hubSessionTTL    time.Duration
 	oauth            *oauth.Service
 	hubSessions      oauth.HubSessionReader
-	oauthClient      oauth.Client
-	oauthRedirect    *url.URL
 	oauthLoginURL    string
 	currentUsers     currentUserRepository
 	refresh          refresh.Refresher
@@ -58,6 +55,7 @@ type Server struct {
 	adminUsers       admin.Manager
 	roleGrid         rolegrid.Manager
 	auditLog         auditlog.Reader
+	organizations    organizationDirectory
 	serviceKeys      servicekey.Manager
 	trustedProxies   []netip.Prefix
 }
@@ -98,15 +96,12 @@ func (s *Server) SetMFAService(service mfa.Authenticator, refreshTTL time.Durati
 	s.mfa, s.mfaRefreshTTL = service, refreshTTL
 }
 
-// SetOAuthService wires the OAuth endpoints. An unparsable or relative
-// redirect URI leaves OAuth unavailable (503) instead of failing per request.
-func (s *Server) SetOAuthService(service *oauth.Service, sessions oauth.HubSessionReader, client oauth.Client, loginURL string, hubSessionTTL time.Duration) {
+// SetOAuthService wires the OAuth endpoints. The service owns the registered
+// clients (loaded from the applications table), so a request can never name an
+// unregistered redirect URI, origin or audience.
+func (s *Server) SetOAuthService(service *oauth.Service, sessions oauth.HubSessionReader, loginURL string, hubSessionTTL time.Duration) {
 	s.hubSessionTTL = hubSessionTTL
-	redirect, err := url.Parse(client.RedirectURI)
-	if err != nil || !redirect.IsAbs() {
-		return
-	}
-	s.oauth, s.hubSessions, s.oauthClient, s.oauthRedirect, s.oauthLoginURL = service, sessions, client, redirect, loginURL
+	s.oauth, s.hubSessions, s.oauthLoginURL = service, sessions, loginURL
 }
 
 // SetCurrentUserRepository is used by composition and focused profile tests.
@@ -128,6 +123,11 @@ func (s *Server) SetAdminUserService(service admin.Manager) { s.adminUsers = ser
 
 // SetRoleGridService is used by composition and focused role-grid handler tests.
 func (s *Server) SetRoleGridService(service rolegrid.Manager) { s.roleGrid = service }
+
+// SetOrganizationDirectory wires the company listing and the per-user application launcher (RF-022).
+func (s *Server) SetOrganizationDirectory(directory organizationDirectory) {
+	s.organizations = directory
+}
 
 // SetAuditLogService is used by composition and focused audit-log handler tests.
 func (s *Server) SetAuditLogService(service auditlog.Reader) { s.auditLog = service }
@@ -243,8 +243,8 @@ func (s *Server) RevokeServiceKey(w http.ResponseWriter, r *http.Request, servic
 	s.adminOnly(func(w http.ResponseWriter, r *http.Request) { s.revokeServiceKey(w, r, serviceKeyID) }).ServeHTTP(w, r)
 }
 
-func (s *Server) ListApplications(w http.ResponseWriter, r *http.Request) {
-	s.adminOnly(s.listApplications).ServeHTTP(w, r)
+func (s *Server) ListApplications(w http.ResponseWriter, r *http.Request, params ListApplicationsParams) {
+	s.adminOnly(func(w http.ResponseWriter, r *http.Request) { s.listApplications(w, r, params) }).ServeHTTP(w, r)
 }
 
 func (s *Server) ListApplicationRoles(w http.ResponseWriter, r *http.Request, applicationID ApplicationId) {

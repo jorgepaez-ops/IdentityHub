@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/netip"
 	"testing"
 	"time"
@@ -19,6 +20,7 @@ type repositoryStub struct {
 	audits      []AuditEvent
 	validRoles  map[string]bool
 	validateErr error
+	replaceErr  error
 }
 
 func (r *repositoryStub) ListUsers(context.Context, ListInput) ([]User, error) { return nil, nil }
@@ -70,6 +72,9 @@ func (r *repositoryStub) UpdateUser(_ context.Context, id uuid.UUID, status Stat
 	return u, nil
 }
 func (r *repositoryStub) ReplaceRoles(_ context.Context, id uuid.UUID, roles []string, _ uuid.UUID) error {
+	if r.replaceErr != nil {
+		return r.replaceErr
+	}
 	r.roles[id] = append([]string(nil), roles...)
 	return nil
 }
@@ -261,3 +266,26 @@ func TestRF009_UpdateUserRequiereMantenerElRolBaseUser(t *testing.T) {
 }
 
 func statusPtr(value Status) *Status { return &value }
+
+func TestRF022_RolDeOtraEmpresaSeRechazaYSeAudita(t *testing.T) {
+	actorID, targetID := uuid.New(), uuid.New()
+	repository := &repositoryStub{
+		users:      map[uuid.UUID]User{actorID: {ID: actorID, Status: StatusActive}, targetID: {ID: targetID, Status: StatusActive}},
+		roles:      map[uuid.UUID][]string{actorID: {"admin"}, targetID: {"user"}},
+		replaceErr: fmt.Errorf("add user role: %w", ErrCrossOrganizationRole),
+	}
+	roles := []string{"user", "contabilidad.analista"}
+
+	_, err := New(repository).UpdateUser(context.Background(), UpdateInput{ActorUserID: actorID, UserID: targetID, Roles: &roles})
+
+	if !errors.Is(err, ErrCrossOrganizationRole) {
+		t.Fatalf("UpdateUser error=%v, want ErrCrossOrganizationRole", err)
+	}
+	if len(repository.audits) != 1 {
+		t.Fatalf("audits=%+v, want one role_assignment_rejected", repository.audits)
+	}
+	audit := repository.audits[0]
+	if audit.Action != "role_assignment_rejected" || audit.Reason != ReasonOrganizationMismatch || audit.ResourceID != targetID.String() || audit.ActorUserID == nil || *audit.ActorUserID != actorID {
+		t.Fatalf("audit=%+v", audit)
+	}
+}

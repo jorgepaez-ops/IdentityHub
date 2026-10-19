@@ -36,11 +36,11 @@ func TestRF011_UnLoginFallidoCreaUnaFila(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Hash: %v", err)
 	}
-	failedUser, err := repository.CreateUser(ctx, store.CreateUserParams{Email: "failed-login@example.test", PasswordHash: passwordHash, DisplayName: "Failed Login"})
+	failedUser, err := repository.CreateUser(ctx, store.CreateUserParams{OrganizationID: store.ContabilidadOrganizationID, Email: "failed-login@example.test", PasswordHash: passwordHash, DisplayName: "Failed Login"})
 	if err != nil {
 		t.Fatalf("CreateUser failed-login: %v", err)
 	}
-	adminUser, err := repository.CreateUser(ctx, store.CreateUserParams{Email: "audit-admin@example.test", PasswordHash: passwordHash, DisplayName: "Audit Admin"})
+	adminUser, err := repository.CreateUser(ctx, store.CreateUserParams{OrganizationID: store.ContabilidadOrganizationID, Email: "audit-admin@example.test", PasswordHash: passwordHash, DisplayName: "Audit Admin"})
 	if err != nil {
 		t.Fatalf("CreateUser admin: %v", err)
 	}
@@ -96,15 +96,15 @@ func TestRF011_FiltraPorAccionYActor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Hash: %v", err)
 	}
-	actor, err := repository.CreateUser(ctx, store.CreateUserParams{Email: "audit-actor@example.test", PasswordHash: passwordHash, DisplayName: "Audit Actor"})
+	actor, err := repository.CreateUser(ctx, store.CreateUserParams{OrganizationID: store.ContabilidadOrganizationID, Email: "audit-actor@example.test", PasswordHash: passwordHash, DisplayName: "Audit Actor"})
 	if err != nil {
 		t.Fatalf("CreateUser actor: %v", err)
 	}
-	otherActor, err := repository.CreateUser(ctx, store.CreateUserParams{Email: "audit-other@example.test", PasswordHash: passwordHash, DisplayName: "Other Actor"})
+	otherActor, err := repository.CreateUser(ctx, store.CreateUserParams{OrganizationID: store.ContabilidadOrganizationID, Email: "audit-other@example.test", PasswordHash: passwordHash, DisplayName: "Other Actor"})
 	if err != nil {
 		t.Fatalf("CreateUser other actor: %v", err)
 	}
-	adminUser, err := repository.CreateUser(ctx, store.CreateUserParams{Email: "filter-admin@example.test", PasswordHash: passwordHash, DisplayName: "Filter Admin"})
+	adminUser, err := repository.CreateUser(ctx, store.CreateUserParams{OrganizationID: store.ContabilidadOrganizationID, Email: "filter-admin@example.test", PasswordHash: passwordHash, DisplayName: "Filter Admin"})
 	if err != nil {
 		t.Fatalf("CreateUser admin: %v", err)
 	}

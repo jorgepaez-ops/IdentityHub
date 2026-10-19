@@ -203,6 +203,21 @@ describe('access denied', () => {
   })
 })
 
+describe('access denied by the Hub at authorize', () => {
+  it('TestRF020_HubAccessDeniedRedirectShowsNoAccessWithoutExchangingACode', async () => {
+    await beginLogin()
+    const state = sessionStorage.getItem('contabilidad.oauth_state')
+    const fetchSpy = vi.fn()
+    vi.stubGlobal('fetch', fetchSpy)
+    window.history.replaceState({}, '', `/oauth/callback?error=access_denied&state=${state}`)
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Sin acceso a Contabilidad' })
+    expect(screen.queryByRole('navigation', { name: 'Secciones' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Identity Hub/ })).toHaveAttribute('href', HUB)
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+})
+
 describe('analyst role', () => {
   beforeEach(async () => { await signInAs(['contabilidad.analista']) })
 

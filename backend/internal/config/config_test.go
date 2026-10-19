@@ -180,20 +180,6 @@ func TestRF012_PublicBaseURLTieneValorPorDefectoYAdmiteOverride(t *testing.T) {
 	}
 }
 
-func TestRF020_ClienteOAuthYRedirectSeFijanEnConfiguracion(t *testing.T) {
-	const seed = "MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE="
-	t.Setenv("DATABASE_URL", "postgres://x")
-	t.Setenv("RABBITMQ_URL", "amqp://x")
-	t.Setenv("JWT_SIGNING_KEY", seed)
-	cfg, err := Load()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if cfg.OAuthClientID != "contabilidad" || cfg.OAuthRedirectURI != "http://contabilidad.localhost:8080/oauth/callback" || cfg.OAuthClientOrigin != "http://contabilidad.localhost:8080" {
-		t.Fatalf("oauth client config=%+v", cfg)
-	}
-}
-
 func TestRF017_ConfiguraLimitesDeFuerzaBruta(t *testing.T) {
 	const seed = "MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE="
 	t.Setenv("DATABASE_URL", "postgres://x")
@@ -432,51 +418,6 @@ func TestRF012_SMTPCombinacionesInvalidasSeRechazan(t *testing.T) {
 			_, err := LoadWorker()
 			if err == nil || !strings.Contains(err.Error(), c.espera) {
 				t.Fatalf("LoadWorker() error = %v, want mention of %s", err, c.espera)
-			}
-		})
-	}
-}
-
-func TestRF020_ClienteOAuthConfigurableYValidado(t *testing.T) {
-	const seed = "MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE="
-	base := map[string]string{"DATABASE_URL": "postgres://x", "RABBITMQ_URL": "amqp://x", "JWT_SIGNING_KEY": seed}
-	set := func(t *testing.T, extra map[string]string) {
-		for k, v := range base {
-			t.Setenv(k, v)
-		}
-		for k, v := range extra {
-			t.Setenv(k, v)
-		}
-	}
-
-	t.Run("valores propios", func(t *testing.T) {
-		set(t, map[string]string{
-			"OAUTH_CLIENT_ID":     "facturacion",
-			"OAUTH_REDIRECT_URI":  "https://app.example.test/oauth/callback",
-			"OAUTH_CLIENT_ORIGIN": "https://app.example.test",
-		})
-		cfg, err := Load()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if cfg.OAuthClientID != "facturacion" || cfg.OAuthRedirectURI != "https://app.example.test/oauth/callback" || cfg.OAuthClientOrigin != "https://app.example.test" {
-			t.Fatalf("cfg = %+v", cfg)
-		}
-	})
-
-	invalid := map[string]map[string]string{
-		"redirect relativo":      {"OAUTH_REDIRECT_URI": "/oauth/callback"},
-		"redirect con fragmento": {"OAUTH_REDIRECT_URI": "http://contabilidad.localhost:8080/cb#x"},
-		"esquema no http":        {"OAUTH_REDIRECT_URI": "ftp://contabilidad.localhost:8080/cb", "OAUTH_CLIENT_ORIGIN": "ftp://contabilidad.localhost:8080"},
-		"origen con ruta":        {"OAUTH_CLIENT_ORIGIN": "http://contabilidad.localhost:8080/app"},
-		"origen no coincide":     {"OAUTH_CLIENT_ORIGIN": "https://otro.example.test"},
-		"client id con espacios": {"OAUTH_CLIENT_ID": "mi cliente"},
-	}
-	for name, env := range invalid {
-		t.Run(name, func(t *testing.T) {
-			set(t, env)
-			if _, err := Load(); err == nil || !strings.Contains(err.Error(), "OAUTH_") {
-				t.Fatalf("Load() error = %v, want an OAUTH_ problem", err)
 			}
 		})
 	}

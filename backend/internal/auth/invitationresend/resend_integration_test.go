@@ -27,11 +27,11 @@ func TestRF001_ReenvioInvalidaLaInvitacionAnterior(t *testing.T) {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	user, err := repository.CreateUser(ctx, store.CreateUserParams{Email: "resend-integration@example.test", PasswordHash: "$argon2id$placeholder", DisplayName: "Resend Integration"})
+	user, err := repository.CreateUser(ctx, store.CreateUserParams{OrganizationID: store.ContabilidadOrganizationID, Email: "resend-integration@example.test", PasswordHash: "$argon2id$placeholder", DisplayName: "Resend Integration"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	actor, err := repository.CreateUser(ctx, store.CreateUserParams{Email: "resend-actor@example.test", PasswordHash: "$argon2id$placeholder", DisplayName: "Resend Actor"})
+	actor, err := repository.CreateUser(ctx, store.CreateUserParams{OrganizationID: store.ContabilidadOrganizationID, Email: "resend-actor@example.test", PasswordHash: "$argon2id$placeholder", DisplayName: "Resend Actor"})
 	if err != nil {
 		t.Fatal(err)
 	}

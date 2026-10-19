@@ -25,11 +25,11 @@ func TestRF016_ListarYRevocarUnaFamiliaSinAfectarOtra(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	owner, err := repository.CreateUser(ctx, store.CreateUserParams{Email: "sessions-owner@example.test", PasswordHash: "$argon2id$fixed-test-value", DisplayName: "Owner"})
+	owner, err := repository.CreateUser(ctx, store.CreateUserParams{OrganizationID: store.ContabilidadOrganizationID, Email: "sessions-owner@example.test", PasswordHash: "$argon2id$fixed-test-value", DisplayName: "Owner"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	other, err := repository.CreateUser(ctx, store.CreateUserParams{Email: "sessions-other@example.test", PasswordHash: "$argon2id$fixed-test-value", DisplayName: "Other"})
+	other, err := repository.CreateUser(ctx, store.CreateUserParams{OrganizationID: store.ContabilidadOrganizationID, Email: "sessions-other@example.test", PasswordHash: "$argon2id$fixed-test-value", DisplayName: "Other"})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -56,6 +56,11 @@ linters:
           - errcheck
           - bodyclose
           - noctx
+      # "inventario" es el client_id de la aplicación demostrativa de Empresa B
+      # (ADR 0015), no una errata de "inventor".
+      - linters:
+          - misspell
+        text: "`[Ii]nventario` is a misspelling"
     paths:
       - third_party$
       - builtin$

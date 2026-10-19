@@ -122,6 +122,13 @@ describe('completeCallback: code exchange and token handling', () => {
     expect(calls).toHaveLength(0)
   })
 
+  it('TestRF020_CallbackReportsAccessDeniedFromHubAsNoAccess', async () => {
+    const { state } = await startedFlow()
+    const calls = stubHub()
+    await expect(completeCallback(`?error=access_denied&state=${state}`)).rejects.toMatchObject({ kind: 'no_access' })
+    expect(calls).toHaveLength(0)
+  })
+
   it('TestRF020_CallbackReportsTokenExchangeFailure', async () => {
     const { state } = await startedFlow()
     stubHub({ token: () => jsonResponse(400, { title: 'Bad Request' }) })

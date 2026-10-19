@@ -16,6 +16,8 @@ export type Role = components['schemas']['Role']
 export type Application = components['schemas']['Application']
 export type ApplicationRole = components['schemas']['ApplicationRole']
 export type Permission = components['schemas']['Permission']
+export type Organization = components['schemas']['Organization']
+export type UserApplication = components['schemas']['UserApplication']
 export type ServiceKey = components['schemas']['ServiceKey']
 export type CreatedServiceKey = components['schemas']['CreatedServiceKey']
 export type ServiceKeyScope = components['schemas']['ServiceKeyScope']
@@ -208,7 +210,7 @@ function withQuery(path: string, query: Record<string, string | number | undefin
   return text ? `${path}?${text}` : path
 }
 
-export const listUsers = (query: ListUsersQuery = {}) => authenticatedRequest<UserPage>(withQuery('/api/v1/admin/users', query))
+export const listUsers = (query: ListUsersQuery) => authenticatedRequest<UserPage>(withQuery('/api/v1/admin/users', query))
 export const getUser = (userId: string) => authenticatedRequest<AdminUser>(`/api/v1/admin/users/${encodeURIComponent(userId)}`)
 export const createUser = (input: CreateUserRequest) =>
   authenticatedRequest<AdminUser>('/api/v1/admin/users', { method: 'POST', body: JSON.stringify(input) })
@@ -218,7 +220,12 @@ export const resendInvitation = (userId: string) =>
   authenticatedRequest<void>(`/api/v1/admin/users/${encodeURIComponent(userId)}/invitation`, { method: 'POST' })
 export const listAuditLog = (query: AuditLogQuery = {}) => authenticatedRequest<AuditLogPage>(withQuery('/api/v1/admin/audit-log', query))
 
-export const listApplications = () => authenticatedRequest<Application[]>('/api/v1/admin/applications')
+export const listOrganizations = () => authenticatedRequest<Organization[]>('/api/v1/admin/organizations')
+// The role grid works inside one company (RF-022): the API requires it and returns only its applications.
+export const listApplications = (organizationId: string) =>
+  authenticatedRequest<Application[]>(withQuery('/api/v1/admin/applications', { organizationId }))
+/** Applications of the signed-in user's company in which they hold a role (RF-022). */
+export const listMyApplications = () => authenticatedRequest<UserApplication[]>('/api/v1/me/applications')
 const rolesPath = (applicationId: string) => `/api/v1/admin/applications/${encodeURIComponent(applicationId)}/roles`
 export const createApplicationRole = (applicationId: string, input: CreateApplicationRoleRequest) =>
   authenticatedRequest<ApplicationRole>(rolesPath(applicationId), { method: 'POST', body: JSON.stringify(input) })

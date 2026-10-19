@@ -19,10 +19,10 @@ func TestRF001_UsersAceptaArgon2idYRechazaMD5(t *testing.T) {
 		t.Fatalf("Hash() error = %v", err)
 	}
 	ctx := context.Background()
-	if _, err := pool.Exec(ctx, `INSERT INTO users (email, password_hash, display_name) VALUES ($1, $2, $3)`, "argon2id@example.test", hash, "Argon2id user"); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO users (email, password_hash, display_name, organization_id) VALUES ($1, $2, $3, '00000000-0000-4000-8000-0000000000a2')`, "argon2id@example.test", hash, "Argon2id user"); err != nil {
 		t.Fatalf("insert Argon2id hash: %v", err)
 	}
-	_, err = pool.Exec(ctx, `INSERT INTO users (email, password_hash, display_name) VALUES ($1, $2, $3)`, "md5@example.test", strings.Repeat("a", 32), "MD5 user")
+	_, err = pool.Exec(ctx, `INSERT INTO users (email, password_hash, display_name, organization_id) VALUES ($1, $2, $3, '00000000-0000-4000-8000-0000000000a2')`, "md5@example.test", strings.Repeat("a", 32), "MD5 user")
 	var pgErr *pgconn.PgError
 	if !errors.As(err, &pgErr) {
 		t.Fatalf("insert MD5-shaped hash error = %v, want a PostgreSQL constraint error", err)

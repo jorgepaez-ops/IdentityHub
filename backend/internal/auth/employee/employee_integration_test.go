@@ -37,7 +37,7 @@ func TestRF001_AltaPersisteHashArgon2idRolesYTokenDeInvitacion(t *testing.T) {
 	// account, exactly like the authenticated admin the RequireRole
 	// middleware already resolved before any real request reaches this
 	// service (backend/internal/api/rbac.go).
-	actorUser, err := repository.CreateUser(ctx, store.CreateUserParams{Email: "admin-actor@example.test", PasswordHash: "$argon2id$actor-placeholder", DisplayName: "Admin actor"})
+	actorUser, err := repository.CreateUser(ctx, store.CreateUserParams{OrganizationID: store.ContabilidadOrganizationID, Email: "admin-actor@example.test", PasswordHash: "$argon2id$actor-placeholder", DisplayName: "Admin actor"})
 	if err != nil {
 		t.Fatalf("create actor user: %v", err)
 	}
@@ -45,7 +45,7 @@ func TestRF001_AltaPersisteHashArgon2idRolesYTokenDeInvitacion(t *testing.T) {
 	service := New(repository, integrationPublisher{}, passwordHasher{}, rand.Reader, time.Now)
 	result, err := service.CreateEmployee(ctx, Input{
 		Email: "employee-integration@example.test", DisplayName: "Employee integration",
-		Roles: []string{"contabilidad.senior"}, ActorUserID: actorUser.ID,
+		Roles: []string{"contabilidad.senior"}, ActorUserID: actorUser.ID, OrganizationID: store.ContabilidadOrganizationID,
 	})
 	if err != nil {
 		t.Fatalf("CreateEmployee: %v", err)
@@ -102,12 +102,12 @@ func TestRF001_CorreoDuplicadoDevuelveErrEmailExists(t *testing.T) {
 		t.Fatalf("NewWithPool: %v", err)
 	}
 	ctx := context.Background()
-	actorUser, err := repository.CreateUser(ctx, store.CreateUserParams{Email: "admin-actor-2@example.test", PasswordHash: "$argon2id$actor-placeholder", DisplayName: "Admin actor"})
+	actorUser, err := repository.CreateUser(ctx, store.CreateUserParams{OrganizationID: store.ContabilidadOrganizationID, Email: "admin-actor-2@example.test", PasswordHash: "$argon2id$actor-placeholder", DisplayName: "Admin actor"})
 	if err != nil {
 		t.Fatalf("create actor user: %v", err)
 	}
 	service := New(repository, integrationPublisher{}, passwordHasher{}, rand.Reader, time.Now)
-	input := Input{Email: "duplicate-employee@example.test", DisplayName: "First", Roles: []string{"user"}, ActorUserID: actorUser.ID}
+	input := Input{Email: "duplicate-employee@example.test", DisplayName: "First", Roles: []string{"user"}, ActorUserID: actorUser.ID, OrganizationID: store.ContabilidadOrganizationID}
 	if _, err := service.CreateEmployee(ctx, input); err != nil {
 		t.Fatalf("first CreateEmployee: %v", err)
 	}

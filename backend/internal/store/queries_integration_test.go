@@ -27,7 +27,7 @@ func TestRNF011_ConsultasBaseSqlcUsanParametros(t *testing.T) {
 	}
 	ctx := context.Background()
 
-	created, err := queries.CreateUser(ctx, store.CreateUserParams{
+	created, err := queries.CreateUser(ctx, store.CreateUserParams{OrganizationID: store.ContabilidadOrganizationID,
 		Email:        "User@Example.test",
 		PasswordHash: "$argon2id$fixed-test-value",
 		DisplayName:  "Example user",

@@ -24,7 +24,7 @@ func TestRF008_ActualizaNombreDeVisualizacionPersisteElCambio(t *testing.T) {
 		t.Fatalf("NewWithPool: %v", err)
 	}
 
-	created, err := repository.CreateUser(ctx, store.CreateUserParams{
+	created, err := repository.CreateUser(ctx, store.CreateUserParams{OrganizationID: store.ContabilidadOrganizationID,
 		Email:        "profile-owner@example.test",
 		PasswordHash: "$argon2id$fixed-test-value",
 		DisplayName:  "Old Name",

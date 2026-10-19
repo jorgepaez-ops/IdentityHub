@@ -33,7 +33,8 @@ func TestRF021_StoreListaAplicacionesConPermisosRolesYConteos(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	applications, err := repository.ListApplications(ctx)
+	// The grid works inside one company (RF-022): Contabilidad S.A. sees only Contabilidad.
+	applications, err := repository.ListApplications(ctx, store.ContabilidadOrganizationID)
 	if err != nil {
 		t.Fatalf("ListApplications() error = %v", err)
 	}
@@ -94,7 +95,7 @@ func TestRF021_ServicioConStoreCreaActualizaYEliminaConAuditoria(t *testing.T) {
 	}
 	service := rolegrid.New(repository)
 	actor := createAdminTestUser(t, ctx, repository, "grid-actor@example.test", "Grid Actor", "")
-	applications, err := repository.ListApplications(ctx)
+	applications, err := repository.ListApplications(ctx, store.ContabilidadOrganizationID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -247,7 +248,7 @@ func TestRF021_StoreMapeaElTriggerYLaRestriccionDeAsignaciones(t *testing.T) {
 	}
 	// A role of another application is not addressable through this application (404).
 	var foreignID uuid.UUID
-	if err := pool.QueryRow(ctx, `INSERT INTO applications (client_id, redirect_uri, allowed_origin, name) VALUES ('otra', 'http://otra.test/cb', 'http://otra.test', 'Otra') RETURNING id`).Scan(&foreignID); err != nil {
+	if err := pool.QueryRow(ctx, `INSERT INTO applications (client_id, redirect_uri, allowed_origin, name, organization_id) VALUES ('otra', 'http://otra.test/cb', 'http://otra.test', 'Otra', '00000000-0000-4000-8000-0000000000a3') RETURNING id`).Scan(&foreignID); err != nil {
 		t.Fatal(err)
 	}
 	err = repository.WithinRoleGridTransaction(ctx, func(w rolegrid.Writer) error {

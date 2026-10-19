@@ -180,7 +180,7 @@ test('RF-020 PKCE plain se rechaza', async ({ playwright }) => {
 })
 
 test('RF-020 Un código de autorización no puede reutilizarse', async ({ playwright }) => {
-  const session = await contextSession(playwright)
+  const session = await contextSession(playwright, ['contabilidad.analista'])
   const verifier = newVerifier()
   const authorized = await authorize(session.context, { verifier, state: 'single-use' })
   expect(authorized.status()).toBe(302)

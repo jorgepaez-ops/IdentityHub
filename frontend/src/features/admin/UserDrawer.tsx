@@ -1,7 +1,8 @@
 import { FormEvent, useEffect, useId, useRef, useState } from 'react'
-import { type AdminUser, type Application, type UserStatus, createUser, listApplications, updateUser } from '../../api/client'
+import { type AdminUser, type Application, type Organization, type UserStatus, createUser, listApplications, updateUser } from '../../api/client'
 import { DIRECTORY_ROLES, DIRECTORY_ROLE_DESCRIPTION, Problems, STATUS_LABEL, adminProblems, isAuthFailure } from './shared'
 import { fieldValue } from '../../formData'
+import { companyLabel } from './company'
 
 export type DrawerTarget = { mode: 'create' } | { mode: 'edit'; user: AdminUser }
 
@@ -10,18 +11,21 @@ const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([di
 const sameRoles = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((role) => b.includes(role))
 
 const CREATE_COPY: Record<number, string> = {
-  400: 'Revisa los datos e inténtalo de nuevo.',
+  400: 'Revisa los datos e inténtalo de nuevo. Los roles deben ser de aplicaciones de la empresa elegida.',
   403: 'No tienes permiso para crear usuarios.',
   409: 'No se pudo crear la cuenta: ese correo ya está registrado o no está disponible.',
 }
 const EDIT_COPY: Record<number, string> = {
-  400: 'El cambio no está permitido: un admin no puede deshabilitarse ni asignarse roles a sí mismo, y siempre debe quedar un admin activo.',
+  400: 'El cambio no está permitido: un admin no puede deshabilitarse ni asignarse roles a sí mismo, siempre debe quedar un admin activo y los roles deben ser de la empresa del usuario.',
   403: 'No tienes permiso para modificar usuarios.',
   404: 'La cuenta ya no existe.',
 }
 
-export function UserDrawer({ target, currentUserId, onClose, onSaved, onSessionEnded }: Readonly<{
+export function UserDrawer({ target, organization, organizations = [organization], currentUserId, onClose, onSaved, onSessionEnded }: Readonly<{
   target: DrawerTarget
+  /** The company selected in the console; an edited account always belongs to it. */
+  organization: Organization
+  organizations?: readonly Organization[]
   currentUserId: string
   onClose: () => void
   onSaved: (user: AdminUser, message: string) => void
@@ -36,7 +40,9 @@ export function UserDrawer({ target, currentUserId, onClose, onSaved, onSessionE
   const [status, setStatus] = useState<UserStatus>(editing?.status ?? 'active')
   // Held roles keep whatever the account already has, even a role the catalog did not return.
   const [roles, setRoles] = useState<string[]>(() => (editing ? [...editing.roles] : ['user']))
-  const [applications, setApplications] = useState<Application[]>([])
+  // The invitation form asks for the company (prefilled with the selected one); an edited account keeps its own.
+  const [organizationId, setOrganizationId] = useState(organization.id)
+  const [applications, setApplications] = useState<Application[] | null>(null)
   const [catalogError, setCatalogError] = useState(false)
   const [problems, setProblems] = useState<string[]>([])
   const [pending, setPending] = useState(false)
@@ -50,9 +56,12 @@ export function UserDrawer({ target, currentUserId, onClose, onSaved, onSessionE
 
   useEffect(() => {
     let active = true
+    setApplications(null)
+    setCatalogError(false)
     void (async () => {
       try {
-        const loaded = await listApplications()
+        // Only the roles of the account's own company are offered (RF-022).
+        const loaded = await listApplications(organizationId)
         if (active) setApplications(loaded)
       } catch (reason) {
         if (!active) return
@@ -61,7 +70,7 @@ export function UserDrawer({ target, currentUserId, onClose, onSaved, onSessionE
       }
     })()
     return () => { active = false }
-  }, [onSessionEnded])
+  }, [organizationId, onSessionEnded])
 
   useEffect(() => {
     const onKeyDown = (event: globalThis.KeyboardEvent) => { if (event.key === 'Escape') onClose() }
@@ -92,7 +101,7 @@ export function UserDrawer({ target, currentUserId, onClose, onSaved, onSessionE
   }, [])
 
   // Application roles come from the API (RF-021); system roles are the two directory ones above.
-  const groups = applications
+  const groups = (applications ?? [])
     .map((application) => ({ application, roles: application.roles.filter((role) => !role.system) }))
     .filter((group) => group.roles.length > 0)
   const catalog = [...DIRECTORY_ROLES as readonly string[], ...groups.flatMap((group) => group.roles.map((role) => role.name))]
@@ -100,6 +109,12 @@ export function UserDrawer({ target, currentUserId, onClose, onSaved, onSessionE
   const ordered = (held: readonly string[]) => [...catalog.filter((role) => held.includes(role)), ...held.filter((role) => !catalog.includes(role))]
   const toggleRole = (role: string) =>
     setRoles((current) => ordered(current.includes(role) ? current.filter((item) => item !== role) : [...current, role]))
+
+  // Roles of the previous company are dropped: they would be rejected for the new one.
+  const changeCompany = (id: string) => {
+    setOrganizationId(id)
+    setRoles(['user'])
+  }
 
   const fail = (reason: unknown, copy: Record<number, string>, fallback: string) => {
     if (isAuthFailure(reason)) onSessionEnded()
@@ -133,7 +148,7 @@ export function UserDrawer({ target, currentUserId, onClose, onSaved, onSessionE
     }
     setPending(true)
     try {
-      const user = await createUser({ email, displayName, roles: ordered(roles) })
+      const user = await createUser({ email, displayName, organizationId, roles: ordered(roles) })
       onSaved(user, `Invitación enviada a ${user.email}.`)
     } catch (reason) {
       fail(reason, CREATE_COPY, 'No fue posible crear la cuenta. Inténtalo de nuevo.')
@@ -161,6 +176,14 @@ export function UserDrawer({ target, currentUserId, onClose, onSaved, onSessionE
           <input id="drawer-name" name="displayName" defaultValue={editing?.displayName ?? ''} maxLength={100} readOnly={editing !== null} autoComplete="off" required />
           <label htmlFor="drawer-email">Correo electrónico</label>
           <input id="drawer-email" name="email" type="email" defaultValue={editing?.email ?? ''} maxLength={254} readOnly={editing !== null} autoComplete="off" required />
+          {!editing && (
+            <>
+              <label htmlFor="drawer-company">Empresa</label>
+              <select id="drawer-company" value={organizationId} onChange={(event) => changeCompany(event.target.value)}>
+                {organizations.map((item) => <option key={item.id} value={item.id}>{companyLabel(item)}</option>)}
+              </select>
+            </>
+          )}
           {editing && (
             <>
               <label htmlFor="drawer-status">Estado</label>

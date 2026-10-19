@@ -19,17 +19,18 @@ type oauthRepository struct{ store *Store }
 
 func (s *Store) OAuthRepository() oauthRepository { return oauthRepository{store: s} }
 
-// ValidateOAuthClient makes a config/seed mismatch an explicit startup error
-// instead of a later authorization-code issuance failure.
-func (s *Store) ValidateOAuthClient(ctx context.Context, configured oauth.Client) error {
-	registered, err := s.queries.GetOAuthApplication(ctx, configured.ID)
+// ListOAuthClients loads every registered client from the applications table
+// (ADR 0015). Callers validate the result with oauth.ValidateClients.
+func (s *Store) ListOAuthClients(ctx context.Context) ([]oauth.Client, error) {
+	rows, err := s.queries.ListOAuthApplications(ctx)
 	if err != nil {
-		return fmt.Errorf("get registered OAuth client: %w", err)
+		return nil, fmt.Errorf("list oauth applications: %w", err)
 	}
-	if err := oauth.ValidateRegisteredClient(configured, oauth.Client{ID: registered.ClientID, RedirectURI: registered.RedirectUri, Origin: registered.AllowedOrigin}); err != nil {
-		return err
+	clients := make([]oauth.Client, 0, len(rows))
+	for _, row := range rows {
+		clients = append(clients, oauth.Client{ID: row.ClientID, RedirectURI: row.RedirectUri, Origin: row.AllowedOrigin, OrganizationID: row.OrganizationID})
 	}
-	return nil
+	return clients, nil
 }
 
 func (s *Store) PurgeAuthorizationCodes(ctx context.Context) (int64, error) {
@@ -115,12 +116,21 @@ func (r oauthRepository) GetHubSessionUser(ctx context.Context, hash []byte) (uu
 	}
 	return userID, nil
 }
-func (w *oauthWriter) ListRolesForUser(ctx context.Context, userID uuid.UUID) ([]string, error) {
-	roles, err := w.queries.ListRolesForUser(ctx, userID)
+func (w *oauthWriter) ListApplicationRolesForUser(ctx context.Context, userID uuid.UUID, clientID string) ([]string, error) {
+	roles, err := w.queries.ListApplicationRolesForUser(ctx, generated.ListApplicationRolesForUserParams{UserID: userID, ClientID: clientID})
 	if err != nil {
-		return nil, fmt.Errorf("list oauth user roles: %w", err)
+		return nil, fmt.Errorf("list oauth application roles: %w", err)
 	}
 	return roles, nil
+}
+
+// GetAuthorizationAccess gathers what /oauth/authorize needs to accept or refuse a user.
+func (r oauthRepository) GetAuthorizationAccess(ctx context.Context, userID uuid.UUID, clientID string) (oauth.AuthorizationAccess, error) {
+	row, err := r.store.queries.GetOAuthAuthorizationAccess(ctx, generated.GetOAuthAuthorizationAccessParams{ID: userID, ClientID: clientID})
+	if err != nil {
+		return oauth.AuthorizationAccess{}, fmt.Errorf("get oauth authorization access: %w", err)
+	}
+	return oauth.AuthorizationAccess{UserOrganizationID: row.UserOrganizationID, ApplicationOrganizationID: row.ApplicationOrganizationID, HasApplicationRole: row.HasApplicationRole}, nil
 }
 func (w *oauthWriter) ListPermissionKeysForRolesAndApplication(ctx context.Context, roleNames []string, clientID string) ([]string, error) {
 	keys, err := w.queries.ListPermissionKeysForRolesAndApplication(ctx, generated.ListPermissionKeysForRolesAndApplicationParams{RoleNames: roleNames, ClientID: clientID})
@@ -138,7 +148,11 @@ func (w *oauthWriter) InsertAuditEvent(ctx context.Context, event oauth.AuditEve
 }
 
 func insertOAuthAuditEvent(ctx context.Context, queries *generated.Queries, event oauth.AuditEvent) error {
-	metadata, err := json.Marshal(map[string]string{})
+	fields := event.Metadata
+	if fields == nil {
+		fields = map[string]string{}
+	}
+	metadata, err := json.Marshal(fields)
 	if err != nil {
 		return fmt.Errorf("marshal oauth audit metadata: %w", err)
 	}

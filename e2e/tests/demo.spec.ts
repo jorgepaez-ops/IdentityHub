@@ -53,7 +53,8 @@ test('DEMO Guion de la demo en vivo: alta, invitación, MFA, SSO y vistas por ro
     await test.step('4. El empleado inicia sesión en el Hub con el código MFA', async () => {
       await employeePage.goto(`${hubUrl}/login`)
       await browserLoginWithMfa(employeePage, employee, strongPassword)
-      await expect(employeePage).toHaveURL(`${hubUrl}/me`)
+      // The analyst's company has a single application, so the Hub sends them straight to it (RF-022).
+      await expect(employeePage).toHaveURL(`${contabilidadUrl}/`)
     })
 
     const mailAfterLogin = await mailIds(employee)

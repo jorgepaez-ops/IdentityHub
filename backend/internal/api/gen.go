@@ -225,7 +225,10 @@ func (e AuthorizeClientParamsCodeChallengeMethod) Valid() bool {
 type AdminCreateUserRequest struct {
 	DisplayName string              `json:"displayName"`
 	Email       openapi_types.Email `json:"email"`
-	Roles       []Role              `json:"roles"`
+
+	// OrganizationId Empresa de la cuenta nueva (RF-022).
+	OrganizationId openapi_types.UUID `json:"organizationId"`
+	Roles          []Role             `json:"roles"`
 }
 
 // AdminUpdateUserRequest defines model for AdminUpdateUserRequest.
@@ -401,6 +404,16 @@ type OAuthTokenResponse struct {
 // OAuthTokenResponseTokenType defines model for OAuthTokenResponse.TokenType.
 type OAuthTokenResponseTokenType string
 
+// Organization defines model for Organization.
+type Organization struct {
+	Id   openapi_types.UUID `json:"id"`
+	Name string             `json:"name"`
+
+	// Operator Verdadero solo para la empresa operadora del Hub.
+	Operator bool   `json:"operator"`
+	Slug     string `json:"slug"`
+}
+
 // PasswordResetConfirmRequest defines model for PasswordResetConfirmRequest.
 type PasswordResetConfirmRequest struct {
 	Password string `json:"password"`
@@ -519,6 +532,15 @@ type User struct {
 	Status     UserStatus `json:"status"`
 }
 
+// UserApplication defines model for UserApplication.
+type UserApplication struct {
+	ClientId string `json:"clientId"`
+
+	// LaunchUrl Origen registrado de la aplicación.
+	LaunchUrl string `json:"launchUrl"`
+	Name      string `json:"name"`
+}
+
 // UserPage defines model for UserPage.
 type UserPage struct {
 	Items      []User  `json:"items"`
@@ -545,6 +567,9 @@ type ExportFormat string
 
 // Limit defines model for Limit.
 type Limit = int
+
+// OrganizationId defines model for OrganizationId.
+type OrganizationId = string
 
 // Query defines model for Query.
 type Query = string
@@ -588,6 +613,14 @@ type bearerAuthContextKey string
 // serviceKeyAuthContextKey is the context key for serviceKeyAuth security scheme
 type serviceKeyAuthContextKey string
 
+// ListApplicationsParams defines parameters for ListApplications.
+type ListApplicationsParams struct {
+	// OrganizationId Empresa a la que se acota el listado (RF-022). El servidor lo exige (UUID de una empresa): sin él, o
+	// mal formado, responde 400, pero solo después de autenticar y comprobar el rol admin (401/403 primero).
+	// Por eso el contrato lo declara opcional: así el binding no valida antes que la autorización.
+	OrganizationId *OrganizationId `form:"organizationId,omitempty" json:"organizationId,omitempty"`
+}
+
 // ListAuditLogParams defines parameters for ListAuditLog.
 type ListAuditLogParams struct {
 	Action  *Action  `form:"action,omitempty" json:"action,omitempty"`
@@ -610,6 +643,11 @@ type ExportAuditLogParamsFormat string
 
 // ListUsersParams defines parameters for ListUsers.
 type ListUsersParams struct {
+	// OrganizationId Empresa a la que se acota el listado (RF-022). El servidor lo exige (UUID de una empresa): sin él, o
+	// mal formado, responde 400, pero solo después de autenticar y comprobar el rol admin (401/403 primero).
+	// Por eso el contrato lo declara opcional: así el binding no valida antes que la autorización.
+	OrganizationId *OrganizationId `form:"organizationId,omitempty" json:"organizationId,omitempty"`
+
 	// Q Búsqueda parcial por correo o nombre
 	Q      *Query  `form:"q,omitempty" json:"q,omitempty"`
 	Status *Status `form:"status,omitempty" json:"status,omitempty"`
@@ -689,9 +727,9 @@ type ServerInterface interface {
 	// Clave pública para validar los tokens emitidos
 	// (GET /.well-known/jwks.json)
 	GetJwks(w http.ResponseWriter, r *http.Request)
-	// Listar aplicaciones, permisos y roles configurables
+	// Listar las aplicaciones, permisos y roles configurables de una empresa
 	// (GET /api/v1/admin/applications)
-	ListApplications(w http.ResponseWriter, r *http.Request)
+	ListApplications(w http.ResponseWriter, r *http.Request, params ListApplicationsParams)
 
 	// (GET /api/v1/admin/applications/{applicationId}/roles)
 	ListApplicationRoles(w http.ResponseWriter, r *http.Request, applicationId ApplicationId)
@@ -710,6 +748,9 @@ type ServerInterface interface {
 	// Exportar el registro de auditoría filtrado en CSV o JSON
 	// (GET /api/v1/admin/audit-log/export)
 	ExportAuditLog(w http.ResponseWriter, r *http.Request, params ExportAuditLogParams)
+	// Listar las empresas que atiende el Hub
+	// (GET /api/v1/admin/organizations)
+	ListOrganizations(w http.ResponseWriter, r *http.Request)
 	// Listar las claves de servicio (solo metadatos)
 	// (GET /api/v1/admin/service-keys)
 	ListServiceKeys(w http.ResponseWriter, r *http.Request)
@@ -719,7 +760,7 @@ type ServerInterface interface {
 	// Revocar una clave de servicio
 	// (DELETE /api/v1/admin/service-keys/{serviceKeyId})
 	RevokeServiceKey(w http.ResponseWriter, r *http.Request, serviceKeyId ServiceKeyId)
-	// Listar y buscar cuentas
+	// Listar y buscar cuentas de una empresa
 	// (GET /api/v1/admin/users)
 	ListUsers(w http.ResponseWriter, r *http.Request, params ListUsersParams)
 	// Dar de alta a un empleado y enviar su invitación
@@ -764,6 +805,9 @@ type ServerInterface interface {
 	// Actualizar el perfil propio
 	// (PATCH /api/v1/me)
 	UpdateCurrentUser(w http.ResponseWriter, r *http.Request)
+	// Aplicaciones de la empresa del titular en las que tiene algún rol
+	// (GET /api/v1/me/applications)
+	ListMyApplications(w http.ResponseWriter, r *http.Request)
 	// Sesiones activas del titular
 	// (GET /api/v1/me/sessions)
 	ListSessions(w http.ResponseWriter, r *http.Request)
@@ -794,9 +838,9 @@ func (_ Unimplemented) GetJwks(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Listar aplicaciones, permisos y roles configurables
+// Listar las aplicaciones, permisos y roles configurables de una empresa
 // (GET /api/v1/admin/applications)
-func (_ Unimplemented) ListApplications(w http.ResponseWriter, r *http.Request) {
+func (_ Unimplemented) ListApplications(w http.ResponseWriter, r *http.Request, params ListApplicationsParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -834,6 +878,12 @@ func (_ Unimplemented) ExportAuditLog(w http.ResponseWriter, r *http.Request, pa
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// Listar las empresas que atiende el Hub
+// (GET /api/v1/admin/organizations)
+func (_ Unimplemented) ListOrganizations(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // Listar las claves de servicio (solo metadatos)
 // (GET /api/v1/admin/service-keys)
 func (_ Unimplemented) ListServiceKeys(w http.ResponseWriter, r *http.Request) {
@@ -852,7 +902,7 @@ func (_ Unimplemented) RevokeServiceKey(w http.ResponseWriter, r *http.Request, 
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Listar y buscar cuentas
+// Listar y buscar cuentas de una empresa
 // (GET /api/v1/admin/users)
 func (_ Unimplemented) ListUsers(w http.ResponseWriter, r *http.Request, params ListUsersParams) {
 	w.WriteHeader(http.StatusNotImplemented)
@@ -942,6 +992,12 @@ func (_ Unimplemented) UpdateCurrentUser(w http.ResponseWriter, r *http.Request)
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// Aplicaciones de la empresa del titular en las que tiene algún rol
+// (GET /api/v1/me/applications)
+func (_ Unimplemented) ListMyApplications(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // Sesiones activas del titular
 // (GET /api/v1/me/sessions)
 func (_ Unimplemented) ListSessions(w http.ResponseWriter, r *http.Request) {
@@ -1004,14 +1060,33 @@ func (siw *ServerInterfaceWrapper) GetJwks(w http.ResponseWriter, r *http.Reques
 // ListApplications operation middleware
 func (siw *ServerInterfaceWrapper) ListApplications(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+	_ = err
+
 	ctx := r.Context()
 
 	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
 
 	r = r.WithContext(ctx)
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListApplicationsParams
+
+	// ------------- Optional query parameter "organizationId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "organizationId", r.URL.Query(), &params.OrganizationId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "organizationId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "organizationId", Err: err})
+		}
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListApplications(w, r)
+		siw.Handler.ListApplications(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1338,6 +1413,26 @@ func (siw *ServerInterfaceWrapper) ExportAuditLog(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// ListOrganizations operation middleware
+func (siw *ServerInterfaceWrapper) ListOrganizations(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListOrganizations(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListServiceKeys operation middleware
 func (siw *ServerInterfaceWrapper) ListServiceKeys(w http.ResponseWriter, r *http.Request) {
 
@@ -1424,6 +1519,19 @@ func (siw *ServerInterfaceWrapper) ListUsers(w http.ResponseWriter, r *http.Requ
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params ListUsersParams
+
+	// ------------- Optional query parameter "organizationId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "organizationId", r.URL.Query(), &params.OrganizationId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "organizationId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "organizationId", Err: err})
+		}
+		return
+	}
 
 	// ------------- Optional query parameter "q" -------------
 
@@ -1804,6 +1912,26 @@ func (siw *ServerInterfaceWrapper) UpdateCurrentUser(w http.ResponseWriter, r *h
 	handler.ServeHTTP(w, r)
 }
 
+// ListMyApplications operation middleware
+func (siw *ServerInterfaceWrapper) ListMyApplications(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMyApplications(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListSessions operation middleware
 func (siw *ServerInterfaceWrapper) ListSessions(w http.ResponseWriter, r *http.Request) {
 
@@ -2134,6 +2262,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/api/v1/admin/audit-log/export", wrapper.ExportAuditLog)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/admin/organizations", wrapper.ListOrganizations)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/admin/service-keys", wrapper.ListServiceKeys)
 	})
 	r.Group(func(r chi.Router) {
@@ -2186,6 +2317,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Patch(options.BaseURL+"/api/v1/me", wrapper.UpdateCurrentUser)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/me/applications", wrapper.ListMyApplications)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/me/sessions", wrapper.ListSessions)

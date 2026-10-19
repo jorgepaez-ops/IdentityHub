@@ -33,7 +33,7 @@ func TestRF007_RefreshTrasLogoutDevuelve401(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Hash: %v", err)
 	}
-	user, err := repository.CreateUser(ctx, store.CreateUserParams{Email: "logout-refresh@example.test", PasswordHash: passwordHash, DisplayName: "Logout refresh"})
+	user, err := repository.CreateUser(ctx, store.CreateUserParams{OrganizationID: store.ContabilidadOrganizationID, Email: "logout-refresh@example.test", PasswordHash: passwordHash, DisplayName: "Logout refresh"})
 	if err != nil {
 		t.Fatalf("CreateUser: %v", err)
 	}

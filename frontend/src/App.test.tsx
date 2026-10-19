@@ -2,9 +2,24 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from './App'
 import { authenticatedRequest, resetSessionForTests } from './api/client'
+import { organizationsRoute, profile, signedIn, stubApi } from './test-utils'
 
 const json = (status: number, body?: unknown) => new Response(body === undefined ? null : JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 const user = (roles: string[]) => ({ id: 'user-id', email: 'person@example.test', displayName: 'Persona', status: 'active', roles, mfaEnabled: true, createdAt: '2026-01-01T00:00:00Z' })
+
+const accessGrant = { accessToken: 'access', tokenType: 'Bearer', expiresIn: 900 }
+// A signed-out visitor who logs in as an administrator: the console also loads the launcher and the company list.
+const adminLoginRoutes = () => {
+  let verified = false
+  return {
+    'POST /api/v1/auth/refresh': () => (verified ? json(200, accessGrant) : json(401, { title: 'Unauthorized', status: 401 })),
+    'POST /api/v1/auth/login': () => json(202, { mfaToken: 'challenge', expiresIn: 300 }),
+    'POST /api/v1/auth/mfa/verify': () => { verified = true; return json(200, accessGrant) },
+    'GET /api/v1/me': () => json(200, user(['admin'])),
+    'GET /api/v1/me/applications': () => json(200, []),
+    ...organizationsRoute,
+  }
+}
 
 describe('authentication routes', () => {
   afterEach(() => {
@@ -14,11 +29,7 @@ describe('authentication routes', () => {
   })
 
   it('TestRF013_RoutesAdminAfterMfaVerification', async () => {
-    vi.stubGlobal('fetch', vi.fn()
-      .mockResolvedValueOnce(json(401, { title: 'Unauthorized', status: 401 }))
-      .mockResolvedValueOnce(json(202, { mfaToken: 'challenge', expiresIn: 300 }))
-      .mockResolvedValueOnce(json(200, { accessToken: 'access', tokenType: 'Bearer', expiresIn: 900 }))
-      .mockResolvedValueOnce(json(200, user(['admin']))))
+    stubApi({ ...adminLoginRoutes(), 'GET /api/v1/admin/users': () => json(200, { items: [], nextCursor: null }), 'GET /api/v1/admin/audit-log': () => json(200, { items: [], nextCursor: null }) })
 
     render(<App />)
     await screen.findByLabelText('Correo electrónico')
@@ -205,9 +216,7 @@ describe('authentication routes', () => {
   })
 
   it('TestRF005_RestoresSessionOnMount', async () => {
-    vi.stubGlobal('fetch', vi.fn()
-      .mockResolvedValueOnce(json(200, { accessToken: 'access', tokenType: 'Bearer', expiresIn: 900 }))
-      .mockResolvedValueOnce(json(200, user(['admin']))))
+    stubApi({ ...signedIn(profile({ roles: ['admin'] })), 'GET /api/v1/admin/users': () => json(200, { items: [], nextCursor: null }), 'GET /api/v1/admin/audit-log': () => json(200, { items: [], nextCursor: null }) })
 
     render(<App />)
 
@@ -278,12 +287,12 @@ describe('authentication routes', () => {
   })
 
   it('TestRF007_LogsOutLocallyWhenRemoteLogoutFails', async () => {
-    vi.stubGlobal('fetch', vi.fn()
-      .mockResolvedValueOnce(json(401, { title: 'Unauthorized', status: 401 }))
-      .mockResolvedValueOnce(json(202, { mfaToken: 'challenge', expiresIn: 300 }))
-      .mockResolvedValueOnce(json(200, { accessToken: 'access', tokenType: 'Bearer', expiresIn: 900 }))
-      .mockResolvedValueOnce(json(200, user(['admin'])))
-      .mockRejectedValueOnce(new TypeError('Failed to fetch')))
+    stubApi({
+      ...adminLoginRoutes(),
+      'GET /api/v1/admin/users': () => json(200, { items: [], nextCursor: null }),
+      'GET /api/v1/admin/audit-log': () => json(200, { items: [], nextCursor: null }),
+      'POST /api/v1/auth/logout': () => { throw new TypeError('Failed to fetch') },
+    })
 
     render(<App />)
     await screen.findByLabelText('Correo electrónico')

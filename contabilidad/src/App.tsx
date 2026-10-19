@@ -11,7 +11,7 @@ export const MINIMUM_SESSION_LIFETIME_MS = CLOCK_LEEWAY_SECONDS * 1000
 
 type CallbackMessageKind = CallbackError['kind'] | 'clock'
 
-const CALLBACK_MESSAGES: Record<CallbackMessageKind, string> = {
+const CALLBACK_MESSAGES: Record<Exclude<CallbackMessageKind, 'no_access'>, string> = {
   state: 'No se pudo validar el inicio de sesión (la respuesta no corresponde a esta solicitud). Inténtalo de nuevo.',
   denied: 'Identity Hub no autorizó el acceso. Inténtalo de nuevo.',
   exchange: 'No se pudo completar el inicio de sesión con Identity Hub. Inténtalo de nuevo.',
@@ -35,6 +35,8 @@ function AppContent() {
   const [session, setSession] = useState<Session | null>(null)
   // Survives the simulated remount of React.StrictMode: the code is single use.
   const callbackHandled = useRef(false)
+  // The Hub refused the authorization (no role here, or another company): no token exists.
+  const [deniedByHub, setDeniedByHub] = useState(false)
 
   useEffect(() => {
     if (!returning || callbackHandled.current) return
@@ -47,7 +49,14 @@ function AppContent() {
         }
         setSession(result)
       },
-      (reason: unknown) => setLogin({ kind: 'error', message: CALLBACK_MESSAGES[(reason as CallbackError)?.kind] ?? CALLBACK_MESSAGES.exchange }),
+      (reason: unknown) => {
+        const kind = (reason as CallbackError)?.kind
+        if (kind === 'no_access') {
+          setDeniedByHub(true)
+          return
+        }
+        setLogin({ kind: 'error', message: CALLBACK_MESSAGES[kind] ?? CALLBACK_MESSAGES.exchange })
+      },
     )
   }, [returning])
 
@@ -67,9 +76,11 @@ function AppContent() {
   }, [])
   const logout = useCallback(() => {
     setSession(null)
+    setDeniedByHub(false)
     setLogin({ kind: 'idle' })
   }, [])
 
+  if (deniedByHub) return <AccessDenied onLogout={logout} />
   if (!session) return <LoginScreen state={login} onContinue={start} />
   const access = accessFor(session.verified.permissions, session.verified.roles)
   if (access.level === 'none') return <AccessDenied onLogout={logout} />

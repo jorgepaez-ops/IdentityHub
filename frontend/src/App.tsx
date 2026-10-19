@@ -7,12 +7,13 @@ import { safeContinueTarget } from './features/account/continueTarget'
 import { redirectTo } from './navigation'
 import { MyAccountPage } from './features/account/MyAccountPage'
 import { AuditLogPage } from './features/admin/AuditLogPage'
+import { CompanyProvider, CompanyScope } from './features/admin/company'
 import { HomePage } from './features/admin/HomePage'
 import { RolesPage } from './features/admin/RolesPage'
 import { ServiceKeysPage } from './features/admin/ServiceKeysPage'
 import { UsersPage } from './features/admin/UsersPage'
 import { AcceptInvitationPage, ForgotPasswordPage, ResetPasswordPage } from './features/account/PublicPages'
-import { ApiProblemError, clearSession, type CurrentUser, type MfaChallenge, getCurrentUser, login, logout, refreshSession, resendMfaCode, verifyMfa } from './api/client'
+import { ApiProblemError, clearSession, type CurrentUser, type MfaChallenge, type UserApplication, getCurrentUser, listMyApplications, login, logout, refreshSession, resendMfaCode, verifyMfa } from './api/client'
 import { fieldValue } from './formData'
 
 type ErrorStep = 'credentials' | 'verify' | 'resend'
@@ -32,6 +33,25 @@ function messageFor(error: unknown, step: ErrorStep = 'credentials') {
     case 503: return 'No fue posible enviar el código. Inténtalo de nuevo.'
     default: return 'No fue posible completar la solicitud. Inténtalo de nuevo.'
   }
+}
+
+// Where a signed-in user lands after the password and MFA steps (RF-022): administrators go to the
+// console; anyone else with exactly one application goes straight to it, and with several (or none)
+// to /me, where the launcher lists them.
+async function goHome(user: CurrentUser, navigate: (to: string, options: { replace: boolean }) => void) {
+  if (user.roles.includes('admin')) {
+    navigate('/inicio', { replace: true })
+    return
+  }
+  let applications: UserApplication[] = []
+  try {
+    applications = await listMyApplications()
+  } catch {
+    // The launcher is a convenience: /me is always a valid landing page.
+  }
+  const only = applications.length === 1 ? applications[0] : undefined
+  if (only) redirectTo(only.launchUrl)
+  else navigate('/me', { replace: true })
 }
 
 function LoginPage({ onAuthenticated }: Readonly<{ onAuthenticated: (user: CurrentUser) => void }>) {
@@ -82,7 +102,7 @@ function LoginPage({ onAuthenticated }: Readonly<{ onAuthenticated: (user: Curre
       }
       const user = await getCurrentUser()
       onAuthenticated(user)
-      navigate(user.roles.includes('admin') ? '/inicio' : '/me', { replace: true })
+      await goHome(user, navigate)
     } catch (reason) {
       if (mfaVerified) {
         clearSession()
@@ -157,6 +177,24 @@ function LoginPage({ onAuthenticated }: Readonly<{ onAuthenticated: (user: Curre
   )
 }
 
+function ConnectedApps() {
+  const [applications, setApplications] = useState<UserApplication[]>([])
+  useEffect(() => {
+    let active = true
+    void (async () => {
+      try {
+        const loaded = await listMyApplications()
+        if (active) setApplications(loaded)
+      } catch {
+        // No launcher is better than a broken shell: the block stays hidden.
+      }
+    })()
+    return () => { active = false }
+  }, [])
+  if (applications.length === 0) return null
+  return <div className="connected-apps"><strong>Aplicaciones conectadas</strong>{applications.map((application) => <a key={application.clientId} href={application.launchUrl}>{application.name}</a>)}</div>
+}
+
 function AppShell({ user, onLogout, onUserChange, onSessionEnded }: Readonly<{ user: CurrentUser; onLogout: () => Promise<void>; onUserChange: (user: CurrentUser) => void; onSessionEnded: () => void }>) {
   const navigate = useNavigate()
   const isAdmin = user.roles.includes('admin')
@@ -182,14 +220,14 @@ function AppShell({ user, onLogout, onUserChange, onSessionEnded }: Readonly<{ u
           {isAdmin && <NavLink to="/claves"><KeyIcon />Claves de servicio</NavLink>}
           <NavLink to="/me"><AccountIcon />Mi cuenta</NavLink>
         </nav>
-        <div className="connected-apps"><strong>Aplicaciones conectadas</strong><a href="http://contabilidad.localhost:8080">Contabilidad</a></div>
+        <ConnectedApps />
         <div className="rail-actions"><ThemeToggle /><button className="logout-button" onClick={() => void closeSession()} type="button"><LogoutIcon />Cerrar sesión</button></div>
       </aside>
       <main className="app-content" id="main-content" tabIndex={-1}>
         <Routes>
-          <Route path="/inicio" element={isAdmin ? <HomePage onSessionEnded={onSessionEnded} /> : <Navigate to="/me" replace />} />
-          <Route path="/usuarios" element={isAdmin ? <UsersPage currentUserId={user.id} onSessionEnded={onSessionEnded} /> : <Navigate to="/me" replace />} />
-          <Route path="/roles" element={isAdmin ? <RolesPage currentRoles={user.roles} onSessionEnded={onSessionEnded} /> : <Navigate to="/me" replace />} />
+          <Route path="/inicio" element={isAdmin ? <CompanyScope>{(organization) => <HomePage organization={organization} onSessionEnded={onSessionEnded} />}</CompanyScope> : <Navigate to="/me" replace />} />
+          <Route path="/usuarios" element={isAdmin ? <CompanyScope>{(organization, organizations) => <UsersPage organization={organization} organizations={organizations} currentUserId={user.id} onSessionEnded={onSessionEnded} />}</CompanyScope> : <Navigate to="/me" replace />} />
+          <Route path="/roles" element={isAdmin ? <CompanyScope>{(organization) => <RolesPage organization={organization} currentRoles={user.roles} onSessionEnded={onSessionEnded} />}</CompanyScope> : <Navigate to="/me" replace />} />
           <Route path="/auditoria" element={isAdmin ? <AuditLogPage onSessionEnded={onSessionEnded} /> : <Navigate to="/me" replace />} />
           <Route path="/claves" element={isAdmin ? <ServiceKeysPage onSessionEnded={onSessionEnded} /> : <Navigate to="/me" replace />} />
           <Route path="/me" element={<MyAccountPage user={user} onUserChange={onUserChange} onSessionEnded={onSessionEnded} />} />
@@ -198,6 +236,12 @@ function AppShell({ user, onLogout, onUserChange, onSessionEnded }: Readonly<{ u
       </main>
     </div>
   )
+}
+
+// Only administrators load the company list (GET /admin/organizations is admin-only).
+function SignedIn(props: Readonly<{ user: CurrentUser; onLogout: () => Promise<void>; onUserChange: (user: CurrentUser) => void; onSessionEnded: () => void }>) {
+  const shell = <AppShell {...props} />
+  return props.user.roles.includes('admin') ? <CompanyProvider onSessionEnded={props.onSessionEnded}>{shell}</CompanyProvider> : shell
 }
 
 // A signed-in console user lands on /login?continue= only when /oauth/authorize found no
@@ -250,7 +294,7 @@ function AppRoutes() {
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/password-reset" element={<ResetPasswordPage />} />
       <Route path="/login" element={user && !hasContinueTarget() ? <Navigate to={user.roles.includes('admin') ? '/inicio' : '/me'} replace /> : <LoginPage onAuthenticated={setUser} />} />
-      <Route path="/*" element={user ? <AppShell user={user} onLogout={async () => { try { await logout() } finally { setUser(null) } }} onUserChange={setUser} onSessionEnded={endSession} /> : <Navigate to="/login" replace />} />
+      <Route path="/*" element={user ? <SignedIn user={user} onLogout={async () => { try { await logout() } finally { setUser(null) } }} onUserChange={setUser} onSessionEnded={endSession} /> : <Navigate to="/login" replace />} />
     </Routes>
   )
 }

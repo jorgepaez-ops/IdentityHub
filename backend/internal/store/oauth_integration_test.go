@@ -30,7 +30,7 @@ func TestRF020_PostgresCodigoPKCEAtomicoYHashOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	user, err := repository.CreateUser(ctx, store.CreateUserParams{Email: "oauth@example.test", PasswordHash: "$argon2id$fixed-test-value", DisplayName: "OAuth"})
+	user, err := repository.CreateUser(ctx, store.CreateUserParams{OrganizationID: store.ContabilidadOrganizationID, Email: "oauth@example.test", PasswordHash: "$argon2id$fixed-test-value", DisplayName: "OAuth"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +41,7 @@ func TestRF020_PostgresCodigoPKCEAtomicoYHashOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	client := oauth.Client{ID: "contabilidad", RedirectURI: "http://contabilidad.localhost:8080/oauth/callback"}
-	service := oauth.New(repository.OAuthRepository(), client, bytes.NewReader(append(bytes.Repeat([]byte{7}, 32), bytes.Repeat([]byte{8}, 96)...)), time.Now)
+	service := oauth.New(repository.OAuthRepository(), []oauth.Client{client}, bytes.NewReader(append(bytes.Repeat([]byte{7}, 32), bytes.Repeat([]byte{8}, 96)...)), time.Now)
 	issued, err := service.Authorize(ctx, user.ID, oauth.AuthorizeInput{ClientID: client.ID, RedirectURI: client.RedirectURI, ResponseType: "code", State: "state", CodeChallenge: challengeForIntegration("verifier"), CodeChallengeMethod: "S256"})
 	if err != nil {
 		t.Fatal(err)
@@ -129,12 +129,15 @@ func TestRF020_PostgresReusoDeCodigoAuditaConElPropietarioComoActor(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	user, err := repository.CreateUser(ctx, store.CreateUserParams{Email: "oauth-reuse@example.test", PasswordHash: "$argon2id$fixed-test-value", DisplayName: "Reuse"})
+	user, err := repository.CreateUser(ctx, store.CreateUserParams{OrganizationID: store.ContabilidadOrganizationID, Email: "oauth-reuse@example.test", PasswordHash: "$argon2id$fixed-test-value", DisplayName: "Reuse"})
 	if err != nil {
 		t.Fatal(err)
 	}
+	if err := assignRoleSQL(ctx, pool, user.ID, "contabilidad.senior"); err != nil {
+		t.Fatal(err)
+	}
 	client := oauth.Client{ID: "contabilidad", RedirectURI: "http://contabilidad.localhost:8080/oauth/callback"}
-	service := oauth.New(repository.OAuthRepository(), client, bytes.NewReader(bytes.Repeat([]byte{5}, 128)), time.Now)
+	service := oauth.New(repository.OAuthRepository(), []oauth.Client{client}, bytes.NewReader(bytes.Repeat([]byte{5}, 128)), time.Now)
 	issued, err := service.Authorize(ctx, user.ID, oauth.AuthorizeInput{ClientID: client.ID, RedirectURI: client.RedirectURI, ResponseType: "code", State: "state", CodeChallenge: challengeForIntegration("verifier"), CodeChallengeMethod: "S256"})
 	if err != nil {
 		t.Fatal(err)
@@ -183,7 +186,7 @@ func TestRF020_PostgresPurgaCodigosYSesionesHubInutilizables(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	user, err := repository.CreateUser(ctx, store.CreateUserParams{Email: "oauth-purge@example.test", PasswordHash: "$argon2id$fixed-test-value", DisplayName: "Purge"})
+	user, err := repository.CreateUser(ctx, store.CreateUserParams{OrganizationID: store.ContabilidadOrganizationID, Email: "oauth-purge@example.test", PasswordHash: "$argon2id$fixed-test-value", DisplayName: "Purge"})
 	if err != nil {
 		t.Fatal(err)
 	}

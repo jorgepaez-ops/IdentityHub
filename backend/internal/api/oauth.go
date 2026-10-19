@@ -31,8 +31,8 @@ func (s *Server) authorizeClient(w http.ResponseWriter, r *http.Request, params 
 		return
 	}
 	if err := s.oauth.ValidateAuthorizeInput(input); err != nil {
-		if s.oauth.IsTrustedClient(input) {
-			s.redirectOAuthInvalid(w, r, input.State)
+		if client, ok := s.oauth.TrustedClient(input); ok {
+			s.redirectToClient(w, r, client, "invalid_request", input.State)
 			return
 		}
 		writeProblem(w, http.StatusBadRequest, problemOAuthInvalidRequest, titleBadRequest, detailOAuthInvalidRequest)
@@ -59,44 +59,71 @@ func (s *Server) authorizeClient(w http.ResponseWriter, r *http.Request, params 
 		return
 	}
 	result, err := s.oauth.Authorize(r.Context(), userID, input)
+	var rejected *oauth.RejectedError
+	if errors.As(err, &rejected) {
+		// RFC 6749 section 4.1.2.1: client_id and redirect_uri are valid, so the
+		// refusal travels to the client; the rejection was already audited.
+		client, _ := s.oauth.TrustedClient(input)
+		s.redirectToClient(w, r, client, "access_denied", input.State)
+		return
+	}
 	if err != nil {
 		s.writeOAuthServerError(w, "authorize", "oauth-authorization-failed", "The authorization code could not be issued.", err)
 		return
 	}
-	http.Redirect(w, r, s.clientRedirectURL(url.Values{"code": {result.Code}, "state": {input.State}}), http.StatusFound)
+	client, _ := s.oauth.TrustedClient(input)
+	target, ok := clientRedirectURL(client, url.Values{"code": {result.Code}, "state": {input.State}})
+	if !ok {
+		writeProblem(w, http.StatusServiceUnavailable, problemOAuthUnavailable, titleServiceUnavailable, detailOAuthUnavailable)
+		return
+	}
+	http.Redirect(w, r, target, http.StatusFound)
 }
 
 func (s *Server) redirectOAuthError(w http.ResponseWriter, r *http.Request) bool {
-	if s.oauth == nil || s.oauthRedirect == nil {
+	if s.oauth == nil {
 		return false
 	}
-	if hasDuplicateOAuthParameter(r.URL.Query()) || len(r.URL.Query()["client_id"]) != 1 || len(r.URL.Query()["redirect_uri"]) != 1 {
+	query := r.URL.Query()
+	if hasDuplicateOAuthParameter(query) || len(query["client_id"]) != 1 || len(query["redirect_uri"]) != 1 {
 		return false
 	}
-	if r.URL.Query().Get("client_id") != s.oauthClient.ID || r.URL.Query().Get("redirect_uri") != s.oauthClient.RedirectURI {
+	client, ok := s.oauth.TrustedClient(oauth.AuthorizeInput{ClientID: query.Get("client_id"), RedirectURI: query.Get("redirect_uri")})
+	if !ok {
 		return false
 	}
-	s.redirectOAuthInvalid(w, r, r.URL.Query().Get("state"))
+	s.redirectToClient(w, r, client, "invalid_request", query.Get("state"))
 	return true
 }
-func (s *Server) redirectOAuthInvalid(w http.ResponseWriter, r *http.Request, state string) {
-	values := url.Values{"error": {"invalid_request"}}
+
+// redirectToClient sends an OAuth error to the registered redirect URI of a
+// client already validated by the caller (RFC 6749 section 4.1.2.1).
+func (s *Server) redirectToClient(w http.ResponseWriter, r *http.Request, client oauth.Client, code, state string) {
+	values := url.Values{"error": {code}}
 	if state != "" {
 		values.Set("state", state)
 	}
-	http.Redirect(w, r, s.clientRedirectURL(values), http.StatusFound)
+	target, ok := clientRedirectURL(client, values)
+	if !ok {
+		writeProblem(w, http.StatusServiceUnavailable, problemOAuthUnavailable, titleServiceUnavailable, detailOAuthUnavailable)
+		return
+	}
+	http.Redirect(w, r, target, http.StatusFound)
 }
 
-// clientRedirectURL adds values to the registered redirect URI, parsed once in
-// SetOAuthService so a request path can never dereference a nil URL.
-func (s *Server) clientRedirectURL(values url.Values) string {
-	target := *s.oauthRedirect
+// clientRedirectURL adds values to the client's registered redirect URI. It
+// reports false when the registration is not an absolute URL.
+func clientRedirectURL(client oauth.Client, values url.Values) (string, bool) {
+	target, err := url.Parse(client.RedirectURI)
+	if err != nil || !target.IsAbs() {
+		return "", false
+	}
 	query := target.Query()
 	for key, list := range values {
 		query[key] = list
 	}
 	target.RawQuery = query.Encode()
-	return target.String()
+	return target.String(), true
 }
 func hasDuplicateOAuthParameter(query url.Values) bool {
 	for _, key := range []string{"client_id", "redirect_uri", "response_type", "state", "code_challenge", "code_challenge_method"} {
@@ -138,7 +165,7 @@ func (s *Server) exchangeAuthorizationCode(w http.ResponseWriter, r *http.Reques
 		s.writeOAuthServerError(w, "exchange", "oauth-token-failed", "The authorization code could not be exchanged.", err)
 		return
 	}
-	access, err := s.tokens.IssueForAudience(result.UserID.String(), result.Roles, result.Permissions, s.oauthClient.ID)
+	access, err := s.tokens.IssueForAudience(result.UserID.String(), result.Roles, result.Permissions, result.ClientID)
 	if err != nil {
 		s.writeOAuthServerError(w, "issue_access_token", "oauth-token-failed", "The access token could not be issued.", err)
 		return
@@ -165,8 +192,9 @@ func (s *Server) oauthCORS(next http.Handler) http.Handler {
 			return
 		}
 		w.Header().Add("Vary", "Origin")
-		if r.Header.Get("Origin") == s.oauthClient.Origin {
-			w.Header().Set("Access-Control-Allow-Origin", s.oauthClient.Origin)
+		// Exact match against the allowed origin of any registered client; never a wildcard.
+		if origin := r.Header.Get("Origin"); s.oauth != nil && s.oauth.AllowsOrigin(origin) {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
 		}
 		if r.Method == http.MethodOptions && r.URL.Path == "/oauth/token" {
 			w.Header().Set("Access-Control-Allow-Methods", http.MethodPost)

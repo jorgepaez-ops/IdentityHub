@@ -41,12 +41,32 @@ test('RF-009 Un empleado sin rol de aplicación no accede a Contabilidad', async
   const email = await createActiveUser(admin)
   const existingMailIds = await mailIds(email)
   const since = new Date()
+  const authorizeRedirects: string[] = []
+  const tokenRequests: string[] = []
+  page.on('response', (response) => {
+    if (new URL(response.url()).pathname === '/oauth/authorize' && response.status() === 302) {
+      authorizeRedirects.push(response.headers().location ?? '')
+    }
+  })
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname === '/oauth/token') tokenRequests.push(request.url())
+  })
 
   await page.goto(contabilidadUrl)
   await page.getByRole('button', { name: 'Continuar con Identity Hub' }).click()
   await browserLoginWithMfa(page, email, strongPassword, { existingMailIds, since })
 
   await expect(page.getByRole('heading', { name: 'Sin acceso a Contabilidad', exact: true })).toHaveText('Sin acceso a Contabilidad')
+  // The Hub refused at authorize: the browser came back with access_denied, never a code,
+  // and Contabilidad never asked for a token.
+  const rejection = authorizeRedirects.find((location) => location.includes('error=access_denied'))
+  expect(rejection).toBeDefined()
+  expect(authorizeRedirects.some((location) => location.includes('code='))).toBe(false)
+  expect(tokenRequests).toHaveLength(0)
+  expect(psql(`SELECT count(*) FROM audit_log a
+               JOIN users u ON u.id = a.actor_user_id
+               WHERE u.email = :'email' AND a.action = 'oauth_authorization_rejected'
+                 AND a.metadata->>'reason' = 'no_application_role' AND a.metadata->>'client_id' = 'contabilidad';`, { email })).toBe('1')
 })
 
 test('RF-010 Un administrador deshabilita una cuenta', async () => {

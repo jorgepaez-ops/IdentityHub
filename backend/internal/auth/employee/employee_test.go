@@ -29,6 +29,9 @@ type fakeWriter struct {
 	audits      int
 	auditActor  *uuid.UUID
 	auditAct    string
+	auditMeta   string
+	auditType   *string
+	auditID     *string
 }
 
 func (w *fakeWriter) ValidateRoleNames(_ context.Context, names []string) ([]string, error) {
@@ -75,6 +78,8 @@ func (w *fakeWriter) InsertAuditEvent(_ context.Context, params store.InsertAudi
 	w.audits++
 	w.auditActor = params.ActorUserID
 	w.auditAct = params.Action
+	w.auditMeta = string(params.Metadata)
+	w.auditType, w.auditID = params.ResourceType, params.ResourceID
 	return store.AuditEvent{}, nil
 }
 
@@ -103,7 +108,7 @@ func TestRF001_AltaDevuelveCuentaPendienteConRolBaseYRolesSolicitados(t *testing
 	repo := &fakeRepository{writer: &fakeWriter{user: store.User{ID: uuid.New(), Email: "ana@example.com", DisplayName: "Ana", Status: "pending_verification"}}}
 	hasher, publisher := &fakeHasher{}, &fakePublisher{}
 
-	result, err := testService(repo, hasher, publisher).CreateEmployee(context.Background(), Input{
+	result, err := testService(repo, hasher, publisher).CreateEmployee(context.Background(), Input{OrganizationID: store.ContabilidadOrganizationID,
 		Email: "ana@example.com", DisplayName: "Ana", Roles: []string{"contabilidad.analista"}, ActorUserID: actor,
 	})
 	if err != nil {
@@ -136,7 +141,7 @@ func TestRF001_AltaDevuelveCuentaPendienteConRolBaseYRolesSolicitados(t *testing
 
 func TestRF001_SoloRolUserNoLoDuplica(t *testing.T) {
 	repo := &fakeRepository{writer: &fakeWriter{user: store.User{ID: uuid.New(), Email: "ana@example.com", Status: "pending_verification"}}}
-	result, err := testService(repo, &fakeHasher{}, &fakePublisher{}).CreateEmployee(context.Background(), Input{
+	result, err := testService(repo, &fakeHasher{}, &fakePublisher{}).CreateEmployee(context.Background(), Input{OrganizationID: store.ContabilidadOrganizationID,
 		Email: "ana@example.com", DisplayName: "Ana", Roles: []string{"user"}, ActorUserID: uuid.New(),
 	})
 	if err != nil {
@@ -152,7 +157,7 @@ func TestRF001_SoloRolUserNoLoDuplica(t *testing.T) {
 
 func TestRF001_RolDuplicadoNoDuplicaLaAsignacion(t *testing.T) {
 	repo := &fakeRepository{writer: &fakeWriter{user: store.User{ID: uuid.New(), Email: "ana@example.com", Status: "pending_verification"}}}
-	result, err := testService(repo, &fakeHasher{}, &fakePublisher{}).CreateEmployee(context.Background(), Input{
+	result, err := testService(repo, &fakeHasher{}, &fakePublisher{}).CreateEmployee(context.Background(), Input{OrganizationID: store.ContabilidadOrganizationID,
 		Email: "ana@example.com", DisplayName: "Ana", Roles: []string{"contabilidad.senior", "contabilidad.senior"}, ActorUserID: uuid.New(),
 	})
 	if err != nil {
@@ -168,7 +173,7 @@ func TestRF001_RolDuplicadoNoDuplicaLaAsignacion(t *testing.T) {
 
 func TestRF001_RolDesconocidoDevuelve400ConCampo(t *testing.T) {
 	repo := &fakeRepository{writer: &fakeWriter{}}
-	_, err := testService(repo, &fakeHasher{}, &fakePublisher{}).CreateEmployee(context.Background(), Input{
+	_, err := testService(repo, &fakeHasher{}, &fakePublisher{}).CreateEmployee(context.Background(), Input{OrganizationID: store.ContabilidadOrganizationID,
 		Email: "ana@example.com", DisplayName: "Ana", Roles: []string{"operator"}, ActorUserID: uuid.New(),
 	})
 	var invalid *InvalidInputError
@@ -182,7 +187,7 @@ func TestRF001_RolDesconocidoDevuelve400ConCampo(t *testing.T) {
 
 func TestRF001_FalloDelValidadorDeRolesAbortaSinCrearCuenta(t *testing.T) {
 	repo := &fakeRepository{writer: &fakeWriter{validateErr: errors.New("roles lookup unavailable")}}
-	_, err := testService(repo, &fakeHasher{}, &fakePublisher{}).CreateEmployee(context.Background(), Input{
+	_, err := testService(repo, &fakeHasher{}, &fakePublisher{}).CreateEmployee(context.Background(), Input{OrganizationID: store.ContabilidadOrganizationID,
 		Email: "ana@example.com", DisplayName: "Ana", Roles: []string{"contabilidad.senior"}, ActorUserID: uuid.New(),
 	})
 	var invalid *InvalidInputError
@@ -196,7 +201,7 @@ func TestRF001_FalloDelValidadorDeRolesAbortaSinCrearCuenta(t *testing.T) {
 
 func TestRF001_SinRolesDevuelve400(t *testing.T) {
 	repo := &fakeRepository{writer: &fakeWriter{}}
-	_, err := testService(repo, &fakeHasher{}, &fakePublisher{}).CreateEmployee(context.Background(), Input{
+	_, err := testService(repo, &fakeHasher{}, &fakePublisher{}).CreateEmployee(context.Background(), Input{OrganizationID: store.ContabilidadOrganizationID,
 		Email: "ana@example.com", DisplayName: "Ana", Roles: nil, ActorUserID: uuid.New(),
 	})
 	var invalid *InvalidInputError
@@ -208,7 +213,7 @@ func TestRF001_SinRolesDevuelve400(t *testing.T) {
 func TestRF001_CorreoDuplicadoDevuelve409SinRevelarExistencia(t *testing.T) {
 	repo := &fakeRepository{writer: &fakeWriter{createErr: ErrEmailExists}}
 	hasher := &fakeHasher{}
-	_, err := testService(repo, hasher, &fakePublisher{}).CreateEmployee(context.Background(), Input{
+	_, err := testService(repo, hasher, &fakePublisher{}).CreateEmployee(context.Background(), Input{OrganizationID: store.ContabilidadOrganizationID,
 		Email: "ana@example.com", DisplayName: "Ana", Roles: []string{"user"}, ActorUserID: uuid.New(),
 	})
 	if !errors.Is(err, ErrEmailExists) {
@@ -221,7 +226,7 @@ func TestRF001_CorreoDuplicadoDevuelve409SinRevelarExistencia(t *testing.T) {
 
 func TestRF001_FalloDelBrokerRevierteYDevuelve503(t *testing.T) {
 	repo := &fakeRepository{writer: &fakeWriter{user: store.User{ID: uuid.New(), Email: "ana@example.com", Status: "pending_verification"}}}
-	_, err := testService(repo, &fakeHasher{}, &fakePublisher{err: errors.New("broker unavailable")}).CreateEmployee(context.Background(), Input{
+	_, err := testService(repo, &fakeHasher{}, &fakePublisher{err: errors.New("broker unavailable")}).CreateEmployee(context.Background(), Input{OrganizationID: store.ContabilidadOrganizationID,
 		Email: "ana@example.com", DisplayName: "Ana", Roles: []string{"user"}, ActorUserID: uuid.New(),
 	})
 	if !errors.Is(err, ErrPublish) {
@@ -238,7 +243,7 @@ func TestRF001_FalloDelBrokerRevierteYDevuelve503(t *testing.T) {
 func TestRF012_LaInvitacionSeEncolaConElTokenEnClaro(t *testing.T) {
 	repo := &fakeRepository{writer: &fakeWriter{user: store.User{ID: uuid.New(), Email: "ana@example.com", DisplayName: "Ana", Status: "pending_verification"}}}
 	publisher := &fakePublisher{}
-	if _, err := testService(repo, &fakeHasher{}, publisher).CreateEmployee(context.Background(), Input{
+	if _, err := testService(repo, &fakeHasher{}, publisher).CreateEmployee(context.Background(), Input{OrganizationID: store.ContabilidadOrganizationID,
 		Email: "ana@example.com", DisplayName: "Ana", Roles: []string{"user"}, ActorUserID: uuid.New(),
 	}); err != nil {
 		t.Fatalf("CreateEmployee() error = %v", err)
@@ -252,5 +257,63 @@ func TestRF012_LaInvitacionSeEncolaConElTokenEnClaro(t *testing.T) {
 	}
 	if event.EventType != events.TypeUserInvited {
 		t.Fatalf("EventType = %q, want %q", event.EventType, events.TypeUserInvited)
+	}
+}
+
+type sqlStateError string
+
+func (e sqlStateError) Error() string    { return "sqlstate " + string(e) }
+func (e sqlStateError) SQLState() string { return string(e) }
+
+func TestRF022_AltaExigeEmpresa(t *testing.T) {
+	repo := &fakeRepository{writer: &fakeWriter{}}
+
+	_, err := testService(repo, &fakeHasher{}, &fakePublisher{}).CreateEmployee(context.Background(), Input{
+		Email: "ana@example.com", DisplayName: "Ana", Roles: []string{"contabilidad.analista"}, ActorUserID: uuid.New(),
+	})
+
+	var invalid *InvalidInputError
+	if !errors.As(err, &invalid) || invalid.Field != "organizationId" {
+		t.Fatalf("CreateEmployee() error = %v, want organizationId validation error", err)
+	}
+	if repo.writer.users != 0 {
+		t.Fatal("an account was created without a company")
+	}
+}
+
+func TestRF022_EmpresaDesconocidaDevuelveErrorDeValidacion(t *testing.T) {
+	repo := &fakeRepository{writer: &fakeWriter{createErr: sqlStateError("23503")}}
+
+	_, err := testService(repo, &fakeHasher{}, &fakePublisher{}).CreateEmployee(context.Background(), Input{
+		Email: "ana@example.com", DisplayName: "Ana", Roles: []string{"user"}, ActorUserID: uuid.New(), OrganizationID: uuid.New(),
+	})
+
+	var invalid *InvalidInputError
+	if !errors.As(err, &invalid) || invalid.Field != "organizationId" {
+		t.Fatalf("CreateEmployee() error = %v, want organizationId validation error", err)
+	}
+}
+
+func TestRF022_RolDeOtraEmpresaSeRechazaYSeAuditaLaInvitacion(t *testing.T) {
+	actor := uuid.New()
+	repo := &fakeRepository{writer: &fakeWriter{user: store.User{ID: uuid.New()}, roleErr: store.ErrCrossOrganizationRole}}
+	publisher := &fakePublisher{}
+
+	_, err := testService(repo, &fakeHasher{}, publisher).CreateEmployee(context.Background(), Input{
+		Email: "ana@example.com", DisplayName: "Ana", Roles: []string{"contabilidad.analista"}, ActorUserID: actor, OrganizationID: store.EmpresaBOrganizationID,
+	})
+
+	if !errors.Is(err, store.ErrCrossOrganizationRole) {
+		t.Fatalf("CreateEmployee() error = %v, want ErrCrossOrganizationRole", err)
+	}
+	writer := repo.writer
+	if publisher.events != 0 || writer.tokens != 0 {
+		t.Fatalf("invitation side effects: events=%d tokens=%d", publisher.events, writer.tokens)
+	}
+	if writer.audits != 1 || writer.auditAct != "role_assignment_rejected" || writer.auditActor == nil || *writer.auditActor != actor {
+		t.Fatalf("audit: count=%d action=%q actor=%v", writer.audits, writer.auditAct, writer.auditActor)
+	}
+	if writer.auditMeta != `{"reason":"organization_mismatch"}` || writer.auditType == nil || *writer.auditType != "organization" || writer.auditID == nil || *writer.auditID != store.EmpresaBOrganizationID.String() {
+		t.Fatalf("audit metadata=%s resource=%v/%v", writer.auditMeta, writer.auditType, writer.auditID)
 	}
 }

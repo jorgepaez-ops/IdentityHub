@@ -60,8 +60,9 @@ trap 'exit 143' TERM
 $COMPOSE exec -T db psql -U "$db_user" -d "$db_name" -X -q -v ON_ERROR_STOP=1 \
   -v "email=$email" -v "hash=$token_hash" >/dev/null <<'SQL'
 WITH u AS (
-  INSERT INTO users (email, password_hash, display_name)
-  VALUES (:'email', '$argon2id$load-placeholder', 'Load Test') RETURNING id
+  INSERT INTO users (email, password_hash, display_name, organization_id)
+  VALUES (:'email', '$argon2id$load-placeholder', 'Load Test',
+          (SELECT id FROM organizations WHERE slug = 'contabilidad-sa')) RETURNING id
 ), r AS (
   INSERT INTO user_roles (user_id, role_id)
   SELECT u.id, roles.id FROM u, roles WHERE roles.name = 'user' RETURNING 1

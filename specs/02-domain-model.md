@@ -4,6 +4,8 @@
 
 ```mermaid
 erDiagram
+    organizations ||--o{ users      : agrupa
+    organizations ||--o{ applications: posee
     users ||--o{ user_roles         : tiene
     roles ||--o{ user_roles         : concede
     users ||--o{ refresh_tokens     : abre
@@ -16,8 +18,14 @@ erDiagram
     users ||--o{ audit_log          : origina
     refresh_tokens ||--o{ refresh_tokens : rota_a
 
+    organizations {
+        uuid   id PK
+        text   slug UK
+        text   name
+    }
     users {
         uuid   id PK
+        uuid   organization_id FK "NOT NULL"
         citext email UK
         text   password_hash
         text   display_name
@@ -72,6 +80,7 @@ erDiagram
     }
     applications {
         uuid   id PK
+        uuid   organization_id FK "NOT NULL"
         text   client_id UK
         text   redirect_uri
         text   allowed_origin
@@ -134,6 +143,14 @@ Reglas que el sistema garantiza siempre. Cada una tiene una prueba con su nombre
 10. **Un código de autorización solo se canjea una vez.** Está ligado a cliente, URI de retorno y
     desafío PKCE; el canje fija `used_at` en la misma transacción que emite el access token.
 11. **Un administrador no se autoasigna roles.** El actor y el destinatario deben ser distintos.
+12. **Toda cuenta y toda aplicación pertenecen a exactamente una empresa.**
+    `users.organization_id` y `applications.organization_id` son `NOT NULL` (RF-022, ADR 0015).
+13. **Coherencia empresa-rol.** Un rol de aplicación solo se asigna a un usuario cuya empresa es la
+    de la aplicación del rol (`roles.application_id` → `applications.organization_id` igual a
+    `users.organization_id`). Se impone en el backend y en la base de datos; los roles de directorio
+    (`application_id` nulo) quedan fuera de la regla.
+14. **Un código de autorización solo se emite a un usuario de la empresa de la aplicación y con al menos
+    un rol en ella.** Ninguna otra combinación produce código ni token.
 
 ## Máquina de estados de la cuenta
 
@@ -187,7 +204,10 @@ Reglas que el sistema garantiza siempre. Cada una tiene una prueba con su nombre
   almacenan como hash; no hay TOTP, enrolamiento ni códigos de recuperación (ADR 0010).
 - **`hub_sessions` es independiente del refresh de consola.** La cookie SSO usa `SameSite=Lax` y
   el refresh conserva `SameSite=Strict`; ambos valores opacos se guardan solo como hash.
-- **`applications` representa el único cliente configurado.** En esta fase solo existe
-  Contabilidad; `authorization_codes` liga cada código al cliente, URI y PKCE S256 (ADR 0009).
+- **`applications` registra los clientes OAuth.** Cada fila lleva su empresa, `client_id`,
+  `redirect_uri` y origen permitido (Contabilidad e Inventario); `authorization_codes` liga cada código
+  al cliente, URI y PKCE S256 (ADR 0009, ADR 0015).
+- **`organizations` es una entidad ligera.** Solo agrupa cuentas y aplicaciones: no hay administrador por
+  empresa ni auditoría separada. Se declara por migración, como las aplicaciones (ADR 0015).
 - **UUID v7 como claves primarias** salvo en `audit_log`, donde un `bigint` secuencial deja
   explícito el orden de inserción y hace más barata la consulta por rango temporal.

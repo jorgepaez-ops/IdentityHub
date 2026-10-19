@@ -62,7 +62,10 @@ func (w *employeeCreationWriter) ValidateRoleNames(ctx context.Context, names []
 }
 
 func (w *employeeCreationWriter) CreateUser(ctx context.Context, params CreateUserParams) (User, error) {
-	user, err := w.queries.CreateUser(ctx, generated.CreateUserParams{Email: params.Email, PasswordHash: params.PasswordHash, DisplayName: params.DisplayName})
+	if params.OrganizationID == uuid.Nil {
+		return User{}, ErrOrganizationRequired
+	}
+	user, err := w.queries.CreateUser(ctx, createUserParamsToGenerated(params))
 	if err != nil {
 		return User{}, fmt.Errorf("create employee user: %w", err)
 	}
@@ -72,7 +75,7 @@ func (w *employeeCreationWriter) CreateUser(ctx context.Context, params CreateUs
 func (w *employeeCreationWriter) AddUserRole(ctx context.Context, userID uuid.UUID, roleName string, grantedBy uuid.UUID) error {
 	rows, err := w.queries.AddUserRole(ctx, generated.AddUserRoleParams{UserID: userID, Name: roleName, GrantedBy: pgtype.UUID{Bytes: grantedBy, Valid: true}})
 	if err != nil {
-		return fmt.Errorf("add employee role: %w", err)
+		return fmt.Errorf("add employee role: %w", mapOrganizationError(err))
 	}
 	if rows != 1 {
 		return fmt.Errorf("add employee role: role %q is missing", roleName)

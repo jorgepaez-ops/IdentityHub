@@ -144,11 +144,12 @@ func (ns NullUserStatus) Value() (driver.Value, error) {
 }
 
 type Application struct {
-	ID            uuid.UUID
-	ClientID      string
-	RedirectUri   string
-	AllowedOrigin string
-	Name          string
+	ID             uuid.UUID
+	ClientID       string
+	RedirectUri    string
+	AllowedOrigin  string
+	Name           string
+	OrganizationID uuid.UUID
 }
 
 type AuditLog struct {
@@ -194,6 +195,14 @@ type MfaChallenge struct {
 	LastSentAt   pgtype.Timestamptz
 	UsedAt       pgtype.Timestamptz
 	CreatedAt    pgtype.Timestamptz
+}
+
+// Companies served by the Hub. "hub" is the platform operator and home of the global administrators.
+type Organization struct {
+	ID        uuid.UUID
+	Slug      string
+	Name      string
+	CreatedAt pgtype.Timestamptz
 }
 
 type Permission struct {
@@ -267,6 +276,7 @@ type User struct {
 	LastLoginAt      pgtype.Timestamptz
 	CreatedAt        pgtype.Timestamptz
 	UpdatedAt        pgtype.Timestamptz
+	OrganizationID   uuid.UUID
 }
 
 type UserRole struct {

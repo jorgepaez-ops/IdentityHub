@@ -319,14 +319,17 @@ paths:
       tags: [auth]
       summary: Autorizar al cliente mediante Authorization Code con PKCE
       description: |
-        Valida el cliente configurado, la coincidencia exacta de `redirect_uri`, `state`
+        Valida que el cliente esté registrado en `applications`, la coincidencia exacta de `redirect_uri`, `state`
         obligatorio y PKCE S256. Si existe la cookie SSO del Hub (`HttpOnly`, `Secure`,
         `SameSite=Lax`) no vuelve a pedir contraseña. Sin sesión SSO
         válida responde `302` al login del Hub con `continue` = la ruta relativa de esta misma
         petición; el login solo acepta `continue` si es una ruta relativa que empieza por
         `/oauth/authorize` (nunca una URL absoluta ni `//host`, para evitar redirección abierta)
         y vuelve a ella tras completar el MFA. Los errores con una URI validada se
-        devuelven por redirección según RFC 6749 §4.1.2.1. No se habilita CORS aquí.
+        devuelven por redirección según RFC 6749 §4.1.2.1. Si el usuario autenticado pertenece a una
+        empresa distinta de la de la aplicación, o no tiene ningún rol de ella, no se emite código:
+        responde `302` a la `redirect_uri` registrada con `error=access_denied` y el `state` original, y
+        registra el evento de auditoría `oauth_authorization_rejected` (ADR 0015). No se habilita CORS aquí.
         Los parámetros en `snake_case` son nombres de protocolo definidos por RFC 6749.
       x-requirement: RF-020
       security: []
@@ -425,6 +428,26 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
+  /api/v1/me/applications:
+    get:
+      operationId: listMyApplications
+      tags: [me]
+      summary: Aplicaciones de la empresa del titular en las que tiene algún rol
+      description: |
+        Devuelve las aplicaciones de la empresa del usuario autenticado en las que tiene al menos un
+        rol, con la URL de lanzamiento (el origen registrado). Un usuario sin roles de aplicación recibe
+        una lista vacía (RF-022).
+      x-requirement: RF-022
+      responses:
+        '200':
+          description: Aplicaciones disponibles para el titular
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/UserApplication' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
   /api/v1/me/sessions:
     get:
       operationId: listSessions
@@ -460,6 +483,10 @@ paths:
       operationId: createEmployee
       tags: [admin]
       summary: Dar de alta a un empleado y enviar su invitación
+      description: |
+        La cuenta pertenece a la empresa indicada en `organizationId` (obligatorio). Un rol de una
+        aplicación de otra empresa se rechaza con `400` y queda auditado como `role_assignment_rejected`
+        (RF-022).
       x-requirement: RF-001
       requestBody:
         required: true
@@ -483,9 +510,11 @@ paths:
     get:
       operationId: listUsers
       tags: [admin]
-      summary: Listar y buscar cuentas
+      summary: Listar y buscar cuentas de una empresa
+      description: Devuelve solo las cuentas de la empresa indicada (RF-022).
       x-requirement: RF-010
       parameters:
+        - $ref: '#/components/parameters/OrganizationId'
         - $ref: '#/components/parameters/Query'
         - $ref: '#/components/parameters/Status'
         - $ref: '#/components/parameters/Limit'
@@ -496,6 +525,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/UserPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
@@ -520,7 +550,10 @@ paths:
       operationId: updateUser
       tags: [admin]
       summary: Cambiar el estado o los roles de una cuenta
-      description: Un administrador no puede deshabilitarse ni asignarse roles a sí mismo (invariantes 6 y 11).
+      description: |
+        Un administrador no puede deshabilitarse ni asignarse roles a sí mismo (invariantes 6 y 11).
+        Un rol de una aplicación de otra empresa que la del usuario se rechaza con `400` y queda
+        auditado como `role_assignment_rejected` (RF-022).
       x-requirement: RF-010
       parameters:
         - $ref: '#/components/parameters/UserId'
@@ -625,12 +658,35 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
+  /api/v1/admin/organizations:
+    get:
+      operationId: listOrganizations
+      tags: [admin]
+      summary: Listar las empresas que atiende el Hub
+      description: |
+        Incluye la empresa operadora `hub` (marcada con `operator: true`), a la que pertenecen los
+        administradores globales. La consola la usa para el selector de empresa (RF-022).
+      x-requirement: RF-022
+      responses:
+        '200':
+          description: Empresas ordenadas por nombre
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Organization' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /api/v1/admin/applications:
     get:
       operationId: listApplications
       tags: [admin]
-      summary: Listar aplicaciones, permisos y roles configurables
+      summary: Listar las aplicaciones, permisos y roles configurables de una empresa
+      description: Devuelve solo las aplicaciones (y sus roles) de la empresa indicada (RF-022).
       x-requirement: RF-021
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
       responses:
         '200':
           description: Aplicaciones con su catálogo declarativo
@@ -639,6 +695,7 @@ paths:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/Application' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
@@ -813,6 +870,15 @@ components:
       in: path
       required: true
       schema: { type: string, format: uuid }
+    OrganizationId:
+      name: organizationId
+      in: query
+      required: false
+      description: |
+        Empresa a la que se acota el listado (RF-022). El servidor lo exige (UUID de una empresa): sin él, o
+        mal formado, responde 400, pero solo después de autenticar y comprobar el rol admin (401/403 primero).
+        Por eso el contrato lo declara opcional: así el binding no valida antes que la autorización.
+      schema: { type: string }
     Query:
       name: q
       in: query
@@ -955,6 +1021,21 @@ components:
         Rol configurable exclusivo de una aplicación, con la forma `<client_id>.<nombre>`. El patrón solo
         comprueba esa forma genérica; el servidor exige además que el prefijo sea exactamente el client_id
         de la aplicación y que el nombre cumpla `^[a-z0-9][a-z0-9_-]{1,40}$`.
+    Organization:
+      type: object
+      required: [id, slug, name, operator]
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string, example: contabilidad-sa }
+        name: { type: string, example: Contabilidad S.A. }
+        operator: { type: boolean, description: Verdadero solo para la empresa operadora del Hub. }
+    UserApplication:
+      type: object
+      required: [clientId, name, launchUrl]
+      properties:
+        clientId: { type: string, example: contabilidad }
+        name: { type: string, example: Contabilidad }
+        launchUrl: { type: string, format: uri, description: Origen registrado de la aplicación., example: 'http://contabilidad.localhost:8080' }
     Permission:
       type: object
       required: [key, description]
@@ -1064,10 +1145,11 @@ components:
 
     AdminCreateUserRequest:
       type: object
-      required: [email, displayName, roles]
+      required: [email, displayName, roles, organizationId]
       properties:
         email:       { type: string, format: email, maxLength: 254 }
         displayName: { type: string, minLength: 1, maxLength: 100 }
+        organizationId: { type: string, format: uuid, description: Empresa de la cuenta nueva (RF-022). }
         roles:
           type: array
           minItems: 1

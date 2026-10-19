@@ -68,9 +68,10 @@ func (w *bootstrapAdminWriter) GetUserByEmail(ctx context.Context, email string)
 }
 
 func (w *bootstrapAdminWriter) CreateUser(ctx context.Context, params CreateUserParams) (User, error) {
-	user, err := w.queries.CreateUser(ctx, generated.CreateUserParams{
-		Email: params.Email, PasswordHash: params.PasswordHash, DisplayName: params.DisplayName,
-	})
+	if params.OrganizationID == uuid.Nil {
+		return User{}, ErrOrganizationRequired
+	}
+	user, err := w.queries.CreateUser(ctx, createUserParamsToGenerated(params))
 	if err != nil {
 		return User{}, fmt.Errorf("create bootstrap user: %w", err)
 	}

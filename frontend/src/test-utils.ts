@@ -38,10 +38,20 @@ export function stubApi(routes: Record<string, Handler>) {
   return { calls, fetch }
 }
 
+// RF-022: the companies the console can pick from. The first non-operator one is the default selection.
+export const hubOrganization = { id: '00000000-0000-4000-8000-0000000000a1', slug: 'hub', name: 'Identity Hub (operador)', operator: true }
+export const contabilidadOrganization = { id: '00000000-0000-4000-8000-0000000000a2', slug: 'contabilidad-sa', name: 'Contabilidad S.A.', operator: false }
+export const empresaBOrganization = { id: '00000000-0000-4000-8000-0000000000a3', slug: 'empresa-b', name: 'Empresa B', operator: false }
+export const organizationsFixture = () => [contabilidadOrganization, empresaBOrganization, hubOrganization]
+export const organizationsRoute = { 'GET /api/v1/admin/organizations': () => json(200, organizationsFixture()) }
+
 export const signedOut = { 'POST /api/v1/auth/refresh': () => problem(401) }
+// Administrators also load the company list the console selector needs (RF-022).
 export const signedIn = (user = profile()) => ({
   'POST /api/v1/auth/refresh': () => json(200, { accessToken: 'access', tokenType: 'Bearer', expiresIn: 900 }),
   'GET /api/v1/me': () => json(200, user),
+  'GET /api/v1/me/applications': () => json(200, []),
+  ...(Array.isArray(user.roles) && user.roles.includes('admin') ? organizationsRoute : {}),
 })
 export const type = (label: string, value: string) => fireEvent.change(screen.getByLabelText(label), { target: { value } })
 export const goTo = (path: string) => window.history.replaceState({}, '', path)

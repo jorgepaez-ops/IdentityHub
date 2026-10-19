@@ -8,7 +8,7 @@ import { challengeFor, generateState, generateVerifier } from './pkce'
 const VERIFIER_KEY = 'contabilidad.pkce_verifier'
 const STATE_KEY = 'contabilidad.oauth_state'
 
-export type CallbackErrorKind = 'state' | 'denied' | 'exchange' | 'token' | 'hub_unavailable'
+export type CallbackErrorKind = 'state' | 'denied' | 'no_access' | 'exchange' | 'token' | 'hub_unavailable'
 
 export class CallbackError extends Error {
   constructor(readonly kind: CallbackErrorKind, message: string) {
@@ -98,6 +98,8 @@ export async function completeCallback(search: string): Promise<Session> {
   if (!stored.state || !stored.verifier || !returnedState || returnedState !== stored.state) {
     throw new CallbackError('state', 'state mismatch')
   }
+  // The Hub refuses users of another company or without a Contabilidad role (ADR 0015).
+  if (params.get('error') === 'access_denied') throw new CallbackError('no_access', 'the Hub denied access to this application')
   if (params.get('error')) throw new CallbackError('denied', 'authorization denied')
   const code = params.get('code')
   if (!code) throw new CallbackError('exchange', 'missing authorization code')

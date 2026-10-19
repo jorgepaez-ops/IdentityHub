@@ -9,6 +9,7 @@ import { browserLoginWithMfa } from '../support/browser'
 import { contabilidadUrl, hubUrl, mailpitUrl } from '../support/config'
 import { extractCode, extractLink, mailIds, waitForMail } from '../support/mailpit'
 import { psql } from '../support/db'
+import { organizations } from '../support/organizations'
 import { purgeRole, roleCount } from '../support/roles'
 
 /**
@@ -97,7 +98,7 @@ async function namedUser(
   const since = new Date()
   const created = await api('POST', '/api/v1/admin/users', {
     token: admin.accessToken,
-    json: { email, displayName, roles: options.roles ?? ['user'] },
+    json: { email, displayName, organizationId: organizations.contabilidad.id, roles: options.roles ?? ['user'] },
   })
   if (created.status !== 201) throw new Error(`creating ${purpose} returned ${created.status}`)
   if (options.activate === false) return email

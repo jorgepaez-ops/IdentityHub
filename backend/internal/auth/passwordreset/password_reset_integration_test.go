@@ -45,7 +45,7 @@ func TestRF015_RestablecimientoRevocaTodasLasSesiones(t *testing.T) {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	user, err := repository.CreateUser(ctx, store.CreateUserParams{Email: "reset-revocation@example.test", PasswordHash: "$argon2id$placeholder", DisplayName: "Reset Revocation"})
+	user, err := repository.CreateUser(ctx, store.CreateUserParams{OrganizationID: store.ContabilidadOrganizationID, Email: "reset-revocation@example.test", PasswordHash: "$argon2id$placeholder", DisplayName: "Reset Revocation"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,7 +93,7 @@ func TestRF015_ConsumirRestablecimientoInvalidaLosDemasTokens(t *testing.T) {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	user, err := repository.CreateUser(ctx, store.CreateUserParams{Email: "reset-other-token@example.test", PasswordHash: "$argon2id$placeholder", DisplayName: "Reset Other Token"})
+	user, err := repository.CreateUser(ctx, store.CreateUserParams{OrganizationID: store.ContabilidadOrganizationID, Email: "reset-other-token@example.test", PasswordHash: "$argon2id$placeholder", DisplayName: "Reset Other Token"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,7 +154,7 @@ func TestRF015_D13_RestablecerDesbloqueaYPermiteEntrarConLaNuevaContrasena(t *te
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	user, err := repository.CreateUser(ctx, store.CreateUserParams{Email: "d13-locked@example.test", PasswordHash: "$argon2id$placeholder", DisplayName: "D13 Locked"})
+	user, err := repository.CreateUser(ctx, store.CreateUserParams{OrganizationID: store.ContabilidadOrganizationID, Email: "d13-locked@example.test", PasswordHash: "$argon2id$placeholder", DisplayName: "D13 Locked"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -214,7 +214,7 @@ func TestRF015_D13_RestablecerNoReactivaCuentaDeshabilitada(t *testing.T) {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	user, err := repository.CreateUser(ctx, store.CreateUserParams{Email: "d13-disabled@example.test", PasswordHash: "$argon2id$placeholder", DisplayName: "D13 Disabled"})
+	user, err := repository.CreateUser(ctx, store.CreateUserParams{OrganizationID: store.ContabilidadOrganizationID, Email: "d13-disabled@example.test", PasswordHash: "$argon2id$placeholder", DisplayName: "D13 Disabled"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -269,7 +269,7 @@ func TestRF015_D13_UnFalloTrasElRestablecimientoNoVuelveABloquear(t *testing.T) 
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	user, err := repository.CreateUser(ctx, store.CreateUserParams{Email: "d13-relock@example.test", PasswordHash: "$argon2id$placeholder", DisplayName: "D13 Relock"})
+	user, err := repository.CreateUser(ctx, store.CreateUserParams{OrganizationID: store.ContabilidadOrganizationID, Email: "d13-relock@example.test", PasswordHash: "$argon2id$placeholder", DisplayName: "D13 Relock"})
 	if err != nil {
 		t.Fatal(err)
 	}
