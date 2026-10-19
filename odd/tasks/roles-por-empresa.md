@@ -320,7 +320,15 @@ ramas locales y se suben después.
   - Verificación: Vitest Contabilidad 157/157 e Inventario 66/66, lint y typecheck limpios; `go test` api y employee, `golangci-lint` (ambos
     tags) sin hallazgos; `informe_excerpts_test.py` OK; `traceability.py --check` al día; enlaces de los .md tocados: 0 rotos;
     `make up-app` + `empresas.spec.ts` 11/11; `make down`.
+- 2026-10-19, cierre de R6 (sesión principal): R6 commiteado (`27dbc63`); `main` (#57 a #61) integrado en la
+  rama (`bc634ca`), con los README reconstruidos sobre la versión de `main` más Inventario y empresas, y dos
+  términos nuevos en el glosario. Revisiones nativas aprobadas: R6 solo y el merge por separado (juntos
+  excedían el presupuesto). Corregidos después: rango de ADR en `docs/README.md`, nota del alcance del token
+  de Docker Hub, próximo paso viejo en `documentacion-lector-externo.md` (`da6a043`). Pendientes menores:
+  `.env.example` líneas 51-54 (comentarios `OAUTH_*`; el entorno niega acceso a ese archivo, lo edita el
+  usuario); pruebas del camino de error de `restartLogin` en `App.tsx` de Contabilidad e Inventario (aviso
+  de revisión); base de datos local del stack con la versión anterior del trigger de 000011.
 
 ## Próximo paso
 
-R6: documentación y cierre (lista de pendientes arriba), luego PRs encadenados a `main`.
+PRs encadenados a `main` (pendiente de confirmación del usuario).
