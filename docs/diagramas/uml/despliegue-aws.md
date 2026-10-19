@@ -104,7 +104,7 @@ sequenceDiagram
 - **El correo por SES:** el worker ya autentica por SMTP y exige STARTTLS (`SMTP_TLS=starttls`, puerto 587; las credenciales SMTP de SES viven en Secrets Manager). Lo que no se prueba es la verificación real de la identidad del dominio y de DKIM en SES, que el Terraform declara pero no se aplica en ninguna nube.
 - **Detrás del ALB**, Nginx tiene que propagar la IP real del cliente; si no, el límite de fallos
   por IP trataría a todos los usuarios como uno solo.
-- **Los hosts y el cliente OAuth** ya se configuran por variables (`SMTP_*`, `OAUTH_*`); siguen fijos el `server_name` de Nginx, las constantes de Contabilidad y la fila del cliente en la base de datos.
+- **Los hosts de SMTP** se configuran por variables (`SMTP_*`); los clientes OAuth se leen de la tabla `applications` al arrancar (ADR 0015). Siguen fijos el `server_name` de Nginx, las constantes de Contabilidad e Inventario y las filas de los clientes en la base de datos.
 
 Detalle de estas brechas (con la actualización del 2026-10-13): [ADR 0012, Consecuencias](../../../specs/adr/0012-arquitectura-de-referencia-en-aws-con-localstack.md).
 

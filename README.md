@@ -17,8 +17,9 @@ Identity Hub es un proveedor de identidad desarrollado desde cero, comparable en
   `v0.1.0-hardened` identifica el estado remediado en `main`, con CI verde.
 - **Semana 3 cerrada:** SSO entre dominios, MFA por correo, alta de empleados y frontend funcional.
 - **Semana 4:** documentación, IaC de referencia, grilla de roles, manual, informe y guion terminados. Las imágenes están publicadas en Docker Hub (`docker.io/jorgeivp/identity-hub-api`, `-worker` y `-web`, firmadas con Cosign y con SBOM adjunto). El seguimiento está en [`odd/tasks/idp-semana-4.md`](odd/tasks/idp-semana-4.md).
-- **Funciones de cierre (F1 a F10, PR 32 a 43), integradas en `main`:** exportación del registro de auditoría en CSV y JSON (RF-019); SMTP con STARTTLS y autenticación obligatorios en el worker y hosts configurables (`SMTP_*`, `OAUTH_*`); Falco en el perfil de observabilidad con cuatro reglas propias, alerta en Grafana y [runbook](docs/runbooks/falco-alerta.md); claves de servicio para integraciones máquina (RF-018, [manual](docs/manuales/claves-de-servicio.md), ADR 0014); columna de controles de CI en la matriz; insignia de cobertura medida; y un filtro de CI para cambios solo de documentación. La integración OAuth/OIDC de terceros y el outbox (F5) quedan como trabajo futuro ([sección 9.1](docs/manuales/integracion-terceros.md)).
+- **Funciones de cierre (F1 a F10, PR 32 a 43), integradas en `main`:** exportación del registro de auditoría en CSV y JSON (RF-019); SMTP con STARTTLS y autenticación obligatorios en el worker y hosts de SMTP configurables (`SMTP_*`); Falco en el perfil de observabilidad con cuatro reglas propias, alerta en Grafana y [runbook](docs/runbooks/falco-alerta.md); claves de servicio para integraciones máquina (RF-018, [manual](docs/manuales/claves-de-servicio.md), ADR 0014); columna de controles de CI en la matriz; insignia de cobertura medida; y un filtro de CI para cambios solo de documentación. La integración OAuth/OIDC de terceros y el outbox (F5) quedan como trabajo futuro ([sección 9.1](docs/manuales/integracion-terceros.md)).
 - **Release firmado:** `latest` solo se mueve después de firmar y atestar, y únicamente para el `vX.Y.Z` más alto; los pasos de red se reintentan y los artefactos se retienen 7 días. El tag `v0.9.1` (ejecución 38405885275) lo validó y se verificó con Cosign v3.1.3 sobre `v0.9.0` y `v0.9.1`.
+- **Empresas (ADR 0015):** cada aplicación y cada usuario pertenecen a una empresa; los roles no se mezclan, la consola trabaja una empresa a la vez y el Hub rechaza el acceso entre empresas. [`inventario/`](inventario/) es la aplicación de la segunda empresa.
 - **Matriz de trazabilidad:** 33 requisitos; 33 completos, 0 parciales, 0 sin cubrir y 0 diferidos.
 - **Pendiente:** el tag de entrega `v1.0.0` y el release de GitHub con el informe en PDF, y la grabación del video, que hace el equipo.
 
@@ -32,7 +33,7 @@ Identity Hub es un proveedor de identidad desarrollado desde cero, comparable en
 | Observabilidad | Prometheus, Loki, Grafana Alloy, Grafana y Falco (detección en tiempo de ejecución) |
 | Seguridad en CI | Gitleaks, CodeQL, Semgrep, gosec mediante golangci-lint, govulncheck, npm audit, osv-scanner, Hadolint y Trivy |
 
-El backend está escrito en Go por decisión del proyecto: el profesor permitió elegir el stack siempre que se cumplieran los requisitos de DevSecOps y de gestor de identidad. Las alternativas mostradas en el material del curso eran sugerencias, no una restricción.
+El backend está escrito en Go por decisión del proyecto: el enunciado deja elegir el stack siempre que se cumplan los requisitos de DevSecOps y de gestor de identidad. Las alternativas mostradas en el material del curso eran sugerencias, no una restricción.
 
 La cobertura de integración tiene un gate mínimo de 70 % en el job **`6b · Pruebas de integración`** del workflow de CI. El badge de cobertura muestra el valor medido en la última ejecución de CI sobre `main` (el job `6c` lo publica como `coverage.json` en la rama `badges`, sin servicio externo); el gate sigue siendo 70 %.
 
@@ -59,7 +60,8 @@ El `docker-compose.yml` de la raíz incluye `deploy/docker-compose.yml`; `make u
 | Servicio | Dirección |
 |---|---|
 | Aplicación web (Hub) | <http://identityhub.localhost:8080> (<http://localhost:8080> también sirve el Hub) |
-| Contabilidad (marcador, T13) | <http://contabilidad.localhost:8080> |
+| Contabilidad (empresa «Contabilidad S.A.») | <http://contabilidad.localhost:8080> |
+| Inventario (empresa «Empresa B») | <http://inventario.localhost:8080> |
 | API | <http://localhost:8081/healthz> |
 | RabbitMQ | <http://localhost:15672> |
 | Mailpit | <http://localhost:8025> |
@@ -122,7 +124,8 @@ Las 27 alertas de Checkov eran omisiones ya justificadas en línea (`#checkov:sk
 - [Matriz de trazabilidad](specs/07-traceability.md): artefacto generado por [`scripts/traceability.py`](scripts/traceability.py).
 - [Especificaciones](specs/): requisitos, modelo de dominio, contrato [OpenAPI](specs/03-api/openapi.yaml), eventos y escenarios de aceptación.
 - [Guía de desarrollo](docs/guia-desarrollo.md): ejecución, generación y pruebas para desarrollo local.
-- [Manual de usuario](docs/manuales/usuario.md): flujos de empleado, administrador y Contabilidad con capturas.
+- [Manual de usuario](docs/manuales/usuario.md): flujos de empleado, administrador, Contabilidad e Inventario con capturas.
+- **Empresa que integra su aplicación:** lea la [guía de integración](docs/manuales/integracion-terceros.md) (empresas, cliente por migración, ejemplos de Contabilidad e Inventario) y el [ADR 0015](specs/adr/0015-empresas-y-aislamiento-de-roles.md).
 - [Claves de servicio](docs/manuales/claves-de-servicio.md): emisión, uso y revocación de claves para integraciones máquina (RF-018).
 - [Informe técnico](docs/informe/informe-tecnico.md): fuente del PDF final; ejecute `make informe` para regenerarlo.
 - [Guion del video](docs/video/guion.md): demostración de 15 minutos; la grabación sigue pendiente.
@@ -135,6 +138,8 @@ Para una revisión técnica ordenada, empiece por la [visión](specs/00-vision.m
 .github/     workflows de automatización y CI
 backend/     API y worker en Go
 frontend/    aplicación React y configuración de Nginx
+contabilidad/ aplicación cliente de ejemplo de Contabilidad S.A. (SSO)
+inventario/  aplicación cliente de ejemplo de Empresa B (SSO, ADR 0015)
 db/          migraciones de PostgreSQL
 deploy/      compose de desarrollo y observabilidad
 docs/        bitácora, diagramas, evidencia e informe

@@ -198,6 +198,8 @@ describe('access denied', () => {
     // The access-denied screen replaces the whole shell: no rail, no ledger.
     expect(screen.queryByRole('navigation', { name: 'Secciones' })).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Sin acceso a Contabilidad' })).toBeInTheDocument()
+    // The copy covers both causes the Hub can have: no role at all, or an account of another company.
+    expect(screen.getByText(/pertenece a otra empresa o no tiene un rol/)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Identity Hub/ })).toHaveAttribute('href', HUB)
     expect(screen.queryByText('M-2041')).not.toBeInTheDocument()
   })
@@ -375,5 +377,47 @@ describe('logout', () => {
     // A user that signed out does not reach the ledger by going back: a new login is required.
     await act(async () => { await Promise.resolve() })
     expect(screen.queryByRole('navigation', { name: 'Secciones' })).not.toBeInTheDocument()
+  })
+})
+
+describe('the validating state always resolves', () => {
+  it('TestRF020_ANetworkFailureAtTheCallbackEndsInAnErrorScreenWithRetry', async () => {
+    await beginLogin()
+    const state = sessionStorage.getItem('contabilidad.oauth_state')
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
+    window.history.replaceState({}, '', `/oauth/callback?code=the-code&state=${state}`)
+    render(<App />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo completar el inicio de sesión')
+    expect(screen.queryByText(/Validando/)).toBeNull()
+    expect(screen.getByRole('button', { name: 'Reintentar' })).toBeInTheDocument()
+  })
+
+  it('TestRF020_ARedirectThatCannotStartEndsInAnErrorScreenInsteadOfASpinner', async () => {
+    redirect.mockImplementation(() => { throw new Error('navigation blocked') })
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar con Identity Hub' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo completar el inicio de sesión')
+    expect(screen.queryByText(/Validando/)).toBeNull()
+  })
+})
+
+describe('clock skew guard', () => {
+  async function landWithTokenLivingFor(seconds: number) {
+    await beginLogin()
+    const state = sessionStorage.getItem('contabilidad.oauth_state')
+    stubHub({ roles: ['contabilidad.senior'], permissions: SEEDED_PERMISSIONS['contabilidad.senior'], exp: Math.floor(Date.now() / 1000) + seconds })
+    window.history.replaceState({}, '', `/oauth/callback?code=the-code&state=${state}`)
+    render(<App />)
+  }
+
+  it('TestRF020_ATokenWithLessThanTheLeewayLeftIsRejectedAsAClockProblem', async () => {
+    await landWithTokenLivingFor(CLOCK_LEEWAY_SECONDS - 30)
+    expect(await screen.findByRole('alert')).toHaveTextContent('reloj')
+    expect(screen.queryByRole('navigation', { name: 'Secciones' })).toBeNull()
+  })
+
+  it('TestRF020_ATokenWithMoreThanTheLeewayLeftIsAccepted', async () => {
+    await landWithTokenLivingFor(CLOCK_LEEWAY_SECONDS + 60)
+    expect(await screen.findByRole('navigation', { name: 'Secciones' })).toBeInTheDocument()
   })
 })

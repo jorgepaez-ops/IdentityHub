@@ -101,10 +101,10 @@ test('RF-022 El listado de usuarios muestra solo los usuarios de la empresa sele
     // The directory pages by 100 and E2E runs pile up accounts, so each check searches for its own account.
     await search.fill(empresaB.email)
     await expect(page.getByRole('row', { name: new RegExp(empresaB.email) })).toBeVisible()
-    expect((await listedEmails(page)).filter((email) => !companyB.has(email))).toEqual([])
+    await expect.poll(async () => (await listedEmails(page)).filter((email) => !companyB.has(email))).toEqual([])
     await search.fill(conta.email)
     await expect(page.getByText('No hay usuarios que coincidan con la búsqueda.')).toBeVisible()
-    expect(await listedEmails(page)).not.toContain(conta.email)
+    await expect.poll(() => listedEmails(page)).not.toContain(conta.email)
 
     await chooseCompany(page, 'Contabilidad S.A.')
 

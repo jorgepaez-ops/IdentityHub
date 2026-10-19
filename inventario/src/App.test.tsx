@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from './App'
+import { CLOCK_LEEWAY_SECONDS } from './auth/jwt'
 import { beginLogin } from './auth/flow'
 import { AppearanceProvider } from './AppearanceProvider'
 import { HUB_ORIGIN } from './config'
@@ -180,5 +181,47 @@ describe('appearance', () => {
     act(() => { fireEvent.click(screen.getByRole('button', { name: 'Cambiar a tema oscuro' })) })
     expect(document.documentElement.dataset.theme).toBe('dark')
     expect(localStorage.getItem('inventario.theme')).toBe('dark')
+  })
+})
+
+describe('the validating state always resolves', () => {
+  it('TestRF020_ANetworkFailureAtTheCallbackEndsInAnErrorScreenWithRetry', async () => {
+    await beginLogin()
+    const state = sessionStorage.getItem('inventario.oauth_state')
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
+    window.history.replaceState({}, '', `/oauth/callback?code=the-code&state=${state}`)
+    render(<App />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo completar el inicio de sesión')
+    expect(screen.queryByText(/Validando/)).toBeNull()
+    expect(screen.getByRole('button', { name: 'Reintentar' })).toBeInTheDocument()
+  })
+
+  it('TestRF020_ARedirectThatCannotStartEndsInAnErrorScreenInsteadOfASpinner', async () => {
+    vi.mocked(navigation.redirectTo).mockImplementation(() => { throw new Error('navigation blocked') })
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar con Identity Hub' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo completar el inicio de sesión')
+    expect(screen.queryByText(/Validando/)).toBeNull()
+  })
+})
+
+describe('clock skew guard', () => {
+  async function landWithTokenLivingFor(seconds: number) {
+    await beginLogin()
+    const state = sessionStorage.getItem('inventario.oauth_state')
+    stubHub({ roles: ['inventario.bodeguero'], permissions: BODEGUERO, exp: Math.floor(Date.now() / 1000) + seconds })
+    window.history.replaceState({}, '', `/oauth/callback?code=the-code&state=${state}`)
+    render(<App />)
+  }
+
+  it('TestRF020_ATokenWithLessThanTheLeewayLeftIsRejectedAsAClockProblem', async () => {
+    await landWithTokenLivingFor(CLOCK_LEEWAY_SECONDS - 30)
+    expect(await screen.findByRole('alert')).toHaveTextContent('reloj')
+    expect(screen.queryByRole('navigation', { name: 'Secciones' })).toBeNull()
+  })
+
+  it('TestRF020_ATokenWithMoreThanTheLeewayLeftIsAccepted', async () => {
+    await landWithTokenLivingFor(CLOCK_LEEWAY_SECONDS + 60)
+    expect(await screen.findByRole('navigation', { name: 'Secciones' })).toBeInTheDocument()
   })
 })

@@ -57,8 +57,22 @@ function AppContent() {
         }
         setLogin({ kind: 'error', message: CALLBACK_MESSAGES[kind] ?? CALLBACK_MESSAGES.exchange })
       },
-    )
+    ).catch(() => {
+      // Whatever went wrong while handling the outcome, "validating" must never be the last screen.
+      setLogin({ kind: 'error', message: CALLBACK_MESSAGES.exchange })
+    })
   }, [returning])
+
+  // Starts the redirect to the Hub; if it cannot even start (blocked navigation, no crypto, storage
+  // refused) the person lands on an error screen with a retry button instead of a stuck spinner.
+  const restartLogin = useCallback(async () => {
+    try {
+      await beginLogin()
+    } catch {
+      setSession(null)
+      setLogin({ kind: 'error', message: CALLBACK_MESSAGES.exchange })
+    }
+  }, [])
 
   const expiresAt = session?.verified.expiresAt
   useEffect(() => {
@@ -66,14 +80,14 @@ function AppContent() {
     // There is no refresh token by design (ADR 0009): when the access token
     // expires the app asks the Hub again, which answers silently while the Hub
     // session lives.
-    const timer = window.setTimeout(() => { void beginLogin() }, Math.max(0, expiresAt * 1000 - Date.now()))
+    const timer = window.setTimeout(() => { void restartLogin() }, Math.max(0, expiresAt * 1000 - Date.now()))
     return () => window.clearTimeout(timer)
-  }, [expiresAt])
+  }, [expiresAt, restartLogin])
 
   const start = useCallback(() => {
     setLogin({ kind: 'validating' })
-    void beginLogin()
-  }, [])
+    void restartLogin()
+  }, [restartLogin])
   const logout = useCallback(() => {
     setSession(null)
     setDeniedByHub(false)

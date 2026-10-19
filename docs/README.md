@@ -12,7 +12,7 @@ Este índice conecta los requisitos de `ENUNCIADO-TRABAJO-FINAL.md` con los arte
 | `.github/workflows/` | [`../.github/workflows/`](../.github/workflows/) y [`../e2e/`](../e2e/) | Los workflows automatizan CI/CD y ejecutan la suite E2E versionada. |
 | `infraestructura/` | [`../infraestructura/`](../infraestructura/) | Módulos Terraform para la arquitectura AWS de referencia; no requieren una nube de pago para levantar el proyecto local. |
 | `orquestacion/` | [`../deploy/`](../deploy/), [`../deploy/docker-compose.yml`](../deploy/docker-compose.yml) y [`../deploy/docker-compose.prod.yml`](../deploy/docker-compose.prod.yml) | `deploy/` concentra Docker Compose y observabilidad; el compose de producción simulada está terminado. |
-| `servicios/` | [`../backend/`](../backend/), [`../frontend/`](../frontend/), [`../contabilidad/`](../contabilidad/) y [`../e2e/`](../e2e/) | Los servicios se separan por responsabilidad; `e2e/` contiene sus pruebas de extremo a extremo. |
+| `servicios/` | [`../backend/`](../backend/), [`../frontend/`](../frontend/), [`../contabilidad/`](../contabilidad/), [`../inventario/`](../inventario/) y [`../e2e/`](../e2e/) | Los servicios se separan por responsabilidad; `e2e/` contiene sus pruebas de extremo a extremo. |
 | `docs/` | [`docs/`](./), [`../specs/`](../specs/), [`../security/`](../security/) y [`../scripts/`](../scripts/) | `docs/` reúne la entrega; las especificaciones, evidencia de seguridad y trazabilidad versionada la respaldan. |
 
 ## Entregables y requisitos del enunciado
@@ -54,12 +54,13 @@ La columna **Ubicación actual** solo enlaza rutas que existen en este checkout.
 
 ## Entregables propios de la semana 4
 
-No los exige el enunciado, pero responden a la demo en vivo con el profesor:
+No los exige el enunciado, pero responden a la demo en vivo:
 
 | Entregable | Ubicación actual | Estado |
 |---|---|---|
 | Grilla de roles y permisos configurable desde el Hub | [`../specs/adr/0013-roles-y-permisos-configurables-por-aplicacion.md`](../specs/adr/0013-roles-y-permisos-configurables-por-aplicacion.md) y [`../specs/06-acceptance/roles-y-permisos.feature`](../specs/06-acceptance/roles-y-permisos.feature) | hecho (T11 a T15; RF-021) |
 | Guía de integración de plataformas de terceros | [`manuales/integracion-terceros.md`](manuales/integracion-terceros.md) | completa; la integración OAuth/OIDC de terceros y el outbox quedan como trabajo futuro (sección 9.1) |
+| Empresas y aislamiento de roles (RF-022) | [`../specs/adr/0015-empresas-y-aislamiento-de-roles.md`](../specs/adr/0015-empresas-y-aislamiento-de-roles.md), [`../specs/06-acceptance/empresas.feature`](../specs/06-acceptance/empresas.feature) y la aplicación [`../inventario/`](../inventario/) | hecho (R1 a R5) |
 | Claves de servicio para integraciones máquina (RF-018) | [`manuales/claves-de-servicio.md`](manuales/claves-de-servicio.md) y [`../specs/adr/0014-claves-de-servicio-para-integraciones-maquina.md`](../specs/adr/0014-claves-de-servicio-para-integraciones-maquina.md) | hecho (F4) |
 | Exportación del registro de auditoría en CSV y JSON (RF-019) | [`manuales/usuario.md`](manuales/usuario.md) y [`../specs/06-acceptance/`](../specs/06-acceptance/) | hecho (F1) |
 | Runbook de alertas de Falco | [`runbooks/falco-alerta.md`](runbooks/falco-alerta.md) | hecho (F3) |

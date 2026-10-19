@@ -19,6 +19,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/google/uuid"
+	"github.com/jorgepaez/identity-hub/internal/auth/admin"
 	"github.com/jorgepaez/identity-hub/internal/events"
 	"github.com/jorgepaez/identity-hub/internal/store"
 )
@@ -129,7 +130,7 @@ func (s *Service) CreateEmployee(ctx context.Context, input Input) (Result, erro
 func (s *Service) auditOrganizationMismatch(ctx context.Context, input Input) error {
 	resourceType, resourceID := "organization", input.OrganizationID.String()
 	err := s.repository.WithinEmployeeCreationTransaction(ctx, func(writer store.EmployeeCreationWriter) error {
-		_, err := writer.InsertAuditEvent(ctx, store.InsertAuditEventParams{ActorUserID: &input.ActorUserID, Action: "role_assignment_rejected", ResourceType: &resourceType, ResourceID: &resourceID, IP: input.IP, UserAgent: input.UserAgent, Metadata: []byte(`{"reason":"organization_mismatch"}`)})
+		_, err := writer.InsertAuditEvent(ctx, store.InsertAuditEventParams{ActorUserID: &input.ActorUserID, Action: "role_assignment_rejected", ResourceType: &resourceType, ResourceID: &resourceID, IP: input.IP, UserAgent: input.UserAgent, Metadata: []byte(`{"reason":"` + admin.ReasonOrganizationMismatch + `"}`)})
 		return err
 	})
 	if err != nil {

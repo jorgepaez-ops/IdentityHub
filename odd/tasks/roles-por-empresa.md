@@ -76,7 +76,7 @@ aplicaciones desde la consola (se declaran por migración, como hoy Contabilidad
 - [x] **R4. Administración y enrutamiento.** API: empresa del usuario, roles asignables, aplicaciones del
   usuario; consola: alta con empresa, `UserDrawer` filtrado, menú dinámico y redirección tras el login.
 - [x] **R5. Inventario.** App mínima, Nginx, build en `web`, compose, E2E del cruce entre empresas.
-- [ ] **R6. Documentación y cierre.** Guía de integración, manual de usuario, README, matriz; checks completos.
+- [x] **R6. Documentación y cierre.** Guía de integración, manual de usuario, README, matriz; checks completos.
 
 ## Criterios de aceptación
 
@@ -301,6 +301,25 @@ ramas locales y se suben después.
     `docs/informe/informe-tecnico.md:351`; en el login de Inventario (y probablemente Contabilidad, de donde
     se copió): `fetch` del callback sin timeout, estado «validando» que puede quedar trabado y control de
     reloj sin prueba.
+- 2026-10-19 (R6, escrito por el ejecutor, sin marcar; revisión y commit del orquestador):
+  - Docs: variables `OAUTH_*` retiradas de `docs/guia-desarrollo.md`, `docs/manuales/despliegue-y-operacion.md`, informe, README de Terraform,
+    `docs/diagramas/uml/despliegue-aws.md` y README; nota fechada en el ADR 0012 y en `docs/BITACORA.md` (historia conservada). La guía de
+    integración pasa al modelo multicliente (secciones 2.1, 2.3, 3.3, 9, 9.1, 10, más «Empresas» y «Segundo ejemplo: Inventario»); manual de
+    usuario con selector de empresa, alta con empresa, rechazo entre empresas, lanzador y sección 4.9 (Inventario); arquitectura, seguridad,
+    informe (párrafo de DAST con cuatro escaneos, límites de cliente por migración), README, `docs/README.md` e `inventario/README.md`.
+  - Pendiente por permisos: `.env.example` (líneas 51-54, comentarios `OAUTH_*`) no se pudo editar (el entorno deniega el acceso al archivo).
+    Sustituir por: «los clientes salen de la tabla applications; ver docs/manuales/integracion-terceros.md».
+  - Pendiente: `specs/adr/0010-...md:44` menciona al profesor (fuera de las superficies permitidas). Capturas desactualizadas (no se corrió
+    `make capturas`): administrador-01, 02, 04, 05, 06, 07 a 16, 19 y 22 (falta el selector de Empresa; 02 también el campo Empresa),
+    contabilidad-14 (texto de «Sin acceso») y empleado-09/10 si el usuario tiene aplicaciones (falta «Aplicaciones conectadas»).
+  - Código: Contabilidad dice «pertenece a otra empresa o no tiene un rol» (prueba actualizada, RED/GREEN); `oauth_test.go` prueba ahora un
+    `redirect_uri` ajeno único (400, sin redirección ni auditoría) y el repetido por separado; Contabilidad e Inventario: `FETCH_TIMEOUT_MS`
+    (10 s, `AbortController`, cubre también el cuerpo) en canje y JWKS, y «validando» siempre termina en error (fallo de `beginLogin` y cualquier
+    rechazo del manejador), con pruebas de timeout, de fallo y de la guarda de reloj (límite derivado de `CLOCK_LEEWAY_SECONDS`);
+    `employee.go` reutiliza `admin.ReasonOrganizationMismatch`; `empresas.spec.ts` usa `expect.poll` en el listado de usuarios.
+  - Verificación: Vitest Contabilidad 157/157 e Inventario 66/66, lint y typecheck limpios; `go test` api y employee, `golangci-lint` (ambos
+    tags) sin hallazgos; `informe_excerpts_test.py` OK; `traceability.py --check` al día; enlaces de los .md tocados: 0 rotos;
+    `make up-app` + `empresas.spec.ts` 11/11; `make down`.
 
 ## Próximo paso
 
