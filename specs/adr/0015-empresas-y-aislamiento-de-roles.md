@@ -4,8 +4,9 @@ Estado: aceptada · 2026-10-19 · Añade RF-022; enmienda RF-020, RF-021 y el mo
 
 ## Contexto
 
-En la revisión final, el profesor observó que la grilla de roles (ADR 0013) solo servía a Contabilidad
-y preguntó qué ocurre con una empresa tercera. El estado actual explica la limitación:
+La grilla de roles (ADR 0013) solo servía a Contabilidad: el Hub no tenía forma de atender a una
+empresa tercera sin mezclar sus roles y sus datos con los de Contabilidad. El estado actual explica la
+limitación:
 
 - No existe la entidad empresa: `users` no tiene organización y `applications` (migración
   `000007`) contiene una sola fila, `contabilidad`.
