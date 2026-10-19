@@ -12,6 +12,36 @@ retomar el trabajo no exija reconstruir el contexto desde cero.
 
 ---
 
+## 2026-10-19 · Resumen del estado al cierre (movido desde el README el 2026-10-19)
+
+Esta sección conserva, sin cambios salvo las rutas relativas de los enlaces, la crónica de estado y el detalle de alertas que vivían en el README raíz, para que el README quede como puerta de entrada. El texto refleja el estado al momento en que se escribió: por ejemplo, la viñeta «Pendiente» es anterior a la publicación de `v1.0.0` (2026-10-13, ver `odd/tasks/cierre-entrega.md`).
+
+### Estado del proyecto
+
+- **Semana 2 cerrada:** 47 de 47 tareas completadas; el tag
+  `v0.1.0-hardened` identifica el estado remediado en `main`, con CI verde.
+- **Semana 3 cerrada:** SSO entre dominios, MFA por correo, alta de empleados y frontend funcional.
+- **Semana 4:** documentación, IaC de referencia, grilla de roles, manual, informe y guion terminados. Las imágenes están publicadas en Docker Hub (`docker.io/jorgeivp/identity-hub-api`, `-worker` y `-web`, firmadas con Cosign y con SBOM adjunto). El seguimiento está en [`odd/tasks/idp-semana-4.md`](../odd/tasks/idp-semana-4.md).
+- **Funciones de cierre (F1 a F10, PR 32 a 43), integradas en `main`:** exportación del registro de auditoría en CSV y JSON (RF-019); SMTP con STARTTLS y autenticación obligatorios en el worker y hosts configurables (`SMTP_*`, `OAUTH_*`); Falco en el perfil de observabilidad con cuatro reglas propias, alerta en Grafana y [runbook](runbooks/falco-alerta.md); claves de servicio para integraciones máquina (RF-018, [manual](manuales/claves-de-servicio.md), ADR 0014); columna de controles de CI en la matriz; insignia de cobertura medida; y un filtro de CI para cambios solo de documentación. La integración OAuth/OIDC de terceros y el outbox (F5) quedan como trabajo futuro ([sección 9.1](manuales/integracion-terceros.md)).
+- **Release firmado:** `latest` solo se mueve después de firmar y atestar, y únicamente para el `vX.Y.Z` más alto; los pasos de red se reintentan y los artefactos se retienen 7 días. El tag `v0.9.1` (ejecución 38405885275) lo validó y se verificó con Cosign v3.1.3 sobre `v0.9.0` y `v0.9.1`.
+- **Matriz de trazabilidad:** 33 requisitos; 33 completos, 0 parciales, 0 sin cubrir y 0 diferidos.
+- **Pendiente:** el tag de entrega `v1.0.0` y el release de GitHub con el informe en PDF, y la grabación del video, que hace el equipo.
+
+### Alertas abiertas conocidas
+
+Estado de las alertas de code scanning en `main` una vez integradas las correcciones de P9b a P9d (2026-10-06). Lo demás (acciones sin fijar, diagramas, nginx, imágenes base de `web`, Checkov, AWS-0089) está corregido o justificado en el propio código.
+
+| Herramienta | Regla | Ubicación | Motivo | Justificación o control compensatorio |
+|---|---|---|---|---|
+| Trivy | GO-2026-5932 | `golang.org/x/crypto` v0.56.0 en la imagen `api` | El aviso cubre el paquete `openpgp` y sus subpaquetes, que no tiene versión corregida; el módulo sigue haciendo falta para Argon2id (ADR 0004) | VULN-028, no afectado (`backend/osv-scanner.toml`, exclusión permanente): ningún paquete propio ni dependencia importa `openpgp` (`go list -deps`); osv-scanner solo lo marca por coincidencia a nivel de módulo y govulncheck no lo reporta |
+| Trivy | DLA-4792-1 | `tzdata` 2026b en las imágenes `api` y `worker` (base `distroless/static-debian12`) | Debian publicó 2026c, pero la imagen distroless fijada todavía no lo incluye; severidad sin clasificar (UNKNOWN) | Solo son datos de zonas horarias. Se actualizará el digest de la base cuando upstream la reconstruya (el escaneo semanal lo detecta) |
+
+Falsos positivos de secretos en SonarCloud (2026-10-07): `security/evidence/**` se excluye del análisis con `.sonarcloud.properties` porque son salidas almacenadas de los escáneres, conservadas como evidencia "antes" (VULN-001), no código; y el ejemplo literal del comentario de `.gitleaks.toml` (regla `secrets:S2068`) se reescribió sin un valor con forma de credencial. Justificación: los valores son sembrados, nunca reales ni reutilizados (confirmado por el responsable el 2026-10-06).
+
+Las 27 alertas de Checkov eran omisiones ya justificadas en línea (`#checkov:skip=ID:motivo`): CI deja de subirlas a code scanning (se filtran del SARIF) pero la justificación sigue en el código y el gate sigue activo. La de Trivy AWS-0089 (bucket de logs del ALB sin logging propio) lleva `#trivy:ignore:AWS-0089` por el mismo motivo que `CKV_AWS_18`.
+
+---
+
 ## 2026-10-13 · Cierre — funciones F1 a F10, release firmado en orden y estado previo a v1.0.0
 
 Integra en `main` las mejoras de complejidad media y alta anotadas el 12 de octubre (PR 32 a 43). El detalle por tarea y la evidencia trazable permanecen en `odd/tasks/cierre-entrega.md`.
