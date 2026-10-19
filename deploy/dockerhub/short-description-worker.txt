@@ -1,0 +1,1 @@
+Consumidor de eventos de Identity Hub: envía correos desde RabbitMQ por SMTP. Va con api y web.
