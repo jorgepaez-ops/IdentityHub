@@ -54,7 +54,7 @@ make up        # genera certificados SMTP locales, construye las imágenes y lev
 
 ## Estado actual
 
-La versión `v1.0.0` (2026-10-13) está publicada con su release en GitHub y las imágenes firmadas en Docker Hub. El repositorio versiona el guion del video de demostración; la grabación la hace el equipo. El historial semana a semana, el estado al cierre y las alertas de seguridad abiertas están en la [bitácora](docs/BITACORA.md).
+La versión `v1.0.0` (2026-10-13) está publicada con su release en GitHub y las imágenes firmadas en Docker Hub. El repositorio versiona el guion del video de demostración; la grabación la hace el equipo. El historial semana a semana y una foto del estado al cierre (incluidas las alertas de seguridad que seguían abiertas en ese momento) están en la [bitácora](docs/BITACORA.md); el estado vigente de cada alerta se ve en la pestaña *Security* de GitHub.
 
 ## Mapa del repositorio
 
