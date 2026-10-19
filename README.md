@@ -81,7 +81,7 @@ El repositorio versiona el guion del video de demostración; la grabación la ha
 | [`security/`](security/README.md) | Fichas de vulnerabilidades, evidencia de escáneres e informes de ZAP | Para auditar qué se encontró y cómo se remedió |
 | [`scripts/`](scripts/README.md) | Utilidades de automatización y sus pruebas | Para entender qué hacen los comandos de `make` por dentro |
 | [`tools/`](tools/README.md) | Versiones fijadas de las herramientas de desarrollo y CI | Al actualizar generadores o escáneres |
-| [`.github/`](.github/README.md) | Workflows de CI/CD, escaneos y release, y Dependabot | Para ver el pipeline DevSecOps |
+| [`.github/`](.github/workflows/README.md) | Workflows de CI/CD, escaneos y release, y Dependabot | Para ver el pipeline DevSecOps |
 | [`odd/`](odd/tasks/) | Archivos de tareas con el seguimiento del trabajo por semana | Para ver cómo se planificó y avanzó el proyecto |
 | [`Makefile`](Makefile) | Comandos del día a día (`make help` los enumera) | Para levantar, probar, escanear o regenerar código |
 | [`docker-compose.yml`](docker-compose.yml) | Archivo de la raíz que incluye el compose real de `deploy/` | Rara vez: es solo la puerta de entrada de `docker compose` |
@@ -136,7 +136,7 @@ Cada ruta va en orden: lea solo hasta donde necesite.
 - [Informe de seguridad](docs/security-report.html) y [manual de seguridad](docs/manuales/seguridad.md): la versión final de la evidencia y cómo leerla.
 - [Fichas de vulnerabilidades](security/findings/): VULN-001 a VULN-031. La línea base vulnerable es deliberada ([ADR 0007](specs/adr/0007-linea-base-vulnerable-deliberada.md)): el tag `v0.0.0-vuln-baseline` nunca debe desplegarse, y `v0.1.0-hardened` marca el estado remediado.
 - [Modelo de amenazas](specs/05-security/threat-model.md): riesgos y mitigaciones por componente.
-- El workflow de CI valida la deriva entre especificaciones y código, secretos, análisis estático, dependencias, pruebas, cobertura de integración (mínimo 70 %), configuración de contenedores e imágenes; los escaneos de línea base y semanales conservan la evidencia histórica. Detalle en [`.github/`](.github/README.md).
+- El workflow de CI valida la deriva entre especificaciones y código, secretos, análisis estático, dependencias, pruebas, cobertura de integración (mínimo 70 %), configuración de contenedores e imágenes; los escaneos de línea base y semanales conservan la evidencia histórica. Detalle en [`.github/`](.github/workflows/README.md).
 
 ## Gestión y trazabilidad
 
