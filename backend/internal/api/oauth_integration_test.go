@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -59,9 +60,16 @@ func newHubFixture(t *testing.T, email string) hubFixture {
 	if _, err := pool.Exec(ctx, `INSERT INTO refresh_tokens (user_id, token_hash, family_id, expires_at) VALUES ($1,$2,$3,$4)`, user.ID, refreshHash[:], uuid.New(), time.Now().Add(time.Hour)); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := pool.Exec(ctx, `INSERT INTO user_roles (user_id, role_id) SELECT $1, id FROM roles WHERE name = 'contabilidad.senior'`, user.ID); err != nil {
+		t.Fatal(err)
+	}
+	clients, err := repository.ListOAuthClients(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
 	client := oauth.Client{ID: "contabilidad", RedirectURI: "http://contabilidad.localhost:8080/oauth/callback", Origin: "http://contabilidad.localhost:8080"}
 	server := NewServer(nil, "test", nil)
-	server.SetOAuthService(oauth.New(repository.OAuthRepository(), client, nil, time.Now), repository.OAuthRepository(), client, "http://identityhub.localhost:8080/login", time.Hour)
+	server.SetOAuthService(oauth.New(repository.OAuthRepository(), clients, nil, time.Now), repository.OAuthRepository(), "http://identityhub.localhost:8080/login", time.Hour)
 	server.SetLogoutService(logout.New(repository))
 	return hubFixture{pool: pool, repository: repository, server: server, client: client, userID: user.ID, hubCookie: base64.RawURLEncoding.EncodeToString(hubRaw), refreshRaw: refreshRaw}
 }
@@ -147,3 +155,32 @@ func (resetPublisher) Publish(context.Context, string, any) error { return nil }
 type resetHasher struct{}
 
 func (resetHasher) Hash(value string) (string, error) { return password.Hash(value) }
+
+// Composed through Server.Routes() with the real store: a Contabilidad user
+// asking for Inventario is sent back to Inventario's registered redirect URI
+// with access_denied and the original state, without a code.
+func TestRF022_AuthorizeRechazaUsuarioDeOtraEmpresaConAccessDeniedYAudita(t *testing.T) {
+	fixture := newHubFixture(t, "hub-cross@example.test")
+	inventario := oauth.Client{ID: "inventario", RedirectURI: "http://inventario.localhost:8080/oauth/callback"}
+	request := httptest.NewRequest(http.MethodGet, oauthAuthorizePath(inventario), nil)
+	request.AddCookie(&http.Cookie{Name: hubSessionCookieName, Value: fixture.hubCookie})
+	response := httptest.NewRecorder()
+	fixture.server.Routes().ServeHTTP(response, request)
+	if response.Code != http.StatusFound {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	location, err := url.Parse(response.Header().Get("Location"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if location.Scheme+"://"+location.Host+location.Path != inventario.RedirectURI || location.Query().Get("error") != "access_denied" || location.Query().Get("state") != "state" || location.Query().Get("code") != "" {
+		t.Fatalf("location=%s", location)
+	}
+	var codes, audits int
+	if err := fixture.pool.QueryRow(context.Background(), `SELECT (SELECT count(*) FROM authorization_codes WHERE user_id = $1), (SELECT count(*) FROM audit_log WHERE action = 'oauth_authorization_rejected' AND actor_user_id = $1 AND metadata->>'reason' = 'organization_mismatch' AND metadata->>'client_id' = 'inventario')`, fixture.userID).Scan(&codes, &audits); err != nil {
+		t.Fatal(err)
+	}
+	if codes != 0 || audits != 1 {
+		t.Fatalf("codes=%d audits=%d, want 0 and 1", codes, audits)
+	}
+}

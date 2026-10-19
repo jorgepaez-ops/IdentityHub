@@ -11,7 +11,6 @@ import (
 	"math"
 	"net/mail"
 	"net/netip"
-	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -55,9 +54,6 @@ type Config struct {
 	AccessTTL               time.Duration
 	RefreshTTL              time.Duration
 	HubSessionTTL           time.Duration
-	OAuthClientID           string
-	OAuthRedirectURI        string
-	OAuthClientOrigin       string
 	LoginAccountMaxFailures int
 	LoginIPMaxFailures      int
 	LoginFailureWindow      time.Duration
@@ -66,16 +62,6 @@ type Config struct {
 	TrustedProxies          []netip.Prefix
 	BootstrapAdminEmail     string
 }
-
-// Defaults of the single registered OAuth client (ADR 0009). Each one can be
-// overridden with OAUTH_CLIENT_ID / OAUTH_REDIRECT_URI / OAUTH_CLIENT_ORIGIN so
-// the same binary runs under real hostnames; the defaults keep local
-// development unchanged.
-const (
-	DefaultOAuthClientID     = "contabilidad"
-	DefaultOAuthRedirectURI  = "http://contabilidad.localhost:8080/oauth/callback"
-	DefaultOAuthClientOrigin = "http://contabilidad.localhost:8080"
-)
 
 // SMTP transport security modes (SMTP_TLS).
 const (
@@ -176,7 +162,6 @@ func load(requireDatabase bool) (*Config, error) {
 	trustedProxies := parseTrustedProxies(os.Getenv("TRUSTED_PROXIES"), &c.problems)
 	bootstrapAdminEmail := loadBootstrapAdminEmail(c)
 	smtpSettings := loadSMTP(c)
-	oauthClient := loadOAuthClient(c)
 
 	cfg := &Config{
 		Port:                    c.integer("API_PORT", "8081"),
@@ -198,9 +183,6 @@ func load(requireDatabase bool) (*Config, error) {
 		AccessTTL:               c.duration("JWT_ACCESS_TTL", "15m"),
 		RefreshTTL:              c.duration("JWT_REFRESH_TTL", "720h"),
 		HubSessionTTL:           c.positiveDuration("HUB_SESSION_TTL", "720h"),
-		OAuthClientID:           oauthClient.id,
-		OAuthRedirectURI:        oauthClient.redirectURI,
-		OAuthClientOrigin:       oauthClient.origin,
 		LoginAccountMaxFailures: c.positiveInteger("LOGIN_ACCOUNT_MAX_FAILURES", "5"),
 		LoginIPMaxFailures:      c.positiveInteger("LOGIN_IP_MAX_FAILURES", "20"),
 		LoginFailureWindow:      c.positiveDuration("LOGIN_FAILURE_WINDOW", "15m"),
@@ -266,43 +248,6 @@ func loadSMTP(c *problemCollector) smtpSecurity {
 		c.add("SMTP_CA_FILE no tiene efecto con SMTP_TLS=none")
 	}
 	return out
-}
-
-type oauthClientSettings struct{ id, redirectURI, origin string }
-
-// loadOAuthClient reads the registered client and validates that the redirect
-// URI is an absolute http(s) URL without fragment and that the origin is
-// exactly the scheme and host of that URI.
-func loadOAuthClient(c *problemCollector) oauthClientSettings {
-	out := oauthClientSettings{
-		id:          c.optional("OAUTH_CLIENT_ID", DefaultOAuthClientID),
-		redirectURI: c.optional("OAUTH_REDIRECT_URI", DefaultOAuthRedirectURI),
-		origin:      c.optional("OAUTH_CLIENT_ORIGIN", DefaultOAuthClientOrigin),
-	}
-	if strings.ContainsAny(out.id, " \t\r\n") {
-		c.add("OAUTH_CLIENT_ID no puede contener espacios")
-	}
-	redirect, ok := parseHTTPURL(c, "OAUTH_REDIRECT_URI", out.redirectURI)
-	origin, ok2 := parseHTTPURL(c, "OAUTH_CLIENT_ORIGIN", out.origin)
-	if ok && redirect.Fragment != "" {
-		c.add("OAUTH_REDIRECT_URI no puede llevar fragmento")
-	}
-	if ok2 && (origin.Path != "" || origin.RawQuery != "" || origin.Fragment != "") {
-		c.add("OAUTH_CLIENT_ORIGIN debe ser solo esquema y host, sin ruta")
-	}
-	if ok && ok2 && (redirect.Scheme != origin.Scheme || redirect.Host != origin.Host) {
-		c.add("OAUTH_CLIENT_ORIGIN debe coincidir con el origen de OAUTH_REDIRECT_URI")
-	}
-	return out
-}
-
-func parseHTTPURL(c *problemCollector, key, value string) (*url.URL, bool) {
-	u, err := url.Parse(value)
-	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-		c.add("%s debe ser una URL absoluta http(s)", key)
-		return nil, false
-	}
-	return u, true
 }
 
 // loadPasswordConfig reads and validates the Argon2 parameters.

@@ -101,7 +101,7 @@ func TestRF020_StoreResuelvePermisosPorRolesYAplicacion(t *testing.T) {
 		t.Fatal(err)
 	}
 	client := oauth.Client{ID: "contabilidad", RedirectURI: "http://contabilidad.localhost:8080/oauth/callback"}
-	service := oauth.New(repository.OAuthRepository(), client, &roleTestReader{}, time.Now)
+	service := oauth.New(repository.OAuthRepository(), []oauth.Client{client}, &roleTestReader{}, time.Now)
 	want := []string{"cierre.ejecutar", "movimientos.aprobar", "movimientos.registrar", "movimientos.ver_todos", "reportes.ver"}
 	if got := exchangeRolePermissions(t, ctx, service, client, user.ID); !reflect.DeepEqual(got, want) {
 		t.Fatalf("permissions=%v, want %v", got, want)

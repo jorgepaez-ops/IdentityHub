@@ -562,22 +562,38 @@ func (q *Queries) GetMfaChallengeForUpdate(ctx context.Context, tokenHash []byte
 	return i, err
 }
 
-const getOAuthApplication = `-- name: GetOAuthApplication :one
-SELECT client_id, redirect_uri, allowed_origin
-FROM applications
-WHERE client_id = $1
+const getOAuthAuthorizationAccess = `-- name: GetOAuthAuthorizationAccess :one
+SELECT
+    users.organization_id AS user_organization_id,
+    applications.organization_id AS application_organization_id,
+    EXISTS (
+        SELECT 1
+        FROM user_roles
+        JOIN roles ON roles.id = user_roles.role_id
+        WHERE user_roles.user_id = users.id AND roles.application_id = applications.id
+    ) AS has_application_role
+FROM users
+CROSS JOIN applications
+WHERE users.id = $1 AND applications.client_id = $2
 `
 
-type GetOAuthApplicationRow struct {
-	ClientID      string
-	RedirectUri   string
-	AllowedOrigin string
+type GetOAuthAuthorizationAccessParams struct {
+	ID       uuid.UUID
+	ClientID string
 }
 
-func (q *Queries) GetOAuthApplication(ctx context.Context, clientID string) (GetOAuthApplicationRow, error) {
-	row := q.db.QueryRow(ctx, getOAuthApplication, clientID)
-	var i GetOAuthApplicationRow
-	err := row.Scan(&i.ClientID, &i.RedirectUri, &i.AllowedOrigin)
+type GetOAuthAuthorizationAccessRow struct {
+	UserOrganizationID        uuid.UUID
+	ApplicationOrganizationID uuid.UUID
+	HasApplicationRole        bool
+}
+
+// What /oauth/authorize needs to decide: the user's company, the application's
+// company and whether the user holds any role of that application.
+func (q *Queries) GetOAuthAuthorizationAccess(ctx context.Context, arg GetOAuthAuthorizationAccessParams) (GetOAuthAuthorizationAccessRow, error) {
+	row := q.db.QueryRow(ctx, getOAuthAuthorizationAccess, arg.ID, arg.ClientID)
+	var i GetOAuthAuthorizationAccessRow
+	err := row.Scan(&i.UserOrganizationID, &i.ApplicationOrganizationID, &i.HasApplicationRole)
 	return i, err
 }
 
@@ -824,6 +840,79 @@ func (q *Queries) ListAdminUsers(ctx context.Context, arg ListAdminUsersParams) 
 			&i.LastLoginAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.OrganizationID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listApplicationRolesForUser = `-- name: ListApplicationRolesForUser :many
+SELECT roles.name
+FROM user_roles
+JOIN roles ON roles.id = user_roles.role_id
+JOIN applications ON applications.id = roles.application_id
+WHERE user_roles.user_id = $1 AND applications.client_id = $2
+ORDER BY roles.name ASC
+`
+
+type ListApplicationRolesForUserParams struct {
+	UserID   uuid.UUID
+	ClientID string
+}
+
+func (q *Queries) ListApplicationRolesForUser(ctx context.Context, arg ListApplicationRolesForUserParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, listApplicationRolesForUser, arg.UserID, arg.ClientID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		items = append(items, name)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listOAuthApplications = `-- name: ListOAuthApplications :many
+SELECT client_id, redirect_uri, allowed_origin, organization_id
+FROM applications
+ORDER BY client_id ASC
+`
+
+type ListOAuthApplicationsRow struct {
+	ClientID       string
+	RedirectUri    string
+	AllowedOrigin  string
+	OrganizationID uuid.UUID
+}
+
+// Registered OAuth clients (ADR 0015): one row per application.
+func (q *Queries) ListOAuthApplications(ctx context.Context) ([]ListOAuthApplicationsRow, error) {
+	rows, err := q.db.Query(ctx, listOAuthApplications)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListOAuthApplicationsRow
+	for rows.Next() {
+		var i ListOAuthApplicationsRow
+		if err := rows.Scan(
+			&i.ClientID,
+			&i.RedirectUri,
+			&i.AllowedOrigin,
 			&i.OrganizationID,
 		); err != nil {
 			return nil, err

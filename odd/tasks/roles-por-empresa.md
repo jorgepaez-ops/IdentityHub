@@ -72,7 +72,7 @@ aplicaciones desde la consola (se declaran por migración, como hoy Contabilidad
 - [x] **R1. Especificación.** ADR 0015, requisitos, modelo de dominio y escenarios `empresas.feature`.
 - [x] **R2. Datos.** Migración de empresas y semillas; consultas sqlc; trigger o validación de que un rol
   asignado pertenece a la empresa del usuario; pruebas de integración.
-- [ ] **R3. OAuth multi-cliente.** Clientes desde `applications`; `redirect_uri`, CORS y `aud` por cliente;
+- [x] **R3. OAuth multi-cliente.** Clientes desde `applications`; `redirect_uri`, CORS y `aud` por cliente;
   rechazo en `/oauth/authorize` por empresa o sin rol; pruebas.
 - [ ] **R4. Administración y enrutamiento.** API: empresa del usuario, roles asignables, aplicaciones del
   usuario; consola: alta con empresa, `UserDrawer` filtrado, menú dinámico y redirección tras el login.
@@ -152,5 +152,55 @@ ramas locales y se suben después.
   - `make gen` regeneró `specs/07-traceability.md` (RF-022 pasa de parcial a completo por las 7 pruebas
     Go; los escenarios siguen sin E2E hasta R5 porque `empresas.feature` aún no está en el repo).
 
+- 2026-10-19 (R3, escrito por el ejecutor, sin marcar; revisión y commit del orquestador):
+  - Clientes desde `applications`: consultas nuevas `ListOAuthApplications`, `GetOAuthAuthorizationAccess`
+    y `ListApplicationRolesForUser` (sustituye a `GetOAuthApplication`); `Store.ListOAuthClients`;
+    `oauth.New` recibe `[]Client` (con `OrganizationID`); `oauth.ValidateClients` falla al arrancar si no hay
+    clientes o alguno está mal formado (id, `redirect_uri` http(s) absoluto sin fragmento, origen igual al de
+    la URI, ids únicos). Decisión: la tabla se lee una vez al arrancar (las aplicaciones entran por
+    migración + despliegue, ADR 0015 punto 8); `main.go` ya no depende de un cliente único. Se retiraron
+    `ValidateOAuthClient`, `ValidateRegisteredClient` y las variables `OAUTH_CLIENT_ID`,
+    `OAUTH_REDIRECT_URI`, `OAUTH_CLIENT_ORIGIN` (config y sus pruebas); `SetOAuthService` ya no recibe cliente.
+  - CORS de `/oauth/token` y `/.well-known/jwks.json`: eco exacto del origen si coincide con el
+    `allowed_origin` de cualquier cliente registrado; nunca comodín. `aud` = `client_id` del código
+    canjeado (`ExchangeResult.ClientID`). Roles del token: ahora por `roles.application_id` (consulta
+    `ListApplicationRolesForUser`), ya no por prefijo del nombre.
+  - Rechazo en `/oauth/authorize`: empresa distinta (`organization_mismatch`, se evalúa primero) o sin rol
+    de la aplicación (`no_application_role`): sin código, auditoría `oauth_authorization_rejected`
+    (metadata `reason`, `client_id`; actor = usuario) y `302` a la `redirect_uri` registrada con
+    `error=access_denied` y el `state`. Si falla la auditoría, error 500 (no se emite nada). Cliente o URI
+    inválidos conservan el comportamiento anterior. OpenAPI: solo texto de la descripción de
+    `/oauth/authorize` (sin cambio de forma); `make gen` regeneró `schema.d.ts`, sqlc y la matriz.
+  - Contabilidad: `completeCallback` distingue `error=access_denied` (`CallbackError` `no_access`) y `App`
+    muestra «Sin acceso a Contabilidad» sin pedir token; los demás errores siguen igual.
+  - RED/GREEN: pruebas escritas antes; RED observado como fallo de compilación en `internal/auth/oauth`
+    (`undefined: AuthorizationAccess`) y en `internal/api` (firma de `SetOAuthService`), y como fallo de
+    comportamiento en Vitest (`access_denied` daba `denied`; la pantalla «Sin acceso» no aparecía).
+    GREEN tras implementar. Pruebas nuevas: `TestRF020_VariosClientesRegistrados...`,
+    `TestRF020_OrigenPermitido...`, `TestRF020_ValidateClients...`, `TestRF020_CORSPermiteElOrigenDeCada...`,
+    `TestRF020_PostgresListaLosClientesRegistrados...`, `TestRF022_AutorizacionRechazadaNoEmiteCodigoYAudita`,
+    `TestRF022_FalloDeAuditoriaDelRechazo...`, `TestRF022_CanjeDeInventarioLlevaSoloSusRoles...`,
+    `TestRF022_AuthorizeRechazadoRedirigeConAccessDenied...` (+ variante con cliente/URI inválidos),
+    `TestRF022_AuthorizeRechazaUsuarioDeOtraEmpresa...` (Postgres real, vía `Server.Routes()`),
+    `TestRF022_PostgresAutorizaSoloAUsuariosDeLaEmpresaConRol...`, y dos de Contabilidad. Se retiraron 2
+    pruebas de `config` (la validación pasó a `ValidateClients`) y la de `ValidateRegisteredClient`.
+    Pruebas existentes ajustadas: usuarios que piden código ahora necesitan un rol de la aplicación.
+  - E2E: «Un empleado sin rol de aplicación no accede a Contabilidad» ahora comprueba `error=access_denied`
+    en la redirección de authorize, ningún `code`, ninguna petición a `/oauth/token` y la auditoría; el
+    test de reutilización de código usa un usuario con `contabilidad.analista`.
+  - Fuera de mis superficies, pendiente para el orquestador: `.env.example` (comentarios `OAUTH_*`),
+    `docs/guia-desarrollo.md`, `docs/manuales/*` (integración, despliegue), `docs/informe/informe-tecnico.md`,
+    `infraestructura/terraform/README.md` y ADR 0012 aún citan esas variables (R6); `e2e/support/accounts.ts`
+    inserta el administrador por SQL sin `organization_id` y rompe todo el E2E tras R2 (ver verificación).
 
-R2 (datos).
+  - Verificación de R3: `make gen` (solo cambios esperados: sqlc, `schema.d.ts`, matriz); `make test-go` verde;
+    `make test-integration` con Postgres desechable verde, cobertura total 81.2 %, y `-v -run 'TestRF02[02]'`
+    muestra las `TestRF020_*`/`TestRF022_*` nuevas en PASS (no SKIP); `golangci-lint` v2.13.2 sin hallazgos
+    (también con `--build-tags=integration`; se añadió a `backend/.golangci.yml` una exclusión de `misspell`
+    para el client_id `inventario`); Vitest de Contabilidad 150/150, lint y typecheck limpios;
+    `traceability.py --check` al día. E2E: stack `make up-app` levantado (la API arrancó leyendo los clientes
+    de la tabla) y `control-de-acceso.spec.ts` + `autorizacion-oauth.spec.ts` 19/19 en verde, pero solo tras
+    `ALTER TABLE users ALTER COLUMN organization_id SET DEFAULT` en la base local del stack: el
+    `seedAdmin()` de `e2e/support/accounts.ts` inserta por SQL sin empresa y falla con `NOT NULL` desde R2
+    (fuera de mis superficies; hay que corregirlo antes de la suite completa). Ese DEFAULT quedó en el
+    volumen local de Postgres del stack (se conserva al hacer `make down`).

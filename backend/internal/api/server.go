@@ -10,7 +10,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/netip"
-	"net/url"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -48,8 +47,6 @@ type Server struct {
 	hubSessionTTL    time.Duration
 	oauth            *oauth.Service
 	hubSessions      oauth.HubSessionReader
-	oauthClient      oauth.Client
-	oauthRedirect    *url.URL
 	oauthLoginURL    string
 	currentUsers     currentUserRepository
 	refresh          refresh.Refresher
@@ -98,15 +95,12 @@ func (s *Server) SetMFAService(service mfa.Authenticator, refreshTTL time.Durati
 	s.mfa, s.mfaRefreshTTL = service, refreshTTL
 }
 
-// SetOAuthService wires the OAuth endpoints. An unparsable or relative
-// redirect URI leaves OAuth unavailable (503) instead of failing per request.
-func (s *Server) SetOAuthService(service *oauth.Service, sessions oauth.HubSessionReader, client oauth.Client, loginURL string, hubSessionTTL time.Duration) {
+// SetOAuthService wires the OAuth endpoints. The service owns the registered
+// clients (loaded from the applications table), so a request can never name an
+// unregistered redirect URI, origin or audience.
+func (s *Server) SetOAuthService(service *oauth.Service, sessions oauth.HubSessionReader, loginURL string, hubSessionTTL time.Duration) {
 	s.hubSessionTTL = hubSessionTTL
-	redirect, err := url.Parse(client.RedirectURI)
-	if err != nil || !redirect.IsAbs() {
-		return
-	}
-	s.oauth, s.hubSessions, s.oauthClient, s.oauthRedirect, s.oauthLoginURL = service, sessions, client, redirect, loginURL
+	s.oauth, s.hubSessions, s.oauthLoginURL = service, sessions, loginURL
 }
 
 // SetCurrentUserRepository is used by composition and focused profile tests.

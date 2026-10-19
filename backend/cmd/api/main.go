@@ -156,8 +156,13 @@ func run() error {
 		return fmt.Errorf("create token service: %w", err)
 	}
 	password.Configure(cfg.Argon2)
-	oauthClient := oauth.Client{ID: cfg.OAuthClientID, RedirectURI: cfg.OAuthRedirectURI, Origin: cfg.OAuthClientOrigin}
-	if err := db.ValidateOAuthClient(ctx, oauthClient); err != nil {
+	// OAuth clients are the applications registered in the database (ADR 0015);
+	// an empty or malformed registration stops the API at startup.
+	oauthClients, err := db.ListOAuthClients(ctx)
+	if err != nil {
+		return fmt.Errorf("load OAuth clients: %w", err)
+	}
+	if err := oauth.ValidateClients(oauthClients); err != nil {
 		return fmt.Errorf("validate OAuth client registration: %w", err)
 	}
 	employeeService := employee.New(db, broker, passwordHasher{}, rand.Reader, time.Now)
@@ -188,7 +193,7 @@ func run() error {
 	server.SetPasswordResetService(passwordreset.New(db, broker, passwordHasher{}, rand.Reader, time.Now).WithLogger(logger))
 	server.SetLoginService(loginService)
 	server.SetMFAService(mfaService, cfg.RefreshTTL)
-	server.SetOAuthService(oauth.New(db.OAuthRepository(), oauthClient, rand.Reader, time.Now), db.OAuthRepository(), oauthClient, cfg.PublicBaseURL+"/login", cfg.HubSessionTTL)
+	server.SetOAuthService(oauth.New(db.OAuthRepository(), oauthClients, rand.Reader, time.Now), db.OAuthRepository(), cfg.PublicBaseURL+"/login", cfg.HubSessionTTL)
 	server.SetRefreshService(refreshService)
 	server.SetSessionService(session.New(db))
 	server.SetLogoutService(logout.New(db))

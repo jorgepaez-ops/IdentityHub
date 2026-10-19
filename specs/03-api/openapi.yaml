@@ -319,14 +319,17 @@ paths:
       tags: [auth]
       summary: Autorizar al cliente mediante Authorization Code con PKCE
       description: |
-        Valida el cliente configurado, la coincidencia exacta de `redirect_uri`, `state`
+        Valida que el cliente esté registrado en `applications`, la coincidencia exacta de `redirect_uri`, `state`
         obligatorio y PKCE S256. Si existe la cookie SSO del Hub (`HttpOnly`, `Secure`,
         `SameSite=Lax`) no vuelve a pedir contraseña. Sin sesión SSO
         válida responde `302` al login del Hub con `continue` = la ruta relativa de esta misma
         petición; el login solo acepta `continue` si es una ruta relativa que empieza por
         `/oauth/authorize` (nunca una URL absoluta ni `//host`, para evitar redirección abierta)
         y vuelve a ella tras completar el MFA. Los errores con una URI validada se
-        devuelven por redirección según RFC 6749 §4.1.2.1. No se habilita CORS aquí.
+        devuelven por redirección según RFC 6749 §4.1.2.1. Si el usuario autenticado pertenece a una
+        empresa distinta de la de la aplicación, o no tiene ningún rol de ella, no se emite código:
+        responde `302` a la `redirect_uri` registrada con `error=access_denied` y el `state` original, y
+        registra el evento de auditoría `oauth_authorization_rejected` (ADR 0015). No se habilita CORS aquí.
         Los parámetros en `snake_case` son nombres de protocolo definidos por RFC 6749.
       x-requirement: RF-020
       security: []

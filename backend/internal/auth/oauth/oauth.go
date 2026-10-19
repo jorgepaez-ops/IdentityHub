@@ -1,5 +1,5 @@
-// Package oauth implements the narrow Authorization Code + PKCE flow used by
-// the configured Contabilidad public client (ADR 0009).
+// Package oauth implements the Authorization Code + PKCE flow for the public
+// clients registered in the applications table (ADR 0009, ADR 0015).
 package oauth
 
 import (
@@ -10,11 +10,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jorgepaez/identity-hub/internal/auth/roles"
 )
 
 const AuthorizationCodeTTL = time.Minute
@@ -39,7 +39,33 @@ var (
 	ErrAuthorizationCodeReused = errors.New("authorization code was already used")
 )
 
-type Client struct{ ID, RedirectURI, Origin string }
+// Client is one registered application: its client_id (also the token
+// audience), exact redirect URI, allowed CORS origin and owning company.
+type Client struct {
+	ID, RedirectURI, Origin string
+	OrganizationID          uuid.UUID
+}
+
+// Reasons recorded when /oauth/authorize refuses an authenticated user
+// (ADR 0015 point 4).
+const (
+	RejectionOrganizationMismatch = "organization_mismatch"
+	RejectionNoApplicationRole    = "no_application_role"
+	// AuditActionAuthorizationRejected is the audit action of a refused authorization.
+	AuditActionAuthorizationRejected = "oauth_authorization_rejected"
+)
+
+// RejectedError reports that the user may not use the application. No code was issued.
+type RejectedError struct{ Reason string }
+
+func (e *RejectedError) Error() string { return "oauth authorization rejected: " + e.Reason }
+
+// AuthorizationAccess is what the authorization decision needs to know about a
+// user and an application.
+type AuthorizationAccess struct {
+	UserOrganizationID, ApplicationOrganizationID uuid.UUID
+	HasApplicationRole                            bool
+}
 type AuthorizeInput struct{ ClientID, RedirectURI, ResponseType, State, CodeChallenge, CodeChallengeMethod string }
 type ExchangeInput struct{ Code, ClientID, RedirectURI, CodeVerifier string }
 type AuthorizeResult struct {
@@ -48,6 +74,7 @@ type AuthorizeResult struct {
 }
 type ExchangeResult struct {
 	UserID      uuid.UUID
+	ClientID    string
 	Roles       []string
 	Permissions []string
 }
@@ -68,16 +95,19 @@ type StoredCode struct {
 type AuditEvent struct {
 	ActorUserID uuid.UUID
 	Action      string
+	Metadata    map[string]string
 }
 
 type Repository interface {
 	CreateAuthorizationCode(context.Context, CreateCode) error
 	InsertAuditEvent(context.Context, AuditEvent) error
+	GetAuthorizationAccess(ctx context.Context, userID uuid.UUID, clientID string) (AuthorizationAccess, error)
 	WithinAuthorizationCodeTransaction(context.Context, func(ExchangeWriter) error) error
 }
 type ExchangeWriter interface {
 	ExchangeAuthorizationCode(context.Context, []byte, string, string, string, time.Time) (StoredCode, error)
-	ListRolesForUser(context.Context, uuid.UUID) ([]string, error)
+	// ListApplicationRolesForUser returns only the roles whose application is clientID.
+	ListApplicationRolesForUser(ctx context.Context, userID uuid.UUID, clientID string) ([]string, error)
 	ListPermissionKeysForRolesAndApplication(context.Context, []string, string) ([]string, error)
 	InsertAuditEvent(context.Context, AuditEvent) error
 }
@@ -87,23 +117,35 @@ type HubSessionReader interface {
 
 type Service struct {
 	repository Repository
-	client     Client
+	clients    map[string]Client
+	origins    map[string]struct{}
 	random     io.Reader
 	now        func() time.Time
 }
 
-func New(repository Repository, client Client, random io.Reader, now func() time.Time) *Service {
+// New builds the service over the registered clients; ValidateClients checks them at startup.
+func New(repository Repository, clients []Client, random io.Reader, now func() time.Time) *Service {
 	if random == nil {
 		random = rand.Reader
 	}
 	if now == nil {
 		now = time.Now
 	}
-	return &Service{repository: repository, client: client, random: random, now: now}
+	byID := make(map[string]Client, len(clients))
+	origins := make(map[string]struct{}, len(clients))
+	for _, client := range clients {
+		byID[client.ID] = client
+		origins[client.Origin] = struct{}{}
+	}
+	return &Service{repository: repository, clients: byID, origins: origins, random: random, now: now}
 }
 
 func (s *Service) Authorize(ctx context.Context, userID uuid.UUID, input AuthorizeInput) (AuthorizeResult, error) {
 	if err := s.ValidateAuthorizeInput(input); err != nil {
+		return AuthorizeResult{}, err
+	}
+	client := s.clients[input.ClientID]
+	if err := s.checkAccess(ctx, userID, client); err != nil {
 		return AuthorizeResult{}, err
 	}
 	raw := make([]byte, 32)
@@ -113,13 +155,36 @@ func (s *Service) Authorize(ctx context.Context, userID uuid.UUID, input Authori
 	now := s.now().UTC()
 	expiresAt := now.Add(AuthorizationCodeTTL)
 	sum := sha256.Sum256(raw)
-	if err := s.repository.CreateAuthorizationCode(ctx, CreateCode{ID: uuid.New(), UserID: userID, ClientID: s.client.ID, RedirectURI: s.client.RedirectURI, CodeHash: sum[:], CodeChallenge: input.CodeChallenge, ExpiresAt: expiresAt}); err != nil {
+	if err := s.repository.CreateAuthorizationCode(ctx, CreateCode{ID: uuid.New(), UserID: userID, ClientID: client.ID, RedirectURI: client.RedirectURI, CodeHash: sum[:], CodeChallenge: input.CodeChallenge, ExpiresAt: expiresAt}); err != nil {
 		return AuthorizeResult{}, fmt.Errorf("create authorization code: %w", err)
 	}
 	if err := s.repository.InsertAuditEvent(ctx, AuditEvent{ActorUserID: userID, Action: "authorization_code_issued"}); err != nil {
 		return AuthorizeResult{}, fmt.Errorf("audit authorization code issuance: %w", err)
 	}
 	return AuthorizeResult{Code: base64.RawURLEncoding.EncodeToString(raw), ExpiresAt: expiresAt}, nil
+}
+
+// checkAccess refuses, with an audit event and no code, a user of another
+// company or without a role in the application (ADR 0015 point 4).
+func (s *Service) checkAccess(ctx context.Context, userID uuid.UUID, client Client) error {
+	access, err := s.repository.GetAuthorizationAccess(ctx, userID, client.ID)
+	if err != nil {
+		return fmt.Errorf("get authorization access: %w", err)
+	}
+	reason := ""
+	switch {
+	case access.UserOrganizationID != access.ApplicationOrganizationID:
+		reason = RejectionOrganizationMismatch
+	case !access.HasApplicationRole:
+		reason = RejectionNoApplicationRole
+	default:
+		return nil
+	}
+	event := AuditEvent{ActorUserID: userID, Action: AuditActionAuthorizationRejected, Metadata: map[string]string{"reason": reason, "client_id": client.ID}}
+	if err := s.repository.InsertAuditEvent(ctx, event); err != nil {
+		return fmt.Errorf("audit rejected authorization: %w", err)
+	}
+	return &RejectedError{Reason: reason}
 }
 
 func (s *Service) Exchange(ctx context.Context, input ExchangeInput) (ExchangeResult, error) {
@@ -156,9 +221,10 @@ type exchangeOutcome struct {
 }
 
 // validExchangeInput reports whether the request names the trusted client and
-// redirect URI and carries both a code and a PKCE verifier.
+// redirect URI of a registered client and carries both a code and a PKCE verifier.
 func (s *Service) validExchangeInput(input ExchangeInput) bool {
-	return input.ClientID == s.client.ID && input.RedirectURI == s.client.RedirectURI && input.Code != "" && input.CodeVerifier != ""
+	client, ok := s.clients[input.ClientID]
+	return ok && input.RedirectURI == client.RedirectURI && input.Code != "" && input.CodeVerifier != ""
 }
 
 // pkceS256Challenge derives the S256 PKCE challenge of a verifier.
@@ -182,29 +248,28 @@ func (s *Service) exchangeCode(ctx context.Context, writer ExchangeWriter, hash 
 	case exchangeErr != nil:
 		return exchangeOutcome{}, fmt.Errorf("exchange authorization code: %w", exchangeErr)
 	}
-	result, err := s.exchangeResult(ctx, writer, code.UserID)
+	result, err := s.exchangeResult(ctx, writer, code.UserID, input.ClientID)
 	if err != nil {
 		return exchangeOutcome{}, err
 	}
 	return exchangeOutcome{result: result}, nil
 }
 
-// exchangeResult looks up the user's application roles and permissions and
-// audits the successful exchange.
-func (s *Service) exchangeResult(ctx context.Context, writer ExchangeWriter, userID uuid.UUID) (ExchangeResult, error) {
-	userRoles, rolesErr := writer.ListRolesForUser(ctx, userID)
+// exchangeResult looks up the user's roles and permissions in the requested
+// application only and audits the successful exchange.
+func (s *Service) exchangeResult(ctx context.Context, writer ExchangeWriter, userID uuid.UUID, clientID string) (ExchangeResult, error) {
+	applicationRoles, rolesErr := writer.ListApplicationRolesForUser(ctx, userID, clientID)
 	if rolesErr != nil {
 		return ExchangeResult{}, fmt.Errorf("list application roles: %w", rolesErr)
 	}
 	if auditErr := writer.InsertAuditEvent(ctx, AuditEvent{ActorUserID: userID, Action: "authorization_code_exchanged"}); auditErr != nil {
 		return ExchangeResult{}, fmt.Errorf("audit authorization code exchange: %w", auditErr)
 	}
-	applicationRoles := roles.ForApplication(userRoles, s.client.ID)
-	permissions, permissionsErr := writer.ListPermissionKeysForRolesAndApplication(ctx, applicationRoles, s.client.ID)
+	permissions, permissionsErr := writer.ListPermissionKeysForRolesAndApplication(ctx, applicationRoles, clientID)
 	if permissionsErr != nil {
 		return ExchangeResult{}, fmt.Errorf("list application permissions: %w", permissionsErr)
 	}
-	return ExchangeResult{UserID: userID, Roles: applicationRoles, Permissions: permissions}, nil
+	return ExchangeResult{UserID: userID, ClientID: clientID, Roles: applicationRoles, Permissions: permissions}, nil
 }
 
 // ValidateAuthorizeInput is the one validation source used by both the HTTP
@@ -220,14 +285,65 @@ func (s *Service) ValidateAuthorizeInput(input AuthorizeInput) error {
 }
 
 func (s *Service) IsTrustedClient(input AuthorizeInput) bool {
-	return input.ClientID == s.client.ID && input.RedirectURI == s.client.RedirectURI
+	_, ok := s.TrustedClient(input)
+	return ok
 }
 
-// ValidateRegisteredClient prevents the fixed deployment configuration and
-// seeded application registry from silently drifting apart at startup.
-func ValidateRegisteredClient(configured, registered Client) error {
-	if configured.ID != registered.ID || configured.RedirectURI != registered.RedirectURI || configured.Origin != registered.Origin {
-		return fmt.Errorf("registered OAuth client does not match configured client")
+// TrustedClient returns the registered client whose client_id and exact
+// redirect URI match the request.
+func (s *Service) TrustedClient(input AuthorizeInput) (Client, bool) {
+	client, ok := s.clients[input.ClientID]
+	if !ok || input.RedirectURI != client.RedirectURI {
+		return Client{}, false
+	}
+	return client, true
+}
+
+// AllowsOrigin reports whether origin is, exactly, the allowed origin of a registered client.
+func (s *Service) AllowsOrigin(origin string) bool {
+	if origin == "" {
+		return false
+	}
+	_, ok := s.origins[origin]
+	return ok
+}
+
+// ValidateClients makes a bad registration an explicit startup error instead of
+// a later failure per request. At least one client must be registered.
+func ValidateClients(clients []Client) error {
+	if len(clients) == 0 {
+		return errors.New("no OAuth client is registered in the applications table")
+	}
+	seen := make(map[string]struct{}, len(clients))
+	for _, client := range clients {
+		if err := validateClient(client); err != nil {
+			return fmt.Errorf("OAuth client %q: %w", client.ID, err)
+		}
+		if _, dup := seen[client.ID]; dup {
+			return fmt.Errorf("OAuth client %q is registered twice", client.ID)
+		}
+		seen[client.ID] = struct{}{}
+	}
+	return nil
+}
+
+func validateClient(client Client) error {
+	if client.ID == "" || strings.ContainsAny(client.ID, " \t\r\n") {
+		return errors.New("client_id must be non-empty and contain no whitespace")
+	}
+	redirect, err := url.Parse(client.RedirectURI)
+	if err != nil || !redirect.IsAbs() || redirect.Host == "" || (redirect.Scheme != "http" && redirect.Scheme != "https") {
+		return errors.New("redirect_uri must be an absolute http(s) URL")
+	}
+	if redirect.Fragment != "" {
+		return errors.New("redirect_uri must not carry a fragment")
+	}
+	origin, err := url.Parse(client.Origin)
+	if err != nil || origin.Host == "" || origin.Path != "" || origin.RawQuery != "" || origin.Fragment != "" || (origin.Scheme != "http" && origin.Scheme != "https") {
+		return errors.New("allowed_origin must be only scheme and host")
+	}
+	if origin.Scheme != redirect.Scheme || origin.Host != redirect.Host {
+		return errors.New("allowed_origin must match the origin of redirect_uri")
 	}
 	return nil
 }

@@ -213,10 +213,35 @@ SELECT $1, $2, id, $3, $4, $5, $6
 FROM applications
 WHERE client_id = $7 AND redirect_uri = $4;
 
--- name: GetOAuthApplication :one
-SELECT client_id, redirect_uri, allowed_origin
+-- name: ListOAuthApplications :many
+-- Registered OAuth clients (ADR 0015): one row per application.
+SELECT client_id, redirect_uri, allowed_origin, organization_id
 FROM applications
-WHERE client_id = $1;
+ORDER BY client_id ASC;
+
+-- name: GetOAuthAuthorizationAccess :one
+-- What /oauth/authorize needs to decide: the user's company, the application's
+-- company and whether the user holds any role of that application.
+SELECT
+    users.organization_id AS user_organization_id,
+    applications.organization_id AS application_organization_id,
+    EXISTS (
+        SELECT 1
+        FROM user_roles
+        JOIN roles ON roles.id = user_roles.role_id
+        WHERE user_roles.user_id = users.id AND roles.application_id = applications.id
+    ) AS has_application_role
+FROM users
+CROSS JOIN applications
+WHERE users.id = $1 AND applications.client_id = $2;
+
+-- name: ListApplicationRolesForUser :many
+SELECT roles.name
+FROM user_roles
+JOIN roles ON roles.id = user_roles.role_id
+JOIN applications ON applications.id = roles.application_id
+WHERE user_roles.user_id = $1 AND applications.client_id = $2
+ORDER BY roles.name ASC;
 
 -- name: PurgeAuthorizationCodes :execrows
 DELETE FROM authorization_codes
