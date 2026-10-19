@@ -58,7 +58,7 @@ Esta página es el índice de `docs/`. Está organizada por la pregunta que uste
 
 ## 6. ¿Qué se decidió y por qué (ADR)?
 
-- [Índice de decisiones (ADR 0001 a 0014)](../specs/adr/README.md): cada decisión con contexto, alternativas y consecuencias, incluidas las malas.
+- [Índice de decisiones (ADR 0001 a 0015)](../specs/adr/README.md): cada decisión con contexto, alternativas y consecuencias, incluidas las malas.
 - Tres que ayudan a entender el resto: [IdP propio en lugar de Keycloak](../specs/adr/0002-idp-propio-en-lugar-de-keycloak.md), [SSO con Authorization Code y PKCE](../specs/adr/0009-sso-entre-dominios-con-authorization-code-y-pkce.md) y [línea base vulnerable deliberada](../specs/adr/0007-linea-base-vulnerable-deliberada.md).
 
 ## 7. ¿Cómo se desarrolló y se siguió el trabajo?
