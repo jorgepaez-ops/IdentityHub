@@ -1,29 +1,16 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { App } from './App'
 import * as browser from './browser'
 import { HUB_ORIGIN } from './hub'
 import { startAuthorization } from './oauth/hubLogin'
 import { MIN_REMAINING_MS } from './session'
-import { FakeHub } from './testkit/fakeHub'
+import { installFakeHubEnvironment } from './testkit/hubEnvironment'
 
 const VIEW_ONLY = ['productos.ver']
 const FULL = ['productos.ver', 'productos.editar', 'movimientos.registrar']
 
-let hub: FakeHub
-beforeAll(async () => { hub = await FakeHub.create() })
-
-beforeEach(() => {
-  sessionStorage.clear()
-  localStorage.clear()
-  vi.spyOn(browser, 'goTo').mockImplementation(() => undefined)
-})
-
-afterEach(() => {
-  vi.unstubAllGlobals()
-  vi.restoreAllMocks()
-  window.history.replaceState(null, '', '/')
-})
+const fakeHub = installFakeHubEnvironment()
 
 const tabs = () => screen.getByRole('navigation', { name: 'Secciones' })
 const openSection = (name: string) => fireEvent.click(within(tabs()).getByRole('button', { name }))
@@ -32,7 +19,7 @@ const openSection = (name: string) => fireEvent.click(within(tabs()).getByRole('
 async function comeBackWith(returned: (state: string) => string, token: Record<string, unknown> = {}) {
   await startAuthorization()
   const state = sessionStorage.getItem('inventario.login.state') ?? ''
-  const seen = hub.serveToken(token)
+  const seen = fakeHub().serveToken(token)
   window.history.replaceState(null, '', `/oauth/callback?${returned(state)}`)
   render(<App />)
   return seen
@@ -196,6 +183,22 @@ describe('sections gated by permissions', () => {
     openSection('Catálogo')
     const row = screen.getByText('P-1004').closest('tr') as HTMLElement
     expect(within(row).getByText('10')).toBeInTheDocument()
+  })
+
+  it('TestRF021_ALateEveningMovementIsDatedWithTheLocalDay', async () => {
+    await signedInAs(['inventario.bodeguero'], FULL)
+    // 23:30 local time (Bogota, UTC-5, see vite.config.ts) is already the next day in UTC.
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date(2026, 9, 19, 23, 30) })
+    try {
+      openSection('Movimientos')
+      const form = screen.getByRole('form', { name: 'Registrar movimiento' })
+      fireEvent.change(within(form).getByLabelText('Cantidad'), { target: { value: '1' } })
+      fireEvent.click(within(form).getByRole('button', { name: 'Registrar movimiento' }))
+      const row = screen.getByText('MV-004').closest('tr') as HTMLElement
+      expect(within(row).getByText('2026-10-19')).toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('TestRF021_AnExitLargerThanTheStockIsRefused', async () => {

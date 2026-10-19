@@ -10,6 +10,8 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
+    // A zone behind UTC makes "late in the day" differ between local time and UTC, so date bugs show up.
+    env: { TZ: 'America/Bogota' },
     setupFiles: ['./src/vitest.setup.ts'],
     coverage: { include: ['src/**/*.{ts,tsx}'], reporter: ['text', 'lcov'] },
   },

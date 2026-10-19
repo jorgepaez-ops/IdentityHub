@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { COMPANY } from '../hub'
 import type { Grants } from '../permissions'
 import { usePageTitle } from '../pageTitle'
+import { localDay } from '../warehouse/day'
 import { DIRECTION_NAME, post, revise, seedWarehouse, type Direction } from '../warehouse/ledger'
 import { CatalogPanel } from './CatalogPanel'
 import { MovementsPanel } from './MovementsPanel'
@@ -41,7 +42,7 @@ export function Workspace({ grants, subject, onSignOut }: Readonly<Props>) {
       say(`Producto ${change.sku} actualizado (datos de ejemplo).`)
       return true
     }
-    const outcome = post(warehouse, change.sku, change.direction, change.quantity, new Date().toISOString().slice(0, 10))
+    const outcome = post(warehouse, change.sku, change.direction, change.quantity, localDay(new Date()))
     if (!outcome.ok) {
       say(outcome.problem === 'not_enough_stock' ? 'No hay existencias suficientes para esa salida.' : 'No se pudo registrar el movimiento.')
       return false

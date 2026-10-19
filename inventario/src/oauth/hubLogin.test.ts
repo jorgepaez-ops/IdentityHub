@@ -5,6 +5,15 @@ import { FakeHub, reply, silentUntilAborted } from '../testkit/fakeHub'
 import { DEADLINE_MS, finishAuthorization, startAuthorization } from './hubLogin'
 import { s256 } from './pkce'
 
+/**
+ * `FakeHub` (src/testkit/fakeHub.ts) stands in for the Hub in these tests. What the tests rely on:
+ *  - `hub.serveToken(overrides)` replaces `fetch`: the token endpoint answers with a freshly signed
+ *    token for the claims `hub.claims(now, overrides)` (issuer, audience `inventario`, a 15 minute
+ *    life, role `inventario.bodeguero`), the key set endpoint serves the matching public key, and it
+ *    returns the list of requests seen so far.
+ *  - `hub.serve(answer)` does the same but lets the test decide what the token endpoint answers.
+ *  - `hub.mint(claims)` signs an arbitrary claim set.
+ */
 let hub: FakeHub
 beforeAll(async () => { hub = await FakeHub.create() })
 
@@ -72,6 +81,23 @@ describe('finishAuthorization', () => {
     expect(localStorage).toHaveLength(0)
     expect(sessionStorage).toHaveLength(0)
     expect(window.location.search).toBe('')
+  })
+
+  it('TestRF020_AfterASuccessfulReturnTheCallbackUrlIsReplacedByTheAppRoot', async () => {
+    const { state } = await leaveForTheHub()
+    hub.serveToken()
+    window.history.replaceState(null, '', `/oauth/callback?code=the-code&state=${state}`)
+    await finishAuthorization(window.location.search)
+    expect(window.location.pathname).toBe('/')
+    expect(window.location.search).toBe('')
+    expect(window.location.href).not.toContain('the-code')
+  })
+
+  it('TestRF020_AfterAFailedReturnTheCallbackUrlIsReplacedByTheAppRootToo', async () => {
+    window.history.replaceState(null, '', '/oauth/callback?code=the-code&state=forged')
+    await expect(finishAuthorization(window.location.search)).rejects.toMatchObject({ kind: 'state' })
+    expect(window.location.pathname).toBe('/')
+    expect(window.location.href).not.toContain('the-code')
   })
 
   it('TestRF020_AForgedStateIsRefusedBeforeAnyRequestAndEmptiesTheSession', async () => {

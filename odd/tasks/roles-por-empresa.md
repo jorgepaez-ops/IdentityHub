@@ -349,6 +349,14 @@ ramas locales y se suben después.
     `npx jscpd@4.0.5 --min-lines 5 inventario/src contabilidad/src frontend/src`: 0 clones que involucren a Inventario (antes: la mayoría de
     sus archivos); `make e2e` completo 77/77 (incluye `empresas.spec.ts` y `nginx.spec.ts`); `scripts/traceability.py --check` al día.
   - Pendiente: confirmar en SonarCloud tras el push que la duplicación en código nuevo baja del 3 %.
+  - Avisos de la revisión nativa corregidos (2026-10-19, ejecutor; sin marcar, el orquestador revisa y commitea): (1) tras el callback,
+    éxito o fallo, la URL se reemplaza por la raíz con `history.replaceState` (el `code` no queda en la barra ni en el historial y una
+    recarga entra por el flujo normal); (2) un `sub` vacío o en blanco se rechaza como `claims`; (3) pruebas directas de `session.ts`
+    (`session.test.tsx`: reducer, fases, StrictMode, reloj, cierre de sesión, vencimiento: al vencer el token se vuelve a pedir al Hub con
+    `checking` y se descarta el token); (4) la fecha del movimiento usa el día local (`warehouse/day.ts`; Vitest corre con `TZ=America/Bogota`
+    desde `vite.config.ts` para que la diferencia con UTC sea observable); (5) `hubLogin.test.ts` documenta qué hace `FakeHub`.
+    Para no duplicar el montaje de pruebas se añadió `testkit/hubEnvironment.ts`. RED observado antes de cada arreglo (6 fallos); luego
+    Vitest 97/97 (antes 74), lint, typecheck y build limpios, jscpd 0 clones con Inventario, `make e2e` 77/77.
 
 ## Próximo paso
 

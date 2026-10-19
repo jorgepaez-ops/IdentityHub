@@ -89,7 +89,7 @@ export async function verifyToken(token: string, keySet: KeySet, expected: Expec
   const expiresAt = claims.exp
   if (typeof expiresAt !== 'number' || expiresAt + LEEWAY_SECONDS < expected.now) throw new TokenRejected('expired')
   if (typeof claims.nbf === 'number' && claims.nbf - LEEWAY_SECONDS > expected.now) throw new TokenRejected('not_yet_valid')
-  if (typeof claims.sub !== 'string') throw new TokenRejected('claims')
+  if (typeof claims.sub !== 'string' || claims.sub.trim() === '') throw new TokenRejected('claims')
 
   return { subject: claims.sub, roles: stringList(claims.roles), permissions: stringList(claims.permissions), expiresAt }
 }

@@ -1,5 +1,5 @@
 import { goTo } from '../browser'
-import { CALLBACK_PATH, CLIENT_ID, HUB_ORIGIN, callbackUrl } from '../hub'
+import { CLIENT_ID, HUB_ORIGIN, callbackUrl } from '../hub'
 import { randomToken, s256 } from './pkce'
 import { verifyToken, type Identity, type KeySet } from './tokenVerifier'
 
@@ -95,12 +95,13 @@ async function fetchKeySet(): Promise<KeySet> {
 
 /**
  * Handles the redirect back from the Hub: checks the state, trades the code for a token and verifies
- * it. The query string is removed from the address bar first, and the token is never persisted.
+ * it. The callback URL is replaced by the app root first, and the token is never persisted.
  */
 export async function finishAuthorization(search: string): Promise<SignedIn> {
   const params = new URLSearchParams(search)
   const { state, verifier } = takeStored()
-  window.history.replaceState(null, '', CALLBACK_PATH)
+  // Success or failure, the code must not stay in the address bar or history, and a reload must start over.
+  window.history.replaceState(null, '', '/')
 
   if (!state || !verifier || params.get('state') !== state) throw new LoginFailure('state')
   const hubError = params.get('error')

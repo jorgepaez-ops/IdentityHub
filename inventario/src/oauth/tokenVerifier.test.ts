@@ -50,6 +50,15 @@ describe('access token verification against the Hub keys', () => {
     expect(await reasonOf(await mintWith({ permissions: [1, 2] }))).toBe('claims')
   })
 
+  it.each([
+    ['empty', ''],
+    ['blank', '   '],
+    ['not a string', 42],
+    ['absent', undefined],
+  ])('TestRF020_ASubjectThatIs%sIsRejectedAsBadClaims', async (_label, sub) => {
+    expect(await reasonOf(await mintWith({ sub }))).toBe('claims')
+  })
+
   it('TestRF020_RejectsASignatureMadeByAnotherKey', async () => {
     const stranger = await FakeHub.create('k1')
     expect(await reasonOf(await stranger.mint(stranger.claims(NOW)))).toBe('signature')
