@@ -39,7 +39,7 @@ RUN npm run build
 # ── Imagen final ──────────────────────────────────────────────────────────
 # nginxinc/nginx-unprivileged:stable-alpine — corre como uid 101 por defecto y ya
 # escucha en el puerto 8080 que usa este proyecto, sin cambiar nada más.
-FROM nginxinc/nginx-unprivileged@sha256:56b8272e43a0525f67aed68d1e0794a712d10e3e45a563e118e9a77c817e6f86 AS web
+FROM nginxinc/nginx-unprivileged@sha256:f5116ed4606f3eb015dd4a8e28cb9b351476dc0ad4bc6e9f93b19cec130cdf03 AS web
 
 COPY frontend/nginx/default.conf /etc/nginx/conf.d/default.conf
 COPY frontend/nginx/security-headers.conf /etc/nginx/security-headers.conf
@@ -52,6 +52,8 @@ COPY --from=contabilidad-builder /app/dist /usr/share/nginx/contabilidad
 # 2026-10-13: el digest vigente de stable-alpine (Alpine 3.24.2) trae zlib 1.3.2-r0 con
 # CVE-2026-85091 (MEDIUM); el repositorio de Alpine ya publica 1.3.2-r1. Se parcha aquí y la capa
 # se retira cuando un digest nuevo de la base lo incluya (mismo criterio que pcre2 en P9d).
+# 2026-10-19: digest nuevo de stable-alpine con libexpat 2.9.0 (CVE-2026-77214) y libx11 1.8.14
+# (CVE-2026-88806); sigue con zlib 1.3.2-r0, así que esta capa se mantiene.
 USER 0
 RUN apk upgrade --no-cache zlib
 
