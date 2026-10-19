@@ -17,9 +17,7 @@ import (
 var (
 	// HubOrganizationID is the platform operator, home of the global administrators.
 	HubOrganizationID = uuid.MustParse("00000000-0000-4000-8000-0000000000a1")
-	// ContabilidadOrganizationID is "Contabilidad S.A.", owner of the Contabilidad application. It is
-	// also the transitional default for user creation paths that do not carry an organization yet
-	// (employee invitation); R4 removes that default when the console sends the company.
+	// ContabilidadOrganizationID is "Contabilidad S.A.", owner of the Contabilidad application.
 	ContabilidadOrganizationID = uuid.MustParse("00000000-0000-4000-8000-0000000000a2")
 	// EmpresaBOrganizationID is "Empresa B", owner of the demo warehouse application (second company demo).
 	EmpresaBOrganizationID = uuid.MustParse("00000000-0000-4000-8000-0000000000a3")
@@ -29,7 +27,7 @@ var (
 	// ErrCrossOrganizationRole reports that a role of an application owned by another organization was
 	// assigned to a user, or that a user's organization changed while they still hold such roles
 	// (invariants 12-14). It maps SQLSTATE IH001 raised by the migration 000011 triggers.
-	ErrCrossOrganizationRole = errors.New("role belongs to an application of another organization")
+	ErrCrossOrganizationRole = admin.ErrCrossOrganizationRole
 	// ErrOrganizationRequired reports a user creation without an organization.
 	ErrOrganizationRequired = errors.New("user organization is required")
 )
@@ -84,6 +82,28 @@ func (s *Store) GetUserOrganization(ctx context.Context, userID uuid.UUID) (Orga
 		return Organization{}, fmt.Errorf("get user organization: %w", err)
 	}
 	return Organization{ID: row.ID, Slug: row.Slug, Name: row.Name, CreatedAt: row.CreatedAt.Time}, nil
+}
+
+// UserApplication is an application the user can launch: it belongs to the user's organization and the
+// user holds at least one of its roles.
+type UserApplication struct {
+	ClientID  string
+	Name      string
+	LaunchURL string
+}
+
+// ListUserApplications returns the applications of the user's organization in which the user holds at
+// least one role. A user without application roles gets an empty list.
+func (s *Store) ListUserApplications(ctx context.Context, userID uuid.UUID) ([]UserApplication, error) {
+	rows, err := s.queries.ListUserApplications(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list user applications: %w", err)
+	}
+	result := make([]UserApplication, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, UserApplication{ClientID: row.ClientID, Name: row.Name, LaunchURL: row.AllowedOrigin})
+	}
+	return result, nil
 }
 
 // ListOrganizationApplications returns only the applications owned by the organization.

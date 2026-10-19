@@ -33,13 +33,12 @@ func TestRF021_StoreListaAplicacionesConPermisosRolesYConteos(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	applications, err := repository.ListApplications(ctx)
+	// The grid works inside one company (RF-022): Contabilidad S.A. sees only Contabilidad.
+	applications, err := repository.ListApplications(ctx, store.ContabilidadOrganizationID)
 	if err != nil {
 		t.Fatalf("ListApplications() error = %v", err)
 	}
-	// Migration 000011 also seeds Inventario (3 permissions) for Empresa B; the grid is filtered by company in R4.
-	if len(applications) != 2 || applications[0].ClientID != "contabilidad" || applications[0].Name != "Contabilidad" || len(applications[0].Permissions) != 5 ||
-		applications[1].ClientID != "inventario" || len(applications[1].Permissions) != 3 {
+	if len(applications) != 1 || applications[0].ClientID != "contabilidad" || applications[0].Name != "Contabilidad" || len(applications[0].Permissions) != 5 {
 		t.Fatalf("applications = %+v", applications)
 	}
 	roles := map[string]rolegrid.Role{}
@@ -96,7 +95,7 @@ func TestRF021_ServicioConStoreCreaActualizaYEliminaConAuditoria(t *testing.T) {
 	}
 	service := rolegrid.New(repository)
 	actor := createAdminTestUser(t, ctx, repository, "grid-actor@example.test", "Grid Actor", "")
-	applications, err := repository.ListApplications(ctx)
+	applications, err := repository.ListApplications(ctx, store.ContabilidadOrganizationID)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/jorgepaez/identity-hub/internal/auth/employee"
 	"github.com/jorgepaez/identity-hub/internal/store"
 )
@@ -34,18 +35,21 @@ func (s *Server) createEmployee(w http.ResponseWriter, r *http.Request) {
 		roleNames[i] = string(role)
 	}
 	result, err := s.employeeCreation.CreateEmployee(r.Context(), employee.Input{
-		Email:       string(request.Email),
-		DisplayName: request.DisplayName,
-		Roles:       roleNames,
-		ActorUserID: actorID,
-		IP:          requestClientIP(r),
-		UserAgent:   optionalRequestUserAgent(r),
+		Email:          string(request.Email),
+		DisplayName:    request.DisplayName,
+		Roles:          roleNames,
+		OrganizationID: uuid.UUID(request.OrganizationId),
+		ActorUserID:    actorID,
+		IP:             requestClientIP(r),
+		UserAgent:      optionalRequestUserAgent(r),
 	})
 	if err != nil {
 		var invalid *employee.InvalidInputError
 		switch {
 		case errors.As(err, &invalid):
 			writeValidationProblem(w, invalid.Field, invalid.Detail)
+		case errors.Is(err, store.ErrCrossOrganizationRole):
+			writeProblem(w, http.StatusBadRequest, problemRoleOrganizationMismatch, titleBadRequest, "A role belongs to an application of another company than the new account's.")
 		case errors.Is(err, employee.ErrEmailExists):
 			// Deliberately as uninformative as the registration conflict
 			// response used to be: it must not reveal that the account exists.

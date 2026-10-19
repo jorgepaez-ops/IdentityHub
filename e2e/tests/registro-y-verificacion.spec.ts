@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test'
 import { api } from '../support/api'
 import { type Admin, createActiveUser, inviteUser, seedAdmin, strongPassword, uniqueEmail } from '../support/accounts'
 import { assertEmail, psql } from '../support/db'
+import { organizations } from '../support/organizations'
 import { extractLink, mailIds, waitForMail } from '../support/mailpit'
 
 let admin: Admin
@@ -30,7 +31,7 @@ test('RF-001 Alta administrativa con datos válidos', async () => {
   const since = new Date()
   const created = await api<{ id: string; email: string; status: string; roles: string[] }>('POST', '/api/v1/admin/users', {
     token: admin.accessToken,
-    json: { email, displayName: 'E2E Accountant', roles: ['contabilidad.analista'] },
+    json: { email, displayName: 'E2E Accountant', organizationId: organizations.contabilidad.id, roles: ['contabilidad.analista'] },
   })
 
   expect(created.status).toBe(201)
@@ -53,7 +54,7 @@ test('RF-001 Un correo no puede darse de alta dos veces', async () => {
   const email = await createActiveUser(admin)
   const duplicate = await api('POST', '/api/v1/admin/users', {
     token: admin.accessToken,
-    json: { email, displayName: 'Duplicate E2E User', roles: ['user'] },
+    json: { email, displayName: 'Duplicate E2E User', organizationId: organizations.contabilidad.id, roles: ['user'] },
   })
 
   expect(duplicate.status).toBe(409)

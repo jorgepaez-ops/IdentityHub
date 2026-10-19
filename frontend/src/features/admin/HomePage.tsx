@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { LoadingSkeleton } from '../../components/LoadingSkeleton'
 import { AuditIcon, ShieldIcon, UsersIcon } from '../../components/icons'
-import { type AuditEvent, type UserStatus, listAuditLog, listUsers } from '../../api/client'
+import { type AuditEvent, type Organization, type UserStatus, listAuditLog, listUsers } from '../../api/client'
 import { formatDate } from '../format'
 import { AUDIT_FAILED_SIGN_IN_PATH, FAILED_SIGN_IN_ACTION, MFA_CODE_REJECTED_ACTION, Problems, STATUS_PARAM, isAuthFailure } from './shared'
 
@@ -40,8 +40,8 @@ const countOf = (page: { items: unknown[]; nextCursor?: string | null }): Count 
 const sumCounts = (counts: Count[]): Count => ({ value: counts.reduce((total, count) => total + count.value, 0), more: counts.some((count) => count.more) })
 const countText = (count: Count) => (count.more ? `${count.value}+` : String(count.value))
 
-async function loadUsers(): Promise<UserCounts> {
-  const pages = await Promise.all(STATUS_ORDER.map((status) => listUsers({ status, limit: COUNT_PAGE })))
+async function loadUsers(organizationId: string): Promise<UserCounts> {
+  const pages = await Promise.all(STATUS_ORDER.map((status) => listUsers({ organizationId, status, limit: COUNT_PAGE })))
   return Object.fromEntries(STATUS_ORDER.map((status, index) => [status, countOf(pages[index] ?? { items: [] })])) as UserCounts
 }
 
@@ -67,7 +67,7 @@ function StatTile({ label, count, tone, to }: Readonly<{ label: string; count: C
   )
 }
 
-export function HomePage({ onSessionEnded }: Readonly<{ onSessionEnded: () => void }>) {
+export function HomePage({ organization, onSessionEnded }: Readonly<{ organization: Organization; onSessionEnded: () => void }>) {
   const [snapshot, setSnapshot] = useState<Snapshot>(LOADING)
   const [attempt, setAttempt] = useState(0)
   const generation = useRef(0)
@@ -93,13 +93,13 @@ export function HomePage({ onSessionEnded }: Readonly<{ onSessionEnded: () => vo
         },
       )
     }
-    run('users', loadUsers)
+    run('users', () => loadUsers(organization.id))
     run('failedSignIns', loadFailedSignIns)
     run('recent', loadRecent)
     return () => {
       generation.current += 1
     }
-  }, [onSessionEnded, attempt])
+  }, [organization.id, onSessionEnded, attempt])
 
   const retry = () => {
     setSnapshot(LOADING)
@@ -112,7 +112,7 @@ export function HomePage({ onSessionEnded }: Readonly<{ onSessionEnded: () => vo
   return (
     <section>
       <h1>Inicio</h1>
-      <p className="muted">Resumen del Hub con los datos actuales de la API. Los conteos grandes se muestran como «100+».</p>
+      <p className="muted">Resumen del Hub con los datos actuales de la API. Los conteos de usuarios son de {organization.name}; los grandes se muestran como «100+».</p>
       {failed.length > 0 && (
         <>
           <Problems messages={failed.map((key) => GROUP_ERROR[key])} />

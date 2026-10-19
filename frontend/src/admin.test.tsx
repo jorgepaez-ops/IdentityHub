@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { UsersPage } from './features/admin/UsersPage'
 import { AuditLogPage } from './features/admin/AuditLogPage'
 import { resetSessionForTests } from './api/client'
-import { type Handler, applicationsRoute, goTo, json, problem, profile, signedIn, stubApi, type } from './test-utils'
+import { type Handler, applicationsRoute, contabilidadOrganization, goTo, json, problem, profile, signedIn, stubApi, type } from './test-utils'
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -64,7 +64,7 @@ describe('admin page unmount safety', () => {
       'GET /api/v1/admin/users': () => late.promise,
       'POST /api/v1/auth/refresh': () => problem(401),
     })
-    const view = render(<MemoryRouter><UsersPage currentUserId="admin-id" onSessionEnded={onSessionEnded} /></MemoryRouter>)
+    const view = render(<MemoryRouter><UsersPage organization={contabilidadOrganization} currentUserId="admin-id" onSessionEnded={onSessionEnded} /></MemoryRouter>)
     await waitFor(() => expect(api.calls).toHaveLength(1))
     view.unmount()
     await act(async () => { late.resolve(problem(401)) })
@@ -93,7 +93,7 @@ describe('admin page unmount safety', () => {
       'POST /api/v1/admin/users/beto-id/invitation': () => late.promise,
       'POST /api/v1/auth/refresh': () => problem(401),
     })
-    const view = render(<MemoryRouter><UsersPage currentUserId="admin-id" onSessionEnded={onSessionEnded} /></MemoryRouter>)
+    const view = render(<MemoryRouter><UsersPage organization={contabilidadOrganization} currentUserId="admin-id" onSessionEnded={onSessionEnded} /></MemoryRouter>)
     const resend = await screen.findByRole('button', { name: 'Reenviar invitación a Beto Ruiz' })
     fireEvent.click(resend)
     await waitFor(() => expect(api.calls.some((call) => call.key === 'POST /api/v1/admin/users/beto-id/invitation')).toBe(true))
@@ -250,7 +250,7 @@ describe('create user drawer', () => {
     fireEvent.click(within(roles).getByLabelText('contabilidad.senior'))
     fireEvent.click(within(drawer()).getByRole('button', { name: 'Crear y enviar invitación' }))
     expect(await screen.findByText('Invitación enviada a eva@example.test.')).toBeInTheDocument()
-    expect(body(api, 'POST /api/v1/admin/users')).toEqual({ email: 'eva@example.test', displayName: 'Eva Mora', roles: ['user', 'contabilidad.senior'] })
+    expect(body(api, 'POST /api/v1/admin/users')).toEqual({ email: 'eva@example.test', displayName: 'Eva Mora', organizationId: contabilidadOrganization.id, roles: ['user', 'contabilidad.senior'] })
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(within(rowOf('Eva Mora')).getByText('Pendiente')).toBeInTheDocument()
   })
@@ -399,7 +399,7 @@ describe('edit user drawer', () => {
     await openEdit('Ana Pérez', { 'PATCH /api/v1/admin/users/ana-id': () => problem(400, { detail: 'The requested user update is not allowed.' }) })
     fireEvent.change(screen.getByLabelText('Estado'), { target: { value: 'locked' } })
     fireEvent.click(within(drawer()).getByRole('button', { name: 'Guardar cambios' }))
-    expect(await within(drawer()).findByText('El cambio no está permitido: un admin no puede deshabilitarse ni asignarse roles a sí mismo, y siempre debe quedar un admin activo.')).toBeInTheDocument()
+    expect(await within(drawer()).findByText('El cambio no está permitido: un admin no puede deshabilitarse ni asignarse roles a sí mismo, siempre debe quedar un admin activo y los roles deben ser de la empresa del usuario.')).toBeInTheDocument()
     expect(screen.getByRole('dialog')).toBeInTheDocument()
   })
 

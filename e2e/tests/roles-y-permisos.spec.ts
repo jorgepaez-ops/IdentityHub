@@ -1,9 +1,10 @@
 import { expect, test } from '@playwright/test'
-import { createActiveUser, inviteUser, seedAdmin, strongPassword } from '../support/accounts'
-import { api } from '../support/api'
+import { createActiveUser, inviteUser, seedAdmin, seedCompanyUser, strongPassword } from '../support/accounts'
+import { api, loginWithMfa } from '../support/api'
 import { browserLoginWithMfa } from '../support/browser'
 import { contabilidadUrl, hubUrl } from '../support/config'
 import { psql } from '../support/db'
+import { organizations } from '../support/organizations'
 import {
   contabilidadApplication, createRole, ownId, purgeRole, roleCount, uniqueRoleName,
   type ApplicationRoleBody,
@@ -113,7 +114,9 @@ test('RF-021 Se rechaza crear un rol de directorio desde la grilla', async () =>
 })
 
 test('RF-021 Un administrador no edita permisos de un rol que posee', async () => {
-  const holder = await seedAdmin()
+  // The holder belongs to Contabilidad S.A.: a global admin of the operator company cannot hold its roles.
+  const holderAccount = await seedCompanyUser(organizations.contabilidad, ['admin'])
+  const holder = { email: holderAccount.email, accessToken: await loginWithMfa(holderAccount.email, strongPassword) }
   const other = await seedAdmin()
   const application = await contabilidadApplication(holder)
   const roleName = uniqueRoleName('propio')

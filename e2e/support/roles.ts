@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto'
 import { api } from './api'
 import type { Admin } from './accounts'
 import { psql } from './db'
+import { organizations } from './organizations'
 
 export interface ApplicationRoleBody {
   id: string
@@ -27,7 +28,7 @@ export function uniqueRoleName(purpose: string): string {
 }
 
 export async function contabilidadApplication(admin: Admin): Promise<ApplicationBody> {
-  const listed = await api<ApplicationBody[]>('GET', '/api/v1/admin/applications', { token: admin.accessToken })
+  const listed = await api<ApplicationBody[]>('GET', `/api/v1/admin/applications?organizationId=${organizations.contabilidad.id}`, { token: admin.accessToken })
   if (listed.status !== 200) throw new Error(`list applications returned ${listed.status}`)
   const application = listed.body.find((item) => item.clientId === 'contabilidad')
   if (!application) throw new Error('the contabilidad application is not registered')

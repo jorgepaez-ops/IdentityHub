@@ -116,13 +116,13 @@ type Writer interface {
 }
 
 type Repository interface {
-	ListApplications(context.Context) ([]Application, error)
+	ListApplications(ctx context.Context, organizationID uuid.UUID) ([]Application, error)
 	ListRoles(context.Context, uuid.UUID) ([]Role, error)
 	WithinRoleGridTransaction(context.Context, func(Writer) error) error
 }
 
 type Manager interface {
-	ListApplications(context.Context) ([]Application, error)
+	ListApplications(ctx context.Context, organizationID uuid.UUID) ([]Application, error)
 	ListRoles(context.Context, uuid.UUID) ([]Role, error)
 	Create(context.Context, CreateInput) (Role, error)
 	Update(context.Context, UpdateInput) (Role, error)
@@ -135,11 +135,12 @@ func New(repository Repository) *Service { return &Service{repository: repositor
 
 var errUnavailable = errors.New("role grid service is unavailable")
 
-func (s *Service) ListApplications(ctx context.Context) ([]Application, error) {
+// ListApplications returns the applications of one organization: the grid never mixes companies (RF-022).
+func (s *Service) ListApplications(ctx context.Context, organizationID uuid.UUID) ([]Application, error) {
 	if s.repository == nil {
 		return nil, errUnavailable
 	}
-	return s.repository.ListApplications(ctx)
+	return s.repository.ListApplications(ctx, organizationID)
 }
 
 func (s *Service) ListRoles(ctx context.Context, applicationID uuid.UUID) ([]Role, error) {

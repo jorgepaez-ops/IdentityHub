@@ -199,6 +199,7 @@ func run() error {
 	server.SetLogoutService(logout.New(db))
 	server.SetAdminUserService(admin.New(db))
 	server.SetRoleGridService(rolegrid.New(db))
+	server.SetOrganizationDirectory(db)
 	server.SetAuditLogService(auditlog.New(db))
 	server.SetServiceKeyService(servicekey.New(db.ServiceKeys()).WithLogger(logger))
 	server.SetCurrentUserRepository(db)

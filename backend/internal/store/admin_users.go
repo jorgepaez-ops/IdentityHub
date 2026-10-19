@@ -16,6 +16,9 @@ import (
 // ListUsers is the read adapter for the administrator user directory. sqlc
 // binds the search text rather than interpolating it into the LIKE expression.
 func (s *Store) ListUsers(ctx context.Context, input admin.ListInput) ([]admin.User, error) {
+	if input.OrganizationID != uuid.Nil {
+		return s.ListOrganizationUsers(ctx, input.OrganizationID, input)
+	}
 	params := generated.ListAdminUsersParams{Query: input.Query, LimitCount: int64(input.Limit)}
 	if input.Status != nil {
 		params.Status = generated.NullUserStatus{UserStatus: generated.UserStatus(*input.Status), Valid: true}
@@ -135,7 +138,11 @@ func (w *adminWriter) ReplaceRoles(ctx context.Context, id uuid.UUID, roles []st
 	return nil
 }
 func (w *adminWriter) InsertAuditEvent(ctx context.Context, event admin.AuditEvent) error {
-	metadata, err := json.Marshal(map[string]string{})
+	entries := map[string]string{}
+	if event.Reason != "" {
+		entries["reason"] = event.Reason
+	}
+	metadata, err := json.Marshal(entries)
 	if err != nil {
 		return fmt.Errorf("marshal admin audit metadata: %w", err)
 	}

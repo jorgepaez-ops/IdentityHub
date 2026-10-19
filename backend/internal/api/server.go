@@ -55,6 +55,7 @@ type Server struct {
 	adminUsers       admin.Manager
 	roleGrid         rolegrid.Manager
 	auditLog         auditlog.Reader
+	organizations    organizationDirectory
 	serviceKeys      servicekey.Manager
 	trustedProxies   []netip.Prefix
 }
@@ -122,6 +123,11 @@ func (s *Server) SetAdminUserService(service admin.Manager) { s.adminUsers = ser
 
 // SetRoleGridService is used by composition and focused role-grid handler tests.
 func (s *Server) SetRoleGridService(service rolegrid.Manager) { s.roleGrid = service }
+
+// SetOrganizationDirectory wires the company listing and the per-user application launcher (RF-022).
+func (s *Server) SetOrganizationDirectory(directory organizationDirectory) {
+	s.organizations = directory
+}
 
 // SetAuditLogService is used by composition and focused audit-log handler tests.
 func (s *Server) SetAuditLogService(service auditlog.Reader) { s.auditLog = service }
@@ -237,8 +243,8 @@ func (s *Server) RevokeServiceKey(w http.ResponseWriter, r *http.Request, servic
 	s.adminOnly(func(w http.ResponseWriter, r *http.Request) { s.revokeServiceKey(w, r, serviceKeyID) }).ServeHTTP(w, r)
 }
 
-func (s *Server) ListApplications(w http.ResponseWriter, r *http.Request) {
-	s.adminOnly(s.listApplications).ServeHTTP(w, r)
+func (s *Server) ListApplications(w http.ResponseWriter, r *http.Request, params ListApplicationsParams) {
+	s.adminOnly(func(w http.ResponseWriter, r *http.Request) { s.listApplications(w, r, params) }).ServeHTTP(w, r)
 }
 
 func (s *Server) ListApplicationRoles(w http.ResponseWriter, r *http.Request, applicationID ApplicationId) {

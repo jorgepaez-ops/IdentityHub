@@ -14,11 +14,18 @@ const problemInvalidApplicationRole = "invalid-application-role"
 // Handlers of the configurable role grid (RF-021, ADR 0013). They are reached
 // only through the Server methods wrapped with RequireRole("admin").
 
-func (s *Server) listApplications(w http.ResponseWriter, r *http.Request) {
+// listApplications lists the applications of one company; organizationId is required, so the grid can
+// never mix companies (RF-022). Role mutations are addressed by application id, which belongs to a single
+// company, so they need no company parameter of their own.
+func (s *Server) listApplications(w http.ResponseWriter, r *http.Request, params ListApplicationsParams) {
 	if !s.roleGridReady(w) {
 		return
 	}
-	applications, err := s.roleGrid.ListApplications(r.Context())
+	organizationID, ok := requiredOrganizationID(w, params.OrganizationId)
+	if !ok {
+		return
+	}
+	applications, err := s.roleGrid.ListApplications(r.Context(), organizationID)
 	if err != nil {
 		s.logRoleGridError(r, "applications load failed", err)
 		writeProblem(w, http.StatusInternalServerError, "applications-load-failed", titleInternalServerError, "Applications could not be loaded.")

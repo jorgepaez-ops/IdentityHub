@@ -162,3 +162,44 @@ func (q *Queries) ListOrganizations(ctx context.Context) ([]Organization, error)
 	}
 	return items, nil
 }
+
+const listUserApplications = `-- name: ListUserApplications :many
+SELECT a.client_id, a.name, a.allowed_origin
+FROM applications a
+JOIN users u ON u.organization_id = a.organization_id
+WHERE u.id = $1
+  AND EXISTS (
+    SELECT 1
+    FROM user_roles ur
+    JOIN roles r ON r.id = ur.role_id
+    WHERE ur.user_id = u.id AND r.application_id = a.id
+  )
+ORDER BY a.name ASC, a.client_id ASC
+`
+
+type ListUserApplicationsRow struct {
+	ClientID      string
+	Name          string
+	AllowedOrigin string
+}
+
+// Applications of the user's own company where the user holds at least one application role (RF-022).
+func (q *Queries) ListUserApplications(ctx context.Context, id uuid.UUID) ([]ListUserApplicationsRow, error) {
+	rows, err := q.db.Query(ctx, listUserApplications, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListUserApplicationsRow
+	for rows.Next() {
+		var i ListUserApplicationsRow
+		if err := rows.Scan(&i.ClientID, &i.Name, &i.AllowedOrigin); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

@@ -2,7 +2,7 @@ import { FormEvent, useCallback, useEffect, useId, useRef, useState } from 'reac
 import { LoadingSkeleton } from '../../components/LoadingSkeleton'
 import { Toast } from '../../components/Toast'
 import {
-  ApiProblemError, type Application, type ApplicationRole,
+  ApiProblemError, type Application, type ApplicationRole, type Organization,
   createApplicationRole, deleteApplicationRole, listApplications, updateApplicationRole,
 } from '../../api/client'
 import { connectionMessage } from '../account/PublicPages'
@@ -249,7 +249,7 @@ function ApplicationSection({ application, currentRoles, onSessionEnded, onNotic
   )
 }
 
-export function RolesPage({ currentRoles, onSessionEnded }: Readonly<{ currentRoles: readonly string[]; onSessionEnded: () => void }>) {
+export function RolesPage({ organization, currentRoles, onSessionEnded }: Readonly<{ organization: Organization; currentRoles: readonly string[]; onSessionEnded: () => void }>) {
   const [applications, setApplications] = useState<Application[] | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [notice, setNotice] = useState<{ text: string; id: number } | null>(null)
@@ -258,14 +258,14 @@ export function RolesPage({ currentRoles, onSessionEnded }: Readonly<{ currentRo
 
   const load = useCallback(async () => {
     try {
-      const loaded = await listApplications()
+      const loaded = await listApplications(organization.id)
       if (active.current) setApplications(loaded)
     } catch (reason) {
       if (!active.current) return
       if (isAuthFailure(reason)) onSessionEnded()
       else setLoadError('No fue posible cargar las aplicaciones. Inténtalo de nuevo.')
     }
-  }, [onSessionEnded])
+  }, [organization.id, onSessionEnded])
 
   useEffect(() => {
     active.current = true
@@ -278,12 +278,12 @@ export function RolesPage({ currentRoles, onSessionEnded }: Readonly<{ currentRo
       <div className="page-header">
         <div>
           <h1>Roles y permisos</h1>
-          <p className="muted">Cada aplicación declara sus permisos; aquí decides qué permisos lleva cada rol. Los roles admin y user son del sistema y no se editan.</p>
+          <p className="muted">Aplicaciones de {organization.name}. Cada una declara sus permisos; aquí decides qué permisos lleva cada rol. Los roles admin y user son del sistema y no se editan.</p>
         </div>
       </div>
       {loadError && <Problems messages={[loadError]} />}
       {applications === null && !loadError && <LoadingSkeleton label="Cargando roles…" />}
-      {applications?.length === 0 && <p className="muted">No hay aplicaciones conectadas.</p>}
+      {applications?.length === 0 && <p className="muted">{organization.name} no tiene aplicaciones conectadas.</p>}
       {applications?.map((application) => <ApplicationSection application={application} currentRoles={currentRoles} key={application.id} onSessionEnded={onSessionEnded} onNotice={showNotice} />)}
       {notice && <Toast key={notice.id} message={notice.text} onClose={() => setNotice(null)} />}
     </section>

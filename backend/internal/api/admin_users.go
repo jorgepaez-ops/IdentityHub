@@ -16,6 +16,9 @@ const (
 	detailAdminUsersUnavailable  = "User management is temporarily unavailable."
 )
 
+// problemRoleOrganizationMismatch is the problem type for a role of another company's application (RF-022).
+const problemRoleOrganizationMismatch = "role-organization-mismatch"
+
 const defaultAdminUsersLimit = 25
 
 func (s *Server) listUsers(w http.ResponseWriter, r *http.Request, params ListUsersParams) {
@@ -47,7 +50,11 @@ func (s *Server) listUsers(w http.ResponseWriter, r *http.Request, params ListUs
 		}
 		cursor = &value
 	}
-	users, err := s.adminUsers.ListUsers(r.Context(), admin.ListInput{Query: stringValue(params.Q), Status: status, Cursor: cursor, Limit: limit + 1})
+	organizationID, ok := requiredOrganizationID(w, params.OrganizationId)
+	if !ok {
+		return
+	}
+	users, err := s.adminUsers.ListUsers(r.Context(), admin.ListInput{OrganizationID: organizationID, Query: stringValue(params.Q), Status: status, Cursor: cursor, Limit: limit + 1})
 	if errors.Is(err, admin.ErrInvalidStatus) {
 		writeValidationProblem(w, "status", "must be a valid user status")
 		return
@@ -121,6 +128,8 @@ func (s *Server) updateUser(w http.ResponseWriter, r *http.Request, userID UserI
 	}
 	user, err := s.adminUsers.UpdateUser(r.Context(), admin.UpdateInput{ActorUserID: actorID, UserID: uuid.UUID(userID), Status: status, Roles: roles})
 	switch {
+	case errors.Is(err, admin.ErrCrossOrganizationRole):
+		writeProblem(w, http.StatusBadRequest, problemRoleOrganizationMismatch, titleBadRequest, "A role belongs to an application of another company than the user's.")
 	case errors.Is(err, admin.ErrSelfDisable), errors.Is(err, admin.ErrSelfRoleAssignment), errors.Is(err, admin.ErrLastActiveAdmin), errors.Is(err, admin.ErrInvalidStatus), errors.Is(err, admin.ErrInvalidRole), errors.Is(err, admin.ErrBaseRoleRequired):
 		writeProblem(w, http.StatusBadRequest, "invalid-user-update", titleBadRequest, "The requested user update is not allowed.")
 	case errors.Is(err, admin.ErrUserNotFound), errors.Is(err, pgx.ErrNoRows):

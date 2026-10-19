@@ -63,7 +63,7 @@ func adminRequest(t *testing.T, server *Server, method, path string, body string
 func TestRF010_BusquedaNoEsInyectable(t *testing.T) {
 	actor := uuid.New()
 	service := &adminServiceStub{listUsers: []admin.User{}}
-	response := adminRequest(t, adminServer(t, actor, service), http.MethodGet, "/api/v1/admin/users?q=%27%20OR%20%271%27%3D%271%27%20--", "", actor)
+	response := adminRequest(t, adminServer(t, actor, service), http.MethodGet, "/api/v1/admin/users?organizationId=00000000-0000-4000-8000-0000000000a2&q=%27%20OR%20%271%27%3D%271%27%20--", "", actor)
 	if response.Code != http.StatusOK {
 		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
 	}

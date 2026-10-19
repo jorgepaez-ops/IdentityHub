@@ -17,16 +17,18 @@ import (
 )
 
 type roleGridStub struct {
-	applications []rolegrid.Application
-	roles        []rolegrid.Role
-	role         rolegrid.Role
-	err          error
-	createInput  rolegrid.CreateInput
-	updateInput  rolegrid.UpdateInput
-	deleteInput  rolegrid.DeleteInput
+	applications     []rolegrid.Application
+	roles            []rolegrid.Role
+	role             rolegrid.Role
+	err              error
+	createInput      rolegrid.CreateInput
+	updateInput      rolegrid.UpdateInput
+	deleteInput      rolegrid.DeleteInput
+	listOrganization uuid.UUID
 }
 
-func (s *roleGridStub) ListApplications(context.Context) ([]rolegrid.Application, error) {
+func (s *roleGridStub) ListApplications(_ context.Context, organizationID uuid.UUID) ([]rolegrid.Application, error) {
+	s.listOrganization = organizationID
 	return s.applications, s.err
 }
 func (s *roleGridStub) ListRoles(context.Context, uuid.UUID) ([]rolegrid.Role, error) {
@@ -76,7 +78,7 @@ func TestRF021_ListaAplicacionesConPermisosYRoles(t *testing.T) {
 	actor, appID, roleID := uuid.New(), uuid.New(), uuid.New()
 	service := &roleGridStub{applications: []rolegrid.Application{{ID: appID, ClientID: "contabilidad", Name: "Contabilidad", Permissions: []rolegrid.Permission{{Key: "reportes.ver", Description: "Ver"}}, Roles: []rolegrid.Role{{ID: roleID, ApplicationID: appID, Name: "contabilidad.auditor", PermissionKeys: []string{"reportes.ver"}, AssignedCount: 2}}}}}
 
-	response := roleGridRequest(t, roleGridServer(t, actor, []string{"admin"}, service), http.MethodGet, "/api/v1/admin/applications", "", actor, "admin")
+	response := roleGridRequest(t, roleGridServer(t, actor, []string{"admin"}, service), http.MethodGet, "/api/v1/admin/applications?organizationId=00000000-0000-4000-8000-0000000000a2", "", actor, "admin")
 	if response.Code != http.StatusOK {
 		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
 	}
@@ -254,7 +256,7 @@ func TestRF021_ErrorInesperadoSeRegistraConRequestIDSinFiltrarseAlCliente(t *tes
 	base := "/api/v1/admin/applications"
 	roleBase := base + "/" + appID.String() + "/roles"
 	for _, call := range []struct{ method, path, body string }{
-		{http.MethodGet, base, ``},
+		{http.MethodGet, base + "?organizationId=00000000-0000-4000-8000-0000000000a2", ``},
 		{http.MethodGet, roleBase, ``},
 		{http.MethodPost, roleBase, `{"name":"contabilidad.auditor","permissionKeys":[]}`},
 		{http.MethodPatch, roleBase + "/" + roleID.String(), `{"description":"x"}`},

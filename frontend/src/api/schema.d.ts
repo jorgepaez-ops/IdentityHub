@@ -286,6 +286,28 @@ export interface paths {
         patch: operations["updateCurrentUser"];
         trace?: never;
     };
+    "/api/v1/me/applications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Aplicaciones de la empresa del titular en las que tiene algún rol
+         * @description Devuelve las aplicaciones de la empresa del usuario autenticado en las que tiene al menos un
+         *     rol, con la URL de lanzamiento (el origen registrado). Un usuario sin roles de aplicación recibe
+         *     una lista vacía (RF-022).
+         */
+        get: operations["listMyApplications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/sessions": {
         parameters: {
             query?: never;
@@ -327,10 +349,18 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Listar y buscar cuentas */
+        /**
+         * Listar y buscar cuentas de una empresa
+         * @description Devuelve solo las cuentas de la empresa indicada (RF-022).
+         */
         get: operations["listUsers"];
         put?: never;
-        /** Dar de alta a un empleado y enviar su invitación */
+        /**
+         * Dar de alta a un empleado y enviar su invitación
+         * @description La cuenta pertenece a la empresa indicada en `organizationId` (obligatorio). Un rol de una
+         *     aplicación de otra empresa se rechaza con `400` y queda auditado como `role_assignment_rejected`
+         *     (RF-022).
+         */
         post: operations["createEmployee"];
         delete?: never;
         options?: never;
@@ -355,6 +385,8 @@ export interface paths {
         /**
          * Cambiar el estado o los roles de una cuenta
          * @description Un administrador no puede deshabilitarse ni asignarse roles a sí mismo (invariantes 6 y 11).
+         *     Un rol de una aplicación de otra empresa que la del usuario se rechaza con `400` y queda
+         *     auditado como `role_assignment_rejected` (RF-022).
          */
         patch: operations["updateUser"];
         trace?: never;
@@ -424,6 +456,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/organizations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Listar las empresas que atiende el Hub
+         * @description Incluye la empresa operadora `hub` (marcada con `operator: true`), a la que pertenecen los
+         *     administradores globales. La consola la usa para el selector de empresa (RF-022).
+         */
+        get: operations["listOrganizations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/applications": {
         parameters: {
             query?: never;
@@ -431,7 +484,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Listar aplicaciones, permisos y roles configurables */
+        /**
+         * Listar las aplicaciones, permisos y roles configurables de una empresa
+         * @description Devuelve solo las aplicaciones (y sus roles) de la empresa indicada (RF-022).
+         */
         get: operations["listApplications"];
         put?: never;
         post?: never;
@@ -590,6 +646,28 @@ export interface components {
          *     de la aplicación y que el nombre cumpla `^[a-z0-9][a-z0-9_-]{1,40}$`.
          */
         ApplicationRoleName: string;
+        Organization: {
+            /** Format: uuid */
+            id: string;
+            /** @example contabilidad-sa */
+            slug: string;
+            /** @example Contabilidad S.A. */
+            name: string;
+            /** @description Verdadero solo para la empresa operadora del Hub. */
+            operator: boolean;
+        };
+        UserApplication: {
+            /** @example contabilidad */
+            clientId: string;
+            /** @example Contabilidad */
+            name: string;
+            /**
+             * Format: uri
+             * @description Origen registrado de la aplicación.
+             * @example http://contabilidad.localhost:8080
+             */
+            launchUrl: string;
+        };
         Permission: {
             /** @example movimientos.ver_todos */
             key: string;
@@ -694,6 +772,11 @@ export interface components {
             /** Format: email */
             email: string;
             displayName: string;
+            /**
+             * Format: uuid
+             * @description Empresa de la cuenta nueva (RF-022).
+             */
+            organizationId: string;
             roles: components["schemas"]["Role"][];
         };
         InvitationAcceptRequest: components["schemas"]["TokenRequest"] & {
@@ -854,6 +937,12 @@ export interface components {
         ServiceKeyId: string;
         UserId: string;
         SessionId: string;
+        /**
+         * @description Empresa a la que se acota el listado (RF-022). El servidor lo exige (UUID de una empresa): sin él, o
+         *     mal formado, responde 400, pero solo después de autenticar y comprobar el rol admin (401/403 primero).
+         *     Por eso el contrato lo declara opcional: así el binding no valida antes que la autorización.
+         */
+        OrganizationId: string;
         /** @description Búsqueda parcial por correo o nombre */
         Query: string;
         Status: components["schemas"]["UserStatus"];
@@ -1308,6 +1397,27 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
         };
     };
+    listMyApplications: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Aplicaciones disponibles para el titular */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserApplication"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
     listSessions: {
         parameters: {
             query?: never;
@@ -1354,6 +1464,12 @@ export interface operations {
     listUsers: {
         parameters: {
             query?: {
+                /**
+                 * @description Empresa a la que se acota el listado (RF-022). El servidor lo exige (UUID de una empresa): sin él, o
+                 *     mal formado, responde 400, pero solo después de autenticar y comprobar el rol admin (401/403 primero).
+                 *     Por eso el contrato lo declara opcional: así el binding no valida antes que la autorización.
+                 */
+                organizationId?: components["parameters"]["OrganizationId"];
                 /** @description Búsqueda parcial por correo o nombre */
                 q?: components["parameters"]["Query"];
                 status?: components["parameters"]["Status"];
@@ -1375,6 +1491,7 @@ export interface operations {
                     "application/json": components["schemas"]["UserPage"];
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
         };
@@ -1563,9 +1680,38 @@ export interface operations {
             403: components["responses"]["Forbidden"];
         };
     };
-    listApplications: {
+    listOrganizations: {
         parameters: {
             query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Empresas ordenadas por nombre */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Organization"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    listApplications: {
+        parameters: {
+            query?: {
+                /**
+                 * @description Empresa a la que se acota el listado (RF-022). El servidor lo exige (UUID de una empresa): sin él, o
+                 *     mal formado, responde 400, pero solo después de autenticar y comprobar el rol admin (401/403 primero).
+                 *     Por eso el contrato lo declara opcional: así el binding no valida antes que la autorización.
+                 */
+                organizationId?: components["parameters"]["OrganizationId"];
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -1581,6 +1727,7 @@ export interface operations {
                     "application/json": components["schemas"]["Application"][];
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
         };

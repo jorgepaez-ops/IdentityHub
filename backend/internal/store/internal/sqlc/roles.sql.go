@@ -265,7 +265,7 @@ func (q *Queries) ListPermissionKeysForRolesAndApplication(ctx context.Context, 
 }
 
 const listRoleGridApplications = `-- name: ListRoleGridApplications :many
-SELECT id, client_id, name FROM applications ORDER BY client_id ASC
+SELECT id, client_id, name FROM applications WHERE organization_id = $1 ORDER BY client_id ASC
 `
 
 type ListRoleGridApplicationsRow struct {
@@ -274,8 +274,9 @@ type ListRoleGridApplicationsRow struct {
 	Name     string
 }
 
-func (q *Queries) ListRoleGridApplications(ctx context.Context) ([]ListRoleGridApplicationsRow, error) {
-	rows, err := q.db.Query(ctx, listRoleGridApplications)
+// The role grid works inside one company (RF-022): only that company's applications.
+func (q *Queries) ListRoleGridApplications(ctx context.Context, organizationID uuid.UUID) ([]ListRoleGridApplicationsRow, error) {
+	rows, err := q.db.Query(ctx, listRoleGridApplications, organizationID)
 	if err != nil {
 		return nil, err
 	}

@@ -9,8 +9,7 @@ aplicación de otra empresa.
 
 ## Problema y por qué
 
-En la revisión final, el profesor observó que la grilla de roles solo servía a Contabilidad y preguntó qué
-pasa con una empresa tercera. Mapa del estado actual (2026-10-19, exploración con evidencia path:line):
+La grilla de roles solo servía a Contabilidad y no había respuesta para una empresa tercera. Mapa del estado actual (2026-10-19, exploración con evidencia path:line):
 
 - No existe la entidad empresa: `users` no tiene organización; `applications` (migración 000007) tiene una
   sola fila, `contabilidad`.
@@ -40,7 +39,7 @@ pasa con una empresa tercera. Mapa del estado actual (2026-10-19, exploración c
   solo sus aplicaciones y roles (crear un rol nunca muestra roles de dos empresas juntos), el listado de
   usuarios solo sus usuarios, y al asignar un rol solo se ofrecen roles de la empresa del usuario. Inventario
   sigue en alcance como aplicación de la segunda empresa, pero la separación en la consola es lo central.
-  Confirmado por el usuario: se construye la app básica de Inventario («por si me preguntan»).
+  Confirmado por el usuario: se construye la app básica de Inventario.
 
 ## Alcance autorizado
 
@@ -74,7 +73,7 @@ aplicaciones desde la consola (se declaran por migración, como hoy Contabilidad
   asignado pertenece a la empresa del usuario; pruebas de integración.
 - [x] **R3. OAuth multi-cliente.** Clientes desde `applications`; `redirect_uri`, CORS y `aud` por cliente;
   rechazo en `/oauth/authorize` por empresa o sin rol; pruebas.
-- [ ] **R4. Administración y enrutamiento.** API: empresa del usuario, roles asignables, aplicaciones del
+- [x] **R4. Administración y enrutamiento.** API: empresa del usuario, roles asignables, aplicaciones del
   usuario; consola: alta con empresa, `UserDrawer` filtrado, menú dinámico y redirección tras el login.
 - [ ] **R5. Inventario.** App mínima, Nginx, build en `web`, compose, E2E del cruce entre empresas.
 - [ ] **R6. Documentación y cierre.** Guía de integración, manual de usuario, README, matriz; checks completos.
@@ -204,3 +203,58 @@ ramas locales y se suben después.
     `seedAdmin()` de `e2e/support/accounts.ts` inserta por SQL sin empresa y falla con `NOT NULL` desde R2
     (fuera de mis superficies; hay que corregirlo antes de la suite completa). Ese DEFAULT quedó en el
     volumen local de Postgres del stack (se conserva al hacer `make down`).
+
+- 2026-10-19 (R4, escrito por el ejecutor, sin marcar; revisión y commit del orquestador):
+  - API (OpenAPI primero, `make gen`): `GET /admin/organizations` (id, slug, name, `operator` = empresa `hub`);
+    `organizationId` obligatorio en `GET /admin/users` y `GET /admin/applications` (la API filtra: `ListInput.OrganizationID`,
+    `ListRoleGridApplications` con `WHERE organization_id`); `organizationId` obligatorio en el alta de empleados (se retira el valor
+    transitorio de R2; falta → 400, empresa desconocida (FK) → 400); `GET /me/applications` (consulta `ListUserApplications`:
+    aplicaciones de la empresa del usuario con al menos un rol; URL = `allowed_origin`; vacía para el admin global).
+    Decisión: crear/editar/borrar rol no recibe parámetro de empresa, porque la aplicación de la ruta pertenece a una sola empresa.
+  - `ErrCrossOrganizationRole` ahora vive en `admin` y `store` lo alias-a; `ReplaceRoles` y el alta responden 400
+    (`role-organization-mismatch`) y auditan `role_assignment_rejected` con `reason=organization_mismatch` en una transacción
+    aparte (la principal hace rollback: el usuario conserva sus roles y la invitación no crea cuenta). Handlers compuestos en
+    `Server.Routes()` y probados por el router (`organizations_test.go`, `organizations_integration_test.go` con Postgres real).
+  - Consola: `company.tsx` (CompanyProvider/CompanyScope/selector; selección por visor en localStorage con try/catch; por defecto la
+    primera empresa no operadora; la página se remonta al cambiar de empresa). Usuarios, Roles e Inicio acotados; `UserDrawer` ofrece
+    solo roles de la empresa del usuario y, al invitar, pide la empresa (prefijada) y descarta los roles al cambiarla. El bloque
+    «Aplicaciones conectadas» sale de `/me/applications` (oculto si está vacío). Tras el login: admin → `/inicio`; una aplicación →
+    redirección a ella; varias o ninguna → `/me`.
+  - RED/GREEN: pruebas escritas junto con la implementación; RED comprobado por mutación (desactivar la rama de auditoría/filtro
+    en admin, employee y store hizo fallar `TestRF022_RolDeOtraEmpresa*`, `...Consola...`, `...AsignarRol...`, `...Invitar...`; quitar
+    `organizationId` de `listApplications` y la redirección única hizo fallar 5 pruebas de Vitest); restauradas y en verde.
+  - Pruebas existentes ajustadas: peticiones a listados con `organizationId` (un parámetro obligatorio ausente da 400 antes de
+    evaluar la autenticación, porque lo valida el binding generado); altas con empresa; Vitest de `App` con `stubApi`.
+  - `specs/06-acceptance/empresas.feature` vuelve al repo con 8 escenarios (grilla, usuarios, roles ofrecidos, rechazo del backend,
+    Contabilidad S.A. entra, Empresa B rechazada en Contabilidad, sin rol rechazado, lista tras el login). Quedan en el scratchpad
+    para R5: «Un usuario de Empresa B entra a Inventario», «Con una sola aplicación el login lleva directamente a ella» y «El token
+    de Inventario contiene solo roles de Inventario». `e2e/tests/empresas.spec.ts` (8 pruebas); `seedCompanyUser` en
+    `e2e/support/accounts.ts`; `traceability.py --check` al día.
+  - E2E: `demo.spec.ts` ahora espera la redirección a Contabilidad tras el login; `roles-y-permisos` usa un admin de Contabilidad
+    como titular del rol (un admin global del `hub` ya no puede tener roles de Contabilidad); `manual/capturas.ts` manda la empresa.
+  - Verificación: `make gen` limpio; `make test-go` y `go test -race -short` verdes; `make test-integration` con Postgres desechable
+    verde (cobertura 81.8 %; `-run TestRF02[12]` con 46 PASS y 0 SKIP); `golangci-lint` v2.13.2 sin hallazgos (también con
+    `--build-tags=integration`); front: lint y typecheck limpios, Vitest 285/285; `make e2e` completo 71/71 (incluye empresas,
+    roles-y-permisos, control-de-acceso y autorizacion-oauth).
+  - Dudas: (1) el escenario «Tras el login se listan…» choca con la regla de una sola aplicación (el usuario cae directo en
+    Contabilidad); la E2E comprueba ambas cosas (redirección y luego el menú en `/me`). (2) El menú «Aplicaciones conectadas» se
+    oculta en móvil (CSS previo). (3) `docs/manuales/*` y capturas no se tocaron (R6).
+  - Ajuste posterior a la revisión: `organizationId` pasó a opcional en OpenAPI (tipo string, la descripción dice que el servidor lo
+    exige) en `GET /admin/users` y `GET /admin/applications`; el handler lo valida después del wrapper admin (401, luego 403, luego
+    400 si falta o es inválido). Se revirtieron los ajustes de pruebas que solo existían por el 400 previo a la autenticación y se
+    añadió `TestRF022_AutenticacionYRolPrecedenAlParametroDeEmpresa`. Reverificado: `make gen`, `make test-go`, golangci-lint (ambos
+    tags), Vitest 285/285, lint/typecheck, integración (128 PASS, 0 SKIP en api/auth/store), `traceability.py --check` y `make e2e` 71/71.
+- 2026-10-19, revisión nativa de R3 (el rango R1–R3 completo excedía el presupuesto de contexto; se revisó
+  solo R3 con `--base-ref` en el commit de R2; aprobada). Avisos para R6: (a) la migración 000011 se editó
+  (`FOR SHARE`) después de aplicarse en la base local del stack: golang-migrate no la reaplica; en CI y bases
+  nuevas no afecta; actualizar la base local al final; (b) la prueba de `backend/internal/api/oauth_test.go`
+  sobre redirección a un URI ajeno choca antes con la guarda de parámetros duplicados y no prueba lo que dice.
+- 2026-10-19, revisión de R4 (sesión principal): `/me/applications` exige sesión y la consulta solo devuelve
+  aplicaciones de la propia empresa con rol del usuario. Pedido y verificado el orden 401/403 antes que 400.
+  Comportamiento aceptado: un usuario con una sola aplicación va directo a ella y solo ve la lista si vuelve
+  al Hub.
+
+## Próximo paso
+
+R5 (Inventario: app mínima, Nginx, build en `web`, E2E de los escenarios de Inventario) y R6 (documentación
+y cierre).

@@ -15,10 +15,10 @@ import (
 	generated "github.com/jorgepaez/identity-hub/internal/store/internal/sqlc"
 )
 
-// ListApplications returns every application with its declared permissions and
-// its configurable roles (permission keys and assignment counts included).
-func (s *Store) ListApplications(ctx context.Context) ([]rolegrid.Application, error) {
-	apps, err := s.queries.ListRoleGridApplications(ctx)
+// ListApplications returns the applications of one organization with their declared permissions and
+// configurable roles (permission keys and assignment counts included).
+func (s *Store) ListApplications(ctx context.Context, organizationID uuid.UUID) ([]rolegrid.Application, error) {
+	apps, err := s.queries.ListRoleGridApplications(ctx, organizationID)
 	if err != nil {
 		return nil, fmt.Errorf("list applications: %w", err)
 	}

@@ -45,7 +45,7 @@ func TestRF001_AltaPersisteHashArgon2idRolesYTokenDeInvitacion(t *testing.T) {
 	service := New(repository, integrationPublisher{}, passwordHasher{}, rand.Reader, time.Now)
 	result, err := service.CreateEmployee(ctx, Input{
 		Email: "employee-integration@example.test", DisplayName: "Employee integration",
-		Roles: []string{"contabilidad.senior"}, ActorUserID: actorUser.ID,
+		Roles: []string{"contabilidad.senior"}, ActorUserID: actorUser.ID, OrganizationID: store.ContabilidadOrganizationID,
 	})
 	if err != nil {
 		t.Fatalf("CreateEmployee: %v", err)
@@ -107,7 +107,7 @@ func TestRF001_CorreoDuplicadoDevuelveErrEmailExists(t *testing.T) {
 		t.Fatalf("create actor user: %v", err)
 	}
 	service := New(repository, integrationPublisher{}, passwordHasher{}, rand.Reader, time.Now)
-	input := Input{Email: "duplicate-employee@example.test", DisplayName: "First", Roles: []string{"user"}, ActorUserID: actorUser.ID}
+	input := Input{Email: "duplicate-employee@example.test", DisplayName: "First", Roles: []string{"user"}, ActorUserID: actorUser.ID, OrganizationID: store.ContabilidadOrganizationID}
 	if _, err := service.CreateEmployee(ctx, input); err != nil {
 		t.Fatalf("first CreateEmployee: %v", err)
 	}

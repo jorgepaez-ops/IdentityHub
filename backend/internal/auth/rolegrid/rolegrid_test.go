@@ -255,7 +255,7 @@ func TestRF021_UnFalloDeAuditoriaAbortaLaTransaccion(t *testing.T) {
 func TestRF021_ListaYReportaServicioNoDisponible(t *testing.T) {
 	repository := &fakeRepository{writer: &fakeWriter{}, applications: []Application{{ClientID: "contabilidad"}}, roles: []Role{{Name: "contabilidad.auditor"}}}
 	service := New(repository)
-	if apps, err := service.ListApplications(context.Background()); err != nil || len(apps) != 1 {
+	if apps, err := service.ListApplications(context.Background(), uuid.New()); err != nil || len(apps) != 1 {
 		t.Fatalf("ListApplications() = %v, %v", apps, err)
 	}
 	if roles, err := service.ListRoles(context.Background(), testApp); err != nil || len(roles) != 1 {
@@ -263,7 +263,7 @@ func TestRF021_ListaYReportaServicioNoDisponible(t *testing.T) {
 	}
 
 	unavailable := New(nil)
-	if _, err := unavailable.ListApplications(context.Background()); err == nil {
+	if _, err := unavailable.ListApplications(context.Background(), uuid.New()); err == nil {
 		t.Fatal("ListApplications() without repository succeeded")
 	}
 	if _, err := unavailable.ListRoles(context.Background(), testApp); err == nil {
@@ -311,7 +311,7 @@ type fakeRepository struct {
 	committed    bool
 }
 
-func (r *fakeRepository) ListApplications(context.Context) ([]Application, error) {
+func (r *fakeRepository) ListApplications(context.Context, uuid.UUID) ([]Application, error) {
 	return r.applications, nil
 }
 func (r *fakeRepository) ListRoles(context.Context, uuid.UUID) ([]Role, error) { return r.roles, nil }

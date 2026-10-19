@@ -23,7 +23,8 @@ WHERE roles.name = ANY(sqlc.arg(role_names)::text[])
 ORDER BY permissions.key ASC;
 
 -- name: ListRoleGridApplications :many
-SELECT id, client_id, name FROM applications ORDER BY client_id ASC;
+-- The role grid works inside one company (RF-022): only that company's applications.
+SELECT id, client_id, name FROM applications WHERE organization_id = $1 ORDER BY client_id ASC;
 
 -- name: GetRoleGridApplication :one
 SELECT id, client_id, name FROM applications WHERE id = $1;

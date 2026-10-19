@@ -53,8 +53,7 @@ type Input struct {
 	Email, DisplayName string
 	Roles              []string
 	ActorUserID        uuid.UUID
-	// OrganizationID is the company of the new account. Transitional (R2): when zero, the account joins
-	// Contabilidad S.A.; R4 removes that default once the console sends the company.
+	// OrganizationID is the company of the new account; it is required (RF-022).
 	OrganizationID uuid.UUID
 	IP             *netip.Addr
 	UserAgent      *string
@@ -112,10 +111,31 @@ func (s *Service) CreateEmployee(ctx context.Context, input Input) (Result, erro
 		result, err = s.createWithinTransaction(ctx, writer, input, finalRoles, passwordHash)
 		return err
 	})
+	if errors.Is(err, store.ErrCrossOrganizationRole) {
+		// The rejected invitation rolled back, so no account exists; the attempt is audited in its own
+		// transaction against the target organization.
+		if auditErr := s.auditOrganizationMismatch(ctx, input); auditErr != nil {
+			return Result{}, auditErr
+		}
+		return Result{}, store.ErrCrossOrganizationRole
+	}
 	if err != nil {
 		return Result{}, err
 	}
 	return result, nil
+}
+
+// auditOrganizationMismatch records role_assignment_rejected with the organization_mismatch reason.
+func (s *Service) auditOrganizationMismatch(ctx context.Context, input Input) error {
+	resourceType, resourceID := "organization", input.OrganizationID.String()
+	err := s.repository.WithinEmployeeCreationTransaction(ctx, func(writer store.EmployeeCreationWriter) error {
+		_, err := writer.InsertAuditEvent(ctx, store.InsertAuditEventParams{ActorUserID: &input.ActorUserID, Action: "role_assignment_rejected", ResourceType: &resourceType, ResourceID: &resourceID, IP: input.IP, UserAgent: input.UserAgent, Metadata: []byte(`{"reason":"organization_mismatch"}`)})
+		return err
+	})
+	if err != nil {
+		return fmt.Errorf("audit rejected cross-organization invitation: %w", err)
+	}
+	return nil
 }
 
 // createWithinTransaction persists the account, its roles, the invitation and
@@ -128,11 +148,7 @@ func (s *Service) createWithinTransaction(ctx context.Context, writer store.Empl
 	if len(found) != len(finalRoles) {
 		return Result{}, &InvalidInputError{Field: "roles", Detail: "contains an unknown role"}
 	}
-	organizationID := input.OrganizationID
-	if organizationID == uuid.Nil {
-		organizationID = store.ContabilidadOrganizationID // transitional default, removed in R4
-	}
-	user, err := writer.CreateUser(ctx, store.CreateUserParams{Email: input.Email, PasswordHash: passwordHash, DisplayName: input.DisplayName, OrganizationID: organizationID})
+	user, err := writer.CreateUser(ctx, store.CreateUserParams{Email: input.Email, PasswordHash: passwordHash, DisplayName: input.DisplayName, OrganizationID: input.OrganizationID})
 	if err != nil {
 		return Result{}, mapCreateUserError(err)
 	}
@@ -157,6 +173,9 @@ func mapCreateUserError(err error) error {
 	var pgErr interface{ SQLState() string }
 	if errors.As(err, &pgErr) && pgErr.SQLState() == "23505" {
 		return ErrEmailExists
+	}
+	if errors.As(err, &pgErr) && pgErr.SQLState() == "23503" {
+		return &InvalidInputError{Field: "organizationId", Detail: "must be a known organization"}
 	}
 	if errors.Is(err, ErrEmailExists) {
 		return ErrEmailExists
@@ -199,6 +218,9 @@ func validate(input Input) ([]string, error) {
 	}
 	if utf8.RuneCountInString(input.DisplayName) < 1 || utf8.RuneCountInString(input.DisplayName) > 100 {
 		return nil, &InvalidInputError{Field: "displayName", Detail: "must contain 1 to 100 characters"}
+	}
+	if input.OrganizationID == uuid.Nil {
+		return nil, &InvalidInputError{Field: "organizationId", Detail: "is required"}
 	}
 	if len(input.Roles) == 0 {
 		return nil, &InvalidInputError{Field: "roles", Detail: "must include at least one role"}

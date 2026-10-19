@@ -38,7 +38,7 @@ func TestRF001_CreateEmployeeDevuelve201ConRolBaseYRolesSolicitados(t *testing.T
 	target := uuid.New()
 	service := &employeeServiceStub{result: employee.Result{ID: target, Email: "ana@example.com", DisplayName: "Ana", Status: "pending_verification", Roles: []string{"user", "contabilidad.analista"}}}
 	server, actor := employeeServer(t, []string{"admin"}, service)
-	response := adminRequest(t, server, http.MethodPost, "/api/v1/admin/users", `{"email":"ana@example.com","displayName":"Ana","roles":["contabilidad.analista"]}`, actor)
+	response := adminRequest(t, server, http.MethodPost, "/api/v1/admin/users", `{"email":"ana@example.com","displayName":"Ana","organizationId":"00000000-0000-4000-8000-0000000000a2","roles":["contabilidad.analista"]}`, actor)
 	if response.Code != http.StatusCreated {
 		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
 	}
@@ -63,7 +63,7 @@ func TestRF001_CreateEmployeeDevuelve201ConRolBaseYRolesSolicitados(t *testing.T
 
 func TestRF001_CreateEmployeeSinAuthDevuelve401(t *testing.T) {
 	server, _ := employeeServer(t, []string{"admin"}, &employeeServiceStub{})
-	request := httptest.NewRequest(http.MethodPost, "/api/v1/admin/users", strings.NewReader(`{"email":"ana@example.com","displayName":"Ana","roles":["user"]}`))
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/admin/users", strings.NewReader(`{"email":"ana@example.com","displayName":"Ana","organizationId":"00000000-0000-4000-8000-0000000000a2","roles":["user"]}`))
 	request.Header.Set("Content-Type", "application/json")
 	response := httptest.NewRecorder()
 	server.Routes().ServeHTTP(response, request)
@@ -75,7 +75,7 @@ func TestRF001_CreateEmployeeSinAuthDevuelve401(t *testing.T) {
 func TestRF001_CreateEmployeeSinRolAdminDevuelve403(t *testing.T) {
 	service := &employeeServiceStub{}
 	server, actor := employeeServer(t, []string{"user"}, service)
-	response := adminRequest(t, server, http.MethodPost, "/api/v1/admin/users", `{"email":"ana@example.com","displayName":"Ana","roles":["user"]}`, actor)
+	response := adminRequest(t, server, http.MethodPost, "/api/v1/admin/users", `{"email":"ana@example.com","displayName":"Ana","organizationId":"00000000-0000-4000-8000-0000000000a2","roles":["user"]}`, actor)
 	if response.Code != http.StatusForbidden {
 		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
 	}
@@ -87,7 +87,7 @@ func TestRF001_CreateEmployeeSinRolAdminDevuelve403(t *testing.T) {
 func TestRF001_CreateEmployeeRolDesconocidoDevuelve400(t *testing.T) {
 	service := &employeeServiceStub{err: &employee.InvalidInputError{Field: "roles", Detail: `unknown role "operator"`}}
 	server, actor := employeeServer(t, []string{"admin"}, service)
-	response := adminRequest(t, server, http.MethodPost, "/api/v1/admin/users", `{"email":"ana@example.com","displayName":"Ana","roles":["operator"]}`, actor)
+	response := adminRequest(t, server, http.MethodPost, "/api/v1/admin/users", `{"email":"ana@example.com","displayName":"Ana","organizationId":"00000000-0000-4000-8000-0000000000a2","roles":["operator"]}`, actor)
 	if response.Code != http.StatusBadRequest {
 		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
 	}
@@ -96,7 +96,7 @@ func TestRF001_CreateEmployeeRolDesconocidoDevuelve400(t *testing.T) {
 func TestRF001_CreateEmployeeCorreoDuplicadoDevuelve409SinRevelarExistencia(t *testing.T) {
 	service := &employeeServiceStub{err: employee.ErrEmailExists}
 	server, actor := employeeServer(t, []string{"admin"}, service)
-	response := adminRequest(t, server, http.MethodPost, "/api/v1/admin/users", `{"email":"ana@example.com","displayName":"Ana","roles":["user"]}`, actor)
+	response := adminRequest(t, server, http.MethodPost, "/api/v1/admin/users", `{"email":"ana@example.com","displayName":"Ana","organizationId":"00000000-0000-4000-8000-0000000000a2","roles":["user"]}`, actor)
 	if response.Code != http.StatusConflict {
 		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
 	}
@@ -115,7 +115,7 @@ func TestRF001_CreateEmployeeCorreoDuplicadoDevuelve409SinRevelarExistencia(t *t
 func TestRF001_CreateEmployeeFalloDelBrokerDevuelve503(t *testing.T) {
 	service := &employeeServiceStub{err: employee.ErrPublish}
 	server, actor := employeeServer(t, []string{"admin"}, service)
-	response := adminRequest(t, server, http.MethodPost, "/api/v1/admin/users", `{"email":"ana@example.com","displayName":"Ana","roles":["user"]}`, actor)
+	response := adminRequest(t, server, http.MethodPost, "/api/v1/admin/users", `{"email":"ana@example.com","displayName":"Ana","organizationId":"00000000-0000-4000-8000-0000000000a2","roles":["user"]}`, actor)
 	if response.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
 	}

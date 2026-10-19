@@ -30,8 +30,8 @@ func TestRNF011_GeneratedServerContract(t *testing.T) {
 		}
 
 		contract := reflect.TypeOf((*ServerInterface)(nil)).Elem()
-		if contract.NumMethod() != 32 {
-			t.Fatalf("ServerInterface methods = %d, want 32", contract.NumMethod())
+		if contract.NumMethod() != 34 {
+			t.Fatalf("ServerInterface methods = %d, want 34", contract.NumMethod())
 		}
 		for _, operation := range []string{"RefreshSession", "Logout"} {
 			assertRefreshTokenIsCookieParam(t, contract, operation)

@@ -29,9 +29,9 @@ declaración de buenas intenciones.
 | **RF-017** | Bloqueo por fuerza bruta | P1 | — | 4 | 23 | 1 | — | ✅ completo |
 | **RF-018** | Claves de servicio | P2 | `listServiceKeys`, `createServiceKey`, `revokeServiceKey` | 5 | 29 | 5 | — | ✅ completo |
 | **RF-019** | Exportación del audit log | P2 | `exportAuditLog` | 2 | 13 | 2 | — | ✅ completo |
-| **RF-020** | Autorización de aplicaciones cliente | P1 | `authorizeClient`, `exchangeAuthorizationCode` | 10 | 34 | 8 | — | ✅ completo |
-| **RF-021** | Roles y permisos configurables por aplicación | P1 | `listApplications`, `listApplicationRoles`, `createApplicationRole`, `updateApplicationRole`, `deleteApplicationRole` | 6 | 31 | 6 | — | ✅ completo |
-| **RF-022** | Empresas y aislamiento de roles | P1 | — | 1 | 15 | — | — | ✅ completo |
+| **RF-020** | Autorización de aplicaciones cliente | P1 | `authorizeClient`, `exchangeAuthorizationCode` | 13 | 34 | 8 | — | ✅ completo |
+| **RF-021** | Roles y permisos configurables por aplicación | P1 | `listApplications`, `listApplicationRoles`, `createApplicationRole`, `updateApplicationRole`, `deleteApplicationRole` | 9 | 31 | 6 | — | ✅ completo |
+| **RF-022** | Empresas y aislamiento de roles | P1 | `listMyApplications`, `listOrganizations` | 9 | 34 | 8 | — | ✅ completo |
 | **RNF-001** | Contenerización total | P0 | — | 1 | — | — | `ci.yml#e2e`, `.github/actions/stack-up/action.yml` | ✅ completo |
 | **RNF-002** | Pipeline de ciclo completo | P0 | — | 1 | — | — | `ci.yml#secrets`, `ci.yml#sast`, `ci.yml#sca`, `ci.yml#image`, `ci.yml#dast` | ✅ completo |
 | **RNF-003** | Cero secretos en el repositorio | P0 | — | — | 10 | — | `ci.yml#secrets` | ✅ completo |
@@ -135,7 +135,13 @@ una sola fuente de evidencia.
   - autorizacion-oauth.feature — Sin sesión en el Hub se pasa por el login y se vuelve a la autorización
   - autorizacion-oauth.feature — Un "continue" absoluto o externo no provoca una redirección abierta
   - control-de-acceso.feature — Un empleado sin rol de aplicación no accede a Contabilidad
+  - empresas.feature — Un usuario de Contabilidad S.A. entra a Contabilidad
+  - empresas.feature — Un usuario de Empresa B que abre Contabilidad es rechazado
+  - empresas.feature — Un usuario sin rol en una aplicación de su empresa es rechazado
 - **RF-021**
+  - empresas.feature — La grilla de roles muestra solo las aplicaciones y roles de la empresa seleccionada
+  - empresas.feature — Al asignar un rol solo se ofrecen roles de la empresa del usuario
+  - empresas.feature — El backend rechaza asignar un rol de otra empresa
   - roles-y-permisos.feature — Admin crea auditor de Contabilidad con capacidades acotadas
   - roles-y-permisos.feature — Se rechaza crear un rol de directorio desde la grilla
   - roles-y-permisos.feature — Un administrador no edita permisos de un rol que posee
@@ -144,6 +150,14 @@ una sola fuente de evidencia.
   - roles-y-permisos.feature — Cada cambio de rol queda auditado
 - **RF-022**
   - control-de-acceso.feature — Un empleado sin rol de aplicación no accede a Contabilidad
+  - empresas.feature — La grilla de roles muestra solo las aplicaciones y roles de la empresa seleccionada
+  - empresas.feature — El listado de usuarios muestra solo los usuarios de la empresa seleccionada
+  - empresas.feature — Al asignar un rol solo se ofrecen roles de la empresa del usuario
+  - empresas.feature — El backend rechaza asignar un rol de otra empresa
+  - empresas.feature — Un usuario de Contabilidad S.A. entra a Contabilidad
+  - empresas.feature — Un usuario de Empresa B que abre Contabilidad es rechazado
+  - empresas.feature — Un usuario sin rol en una aplicación de su empresa es rechazado
+  - empresas.feature — Tras el login se listan solo las aplicaciones de la empresa del usuario
 - **RNF-001**
   - requisitos-no-funcionales.feature — Cada servicio corre en su propio contenedor y todo arranca con un solo docker compose up
 - **RNF-002**

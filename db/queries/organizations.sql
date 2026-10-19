@@ -27,3 +27,17 @@ WHERE organization_id = sqlc.arg(organization_id)::uuid
   AND (sqlc.narg(cursor)::uuid IS NULL OR id > sqlc.narg(cursor)::uuid)
 ORDER BY id ASC
 LIMIT sqlc.arg(limit_count)::bigint;
+
+-- name: ListUserApplications :many
+-- Applications of the user's own company where the user holds at least one application role (RF-022).
+SELECT a.client_id, a.name, a.allowed_origin
+FROM applications a
+JOIN users u ON u.organization_id = a.organization_id
+WHERE u.id = $1
+  AND EXISTS (
+    SELECT 1
+    FROM user_roles ur
+    JOIN roles r ON r.id = ur.role_id
+    WHERE ur.user_id = u.id AND r.application_id = a.id
+  )
+ORDER BY a.name ASC, a.client_id ASC;

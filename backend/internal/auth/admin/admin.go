@@ -18,7 +18,14 @@ var (
 	ErrInvalidStatus      = errors.New("invalid user status")
 	ErrInvalidRole        = errors.New("invalid user role")
 	ErrBaseRoleRequired   = errors.New("every account must keep the base user role")
+	// ErrCrossOrganizationRole reports a role of an application owned by another organization than the
+	// user's (RF-022). The store aliases its own sentinel to this value.
+	ErrCrossOrganizationRole = errors.New("role belongs to an application of another organization")
 )
+
+// ReasonOrganizationMismatch is the audit reason recorded when a role assignment is rejected because
+// the role's application belongs to another organization.
+const ReasonOrganizationMismatch = "organization_mismatch"
 
 type Status string
 
@@ -42,10 +49,12 @@ type User struct {
 }
 
 type ListInput struct {
-	Query  string
-	Status *Status
-	Cursor *uuid.UUID
-	Limit  int
+	// OrganizationID restricts the listing to one organization (RF-022); the zero value lists every user.
+	OrganizationID uuid.UUID
+	Query          string
+	Status         *Status
+	Cursor         *uuid.UUID
+	Limit          int
 }
 
 type UpdateInput struct {
@@ -60,6 +69,8 @@ type AuditEvent struct {
 	Action       string
 	ResourceType string
 	ResourceID   string
+	// Reason is stored as the "reason" metadata entry when not empty.
+	Reason string
 }
 
 type Writer interface {
@@ -143,10 +154,29 @@ func (s *Service) UpdateUser(ctx context.Context, input UpdateInput) (User, erro
 		result = updated
 		return nil
 	})
+	if errors.Is(err, ErrCrossOrganizationRole) {
+		// The failed transaction rolled back (the user keeps their roles); the rejection is audited in
+		// its own committed transaction, like a self-assignment.
+		if auditErr := s.auditOrganizationMismatch(ctx, input); auditErr != nil {
+			return User{}, auditErr
+		}
+		return User{}, ErrCrossOrganizationRole
+	}
 	if err != nil {
 		return User{}, err
 	}
 	return result, nil
+}
+
+// auditOrganizationMismatch records role_assignment_rejected with the organization_mismatch reason.
+func (s *Service) auditOrganizationMismatch(ctx context.Context, input UpdateInput) error {
+	err := s.repository.WithinUserManagementTransaction(ctx, func(writer Writer) error {
+		return writer.InsertAuditEvent(ctx, AuditEvent{ActorUserID: &input.ActorUserID, Action: "role_assignment_rejected", ResourceType: "user", ResourceID: input.UserID.String(), Reason: ReasonOrganizationMismatch})
+	})
+	if err != nil {
+		return fmt.Errorf("audit rejected cross-organization role assignment: %w", err)
+	}
+	return nil
 }
 
 // rejectSelfRoleAssignment returns ErrSelfRoleAssignment when the actor tries to

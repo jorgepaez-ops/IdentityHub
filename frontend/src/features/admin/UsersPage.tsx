@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { LoadingSkeleton } from '../../components/LoadingSkeleton'
 import { Toast } from '../../components/Toast'
 import { DownloadIcon, SearchIcon, UsersIcon } from '../../components/icons'
-import { type AdminUser, listUsers, resendInvitation } from '../../api/client'
+import { type AdminUser, type Organization, listUsers, resendInvitation } from '../../api/client'
 import { csvFileName, downloadCsv, toCsv } from '../csv'
 import { formatDate } from '../format'
 import { type DrawerTarget, UserDrawer } from './UserDrawer'
@@ -33,7 +33,7 @@ function emptyMessage(search: string, status: AdminUser['status'] | null): strin
   return 'Todavía no hay usuarios.'
 }
 
-export function UsersPage({ currentUserId, onSessionEnded }: Readonly<{ currentUserId: string; onSessionEnded: () => void }>) {
+export function UsersPage({ organization, organizations = [organization], currentUserId, onSessionEnded }: Readonly<{ organization: Organization; organizations?: readonly Organization[]; currentUserId: string; onSessionEnded: () => void }>) {
   const [users, setUsers] = useState<AdminUser[] | null>(null)
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -74,7 +74,7 @@ export function UsersPage({ currentUserId, onSessionEnded }: Readonly<{ currentU
     setLoadingMore(false)
     void (async () => {
       try {
-        const page = await listUsers({ limit: PAGE_SIZE, ...(appliedSearch ? { q: appliedSearch } : {}), ...(status ? { status } : {}) })
+        const page = await listUsers({ organizationId: organization.id, limit: PAGE_SIZE, ...(appliedSearch ? { q: appliedSearch } : {}), ...(status ? { status } : {}) })
         if (!current()) return
         setUsers(page.items)
         setNextCursor(page.nextCursor ?? null)
@@ -84,14 +84,14 @@ export function UsersPage({ currentUserId, onSessionEnded }: Readonly<{ currentU
         else setLoadError('No fue posible cargar el directorio. Inténtalo de nuevo.')
       }
     })()
-  }, [appliedSearch, status, onSessionEnded])
+  }, [organization.id, appliedSearch, status, onSessionEnded])
 
   const loadMore = async () => {
     if (!nextCursor) return
     const mine = generation.current
     setLoadingMore(true)
     try {
-      const page = await listUsers({ limit: PAGE_SIZE, cursor: nextCursor, ...(appliedSearch ? { q: appliedSearch } : {}), ...(status ? { status } : {}) })
+      const page = await listUsers({ organizationId: organization.id, limit: PAGE_SIZE, cursor: nextCursor, ...(appliedSearch ? { q: appliedSearch } : {}), ...(status ? { status } : {}) })
       if (mine !== generation.current) return
       setUsers((current) => [...(current ?? []), ...page.items])
       setNextCursor(page.nextCursor ?? null)
@@ -162,7 +162,7 @@ export function UsersPage({ currentUserId, onSessionEnded }: Readonly<{ currentU
       <div className="page-header">
         <div>
           <h1>Usuarios</h1>
-          <p className="muted">Cuentas del Hub, sus roles y el estado de cada invitación.</p>
+          <p className="muted">Cuentas de {organization.name}, sus roles y el estado de cada invitación.</p>
         </div>
         <button className="primary-button fit" onClick={() => openDrawer({ mode: 'create' })} type="button"><UsersIcon />Nuevo usuario</button>
       </div>
@@ -231,7 +231,7 @@ export function UsersPage({ currentUserId, onSessionEnded }: Readonly<{ currentU
         )}
         {nextCursor && <button className="secondary-button fit" disabled={loadingMore} onClick={() => void loadMore()} type="button">{loadingMore ? 'Cargando…' : 'Cargar más'}</button>}
       </section>
-      {drawer && <UserDrawer target={drawer} currentUserId={currentUserId} onClose={closeDrawer} onSaved={saved} onSessionEnded={onSessionEnded} />}
+      {drawer && <UserDrawer target={drawer} organization={organization} organizations={organizations} currentUserId={currentUserId} onClose={closeDrawer} onSaved={saved} onSessionEnded={onSessionEnded} />}
       {toast && <Toast key={toast.id} message={toast.text} onClose={() => setToast(null)} />}
     </section>
   )
