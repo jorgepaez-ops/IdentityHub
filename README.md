@@ -74,7 +74,7 @@ El repositorio versiona el guion del video de demostración; la grabación la ha
 | [`frontend/`](frontend/README.md) | Consola web del Hub (React) y su Nginx | Para leer o modificar lo que ve el usuario del Hub |
 | [`contabilidad/`](contabilidad/README.md) | Aplicación de ejemplo que usa el Hub para iniciar sesión | Para ver cómo integra su aplicación un tercero |
 | [`db/`](db/README.md) | Migraciones y consultas SQL de PostgreSQL | Para cambiar o entender el esquema de datos |
-| [`deploy/`](deploy/README.md) | Docker Compose (desarrollo y producción simulada) y observabilidad (Prometheus, Grafana, Loki, Alloy, Falco) | Para levantar, operar u observar el sistema |
+| [`deploy/`](deploy/README.md) | Docker Compose (desarrollo y producción simulada), observabilidad (Prometheus, Grafana, Loki, Alloy, Falco) y la descripción de las imágenes en Docker Hub ([`deploy/dockerhub/`](deploy/dockerhub/README.md)) | Para levantar, operar u observar el sistema |
 | [`infraestructura/`](infraestructura/README.md) | Terraform de la arquitectura de referencia en AWS | Para ver cómo se desplegaría en la nube (no hace falta para correr el proyecto) |
 | [`e2e/`](e2e/README.md) | Pruebas de extremo a extremo con Playwright | Para ver cómo se comprueba el sistema como lo usaría una persona |
 | [`tests/`](tests/README.md) | Prueba de carga de latencia (k6) | Para revisar el requisito de rendimiento |
