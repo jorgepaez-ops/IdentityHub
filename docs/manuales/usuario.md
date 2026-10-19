@@ -36,13 +36,11 @@ Para levantar el stack, vea la [guía de desarrollo](../guia-desarrollo.md) o ej
 
 ### 1.3 Cómo regenerar las capturas
 
-> **Capturas pendientes de regenerar.** Las pantallas que cambiaron con las empresas (selector **Empresa** en Inicio, Usuarios y Roles; campo **Empresa** al invitar; bloque **Aplicaciones conectadas**; texto de «Sin acceso») conservan la imagen anterior y llevan una nota donde corresponde. Se actualizarán con `make capturas`.
-
 Las imágenes de [`img/usuario/`](img/usuario/) las produce un script que maneja el stack real, de modo que siguen el comportamiento actual:
 
 ```bash
 make up          # si el stack no está levantado
-make capturas    # escribe docs/manuales/img/usuario/*.png (55 imágenes, ~1 min)
+make capturas    # escribe docs/manuales/img/usuario/*.png (65 imágenes, ~1 min)
 ```
 
 El script ([`e2e/manual/capturas.ts`](../../e2e/manual/capturas.ts)) no forma parte de `make e2e` ni de la matriz de trazabilidad. Crea sus propias cuentas de prueba (que quedan deshabilitadas al terminar) y los roles `contabilidad.auditor` y `contabilidad.temporal`, que elimina al final. Si alguno de esos roles ya existe, se detiene sin tocarlo. Con la variable `CAPTURAS_OUT=<carpeta>` escribe las imágenes en otra carpeta, para previsualizarlas sin tocar las del manual.
@@ -103,6 +101,10 @@ Si el enlace está incompleto, venció o ya se usó, la pantalla lo dice (**La i
 
 ![Mi cuenta con el perfil y las sesiones activas](img/usuario/empleado-09-mi-cuenta.png)
 
+Cuando la cuenta ya tiene un rol en una aplicación de su empresa, el menú lateral muestra el bloque **Aplicaciones conectadas** con el enlace a ella.
+
+![Mi cuenta con el bloque Aplicaciones conectadas en el menú lateral](img/usuario/empleado-17-aplicaciones-conectadas.png)
+
 Para cambiar el nombre, edítelo y pulse **Guardar cambios**: aparece **Perfil actualizado.**
 
 ![Perfil actualizado](img/usuario/empleado-10-perfil-actualizado.png)
@@ -149,7 +151,7 @@ En el menú lateral, pulse **Cerrar sesión**: vuelve al formulario de inicio de
 
 Los administradores ven en el menú lateral seis entradas: **Inicio**, **Usuarios**, **Roles**, **Auditoría**, **Claves de servicio** y **Mi cuenta**. Las cinco primeras solo existen para el rol `admin`; un empleado que escriba esas direcciones es devuelto a **Mi cuenta**. Inicie sesión como se explica en la sección 2.2: entrará directamente a **Inicio**.
 
-**Una empresa a la vez.** En **Inicio**, **Usuarios** y **Roles** aparece arriba el selector **Empresa**: usted elige primero la empresa y la página muestra solo lo suyo (sus usuarios, sus aplicaciones y roles, sus indicadores). Al cambiar de empresa la página se recarga sin nada de la anterior. Por defecto se abre la primera empresa que no es «Identity Hub (operador)», que es la del administrador global; su elección queda guardada en este navegador. La **Auditoría** y las **Claves de servicio** no se dividen por empresa. Las capturas de las secciones 3.0 a 3.5 son anteriores al selector y no lo muestran.
+**Una empresa a la vez.** En **Inicio**, **Usuarios** y **Roles** aparece arriba el selector **Empresa**: usted elige primero la empresa y la página muestra solo lo suyo (sus usuarios, sus aplicaciones y roles, sus indicadores). Al cambiar de empresa la página se recarga sin nada de la anterior. Por defecto se abre la primera empresa que no es «Identity Hub (operador)», que es la del administrador global; su elección queda guardada en este navegador. La **Auditoría** y las **Claves de servicio** no se dividen por empresa.
 
 ### 3.0 Inicio
 
@@ -188,7 +190,11 @@ Para buscar, escriba en **Buscar por correo o nombre**; la lista se filtra mient
 
 1. Pulse **Nuevo usuario**. Se abre el panel lateral con el nombre, el correo, la **Empresa** (viene con la empresa elegida en el selector) y los roles. El rol `user` va siempre marcado; puede añadir roles de las aplicaciones de esa empresa (por ejemplo `contabilidad.senior`); si cambia la empresa en el panel, los roles marcados se descartan porque pertenecen a la anterior, cada uno con su descripción y sus permisos.
 
-   ![Panel Nuevo usuario](img/usuario/administrador-02-nuevo-usuario.png)
+   ![Panel Nuevo usuario con el campo Empresa y los roles de Contabilidad](img/usuario/administrador-02-nuevo-usuario.png)
+
+   Con **Empresa B** elegida en el selector, el panel ofrece los roles de Inventario.
+
+   ![Panel Nuevo usuario con Empresa B y los roles de Inventario](img/usuario/administrador-24-nuevo-usuario-empresa-b.png)
 
 2. Pulse **Crear y enviar invitación**. El Hub crea la cuenta en estado **Pendiente** y envía el correo; aparece **Invitación enviada a ...**.
 
@@ -216,6 +222,10 @@ Reglas que el panel hace cumplir: un administrador **no puede deshabilitarse ni 
 **Roles** ofrece una grilla por cada aplicación conectada de la empresa elegida (Contabilidad S.A. muestra Contabilidad; Empresa B, Inventario); nunca se mezclan roles de dos empresas en la misma pantalla. Cada aplicación declara sus permisos (columnas) y usted decide qué permisos lleva cada rol (filas). Los roles `admin` y `user` son del sistema y no se editan aquí. Un cambio de permisos rige desde el siguiente token de acceso de la persona (hasta 15 minutos).
 
 ![Grilla de roles y permisos de Contabilidad](img/usuario/administrador-07-roles-grilla.png)
+
+Al elegir **Empresa B** en el selector, la grilla muestra la aplicación Inventario y sus roles.
+
+![Grilla de roles y permisos de Inventario con Empresa B elegida](img/usuario/administrador-23-roles-empresa-b.png)
 
 > En pantallas de 1280 px la grilla se desplaza horizontalmente dentro de su panel. Las capturas de esta sección se tomaron en una ventana más ancha para mostrarla completa.
 
@@ -378,8 +388,6 @@ Un rol con solo `reportes.ver` y `movimientos.ver_todos` ve el **Resumen** de to
 
 Contabilidad muestra **Sin acceso a Contabilidad** en dos casos: la cuenta pertenece a **otra empresa** (por ejemplo, es de Empresa B) o no tiene ningún rol `contabilidad.*`. En ambos el Hub no entrega credencial alguna: rechaza la solicitud y registra el intento en la auditoría (`oauth_authorization_rejected`). Use **Ir a Identity Hub** o pida a un administrador que le asigne un rol (sección 3.5); si su cuenta es de otra empresa, la aplicación que le corresponde es la de su propia empresa (menú **Aplicaciones conectadas**).
 
-> La captura es anterior al texto actual, que dice «pertenece a otra empresa o no tiene un rol de esta aplicación».
-
 ![Pantalla Sin acceso a Contabilidad](img/usuario/contabilidad-14-sin-acceso.png)
 
 ### 4.7 Cerrar sesión
@@ -413,7 +421,33 @@ Inventario (`http://inventario.localhost:8080`) es una aplicación mínima de **
 | Catálogo de productos | Solo lectura | Lectura y edición |
 | Movimientos de bodega (entradas y salidas) | Deshabilitado | Sí; una salida no deja el saldo bajo cero |
 
-Quien no sea de Empresa B, o no tenga un rol `inventario.*`, ve **Sin acceso a Inventario**. Para dar acceso a una persona, un administrador elige **Empresa B** en el selector, la invita (o la edita) y le asigna el rol. Esta sección no tiene capturas.
+Quien no sea de Empresa B, o no tenga un rol `inventario.*`, ve **Sin acceso a Inventario**. Para dar acceso a una persona, un administrador elige **Empresa B** en el selector, la invita (o la edita) y le asigna el rol.
+
+La pantalla de entrada ofrece **Continuar con Identity Hub**; el Hub pide el correo, la contraseña y el código por correo, igual que en Contabilidad.
+
+![Pantalla de entrada de Inventario](img/usuario/inventario-01-inicio.png)
+
+![Inicio de sesión en Identity Hub desde Inventario](img/usuario/inventario-02-login-hub.png)
+
+Con el rol `inventario.consulta`, el **Catálogo** se ve en solo lectura y **Movimientos** aparece **Bloqueado**.
+
+![Catálogo de Inventario con el rol de consulta](img/usuario/inventario-03-consulta-catalogo.png)
+
+Con el rol `inventario.bodeguero`, el catálogo ofrece **Editar** en cada producto y **Movimientos** permite registrar entradas y salidas.
+
+![Catálogo de Inventario con el rol de bodeguero](img/usuario/inventario-04-bodeguero-catalogo.png)
+
+En **Movimientos**, elija el producto, el tipo y la cantidad, y pulse **Registrar movimiento**.
+
+![Formulario para registrar un movimiento en Inventario](img/usuario/inventario-05-bodeguero-registrar.png)
+
+Aparece el aviso del movimiento registrado y la entrada se suma al historial (son datos de ejemplo y se pierden al recargar la página).
+
+![Movimiento registrado en Inventario](img/usuario/inventario-06-bodeguero-registrado.png)
+
+Una cuenta de Empresa B sin rol de Inventario ve **Sin acceso a Inventario**.
+
+![Pantalla Sin acceso a Inventario](img/usuario/inventario-07-sin-acceso.png)
 
 ---
 

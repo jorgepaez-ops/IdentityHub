@@ -3,10 +3,10 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, test, type Browser, type Locator, type Page } from '@playwright/test'
-import { seedAdmin, strongPassword, tokenFromLink, uniqueEmail, type Admin } from '../support/accounts'
+import { seedAdmin, seedCompanyUser, strongPassword, tokenFromLink, uniqueEmail, type Admin } from '../support/accounts'
 import { api } from '../support/api'
 import { browserLoginWithMfa } from '../support/browser'
-import { contabilidadUrl, hubUrl, mailpitUrl } from '../support/config'
+import { contabilidadUrl, hubUrl, inventarioUrl, mailpitUrl } from '../support/config'
 import { extractCode, extractLink, mailIds, waitForMail } from '../support/mailpit'
 import { psql } from '../support/db'
 import { organizations } from '../support/organizations'
@@ -125,6 +125,22 @@ async function signInToContabilidad(page: Page, email: string, password: string,
   await expect(page.locator('#email')).toBeVisible()
   if (shots) await shot(page, shots.hubLogin)
   await browserLoginWithMfa(page, email, password)
+}
+
+/** Same OAuth sign-in as Contabilidad, for Inventario (Empresa B). */
+async function signInToInventario(page: Page, email: string, shots?: { landing: string; hubLogin: string }): Promise<void> {
+  await page.goto(inventarioUrl)
+  await expect(page.getByRole('button', { name: 'Continuar con Identity Hub' })).toBeVisible()
+  if (shots) await shot(page, shots.landing)
+  await page.getByRole('button', { name: 'Continuar con Identity Hub' }).click()
+  await expect(page.locator('#email')).toBeVisible()
+  if (shots) await shot(page, shots.hubLogin)
+  await browserLoginWithMfa(page, email, strongPassword)
+}
+
+/** Gives a seeded account a presentable name (seedCompanyUser uses a generic one). */
+function renameUser(id: string, displayName: string): void {
+  psql(`UPDATE users SET display_name = :'name' WHERE id = :'id'::uuid;`, { name: displayName, id })
 }
 
 test('Capturas del manual de usuario', async ({ browser }) => {
@@ -416,6 +432,25 @@ test('Capturas del manual de usuario', async ({ browser }) => {
       await shot(adminPage, 'administrador-22-inicio', { full: true })
     })
 
+    await test.step('Administrador: roles y usuarios de Empresa B', async () => {
+      await adminPage.getByRole('link', { name: 'Roles', exact: true }).click()
+      await adminPage.getByLabel('Empresa', { exact: true }).selectOption({ label: 'Empresa B' })
+      const grid = adminPage.getByRole('table', { name: 'Permisos de roles de Inventario' })
+      await expect(grid).toBeVisible()
+      await expect(adminPage.getByRole('rowheader', { name: 'inventario.bodeguero', exact: true })).toBeVisible()
+      await shot(adminPage, 'administrador-23-roles-empresa-b', { viewport: { width: 1600, height: 1000 }, widen: true })
+
+      await adminPage.getByRole('link', { name: 'Usuarios', exact: true }).click()
+      await expect(adminPage.getByLabel('Empresa', { exact: true })).toHaveValue(/.+/)
+      await adminPage.getByRole('button', { name: 'Nuevo usuario' }).click()
+      const drawer = adminPage.getByRole('dialog', { name: 'Nuevo usuario' })
+      await drawer.getByLabel('Nombre para mostrar').fill('Camilo Rojas')
+      await drawer.getByLabel('Correo electrónico').fill(uniqueEmail(`manual-${tag}-bodega`))
+      await expect(drawer.getByLabel('inventario.bodeguero', { exact: true })).toBeVisible()
+      await shot(adminPage, 'administrador-24-nuevo-usuario-empresa-b', { viewport: { width: 1280, height: 1000 } })
+      await drawer.getByRole('button', { name: 'Cancelar' }).click()
+    })
+
     await test.step('Contabilidad: auditor (historia de usuario)', async () => {
       const side = await newPage(browser)
       extraContexts.push(side.context)
@@ -437,6 +472,12 @@ test('Capturas del manual de usuario', async ({ browser }) => {
       await side.page.getByRole('button', { name: /^Monto/ }).click()
       await expect(side.page.getByRole('table', { name: 'Movimientos del periodo' })).toBeVisible()
       await shot(side.page, 'contabilidad-16-transacciones-filtros')
+      // The Hub's "Mi cuenta" of a person who now holds a role lists the connected applications.
+      const hubTab = await side.context.newPage()
+      await hubTab.goto(`${hubUrl}/me`)
+      await expect(hubTab.locator('.connected-apps').getByRole('link', { name: 'Contabilidad', exact: true })).toBeVisible()
+      await shot(hubTab, 'empleado-17-aplicaciones-conectadas')
+      await hubTab.close()
       await side.page.getByRole('button', { name: 'Cerrar sesión' }).click()
       await expect(side.page.getByRole('button', { name: 'Continuar con Identity Hub' })).toBeVisible()
     })
@@ -492,6 +533,45 @@ test('Capturas del manual de usuario', async ({ browser }) => {
       await signInToContabilidad(side.page, email, strongPassword)
       await expect(side.page.getByRole('heading', { name: 'Sin acceso a Contabilidad' })).toBeVisible()
       await shot(side.page, 'contabilidad-14-sin-acceso')
+    })
+
+    await test.step('Inventario: consulta', async () => {
+      const user = await seedCompanyUser(organizations.empresaB, ['inventario.consulta'])
+      renameUser(user.id, 'Elena Vargas')
+      const side = await newPage(browser)
+      extraContexts.push(side.context)
+      await signInToInventario(side.page, user.email, { landing: 'inventario-01-inicio', hubLogin: 'inventario-02-login-hub' })
+      await expect(side.page.getByText('Consulta de inventario', { exact: true })).toBeVisible()
+      await expect(side.page.getByRole('table', { name: 'Productos' })).toBeVisible()
+      await shot(side.page, 'inventario-03-consulta-catalogo')
+    })
+
+    await test.step('Inventario: bodeguero', async () => {
+      const user = await seedCompanyUser(organizations.empresaB, ['inventario.bodeguero'])
+      renameUser(user.id, 'Camilo Rojas')
+      const side = await newPage(browser)
+      extraContexts.push(side.context)
+      await signInToInventario(side.page, user.email)
+      await expect(side.page.getByText('Bodeguero', { exact: true })).toBeVisible()
+      await expect(side.page.getByRole('table', { name: 'Productos' })).toBeVisible()
+      await shot(side.page, 'inventario-04-bodeguero-catalogo')
+      await side.page.getByRole('button', { name: 'Movimientos' }).click()
+      await expect(side.page.getByRole('form', { name: 'Registrar movimiento' })).toBeVisible()
+      await side.page.getByLabel('Cantidad').fill('12')
+      await shot(side.page, 'inventario-05-bodeguero-registrar')
+      await side.page.getByRole('button', { name: 'Registrar movimiento' }).click()
+      await expect(side.page.getByRole('status')).toContainText('registrada')
+      await shot(side.page, 'inventario-06-bodeguero-registrado')
+    })
+
+    await test.step('Inventario: cuenta sin rol', async () => {
+      const user = await seedCompanyUser(organizations.empresaB)
+      renameUser(user.id, 'Julián Mora')
+      const side = await newPage(browser)
+      extraContexts.push(side.context)
+      await signInToInventario(side.page, user.email)
+      await expect(side.page.getByRole('heading', { name: 'Sin acceso a Inventario' })).toBeVisible()
+      await shot(side.page, 'inventario-07-sin-acceso')
     })
     publishShots()
   } finally {
