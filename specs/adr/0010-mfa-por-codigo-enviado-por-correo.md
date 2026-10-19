@@ -41,6 +41,6 @@ invitación, así que todas las cuentas tienen un correo comprobado.
 - El login depende del worker y de RabbitMQ: si el correo no sale, nadie entra. Es coherente con
   RF-012 (notificaciones asíncronas) pero convierte al worker en parte del camino crítico; su
   salud tiene que vigilarse igual que la de la API.
-- La demostración queda completa con el buzón web de Mailpit: el profesor ve llegar el código.
+- La demostración queda completa con el buzón web de Mailpit: quien la sigue ve llegar el código.
 - En producción Mailpit se sustituye por un servidor SMTP real; el código de la aplicación no
   cambia.

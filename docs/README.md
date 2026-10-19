@@ -114,7 +114,7 @@ La columna **Ubicación actual** solo enlaza rutas que existen en este checkout.
 | Fase 1: Threat Dragon, DFD y STRIDE | 75–79 | [`threat-model/`](threat-model/) | hecho |
 | Fase 2: hooks, SAST y SCA | 80–84 | [`../.pre-commit-config.yaml`](../.pre-commit-config.yaml) y [`../.github/workflows/ci.yml`](../.github/workflows/ci.yml) | hecho |
 | Fase 3: build de imágenes, escaneo y gate de CVE | 85–89 | [`../.github/workflows/ci.yml`](../.github/workflows/ci.yml), [`../backend/Dockerfile`](../backend/Dockerfile) y [`../frontend/Dockerfile`](../frontend/Dockerfile) | hecho |
-| Fase 4: pruebas unitarias y DAST | 90–93 | [`../.github/workflows/ci.yml`](../.github/workflows/ci.yml), [`../e2e/`](../e2e/) y [`../security/zap-reports/`](../security/zap-reports/) | hecho |
+| Fase 4: pruebas unitarias y DAST | 90–93 | [`../.github/workflows/ci.yml`](../.github/workflows/ci.yml), [`../e2e/`](../e2e/) y los informes de OWASP ZAP (artefacto `zap-reports-<run_id>` de cada ejecución de CI; en local, `make scan-dast` los deja en `security/zap-reports/`, fuera de Git) | hecho |
 | Fase 5: IaC, Checkov/tfsec y orquestación simulada | 94–98 | [`../infraestructura/`](../infraestructura/), [`../deploy/docker-compose.prod.yml`](../deploy/docker-compose.prod.yml) y [`../.github/workflows/ci.yml`](../.github/workflows/ci.yml) | hecho (T8, T9 y T10) |
 | Fase 6: métricas, logs y detección en ejecución | 99–103 | [`../deploy/docker-compose.yml`](../deploy/docker-compose.yml) y [`../deploy/observability/`](../deploy/observability/) | hecho: Prometheus, Grafana y Loki (vía Grafana Alloy) y Falco (cuatro reglas propias, alerta en Grafana y [runbook](runbooks/falco-alerta.md)) |
 | Repositorio GitHub público con código, pipeline, IaC y documentación | 163–166 | [`../README.md`](../README.md), [`../.github/workflows/`](../.github/workflows/) e [`../infraestructura/`](../infraestructura/) | hecho (T21c; el PR de la fase 4 está fusionado) |
@@ -132,7 +132,7 @@ La columna **Ubicación actual** solo enlaza rutas que existen en este checkout.
 
 ### Entregables propios de la semana 4
 
-No los exige el enunciado, pero responden a la demo en vivo con el profesor:
+No los exige el enunciado; amplían el alcance del Hub:
 
 | Entregable | Ubicación actual | Estado |
 |---|---|---|
